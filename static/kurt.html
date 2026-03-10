@@ -682,7 +682,7 @@ async function loadMentions() {
   const feed = document.getElementById('mentions-feed');
   feed.innerHTML = '<div class="loading"><div class="spinner"></div>Loading mentions...</div>';
   try {
-    mentionsData = await atFetchAll(MENTIONS_TABLE, 'sort[0][field]=Date&sort[0][direction]=desc');
+    mentionsData = await atFetchAll(MENTIONS_TABLE, 'sort%5B0%5D%5Bfield%5D=Date+Found&sort%5B0%5D%5Bdirection%5D=desc');
     const platforms = [...new Set(mentionsData.map(r => r.fields['Platform']).filter(Boolean))];
     const sel = document.getElementById('mentions-filter');
     sel.innerHTML = '<option value="">All Platforms</option>' + platforms.map(p=>`<option>${p}</option>`).join('');
