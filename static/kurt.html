@@ -10,60 +10,60 @@
   
   /* Password overlay */
   #pw-overlay {
-    position: fixed; inset: 0; background: #1B2A4A; display: flex; align-items: center; justify-content: center; z-index: 9999;
+    position: fixed; inset: 0; background: #1B3A6B; display: flex; align-items: center; justify-content: center; z-index: 9999;
   }
   .pw-box {
     background: #fff; border-radius: 12px; padding: 40px; width: 360px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.4);
   }
-  .pw-box .logo { font-size: 28px; font-weight: 700; color: #1B2A4A; margin-bottom: 4px; }
+  .pw-box .logo { font-size: 28px; font-weight: 700; color: #1B3A6B; margin-bottom: 4px; }
   .pw-box .sub { color: #888; font-size: 14px; margin-bottom: 28px; }
   .pw-box input {
     width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; outline: none; margin-bottom: 12px;
     transition: border-color 0.2s;
   }
-  .pw-box input:focus { border-color: #C8973A; }
+  .pw-box input:focus { border-color: #B22222; }
   .pw-box button {
-    width: 100%; padding: 12px; background: #C8973A; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer;
+    width: 100%; padding: 12px; background: #B22222; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer;
     transition: background 0.2s;
   }
-  .pw-box button:hover { background: #b8872a; }
+  .pw-box button:hover { background: #8B1A1A; }
   .pw-box .error { color: #e53e3e; font-size: 13px; margin-top: 8px; display: none; }
 
   /* Layout */
   .sidebar {
-    position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #1B2A4A; color: #fff; padding: 24px 0;
+    position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #1B3A6B; color: #fff; padding: 24px 0;
     display: flex; flex-direction: column;
   }
   .sidebar .brand { padding: 0 24px 24px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-  .sidebar .brand h2 { font-size: 18px; font-weight: 700; color: #C8973A; }
+  .sidebar .brand h2 { font-size: 18px; font-weight: 700; color: #B22222; }
   .sidebar .brand p { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 2px; }
   .sidebar nav { padding: 16px 0; }
   .sidebar nav a {
     display: block; padding: 10px 24px; color: rgba(255,255,255,0.7); text-decoration: none; font-size: 14px;
     transition: all 0.2s; border-left: 3px solid transparent;
   }
-  .sidebar nav a.active, .sidebar nav a:hover { color: #fff; background: rgba(200,151,58,0.15); border-left-color: #C8973A; }
+  .sidebar nav a.active, .sidebar nav a:hover { color: #fff; background: rgba(200,151,58,0.15); border-left-color: #B22222; }
   .sidebar .logout { margin-top: auto; padding: 16px 24px; }
   .sidebar .logout button {
     background: transparent; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.6);
     padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; width: 100%; transition: all 0.2s;
   }
-  .sidebar .logout button:hover { border-color: #C8973A; color: #C8973A; }
+  .sidebar .logout button:hover { border-color: #B22222; color: #B22222; }
 
   .main { margin-left: 220px; min-height: 100vh; }
   .topbar {
     background: #fff; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between;
     border-bottom: 1px solid #e8ecf0; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
   }
-  .topbar h1 { font-size: 20px; font-weight: 700; color: #1B2A4A; }
+  .topbar h1 { font-size: 20px; font-weight: 700; color: #1B3A6B; }
   .stats-pills { display: flex; gap: 12px; }
   .pill {
-    background: #f0f2f5; border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 600; color: #1B2A4A;
+    background: #f0f2f5; border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 600; color: #1B3A6B;
     display: flex; align-items: center; gap: 6px;
   }
   .pill .dot { width: 8px; height: 8px; border-radius: 50%; }
-  .pill.total .dot { background: #1B2A4A; }
-  .pill.pipeline .dot { background: #C8973A; }
+  .pill.total .dot { background: #1B3A6B; }
+  .pill.pipeline .dot { background: #B22222; }
 
   .content { padding: 24px 32px; }
   
@@ -77,14 +77,14 @@
     padding: 8px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; outline: none;
     background: #fff; cursor: pointer; min-width: 160px; transition: border-color 0.2s;
   }
-  .filter-bar select:focus { border-color: #C8973A; }
+  .filter-bar select:focus { border-color: #B22222; }
   .slider-wrap { display: flex; align-items: center; gap: 10px; flex: 1; }
-  .filter-bar input[type=range] { flex: 1; accent-color: #C8973A; cursor: pointer; }
+  .filter-bar input[type=range] { flex: 1; accent-color: #B22222; cursor: pointer; }
   .slider-val {
-    background: #C8973A; color: #fff; border-radius: 6px; padding: 3px 10px; font-size: 13px; font-weight: 700; min-width: 36px; text-align: center;
+    background: #B22222; color: #fff; border-radius: 6px; padding: 3px 10px; font-size: 13px; font-weight: 700; min-width: 36px; text-align: center;
   }
   .btn-refresh {
-    background: #1B2A4A; color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600;
+    background: #1B3A6B; color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600;
     cursor: pointer; transition: background 0.2s; margin-left: auto;
   }
   .btn-refresh:hover { background: #2a3d5c; }
@@ -97,9 +97,9 @@
     border: 2px solid transparent;
   }
   .card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
-  .card.in-pipeline { border-color: #C8973A; }
+  .card.in-pipeline { border-color: #B22222; }
   .card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-  .card-title { font-size: 15px; font-weight: 700; color: #1B2A4A; flex: 1; line-height: 1.3; }
+  .card-title { font-size: 15px; font-weight: 700; color: #1B3A6B; flex: 1; line-height: 1.3; }
   .score-badge {
     border-radius: 6px; padding: 3px 8px; font-size: 12px; font-weight: 700; color: #fff; white-space: nowrap; flex-shrink: 0;
   }
@@ -109,21 +109,21 @@
   .score-7 { background: #718096; }
   .score-low { background: #a0aec0; }
   .cat-badge {
-    display: inline-block; background: rgba(27,42,74,0.08); color: #1B2A4A; border-radius: 20px;
+    display: inline-block; background: rgba(27,42,74,0.08); color: #1B3A6B; border-radius: 20px;
     padding: 3px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
   }
   .card-desc { font-size: 13px; color: #555; line-height: 1.5; }
-  .card-why { font-size: 12px; color: #888; line-height: 1.4; background: #f8f9fa; padding: 8px 10px; border-radius: 6px; border-left: 3px solid #C8973A; }
-  .card-why strong { color: #C8973A; font-size: 11px; text-transform: uppercase; display: block; margin-bottom: 2px; }
+  .card-why { font-size: 12px; color: #888; line-height: 1.4; background: #f8f9fa; padding: 8px 10px; border-radius: 6px; border-left: 3px solid #B22222; }
+  .card-why strong { color: #B22222; font-size: 11px; text-transform: uppercase; display: block; margin-bottom: 2px; }
   .card-footer { margin-top: auto; display: flex; align-items: center; justify-content: space-between; }
   .pipeline-tag {
-    font-size: 11px; color: #C8973A; font-weight: 600; background: rgba(200,151,58,0.1); padding: 3px 8px; border-radius: 12px;
+    font-size: 11px; color: #B22222; font-weight: 600; background: rgba(200,151,58,0.1); padding: 3px 8px; border-radius: 12px;
   }
   .btn-add {
-    background: #1B2A4A; color: #fff; border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600;
+    background: #1B3A6B; color: #fff; border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600;
     cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 5px;
   }
-  .btn-add:hover { background: #C8973A; }
+  .btn-add:hover { background: #B22222; }
   .btn-add.added { background: #38a169; cursor: default; }
 
   .empty-state { text-align: center; padding: 60px; color: #aaa; }
@@ -131,7 +131,7 @@
   
   .loading { text-align: center; padding: 60px; }
   .spinner {
-    width: 40px; height: 40px; border: 3px solid #e0e0e0; border-top-color: #C8973A;
+    width: 40px; height: 40px; border: 3px solid #e0e0e0; border-top-color: #B22222;
     border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -146,7 +146,7 @@
     background: #fff; border-radius: 14px; padding: 28px; width: 480px; max-width: 95vw;
     box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-height: 90vh; overflow-y: auto;
   }
-  .modal h3 { font-size: 18px; font-weight: 700; color: #1B2A4A; margin-bottom: 4px; }
+  .modal h3 { font-size: 18px; font-weight: 700; color: #1B3A6B; margin-bottom: 4px; }
   .modal .modal-sub { font-size: 13px; color: #888; margin-bottom: 20px; }
   .form-group { margin-bottom: 16px; }
   .form-group label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 6px; }
@@ -154,13 +154,13 @@
     width: 100%; padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; outline: none;
     font-family: inherit; transition: border-color 0.2s;
   }
-  .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: #C8973A; }
+  .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: #B22222; }
   .form-group textarea { resize: vertical; min-height: 80px; }
   .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
   .btn-cancel { background: #f0f2f5; color: #444; border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
   .btn-cancel:hover { background: #e0e2e5; }
-  .btn-confirm { background: #C8973A; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-  .btn-confirm:hover { background: #b8872a; }
+  .btn-confirm { background: #B22222; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+  .btn-confirm:hover { background: #8B1A1A; }
   .btn-confirm:disabled { background: #ccc; cursor: not-allowed; }
 
   .toast {
@@ -177,7 +177,7 @@
 <!-- Password Overlay -->
 <div id="pw-overlay">
   <div class="pw-box">
-    <div class="logo">🦅 Blue Alpha</div>
+    <div class="logo"><img src="/static/ba-logo.jpg" alt="Blue Alpha" style="width:180px;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;"></div>
     <div class="sub">Kurt's Dashboard — Email Ideas</div>
     <input type="password" id="pw-input" placeholder="Enter password" onkeydown="if(event.key==='Enter')checkPw()">
     <button onclick="checkPw()">Unlock Dashboard</button>
@@ -188,7 +188,7 @@
 <!-- Sidebar -->
 <div class="sidebar">
   <div class="brand">
-    <h2>Blue Alpha</h2>
+    <img src="/static/ba-logo.jpg" alt="Blue Alpha" style="width:140px;display:block;margin-bottom:4px;">
     <p>Email Ideas Bank</p>
   </div>
   <nav>

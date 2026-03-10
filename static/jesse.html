@@ -8,40 +8,40 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; min-height: 100vh; }
 
-  #pw-overlay { position: fixed; inset: 0; background: #1B2A4A; display: flex; align-items: center; justify-content: center; z-index: 9999; }
+  #pw-overlay { position: fixed; inset: 0; background: #1B3A6B; display: flex; align-items: center; justify-content: center; z-index: 9999; }
   .pw-box { background: #fff; border-radius: 12px; padding: 40px; width: 360px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
-  .pw-box .logo { font-size: 28px; font-weight: 700; color: #1B2A4A; margin-bottom: 4px; }
+  .pw-box .logo { font-size: 28px; font-weight: 700; color: #1B3A6B; margin-bottom: 4px; }
   .pw-box .sub { color: #888; font-size: 14px; margin-bottom: 28px; }
   .pw-box input { width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; outline: none; margin-bottom: 12px; transition: border-color 0.2s; }
-  .pw-box input:focus { border-color: #C8973A; }
-  .pw-box button { width: 100%; padding: 12px; background: #C8973A; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
+  .pw-box input:focus { border-color: #B22222; }
+  .pw-box button { width: 100%; padding: 12px; background: #B22222; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
   .pw-box .error { color: #e53e3e; font-size: 13px; margin-top: 8px; display: none; }
 
-  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #1B2A4A; color: #fff; padding: 24px 0; display: flex; flex-direction: column; }
+  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #1B3A6B; color: #fff; padding: 24px 0; display: flex; flex-direction: column; }
   .sidebar .brand { padding: 0 24px 24px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-  .sidebar .brand h2 { font-size: 18px; font-weight: 700; color: #C8973A; }
+  .sidebar .brand h2 { font-size: 18px; font-weight: 700; color: #B22222; }
   .sidebar .brand p { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 2px; }
   .sidebar nav { padding: 16px 0; }
   .sidebar nav a { display: block; padding: 10px 24px; color: rgba(255,255,255,0.7); text-decoration: none; font-size: 14px; transition: all 0.2s; border-left: 3px solid transparent; }
-  .sidebar nav a.active, .sidebar nav a:hover { color: #fff; background: rgba(200,151,58,0.15); border-left-color: #C8973A; }
+  .sidebar nav a.active, .sidebar nav a:hover { color: #fff; background: rgba(200,151,58,0.15); border-left-color: #B22222; }
   .sidebar .logout { margin-top: auto; padding: 16px 24px; }
   .sidebar .logout button { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.6); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; width: 100%; transition: all 0.2s; }
-  .sidebar .logout button:hover { border-color: #C8973A; color: #C8973A; }
+  .sidebar .logout button:hover { border-color: #B22222; color: #B22222; }
 
   .main { margin-left: 220px; min-height: 100vh; }
   .topbar { background: #fff; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e8ecf0; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-  .topbar h1 { font-size: 20px; font-weight: 700; color: #1B2A4A; }
-  .btn-refresh { background: #1B2A4A; color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .topbar h1 { font-size: 20px; font-weight: 700; color: #1B3A6B; }
+  .btn-refresh { background: #1B3A6B; color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
   .btn-refresh:hover { background: #2a3d5c; }
 
   /* Stats row */
   .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 24px 32px 0; }
   .stat-card { background: #fff; border-radius: 12px; padding: 20px 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); display: flex; flex-direction: column; gap: 4px; border-top: 4px solid; }
-  .stat-card:nth-child(1) { border-color: #1B2A4A; }
-  .stat-card:nth-child(2) { border-color: #C8973A; }
+  .stat-card:nth-child(1) { border-color: #1B3A6B; }
+  .stat-card:nth-child(2) { border-color: #B22222; }
   .stat-card:nth-child(3) { border-color: #805ad5; }
   .stat-card:nth-child(4) { border-color: #38a169; }
-  .stat-num { font-size: 32px; font-weight: 800; color: #1B2A4A; }
+  .stat-num { font-size: 32px; font-weight: 800; color: #1B3A6B; }
   .stat-label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
 
   .content { padding: 24px 32px; }
@@ -50,15 +50,15 @@
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
 
   .section { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow: hidden; }
-  .section-header { background: #1B2A4A; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; }
+  .section-header { background: #1B3A6B; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; }
   .section-header h2 { font-size: 14px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; }
-  .section-header .count { background: rgba(200,151,58,0.3); color: #C8973A; border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
+  .section-header .count { background: rgba(200,151,58,0.3); color: #B22222; border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
   .section-body { overflow-y: auto; max-height: 480px; }
 
   /* Pipeline list */
   .pipeline-item { padding: 12px 20px; border-bottom: 1px solid #f5f5f5; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }
   .pipeline-item:last-child { border-bottom: none; }
-  .pi-title { font-size: 13px; font-weight: 600; color: #1B2A4A; margin-bottom: 3px; }
+  .pi-title { font-size: 13px; font-weight: 600; color: #1B3A6B; margin-bottom: 3px; }
   .pi-meta { font-size: 11px; color: #999; display: flex; gap: 8px; align-items: center; }
   .pi-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
   
@@ -73,7 +73,7 @@
   .idea-item { padding: 10px 20px; border-bottom: 1px solid #f5f5f5; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .idea-item:last-child { border-bottom: none; }
   .idea-num { font-size: 11px; color: #ccc; font-weight: 700; width: 20px; flex-shrink: 0; }
-  .idea-title { font-size: 13px; font-weight: 600; color: #1B2A4A; flex: 1; }
+  .idea-title { font-size: 13px; font-weight: 600; color: #1B3A6B; flex: 1; }
   .idea-cat { font-size: 11px; color: #888; }
   .score-pill { border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700; color: #fff; }
   .s10 { background: #e53e3e; }
@@ -84,20 +84,20 @@
 
   /* Mini calendar */
   .mini-cal { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow: hidden; }
-  .mini-cal-header { background: #1B2A4A; padding: 14px 20px; }
+  .mini-cal-header { background: #1B3A6B; padding: 14px 20px; }
   .mini-cal-header h2 { font-size: 14px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; }
   .mini-cal-body { padding: 16px 20px; }
   .mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
   .mini-cal-dow { font-size: 10px; font-weight: 700; color: #aaa; text-align: center; text-transform: uppercase; padding: 4px 2px; }
   .mini-day { height: 36px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #333; position: relative; }
   .mini-day.other { color: #ddd; }
-  .mini-day.today { background: #C8973A; color: #fff; }
-  .mini-day.has-email { background: rgba(27,42,74,0.08); color: #1B2A4A; }
-  .mini-day.has-email::after { content: ''; width: 5px; height: 5px; background: #C8973A; border-radius: 50%; position: absolute; bottom: 3px; }
+  .mini-day.today { background: #B22222; color: #fff; }
+  .mini-day.has-email { background: rgba(27,42,74,0.08); color: #1B3A6B; }
+  .mini-day.has-email::after { content: ''; width: 5px; height: 5px; background: #B22222; border-radius: 50%; position: absolute; bottom: 3px; }
   .mini-month { font-size: 13px; font-weight: 700; color: #666; margin: 8px 0 4px; text-align: center; }
 
   .loading { text-align: center; padding: 40px; }
-  .spinner { width: 32px; height: 32px; border: 3px solid #e0e0e0; border-top-color: #C8973A; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+  .spinner { width: 32px; height: 32px; border: 3px solid #e0e0e0; border-top-color: #B22222; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
   .empty { text-align: center; padding: 30px; color: #bbb; font-size: 13px; }
@@ -107,7 +107,7 @@
 
 <div id="pw-overlay">
   <div class="pw-box">
-    <div class="logo">🦅 Blue Alpha</div>
+    <div class="logo"><img src="/static/ba-logo.jpg" alt="Blue Alpha" style="width:180px;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;"></div>
     <div class="sub">Jesse's Overview — Email Program</div>
     <input type="password" id="pw-input" placeholder="Enter password" onkeydown="if(event.key==='Enter')checkPw()">
     <button onclick="checkPw()">Unlock Dashboard</button>
@@ -116,7 +116,7 @@
 </div>
 
 <div class="sidebar">
-  <div class="brand"><h2>Blue Alpha</h2><p>Email Overview</p></div>
+  <div class="brand"><img src="/static/ba-logo.jpg" alt="Blue Alpha" style="width:140px;display:block;margin-bottom:4px;"><p>Email Overview</p></div>
   <nav>
     <a href="kurt.html">📋 Kurt's Ideas</a>
     <a href="kelly.html">📅 Kelly's Calendar</a>

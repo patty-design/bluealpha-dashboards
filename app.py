@@ -30,6 +30,10 @@ def require_auth(f):
         return f(*args, **kwargs)
     return decorated
 
+@app.route("/static/<path:filename>")
+def serve_static(filename):
+    return send_from_directory("static", filename)
+
 @app.route("/")
 def index():
     return "Blue Alpha Dashboards", 200
