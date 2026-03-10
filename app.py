@@ -36,6 +36,9 @@ def serve_static(filename):
 
 @app.route("/")
 def index():
+    host = request.host.split(".")[0].lower()
+    if host in DASHBOARDS:
+        return dashboard(host)
     return "Blue Alpha Dashboards", 200
 
 @app.route("/<name>")
