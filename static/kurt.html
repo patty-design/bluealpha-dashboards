@@ -3,469 +3,734 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kurt's Dashboard — Email Ideas</title>
+<title>Blue Alpha — Kurt's Dashboard</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; min-height: 100vh; }
-  
-  /* Password overlay */
-  #pw-overlay {
-    position: fixed; inset: 0; background: #1B3A6B; display: flex; align-items: center; justify-content: center; z-index: 9999;
-  }
-  .pw-box {
-    background: #fff; border-radius: 12px; padding: 40px; width: 360px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-  }
-  .pw-box .logo { font-size: 28px; font-weight: 700; color: #1B3A6B; margin-bottom: 4px; }
-  .pw-box .sub { color: #888; font-size: 14px; margin-bottom: 28px; }
-  .pw-box input {
-    width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; outline: none; margin-bottom: 12px;
-    transition: border-color 0.2s;
-  }
-  .pw-box input:focus { border-color: #B22222; }
-  .pw-box button {
-    width: 100%; padding: 12px; background: #B22222; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer;
-    transition: background 0.2s;
-  }
-  .pw-box button:hover { background: #8B1A1A; }
-  .pw-box .error { color: #e53e3e; font-size: 13px; margin-top: 8px; display: none; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #222; }
 
-  /* Layout */
-  .sidebar {
-    position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #1B3A6B; color: #fff; padding: 24px 0;
-    display: flex; flex-direction: column;
+  /* LOGIN */
+  #login-overlay {
+    position: fixed; inset: 0; background: #f0f2f5;
+    display: flex; align-items: center; justify-content: center; z-index: 1000;
   }
-  .sidebar .brand { padding: 0 24px 24px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-  .sidebar .brand h2 { font-size: 18px; font-weight: 700; color: #B22222; }
-  .sidebar .brand p { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 2px; }
-  .sidebar nav { padding: 16px 0; }
-  .sidebar nav a {
-    display: block; padding: 10px 24px; color: rgba(255,255,255,0.7); text-decoration: none; font-size: 14px;
-    transition: all 0.2s; border-left: 3px solid transparent;
+  .login-card {
+    background: #fff; border-radius: 12px; padding: 48px 40px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12); width: 360px; text-align: center;
   }
-  .sidebar nav a.active, .sidebar nav a:hover { color: #fff; background: rgba(200,151,58,0.15); border-left-color: #B22222; }
-  .sidebar .logout { margin-top: auto; padding: 16px 24px; }
-  .sidebar .logout button {
-    background: transparent; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.6);
-    padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; width: 100%; transition: all 0.2s;
+  .login-card img { width: 120px; margin-bottom: 24px; }
+  .login-card h2 { color: #1B3A6B; margin-bottom: 8px; font-size: 1.4rem; }
+  .login-card p { color: #666; margin-bottom: 24px; font-size: 0.9rem; }
+  .login-card input {
+    width: 100%; padding: 12px 14px; border: 1.5px solid #ddd; border-radius: 8px;
+    font-size: 1rem; margin-bottom: 16px; outline: none;
   }
-  .sidebar .logout button:hover { border-color: #B22222; color: #B22222; }
+  .login-card input:focus { border-color: #1B3A6B; }
+  .login-card button {
+    width: 100%; padding: 12px; background: #1B3A6B; color: #fff;
+    border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; font-weight: 600;
+  }
+  .login-card button:hover { background: #16305a; }
+  .login-error { color: #B22222; font-size: 0.85rem; margin-top: 8px; display: none; }
 
-  .main { margin-left: 220px; min-height: 100vh; }
-  .topbar {
-    background: #fff; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between;
-    border-bottom: 1px solid #e8ecf0; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-  }
-  .topbar h1 { font-size: 20px; font-weight: 700; color: #1B3A6B; }
-  .stats-pills { display: flex; gap: 12px; }
-  .pill {
-    background: #f0f2f5; border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 600; color: #1B3A6B;
-    display: flex; align-items: center; gap: 6px;
-  }
-  .pill .dot { width: 8px; height: 8px; border-radius: 50%; }
-  .pill.total .dot { background: #1B3A6B; }
-  .pill.pipeline .dot { background: #B22222; }
+  /* LAYOUT */
+  #app { display: flex; height: 100vh; overflow: hidden; }
 
-  .content { padding: 24px 32px; }
-  
-  /* Filter bar */
-  .filter-bar {
-    background: #fff; border-radius: 10px; padding: 16px 20px; margin-bottom: 24px;
-    display: flex; align-items: center; gap: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  /* SIDEBAR */
+  #sidebar {
+    width: 220px; min-width: 220px; background: #1B3A6B; color: #fff;
+    display: flex; flex-direction: column; height: 100vh; position: fixed; left: 0; top: 0;
   }
-  .filter-bar label { font-size: 13px; color: #666; font-weight: 500; white-space: nowrap; }
-  .filter-bar select {
-    padding: 8px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; outline: none;
-    background: #fff; cursor: pointer; min-width: 160px; transition: border-color 0.2s;
+  .sidebar-logo { padding: 20px 16px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .sidebar-logo img { width: 100%; max-width: 140px; }
+  .sidebar-user { padding: 12px 16px; font-size: 0.8rem; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.05em; }
+  nav { flex: 1; padding: 8px 0; }
+  nav a {
+    display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+    color: rgba(255,255,255,0.8); text-decoration: none; font-size: 0.95rem;
+    cursor: pointer; border-left: 3px solid transparent; transition: all 0.15s;
   }
-  .filter-bar select:focus { border-color: #B22222; }
-  .slider-wrap { display: flex; align-items: center; gap: 10px; flex: 1; }
-  .filter-bar input[type=range] { flex: 1; accent-color: #B22222; cursor: pointer; }
-  .slider-val {
-    background: #B22222; color: #fff; border-radius: 6px; padding: 3px 10px; font-size: 13px; font-weight: 700; min-width: 36px; text-align: center;
+  nav a:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  nav a.active { background: rgba(255,255,255,0.12); color: #fff; border-left-color: #B22222; font-weight: 600; }
+  .sidebar-footer { padding: 16px; border-top: 1px solid rgba(255,255,255,0.1); }
+  .lock-btn {
+    width: 100%; padding: 10px; background: rgba(178,34,34,0.2); color: #fff;
+    border: 1px solid rgba(178,34,34,0.4); border-radius: 8px; cursor: pointer;
+    font-size: 0.85rem; transition: background 0.15s;
   }
-  .btn-refresh {
-    background: #1B3A6B; color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600;
-    cursor: pointer; transition: background 0.2s; margin-left: auto;
-  }
-  .btn-refresh:hover { background: #2a3d5c; }
+  .lock-btn:hover { background: rgba(178,34,34,0.4); }
 
-  /* Cards grid */
-  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
-  .card {
-    background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-    display: flex; flex-direction: column; gap: 10px; transition: transform 0.2s, box-shadow 0.2s;
-    border: 2px solid transparent;
-  }
-  .card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
-  .card.in-pipeline { border-color: #B22222; }
-  .card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-  .card-title { font-size: 15px; font-weight: 700; color: #1B3A6B; flex: 1; line-height: 1.3; }
-  .score-badge {
-    border-radius: 6px; padding: 3px 8px; font-size: 12px; font-weight: 700; color: #fff; white-space: nowrap; flex-shrink: 0;
-  }
-  .score-10 { background: #e53e3e; }
-  .score-9 { background: #ed8936; }
-  .score-8 { background: #3182ce; }
-  .score-7 { background: #718096; }
-  .score-low { background: #a0aec0; }
-  .cat-badge {
-    display: inline-block; background: rgba(27,42,74,0.08); color: #1B3A6B; border-radius: 20px;
-    padding: 3px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
-  }
-  .card-desc { font-size: 13px; color: #555; line-height: 1.5; }
-  .card-why { font-size: 12px; color: #888; line-height: 1.4; background: #f8f9fa; padding: 8px 10px; border-radius: 6px; border-left: 3px solid #B22222; }
-  .card-why strong { color: #B22222; font-size: 11px; text-transform: uppercase; display: block; margin-bottom: 2px; }
-  .card-footer { margin-top: auto; display: flex; align-items: center; justify-content: space-between; }
-  .pipeline-tag {
-    font-size: 11px; color: #B22222; font-weight: 600; background: rgba(200,151,58,0.1); padding: 3px 8px; border-radius: 12px;
-  }
-  .btn-add {
-    background: #1B3A6B; color: #fff; border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600;
-    cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 5px;
-  }
-  .btn-add:hover { background: #B22222; }
-  .btn-add.added { background: #38a169; cursor: default; }
+  /* MAIN */
+  #main { margin-left: 220px; flex: 1; overflow-y: auto; padding: 32px; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .page-header { margin-bottom: 24px; }
+  .page-header h1 { color: #1B3A6B; font-size: 1.6rem; margin-bottom: 4px; }
+  .page-header p { color: #666; font-size: 0.9rem; }
 
-  .empty-state { text-align: center; padding: 60px; color: #aaa; }
-  .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
-  
-  .loading { text-align: center; padding: 60px; }
+  /* CARDS GRID */
+  .toolbar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+  .toolbar select, .toolbar input {
+    padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 8px;
+    font-size: 0.9rem; outline: none; background: #fff;
+  }
+  .toolbar select:focus, .toolbar input:focus { border-color: #1B3A6B; }
+  .btn-primary {
+    padding: 8px 18px; background: #1B3A6B; color: #fff; border: none;
+    border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 600;
+    margin-left: auto;
+  }
+  .btn-primary:hover { background: #16305a; }
+  .btn-danger { background: #B22222; }
+  .btn-danger:hover { background: #8b1a1a; }
+
+  .cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .idea-card {
+    background: #fff; border-radius: 10px; padding: 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08); cursor: pointer;
+    transition: box-shadow 0.15s, transform 0.1s;
+    border: 1px solid #e8e8e8;
+  }
+  .idea-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.12); transform: translateY(-1px); }
+  .card-title { font-weight: 700; color: #1B3A6B; margin-bottom: 8px; font-size: 1rem; }
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .badge {
+    font-size: 0.72rem; padding: 3px 8px; border-radius: 20px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .badge-cat { background: #e8eef8; color: #1B3A6B; }
+  .badge-idea { background: #e8f0fe; color: #1967d2; }
+  .badge-review { background: #fef3cd; color: #856404; }
+  .badge-approved { background: #d1ecf1; color: #0c5460; }
+  .badge-live { background: #d4edda; color: #155724; }
+  .badge-archived { background: #e2e3e5; color: #383d41; }
+  .badge-priority-low { background: #d4edda; color: #155724; }
+  .badge-priority-mid { background: #fff3cd; color: #856404; }
+  .badge-priority-high { background: #f8d7da; color: #721c24; }
+  .card-desc { font-size: 0.85rem; color: #555; line-height: 1.5;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .card-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .btn-sm {
+    padding: 5px 12px; border: none; border-radius: 6px; cursor: pointer;
+    font-size: 0.8rem; font-weight: 600;
+  }
+  .btn-edit { background: #e8eef8; color: #1B3A6B; }
+  .btn-edit:hover { background: #c8d8f0; }
+  .btn-del { background: #fde8e8; color: #B22222; }
+  .btn-del:hover { background: #f8c8c8; }
+
+  /* MODAL */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    display: flex; align-items: center; justify-content: center; z-index: 500;
+  }
+  .modal {
+    background: #fff; border-radius: 12px; padding: 32px;
+    width: 580px; max-width: 95vw; max-height: 85vh; overflow-y: auto;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+  }
+  .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+  .modal-header h2 { color: #1B3A6B; font-size: 1.25rem; flex: 1; }
+  .close-btn { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #999; padding: 0 4px; line-height: 1; }
+  .close-btn:hover { color: #333; }
+  .modal-field { margin-bottom: 16px; }
+  .modal-field label { display: block; font-size: 0.8rem; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .modal-field p { font-size: 0.95rem; color: #333; line-height: 1.6; }
+  .modal-field input, .modal-field textarea, .modal-field select {
+    width: 100%; padding: 10px 12px; border: 1.5px solid #ddd; border-radius: 8px;
+    font-size: 0.95rem; outline: none; font-family: inherit;
+  }
+  .modal-field input:focus, .modal-field textarea:focus, .modal-field select:focus { border-color: #1B3A6B; }
+  .modal-field textarea { min-height: 80px; resize: vertical; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+  .btn-secondary { padding: 8px 18px; background: #f0f2f5; color: #333; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+  .btn-secondary:hover { background: #e0e4eb; }
+
+  /* CALENDAR */
+  .calendar-nav { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+  .calendar-nav h2 { color: #1B3A6B; font-size: 1.2rem; min-width: 180px; text-align: center; }
+  .cal-btn { padding: 8px 16px; background: #fff; border: 1.5px solid #ddd; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+  .cal-btn:hover { background: #f0f2f5; }
+  .calendar-grid { background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .cal-header { display: grid; grid-template-columns: repeat(7, 1fr); background: #1B3A6B; }
+  .cal-header div { padding: 10px; text-align: center; color: #fff; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; }
+  .cal-body { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .cal-cell {
+    min-height: 90px; padding: 6px; border-right: 1px solid #eee; border-bottom: 1px solid #eee;
+    cursor: pointer; transition: background 0.1s;
+  }
+  .cal-cell:hover { background: #f8f9ff; }
+  .cal-cell.other-month { background: #fafafa; }
+  .cal-cell.other-month .cal-date { color: #ccc; }
+  .cal-cell.today { background: #eef2ff; }
+  .cal-date { font-size: 0.85rem; font-weight: 600; color: #333; margin-bottom: 4px; }
+  .cal-cell.today .cal-date {
+    background: #1B3A6B; color: #fff; width: 24px; height: 24px;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  }
+  .cal-item {
+    font-size: 0.72rem; background: #1B3A6B; color: #fff; border-radius: 4px;
+    padding: 2px 5px; margin-bottom: 2px; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; cursor: pointer;
+  }
+  .cal-item:hover { background: #B22222; }
+
+  /* MENTIONS FEED */
+  .mentions-feed { display: flex; flex-direction: column; gap: 14px; }
+  .mention-card {
+    background: #fff; border-radius: 10px; padding: 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08); border: 1px solid #e8e8e8;
+  }
+  .mention-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .mention-content { font-size: 0.9rem; color: #333; line-height: 1.6; margin-bottom: 10px; }
+  .mention-link { font-size: 0.85rem; color: #1B3A6B; text-decoration: none; }
+  .mention-link:hover { text-decoration: underline; }
+  .mention-date { font-size: 0.8rem; color: #999; margin-left: auto; }
+
+  /* LOADING / EMPTY */
+  .loading { text-align: center; padding: 48px; color: #888; }
   .spinner {
-    width: 40px; height: 40px; border: 3px solid #e0e0e0; border-top-color: #B22222;
-    border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px;
+    width: 32px; height: 32px; border: 3px solid #e0e4eb;
+    border-top-color: #1B3A6B; border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin: 0 auto 12px;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .empty-state { text-align: center; padding: 48px; color: #aaa; font-size: 0.95rem; }
+  .empty-state .empty-icon { font-size: 2.5rem; margin-bottom: 12px; }
 
-  /* Modal */
-  .modal-overlay {
-    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000;
-    align-items: center; justify-content: center;
+  /* PIPELINE */
+  .pipeline-columns { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; }
+  .pipeline-col { min-width: 220px; flex: 1; }
+  .pipeline-col-header {
+    padding: 10px 14px; border-radius: 8px 8px 0 0; font-size: 0.85rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 8px;
   }
-  .modal-overlay.show { display: flex; }
-  .modal {
-    background: #fff; border-radius: 14px; padding: 28px; width: 480px; max-width: 95vw;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-height: 90vh; overflow-y: auto;
+  .col-draft { background: #e2e3e5; color: #383d41; }
+  .col-review { background: #fff3cd; color: #856404; }
+  .col-approved { background: #d1ecf1; color: #0c5460; }
+  .col-scheduled { background: #d4edda; color: #155724; }
+  .col-sent { background: #e8eef8; color: #1B3A6B; }
+  .pipeline-col-body { background: #f8f9fa; border: 1px solid #e0e4eb; border-top: none; border-radius: 0 0 8px 8px; min-height: 200px; padding: 8px; }
+  .pipeline-item {
+    background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.07); cursor: pointer; border: 1px solid #e8e8e8;
+    transition: box-shadow 0.15s;
   }
-  .modal h3 { font-size: 18px; font-weight: 700; color: #1B3A6B; margin-bottom: 4px; }
-  .modal .modal-sub { font-size: 13px; color: #888; margin-bottom: 20px; }
-  .form-group { margin-bottom: 16px; }
-  .form-group label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 6px; }
-  .form-group input, .form-group textarea, .form-group select {
-    width: 100%; padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; outline: none;
-    font-family: inherit; transition: border-color 0.2s;
-  }
-  .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: #B22222; }
-  .form-group textarea { resize: vertical; min-height: 80px; }
-  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
-  .btn-cancel { background: #f0f2f5; color: #444; border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
-  .btn-cancel:hover { background: #e0e2e5; }
-  .btn-confirm { background: #B22222; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-  .btn-confirm:hover { background: #8B1A1A; }
-  .btn-confirm:disabled { background: #ccc; cursor: not-allowed; }
-
-  .toast {
-    position: fixed; bottom: 24px; right: 24px; background: #38a169; color: #fff; padding: 12px 20px; border-radius: 8px;
-    font-size: 14px; font-weight: 600; box-shadow: 0 4px 20px rgba(0,0,0,0.2); z-index: 9000;
-    transform: translateY(100px); opacity: 0; transition: all 0.3s;
-  }
-  .toast.show { transform: translateY(0); opacity: 1; }
-  .toast.error { background: #e53e3e; }
+  .pipeline-item:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.12); }
+  .pipeline-title { font-weight: 700; color: #1B3A6B; font-size: 0.9rem; margin-bottom: 4px; }
+  .pipeline-subject { font-size: 0.8rem; color: #666; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pipeline-meta { display: flex; justify-content: space-between; align-items: center; }
+  .pipeline-date { font-size: 0.75rem; color: #999; }
+  .badge-assignee { background: #e8eef8; color: #1B3A6B; font-size: 0.72rem; padding: 2px 7px; border-radius: 12px; font-weight: 600; }
+  .col-count { background: rgba(0,0,0,0.1); border-radius: 10px; padding: 1px 7px; font-size: 0.78rem; }
 </style>
 </head>
 <body>
 
-<!-- Password Overlay -->
-<div id="pw-overlay">
-  <div class="pw-box">
-    <div class="logo"><img src="/static/ba-logo.jpg" alt="Blue Alpha" style="width:180px;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;"></div>
-    <div class="sub">Kurt's Dashboard — Email Ideas</div>
-    <input type="password" id="pw-input" placeholder="Enter password" onkeydown="if(event.key==='Enter')checkPw()">
-    <button onclick="checkPw()">Unlock Dashboard</button>
-    <div class="error" id="pw-error">Incorrect password. Try again.</div>
+<!-- LOGIN OVERLAY -->
+<div id="login-overlay">
+  <div class="login-card">
+    <img src="/static/ba-logo.jpg" alt="Blue Alpha">
+    <h2>Kurt's Dashboard</h2>
+    <p>Enter your password to continue</p>
+    <input type="password" id="login-pw" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()">Unlock Dashboard</button>
+    <div class="login-error" id="login-error">Incorrect password. Try again.</div>
   </div>
 </div>
 
-<!-- Sidebar -->
-<div class="sidebar">
-  <div class="brand">
-    <img src="/static/ba-logo.jpg" alt="Blue Alpha" style="width:140px;display:block;margin-bottom:4px;">
-    <p>Email Ideas Bank</p>
-  </div>
-  <nav>
-    <a href="#" class="active">📋 Email Ideas</a>
-    <a href="kelly.html">📅 Kelly's Calendar</a>
-    <a href="patty.html">📊 Patty's Pipeline</a>
-    <a href="jesse.html">👁 Jesse's Overview</a>
-  </nav>
-  <div class="logout">
-    <button onclick="logout()">🔒 Lock Dashboard</button>
-  </div>
-</div>
-
-<!-- Main Content -->
-<div class="main">
-  <div class="topbar">
-    <h1>Kurt's Dashboard — Email Ideas</h1>
-    <div class="stats-pills">
-      <div class="pill total"><span class="dot"></span><span id="total-count">—</span> Total Ideas</div>
-      <div class="pill pipeline"><span class="dot"></span><span id="pipeline-count">—</span> In Pipeline</div>
+<!-- APP -->
+<div id="app" style="display:none">
+  <div id="sidebar">
+    <div class="sidebar-logo"><img src="/static/ba-logo.jpg" alt="Blue Alpha"></div>
+    <div class="sidebar-user">Kurt Sills</div>
+    <nav>
+      <a onclick="showTab('ideas')" id="nav-ideas">📋 E-Mail Ideas</a>
+      <a onclick="showTab('calendar')" id="nav-calendar">📅 E-mail Calendar</a>
+      <a onclick="showTab('mentions')" id="nav-mentions">📣 Mentions</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="lock-btn" onclick="lockDashboard()">🔒 Lock Dashboard</button>
     </div>
   </div>
+  <div id="main">
 
-  <div class="content">
-    <div class="filter-bar">
-      <label>Category:</label>
-      <select id="cat-filter" onchange="applyFilters()">
-        <option value="">All Categories</option>
-        <option>Storytelling</option>
-        <option>Product Education</option>
-        <option>Behind the Scenes</option>
-        <option>Community</option>
-        <option>Seasonal</option>
-        <option>Brand Values</option>
-        <option>How-To</option>
-        <option>Customer Story</option>
-      </select>
-      <label>Min Priority:</label>
-      <div class="slider-wrap">
-        <input type="range" id="score-filter" min="1" max="10" value="1" oninput="document.getElementById('score-val').textContent=this.value; applyFilters()">
-        <div class="slider-val" id="score-val">1</div>
+    <!-- IDEAS TAB -->
+    <div class="tab-panel" id="tab-ideas">
+      <div class="page-header">
+        <h1>📋 E-Mail Ideas</h1>
+        <p>Browse, manage, and add email campaign concepts</p>
       </div>
-      <button class="btn-refresh" onclick="loadIdeas()">↻ Refresh</button>
+      <div class="toolbar">
+        <select id="ideas-filter-cat" onchange="filterIdeas()"><option value="">All Categories</option></select>
+        <select id="ideas-filter-status" onchange="filterIdeas()">
+          <option value="">All Statuses</option>
+          <option>Idea</option><option>In Review</option><option>Approved</option><option>Live</option><option>Archived</option>
+        </select>
+        <button class="btn-primary" onclick="openIdeaModal(null)">+ Add New Idea</button>
+      </div>
+      <div class="cards-grid" id="ideas-grid"></div>
     </div>
 
-    <div id="cards-container">
-      <div class="loading">
-        <div class="spinner"></div>
-        <div style="color:#888;">Loading ideas from Airtable...</div>
+    <!-- CALENDAR TAB -->
+    <div class="tab-panel" id="tab-calendar">
+      <div class="page-header">
+        <h1>📅 E-mail Calendar</h1>
+        <p>Scheduled email campaigns — click a date to schedule, click an item for details</p>
+      </div>
+      <div class="calendar-nav">
+        <button class="cal-btn" onclick="changeMonth(-1)">← Prev</button>
+        <h2 id="cal-title"></h2>
+        <button class="cal-btn" onclick="changeMonth(1)">Next →</button>
+      </div>
+      <div class="calendar-grid">
+        <div class="cal-header">
+          <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+        </div>
+        <div class="cal-body" id="cal-body"></div>
       </div>
     </div>
+
+    <!-- MENTIONS TAB -->
+    <div class="tab-panel" id="tab-mentions">
+      <div class="page-header">
+        <h1>📣 Mentions</h1>
+        <p>Blue Alpha mentions across the web</p>
+      </div>
+      <div class="toolbar">
+        <select id="mentions-filter" onchange="filterMentions()"><option value="">All Platforms</option></select>
+      </div>
+      <div class="mentions-feed" id="mentions-feed"></div>
+    </div>
+
   </div>
 </div>
 
-<!-- Add to Pipeline Modal -->
-<div class="modal-overlay" id="modal">
+<!-- IDEA MODAL -->
+<div class="modal-backdrop" id="idea-modal" style="display:none" onclick="closeModalOnBackdrop(event,'idea-modal')">
   <div class="modal">
-    <h3>→ Add to Email Pipeline</h3>
-    <div class="modal-sub" id="modal-sub">Sending this idea to the pipeline</div>
-    <div class="form-group">
-      <label>Email Title</label>
-      <input type="text" id="modal-title" placeholder="Email title">
+    <div class="modal-header">
+      <h2 id="idea-modal-title">Idea Details</h2>
+      <button class="close-btn" onclick="closeModal('idea-modal')">×</button>
     </div>
-    <div class="form-group">
-      <label>Scheduled Date</label>
-      <input type="date" id="modal-date">
-    </div>
-    <div class="form-group">
-      <label>Assigned To</label>
-      <input type="text" id="modal-assigned" placeholder="Team member name">
-    </div>
-    <div class="form-group">
-      <label>Notes</label>
-      <textarea id="modal-notes" placeholder="Any notes or context..."></textarea>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
-      <button class="btn-confirm" id="confirm-btn" onclick="confirmAdd()">✓ Add to Pipeline</button>
-    </div>
+    <div id="idea-modal-body"></div>
+    <div class="modal-actions" id="idea-modal-actions"></div>
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<!-- CALENDAR ITEM MODAL -->
+<div class="modal-backdrop" id="cal-modal" style="display:none" onclick="closeModalOnBackdrop(event,'cal-modal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="cal-modal-title">Scheduled Email</h2>
+      <button class="close-btn" onclick="closeModal('cal-modal')">×</button>
+    </div>
+    <div id="cal-modal-body"></div>
+    <div class="modal-actions" id="cal-modal-actions"></div>
+  </div>
+</div>
+
+<!-- ADD TO CALENDAR MODAL -->
+<div class="modal-backdrop" id="addcal-modal" style="display:none" onclick="closeModalOnBackdrop(event,'addcal-modal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Schedule Email for <span id="addcal-date-label"></span></h2>
+      <button class="close-btn" onclick="closeModal('addcal-modal')">×</button>
+    </div>
+    <div id="addcal-body"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal('addcal-modal')">Cancel</button>
+      <button class="btn-primary" onclick="saveScheduledDate()">Save</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const AT_TOKEN = 'pat3wxVXHb3JhDBBn.e0ca55ff285ba026b093f4232320f63fff16252679f6a4c08cc85ea3425c4954';
 const BASE_ID = 'appTCZwoETAInVuiX';
 const IDEAS_TABLE = 'tblXldjh2t3436DOO';
 const PIPELINE_TABLE = 'tblrFJ5qikGN5H5X9';
+const MENTIONS_TABLE = 'tblbYG1uefdBJDgPL';
+const AUTH_KEY = 'ba_kurt_auth';
 const PASSWORD = 'bluealpha2026';
-const PW_KEY = 'ba_kurt_auth';
 
-let allIdeas = [];
-let currentIdeaId = null;
-let currentConcept = null;
+let ideasData = [], pipelineData = [], mentionsData = [];
+let calYear, calMonth;
+let editingIdeaId = null;
+let addCalDate = null, addCalPipelineItems = [];
 
-// Password check
-function checkPw() {
-  const val = document.getElementById('pw-input').value;
-  if (val === PASSWORD) {
-    localStorage.setItem(PW_KEY, 'true');
-    document.getElementById('pw-overlay').style.display = 'none';
-    loadIdeas();
+// AUTH
+function doLogin() {
+  const pw = document.getElementById('login-pw').value;
+  if (pw === PASSWORD) {
+    localStorage.setItem(AUTH_KEY, '1');
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    initApp();
   } else {
-    document.getElementById('pw-error').style.display = 'block';
-    document.getElementById('pw-input').value = '';
-    document.getElementById('pw-input').focus();
+    document.getElementById('login-error').style.display = 'block';
+  }
+}
+function lockDashboard() {
+  localStorage.removeItem(AUTH_KEY);
+  location.reload();
+}
+function checkAuth() {
+  if (localStorage.getItem(AUTH_KEY) === '1') {
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    initApp();
   }
 }
 
-function logout() {
-  localStorage.removeItem(PW_KEY);
-  location.reload();
-}
-
-// Init
-if (localStorage.getItem(PW_KEY) === 'true') {
-  document.getElementById('pw-overlay').style.display = 'none';
+// APP INIT
+function initApp() {
+  const now = new Date();
+  calYear = now.getFullYear(); calMonth = now.getMonth();
+  showTab('ideas');
   loadIdeas();
 }
 
+function showTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('nav-' + tab).classList.add('active');
+  if (tab === 'calendar' && pipelineData.length === 0) loadPipeline().then(renderCalendar);
+  else if (tab === 'calendar') renderCalendar();
+  if (tab === 'mentions' && mentionsData.length === 0) loadMentions();
+}
+
+// AIRTABLE HELPERS
+async function atFetch(table, params='') {
+  const url = `https://api.airtable.com/v0/${BASE_ID}/${table}?${params}`;
+  const resp = await fetch(url, { headers: { Authorization: `Bearer ${AT_TOKEN}` } });
+  if (!resp.ok) throw new Error('Airtable error: ' + resp.status);
+  return resp.json();
+}
+async function atCreate(table, fields) {
+  const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${table}`, {
+    method: 'POST', headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields })
+  });
+  return resp.json();
+}
+async function atUpdate(table, id, fields) {
+  const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${table}/${id}`, {
+    method: 'PATCH', headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields })
+  });
+  return resp.json();
+}
+async function atDelete(table, id) {
+  await fetch(`https://api.airtable.com/v0/${BASE_ID}/${table}/${id}`, {
+    method: 'DELETE', headers: { Authorization: `Bearer ${AT_TOKEN}` }
+  });
+}
+async function atFetchAll(table, params='') {
+  let records = [], offset = null;
+  do {
+    const p = offset ? params + '&offset=' + offset : params;
+    const data = await atFetch(table, p);
+    records = records.concat(data.records || []);
+    offset = data.offset || null;
+  } while (offset);
+  return records;
+}
+
+// IDEAS
 async function loadIdeas() {
-  document.getElementById('cards-container').innerHTML = '<div class="loading"><div class="spinner"></div><div style="color:#888;">Loading ideas...</div></div>';
-  
+  const grid = document.getElementById('ideas-grid');
+  grid.innerHTML = '<div class="loading"><div class="spinner"></div>Loading ideas...</div>';
   try {
-    let records = [];
-    let offset = null;
-    do {
-      let url = `https://api.airtable.com/v0/${BASE_ID}/${IDEAS_TABLE}?pageSize=100`;
-      if (offset) url += `&offset=${offset}`;
-      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${AT_TOKEN}` } });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error.message);
-      records = records.concat(data.records);
-      offset = data.offset;
-    } while (offset);
-    
-    allIdeas = records;
-    const pipelineCount = allIdeas.filter(r => ['Drafting', 'Ready', 'In Development', 'Copy Written', 'In Review', 'Scheduled'].includes(r.fields.Status)).length;
-    document.getElementById('total-count').textContent = allIdeas.length;
-    document.getElementById('pipeline-count').textContent = pipelineCount;
-    applyFilters();
+    ideasData = await atFetchAll(IDEAS_TABLE, 'sort[0][field]=Priority Score&sort[0][direction]=desc');
+    populateCatFilter();
+    filterIdeas();
   } catch(e) {
-    document.getElementById('cards-container').innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><div>Error loading ideas: ${e.message}</div></div>`;
+    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>Failed to load ideas. Check console.</div>`;
+    console.error(e);
   }
 }
 
-function applyFilters() {
-  const cat = document.getElementById('cat-filter').value;
-  const minScore = parseInt(document.getElementById('score-filter').value);
-  
-  let filtered = allIdeas.filter(r => {
-    const score = r.fields['Priority Score'] || 0;
-    const category = r.fields['Category'] || '';
-    return score >= minScore && (!cat || category === cat);
-  });
-  
-  filtered.sort((a, b) => (b.fields['Priority Score'] || 0) - (a.fields['Priority Score'] || 0));
-  renderCards(filtered);
+function populateCatFilter() {
+  const cats = [...new Set(ideasData.map(r => r.fields['Category']).filter(Boolean))];
+  const sel = document.getElementById('ideas-filter-cat');
+  sel.innerHTML = '<option value="">All Categories</option>' + cats.map(c => `<option>${c}</option>`).join('');
 }
 
-function getScoreClass(score) {
-  if (score >= 10) return 'score-10';
-  if (score >= 9) return 'score-9';
-  if (score >= 8) return 'score-8';
-  if (score >= 7) return 'score-7';
-  return 'score-low';
+function getPriorityBadge(score) {
+  const n = parseInt(score) || 0;
+  if (n >= 7) return `<span class="badge badge-priority-high">🔴 ${n}</span>`;
+  if (n >= 4) return `<span class="badge badge-priority-mid">🟡 ${n}</span>`;
+  return `<span class="badge badge-priority-low">🟢 ${n}</span>`;
 }
 
-function renderCards(ideas) {
-  if (!ideas.length) {
-    document.getElementById('cards-container').innerHTML = '<div class="empty-state"><div class="icon">🔍</div><div>No ideas match your filters.</div></div>';
+function getStatusBadge(status) {
+  const map = { 'Idea':'badge-idea','In Review':'badge-review','Approved':'badge-approved','Live':'badge-live','Archived':'badge-archived' };
+  return `<span class="badge ${map[status]||'badge-idea'}">${status||'Idea'}</span>`;
+}
+
+function filterIdeas() {
+  const cat = document.getElementById('ideas-filter-cat').value;
+  const status = document.getElementById('ideas-filter-status').value;
+  let filtered = ideasData;
+  if (cat) filtered = filtered.filter(r => r.fields['Category'] === cat);
+  if (status) filtered = filtered.filter(r => r.fields['Status'] === status);
+  renderIdeasGrid(filtered);
+}
+
+function renderIdeasGrid(records) {
+  const grid = document.getElementById('ideas-grid');
+  if (!records.length) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">💡</div>No ideas found. Add one!</div>';
     return;
   }
-  
-  const html = `<div class="cards-grid">${ideas.map(r => {
+  grid.innerHTML = records.map(r => {
     const f = r.fields;
-    const score = f['Priority Score'] || 0;
-    const inPipeline = ['Drafting', 'Ready', 'In Development', 'Copy Written', 'In Review', 'Scheduled', 'Sent'].includes(f.Status);
-    return `
-      <div class="card ${inPipeline ? 'in-pipeline' : ''}">
-        <div class="card-header">
-          <div class="card-title">${escHtml(f.Concept || 'Untitled')}</div>
-          <div class="score-badge ${getScoreClass(score)}">${score}</div>
-        </div>
-        <div><span class="cat-badge">${escHtml(f.Category || 'Uncategorized')}</span></div>
-        ${f.Description ? `<div class="card-desc">${escHtml(f.Description)}</div>` : ''}
-        ${f['Why It Works'] ? `<div class="card-why"><strong>Why It Works</strong>${escHtml(f['Why It Works'])}</div>` : ''}
-        <div class="card-footer">
-          ${inPipeline ? '<div class="pipeline-tag">✓ In Pipeline</div>' : '<div></div>'}
-          <button class="btn-add ${inPipeline ? 'added' : ''}" onclick="openModal('${r.id}', '${escAttr(f.Concept)}')"
-            ${inPipeline ? 'disabled' : ''}>
-            ${inPipeline ? '✓ Added' : '→ Add to Pipeline'}
-          </button>
-        </div>
+    return `<div class="idea-card" onclick="viewIdea('${r.id}')">
+      <div class="card-title">${f['Concept']||'Untitled'}</div>
+      <div class="badges">
+        ${f['Category'] ? `<span class="badge badge-cat">${f['Category']}</span>` : ''}
+        ${getStatusBadge(f['Status'])}
+        ${getPriorityBadge(f['Priority Score'])}
       </div>
-    `;
-  }).join('')}</div>`;
-  
-  document.getElementById('cards-container').innerHTML = html;
+      <div class="card-desc">${f['Description']||'No description'}</div>
+      <div class="card-actions" onclick="event.stopPropagation()">
+        <button class="btn-sm btn-edit" onclick="openIdeaModal('${r.id}')">Edit</button>
+        <button class="btn-sm btn-del" onclick="deleteIdea('${r.id}')">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
-function openModal(ideaId, concept) {
-  currentIdeaId = ideaId;
-  currentConcept = concept;
-  document.getElementById('modal-title').value = concept;
-  document.getElementById('modal-date').value = '';
-  document.getElementById('modal-assigned').value = '';
-  document.getElementById('modal-notes').value = '';
-  document.getElementById('modal-sub').textContent = `Adding "${concept}" to the Email Pipeline`;
-  document.getElementById('confirm-btn').disabled = false;
-  document.getElementById('confirm-btn').textContent = '✓ Add to Pipeline';
-  document.getElementById('modal').classList.add('show');
+function viewIdea(id) {
+  const r = ideasData.find(x => x.id === id);
+  if (!r) return;
+  const f = r.fields;
+  document.getElementById('idea-modal-title').textContent = f['Concept']||'Idea Details';
+  document.getElementById('idea-modal-body').innerHTML = `
+    <div class="modal-field"><label>Concept</label><p>${f['Concept']||'—'}</p></div>
+    <div class="modal-field"><label>Category</label><p>${f['Category']||'—'}</p></div>
+    <div class="modal-field"><label>Status</label>${getStatusBadge(f['Status'])}</div>
+    <div class="modal-field"><label>Priority Score</label>${getPriorityBadge(f['Priority Score'])}</div>
+    <div class="modal-field"><label>Description</label><p>${f['Description']||'—'}</p></div>
+    <div class="modal-field"><label>Why It Works</label><p>${f['Why It Works']||'—'}</p></div>
+    <div class="modal-field"><label>Notes</label><p>${f['Notes']||'—'}</p></div>
+  `;
+  document.getElementById('idea-modal-actions').innerHTML = `
+    <button class="btn-secondary" onclick="closeModal('idea-modal')">Close</button>
+    <button class="btn-primary" onclick="openIdeaModal('${id}')">Edit</button>
+  `;
+  document.getElementById('idea-modal').style.display = 'flex';
 }
 
-function closeModal() {
-  document.getElementById('modal').classList.remove('show');
+function openIdeaModal(id) {
+  closeModal('idea-modal');
+  editingIdeaId = id;
+  const r = id ? ideasData.find(x => x.id === id) : null;
+  const f = r ? r.fields : {};
+  document.getElementById('idea-modal-title').textContent = id ? 'Edit Idea' : 'Add New Idea';
+  document.getElementById('idea-modal-body').innerHTML = `
+    <div class="modal-field"><label>Concept *</label><input id="f-concept" value="${f['Concept']||''}"></div>
+    <div class="modal-field"><label>Category</label><input id="f-category" value="${f['Category']||''}"></div>
+    <div class="modal-field"><label>Status</label>
+      <select id="f-status">
+        ${['Idea','In Review','Approved','Live','Archived'].map(s=>`<option ${f['Status']===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+    </div>
+    <div class="modal-field"><label>Priority Score (1-10)</label><input id="f-priority" type="number" min="1" max="10" value="${f['Priority Score']||''}"></div>
+    <div class="modal-field"><label>Description</label><textarea id="f-desc">${f['Description']||''}</textarea></div>
+    <div class="modal-field"><label>Why It Works</label><textarea id="f-why">${f['Why It Works']||''}</textarea></div>
+    <div class="modal-field"><label>Notes</label><textarea id="f-notes">${f['Notes']||''}</textarea></div>
+  `;
+  document.getElementById('idea-modal-actions').innerHTML = `
+    <button class="btn-secondary" onclick="closeModal('idea-modal')">Cancel</button>
+    <button class="btn-primary" onclick="saveIdea()">Save</button>
+  `;
+  document.getElementById('idea-modal').style.display = 'flex';
 }
 
-async function confirmAdd() {
-  const btn = document.getElementById('confirm-btn');
-  btn.disabled = true;
-  btn.textContent = 'Adding...';
-  
-  const title = document.getElementById('modal-title').value.trim();
-  const date = document.getElementById('modal-date').value;
-  const assigned = document.getElementById('modal-assigned').value.trim();
-  const notes = document.getElementById('modal-notes').value.trim();
-  
-  if (!title) { showToast('Please enter an email title.', true); btn.disabled = false; btn.textContent = '✓ Add to Pipeline'; return; }
-  
+async function saveIdea() {
+  const fields = {
+    'Concept': document.getElementById('f-concept').value,
+    'Category': document.getElementById('f-category').value,
+    'Status': document.getElementById('f-status').value,
+    'Description': document.getElementById('f-desc').value,
+    'Why It Works': document.getElementById('f-why').value,
+    'Notes': document.getElementById('f-notes').value,
+  };
+  const ps = document.getElementById('f-priority').value;
+  if (ps) fields['Priority Score'] = parseInt(ps);
   try {
-    // Create pipeline record
-    const pipelineRes = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${PIPELINE_TABLE}`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields: {
-        'Email Title': title,
-        'Status': 'In Development',
-        'Scheduled Date': date || undefined,
-        'Assigned To': assigned || undefined,
-        'Notes': notes || undefined,
-        'Source Idea': currentConcept
-      }})
-    });
-    const pipelineData = await pipelineRes.json();
-    if (pipelineData.error) throw new Error(pipelineData.error.message);
-    
-    // Update idea status to Drafting
-    await fetch(`https://api.airtable.com/v0/${BASE_ID}/${IDEAS_TABLE}/${currentIdeaId}`, {
-      method: 'PATCH',
-      headers: { 'Authorization': `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields: { 'Status': 'Drafting' } })
-    });
-    
-    closeModal();
-    showToast('✓ Added to Email Pipeline!');
-    await loadIdeas();
+    if (editingIdeaId) { await atUpdate(IDEAS_TABLE, editingIdeaId, fields); }
+    else { await atCreate(IDEAS_TABLE, fields); }
+    closeModal('idea-modal');
+    loadIdeas();
+  } catch(e) { alert('Save failed: ' + e.message); }
+}
+
+async function deleteIdea(id) {
+  if (!confirm('Delete this idea?')) return;
+  try { await atDelete(IDEAS_TABLE, id); loadIdeas(); }
+  catch(e) { alert('Delete failed: ' + e.message); }
+}
+
+// PIPELINE (for calendar)
+async function loadPipeline() {
+  try { pipelineData = await atFetchAll(PIPELINE_TABLE); }
+  catch(e) { console.error(e); }
+}
+
+// CALENDAR
+function changeMonth(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-title').textContent = `${months[calMonth]} ${calYear}`;
+  const today = new Date();
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const daysInPrev = new Date(calYear, calMonth, 0).getDate();
+
+  // Map pipeline items by date
+  const byDate = {};
+  pipelineData.forEach(r => {
+    const d = r.fields['Scheduled Date'];
+    if (d) { if (!byDate[d]) byDate[d] = []; byDate[d].push(r); }
+  });
+
+  let html = '';
+  let day = 1, nextDay = 1;
+  for (let i = 0; i < 42; i++) {
+    if (i < firstDay) {
+      const prevD = daysInPrev - firstDay + i + 1;
+      html += `<div class="cal-cell other-month"><div class="cal-date">${prevD}</div></div>`;
+    } else if (day > daysInMonth) {
+      const isToday = false;
+      html += `<div class="cal-cell other-month"><div class="cal-date">${nextDay++}</div></div>`;
+    } else {
+      const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      const isToday = calYear===today.getFullYear() && calMonth===today.getMonth() && day===today.getDate();
+      const items = byDate[dateStr] || [];
+      const d = day;
+      html += `<div class="cal-cell${isToday?' today':''}" onclick="handleCalCellClick('${dateStr}')">
+        <div class="cal-date">${d}</div>
+        ${items.map(r => `<div class="cal-item" onclick="event.stopPropagation();viewCalItem('${r.id}')">${r.fields['Email Title']||'Email'}</div>`).join('')}
+      </div>`;
+      day++;
+    }
+  }
+  document.getElementById('cal-body').innerHTML = html;
+}
+
+function handleCalCellClick(dateStr) {
+  // Edit mode: open add-to-calendar modal
+  openAddCalModal(dateStr);
+}
+
+async function openAddCalModal(dateStr) {
+  addCalDate = dateStr;
+  if (pipelineData.length === 0) await loadPipeline();
+  // Only show unscheduled or items not yet on this date
+  const available = pipelineData.filter(r => !r.fields['Scheduled Date'] || r.fields['Scheduled Date'] !== dateStr);
+  document.getElementById('addcal-date-label').textContent = dateStr;
+  document.getElementById('addcal-body').innerHTML = available.length
+    ? `<div class="modal-field"><label>Select Email to Schedule</label>
+        <select id="addcal-select">
+          <option value="">-- Choose an email --</option>
+          ${available.map(r => `<option value="${r.id}">${r.fields['Email Title']||'Untitled'}</option>`).join('')}
+        </select>
+       </div>`
+    : '<p style="color:#888">No unscheduled emails available.</p>';
+  document.getElementById('addcal-modal').style.display = 'flex';
+}
+
+async function saveScheduledDate() {
+  const sel = document.getElementById('addcal-select');
+  if (!sel || !sel.value) { closeModal('addcal-modal'); return; }
+  try {
+    await atUpdate(PIPELINE_TABLE, sel.value, { 'Scheduled Date': addCalDate });
+    closeModal('addcal-modal');
+    await loadPipeline();
+    renderCalendar();
+  } catch(e) { alert('Save failed: ' + e.message); }
+}
+
+function viewCalItem(id) {
+  const r = pipelineData.find(x => x.id === id);
+  if (!r) return;
+  const f = r.fields;
+  document.getElementById('cal-modal-title').textContent = f['Email Title']||'Email';
+  document.getElementById('cal-modal-body').innerHTML = `
+    <div class="modal-field"><label>Email Title</label><p>${f['Email Title']||'—'}</p></div>
+    <div class="modal-field"><label>Subject Line</label><p>${f['Subject Line']||'—'}</p></div>
+    <div class="modal-field"><label>Status</label><p>${f['Status']||'—'}</p></div>
+    <div class="modal-field"><label>Scheduled Date</label><p>${f['Scheduled Date']||'—'}</p></div>
+    <div class="modal-field"><label>Assigned To</label><p>${f['Assigned To']||'—'}</p></div>
+    <div class="modal-field"><label>Notes</label><p>${f['Notes']||'—'}</p></div>
+  `;
+  document.getElementById('cal-modal-actions').innerHTML = `<button class="btn-secondary" onclick="closeModal('cal-modal')">Close</button>`;
+  document.getElementById('cal-modal').style.display = 'flex';
+}
+
+// MENTIONS
+async function loadMentions() {
+  const feed = document.getElementById('mentions-feed');
+  feed.innerHTML = '<div class="loading"><div class="spinner"></div>Loading mentions...</div>';
+  try {
+    mentionsData = await atFetchAll(MENTIONS_TABLE, 'sort[0][field]=Date&sort[0][direction]=desc');
+    const platforms = [...new Set(mentionsData.map(r => r.fields['Platform']).filter(Boolean))];
+    const sel = document.getElementById('mentions-filter');
+    sel.innerHTML = '<option value="">All Platforms</option>' + platforms.map(p=>`<option>${p}</option>`).join('');
+    filterMentions();
   } catch(e) {
-    showToast(`Error: ${e.message}`, true);
-    btn.disabled = false;
-    btn.textContent = '✓ Add to Pipeline';
+    feed.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>Failed to load mentions.</div>`;
+    console.error(e);
   }
 }
 
-function showToast(msg, isError) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast show' + (isError ? ' error' : '');
-  setTimeout(() => t.className = 'toast', 3500);
+function filterMentions() {
+  const platform = document.getElementById('mentions-filter').value;
+  let filtered = mentionsData;
+  if (platform) filtered = filtered.filter(r => r.fields['Platform'] === platform);
+  renderMentions(filtered);
 }
 
-function escHtml(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function escAttr(s) { return String(s || '').replace(/'/g, "\\'").replace(/\n/g,' '); }
+function renderMentions(records) {
+  const feed = document.getElementById('mentions-feed');
+  if (!records.length) {
+    feed.innerHTML = '<div class="empty-state"><div class="empty-icon">📣</div>No mentions found.</div>';
+    return;
+  }
+  feed.innerHTML = records.map(r => {
+    const f = r.fields;
+    const platform = f['Platform'] || f['Source'] || 'Unknown';
+    const content = f['Content'] || f['Text'] || f['Content/Text'] || '';
+    const url = f['URL'] || f['Link'] || '';
+    const date = f['Date'] ? new Date(f['Date']).toLocaleDateString() : '';
+    const sentiment = f['Sentiment'] || f['Priority'] || '';
+    return `<div class="mention-card">
+      <div class="mention-header">
+        <span class="badge badge-cat">${platform}</span>
+        ${sentiment ? `<span class="badge badge-priority-${sentiment.toLowerCase()==='positive'?'low':sentiment.toLowerCase()==='negative'?'high':'mid'}">${sentiment}</span>` : ''}
+        <span class="mention-date">${date}</span>
+      </div>
+      <div class="mention-content">${content.substring(0,300)}${content.length>300?'...':''}</div>
+      ${url ? `<a href="${url}" target="_blank" class="mention-link">🔗 View Source</a>` : ''}
+    </div>`;
+  }).join('');
+}
 
-// Close modal on overlay click
-document.getElementById('modal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+// MODAL HELPERS
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+function closeModalOnBackdrop(e, id) { if (e.target.classList.contains('modal-backdrop')) closeModal(id); }
+
+// INIT
+checkAuth();
 </script>
 </body>
 </html>

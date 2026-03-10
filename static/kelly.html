@@ -3,176 +3,266 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kelly's Dashboard — Email Calendar</title>
+<title>Blue Alpha — Kelly's Dashboard</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; min-height: 100vh; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #222; }
 
-  #pw-overlay { position: fixed; inset: 0; background: #1B3A6B; display: flex; align-items: center; justify-content: center; z-index: 9999; }
-  .pw-box { background: #fff; border-radius: 12px; padding: 40px; width: 360px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
-  .pw-box .logo { font-size: 28px; font-weight: 700; color: #1B3A6B; margin-bottom: 4px; }
-  .pw-box .sub { color: #888; font-size: 14px; margin-bottom: 28px; }
-  .pw-box input { width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; outline: none; margin-bottom: 12px; transition: border-color 0.2s; }
-  .pw-box input:focus { border-color: #B22222; }
-  .pw-box button { width: 100%; padding: 12px; background: #B22222; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
-  .pw-box .error { color: #e53e3e; font-size: 13px; margin-top: 8px; display: none; }
+  #login-overlay {
+    position: fixed; inset: 0; background: #f0f2f5;
+    display: flex; align-items: center; justify-content: center; z-index: 1000;
+  }
+  .login-card {
+    background: #fff; border-radius: 12px; padding: 48px 40px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12); width: 360px; text-align: center;
+  }
+  .login-card img { width: 120px; margin-bottom: 24px; }
+  .login-card h2 { color: #1B3A6B; margin-bottom: 8px; font-size: 1.4rem; }
+  .login-card p { color: #666; margin-bottom: 24px; font-size: 0.9rem; }
+  .login-card input {
+    width: 100%; padding: 12px 14px; border: 1.5px solid #ddd; border-radius: 8px;
+    font-size: 1rem; margin-bottom: 16px; outline: none;
+  }
+  .login-card input:focus { border-color: #1B3A6B; }
+  .login-card button {
+    width: 100%; padding: 12px; background: #1B3A6B; color: #fff;
+    border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; font-weight: 600;
+  }
+  .login-card button:hover { background: #16305a; }
+  .login-error { color: #B22222; font-size: 0.85rem; margin-top: 8px; display: none; }
 
-  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #1B3A6B; color: #fff; padding: 24px 0; display: flex; flex-direction: column; }
-  .sidebar .brand { padding: 0 24px 24px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-  .sidebar .brand h2 { font-size: 18px; font-weight: 700; color: #B22222; }
-  .sidebar .brand p { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 2px; }
-  .sidebar nav { padding: 16px 0; }
-  .sidebar nav a { display: block; padding: 10px 24px; color: rgba(255,255,255,0.7); text-decoration: none; font-size: 14px; transition: all 0.2s; border-left: 3px solid transparent; }
-  .sidebar nav a.active, .sidebar nav a:hover { color: #fff; background: rgba(200,151,58,0.15); border-left-color: #B22222; }
-  .sidebar .logout { margin-top: auto; padding: 16px 24px; }
-  .sidebar .logout button { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.6); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; width: 100%; transition: all 0.2s; }
-  .sidebar .logout button:hover { border-color: #B22222; color: #B22222; }
+  #app { display: flex; height: 100vh; overflow: hidden; }
+  #sidebar {
+    width: 220px; min-width: 220px; background: #1B3A6B; color: #fff;
+    display: flex; flex-direction: column; height: 100vh; position: fixed; left: 0; top: 0;
+  }
+  .sidebar-logo { padding: 20px 16px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .sidebar-logo img { width: 100%; max-width: 140px; }
+  .sidebar-user { padding: 12px 16px; font-size: 0.8rem; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.05em; }
+  nav { flex: 1; padding: 8px 0; }
+  nav a {
+    display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+    color: rgba(255,255,255,0.8); text-decoration: none; font-size: 0.95rem;
+    cursor: pointer; border-left: 3px solid transparent; transition: all 0.15s;
+  }
+  nav a:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  nav a.active { background: rgba(255,255,255,0.12); color: #fff; border-left-color: #B22222; font-weight: 600; }
+  .sidebar-footer { padding: 16px; border-top: 1px solid rgba(255,255,255,0.1); }
+  .lock-btn {
+    width: 100%; padding: 10px; background: rgba(178,34,34,0.2); color: #fff;
+    border: 1px solid rgba(178,34,34,0.4); border-radius: 8px; cursor: pointer;
+    font-size: 0.85rem; transition: background 0.15s;
+  }
+  .lock-btn:hover { background: rgba(178,34,34,0.4); }
 
-  .main { margin-left: 220px; min-height: 100vh; }
-  .topbar { background: #fff; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e8ecf0; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-  .topbar h1 { font-size: 20px; font-weight: 700; color: #1B3A6B; }
-  .view-toggle { display: flex; gap: 8px; }
-  .view-btn { background: #f0f2f5; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; color: #666; transition: all 0.2s; }
-  .view-btn.active { background: #1B3A6B; color: #fff; }
+  #main { margin-left: 220px; flex: 1; overflow-y: auto; padding: 32px; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .page-header { margin-bottom: 24px; }
+  .page-header h1 { color: #1B3A6B; font-size: 1.6rem; margin-bottom: 4px; }
+  .page-header p { color: #666; font-size: 0.9rem; }
 
-  .content { padding: 24px 32px; }
+  .toolbar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+  .toolbar select, .toolbar input {
+    padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 8px;
+    font-size: 0.9rem; outline: none; background: #fff;
+  }
+  .btn-primary {
+    padding: 8px 18px; background: #1B3A6B; color: #fff; border: none;
+    border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 600; margin-left: auto;
+  }
+  .btn-primary:hover { background: #16305a; }
+  .btn-secondary { padding: 8px 18px; background: #f0f2f5; color: #333; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+  .btn-secondary:hover { background: #e0e4eb; }
+  .btn-danger { background: #B22222; color: #fff; padding: 8px 18px; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+  .btn-danger:hover { background: #8b1a1a; }
+  .btn-sm { padding: 5px 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
+  .btn-edit { background: #e8eef8; color: #1B3A6B; }
+  .btn-edit:hover { background: #c8d8f0; }
+  .btn-del { background: #fde8e8; color: #B22222; }
+  .btn-del:hover { background: #f8c8c8; }
 
-  /* Calendar */
-  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-  .cal-nav h2 { font-size: 20px; font-weight: 700; color: #1B3A6B; }
-  .cal-nav-btns { display: flex; gap: 8px; }
-  .cal-nav-btn { background: #fff; border: 2px solid #e0e0e0; border-radius: 8px; padding: 6px 14px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; color: #444; }
-  .cal-nav-btn:hover { border-color: #B22222; color: #B22222; }
+  .badge { font-size: 0.72rem; padding: 3px 8px; border-radius: 20px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+  .badge-cat { background: #e8eef8; color: #1B3A6B; }
+  .badge-draft { background: #e2e3e5; color: #383d41; }
+  .badge-review { background: #fff3cd; color: #856404; }
+  .badge-approved { background: #d1ecf1; color: #0c5460; }
+  .badge-scheduled { background: #d4edda; color: #155724; }
+  .badge-sent { background: #e8eef8; color: #1B3A6B; }
 
-  .cal-grid { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow: hidden; }
+  .pipeline-columns { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; align-items: flex-start; }
+  .pipeline-col { min-width: 220px; flex: 1; }
+  .pipeline-col-header {
+    padding: 10px 14px; border-radius: 8px 8px 0 0; font-size: 0.85rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 8px;
+  }
+  .col-draft { background: #e2e3e5; color: #383d41; }
+  .col-review { background: #fff3cd; color: #856404; }
+  .col-approved { background: #d1ecf1; color: #0c5460; }
+  .col-scheduled { background: #d4edda; color: #155724; }
+  .col-sent { background: #e8eef8; color: #1B3A6B; }
+  .pipeline-col-body { background: #f8f9fa; border: 1px solid #e0e4eb; border-top: none; border-radius: 0 0 8px 8px; min-height: 200px; padding: 8px; }
+  .pipeline-item {
+    background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.07); cursor: pointer; border: 1px solid #e8e8e8; transition: box-shadow 0.15s;
+  }
+  .pipeline-item:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.12); }
+  .pipeline-title { font-weight: 700; color: #1B3A6B; font-size: 0.9rem; margin-bottom: 4px; }
+  .pipeline-subject { font-size: 0.8rem; color: #666; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pipeline-meta { display: flex; justify-content: space-between; align-items: center; }
+  .pipeline-date { font-size: 0.75rem; color: #999; }
+  .badge-assignee { background: #e8eef8; color: #1B3A6B; font-size: 0.72rem; padding: 2px 7px; border-radius: 12px; font-weight: 600; }
+  .col-count { background: rgba(0,0,0,0.1); border-radius: 10px; padding: 1px 7px; font-size: 0.78rem; }
+
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    display: flex; align-items: center; justify-content: center; z-index: 500;
+  }
+  .modal {
+    background: #fff; border-radius: 12px; padding: 32px;
+    width: 580px; max-width: 95vw; max-height: 85vh; overflow-y: auto;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+  }
+  .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+  .modal-header h2 { color: #1B3A6B; font-size: 1.25rem; flex: 1; }
+  .close-btn { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #999; padding: 0 4px; }
+  .close-btn:hover { color: #333; }
+  .modal-field { margin-bottom: 16px; }
+  .modal-field label { display: block; font-size: 0.8rem; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .modal-field p { font-size: 0.95rem; color: #333; line-height: 1.6; }
+  .modal-field input, .modal-field textarea, .modal-field select {
+    width: 100%; padding: 10px 12px; border: 1.5px solid #ddd; border-radius: 8px;
+    font-size: 0.95rem; outline: none; font-family: inherit;
+  }
+  .modal-field input:focus, .modal-field textarea:focus, .modal-field select:focus { border-color: #1B3A6B; }
+  .modal-field textarea { min-height: 80px; resize: vertical; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; flex-wrap: wrap; }
+
+  .calendar-nav { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+  .calendar-nav h2 { color: #1B3A6B; font-size: 1.2rem; min-width: 180px; text-align: center; }
+  .cal-btn { padding: 8px 16px; background: #fff; border: 1.5px solid #ddd; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+  .cal-btn:hover { background: #f0f2f5; }
+  .calendar-grid { background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
   .cal-header { display: grid; grid-template-columns: repeat(7, 1fr); background: #1B3A6B; }
-  .cal-header div { padding: 10px; text-align: center; font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 0.5px; }
+  .cal-header div { padding: 10px; text-align: center; color: #fff; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; }
   .cal-body { display: grid; grid-template-columns: repeat(7, 1fr); }
-  .cal-day {
-    min-height: 100px; padding: 8px; border-right: 1px solid #f0f2f5; border-bottom: 1px solid #f0f2f5;
-    position: relative; transition: background 0.15s;
-  }
-  .cal-day:nth-child(7n) { border-right: none; }
-  .cal-day.other-month { background: #fafafa; }
-  .cal-day.today { background: rgba(200,151,58,0.06); }
-  .cal-day.holiday { background: rgba(0,0,0,0.03); }
-  .day-num { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 4px; }
-  .day-num.today-num { background: #B22222; color: #fff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; }
-  .holiday-name { font-size: 10px; color: #aaa; font-style: italic; margin-bottom: 3px; line-height: 1.2; }
-  .email-chip {
-    border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 600; color: #fff; margin-bottom: 2px;
-    cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: opacity 0.15s;
-  }
-  .email-chip:hover { opacity: 0.85; }
+  .cal-cell { min-height: 90px; padding: 6px; border-right: 1px solid #eee; border-bottom: 1px solid #eee; cursor: pointer; transition: background 0.1s; }
+  .cal-cell:hover { background: #f8f9ff; }
+  .cal-cell.other-month { background: #fafafa; }
+  .cal-cell.other-month .cal-date { color: #ccc; }
+  .cal-cell.today { background: #eef2ff; }
+  .cal-date { font-size: 0.85rem; font-weight: 600; color: #333; margin-bottom: 4px; }
+  .cal-cell.today .cal-date { background: #1B3A6B; color: #fff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .cal-item { font-size: 0.72rem; background: #1B3A6B; color: #fff; border-radius: 4px; padding: 2px 5px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  .cal-item:hover { background: #B22222; }
 
-  /* Status colors */
-  .s-dev { background: #d69e2e; }
-  .s-written { background: #3182ce; }
-  .s-review { background: #dd6b20; }
-  .s-scheduled { background: #805ad5; }
-  .s-sent { background: #38a169; }
-
-  /* List view */
-  .list-view { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow: hidden; }
-  .list-view table { width: 100%; border-collapse: collapse; }
-  .list-view th { background: #1B3A6B; color: rgba(255,255,255,0.85); padding: 12px 16px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
-  .list-view td { padding: 12px 16px; border-bottom: 1px solid #f0f2f5; font-size: 14px; color: #333; }
-  .list-view tr:last-child td { border-bottom: none; }
-  .list-view tr:hover td { background: #fafafa; }
-  .status-badge { border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; color: #fff; white-space: nowrap; }
-
-  /* Detail modal */
-  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
-  .modal-overlay.show { display: flex; }
-  .modal { background: #fff; border-radius: 14px; padding: 28px; width: 560px; max-width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-height: 85vh; overflow-y: auto; }
-  .modal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
-  .modal-header h3 { font-size: 18px; font-weight: 700; color: #1B3A6B; flex: 1; padding-right: 16px; }
-  .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #aaa; line-height: 1; }
-  .detail-row { margin-bottom: 14px; }
-  .detail-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; font-weight: 700; margin-bottom: 4px; }
-  .detail-val { font-size: 14px; color: #333; line-height: 1.5; background: #f8f9fa; padding: 10px 12px; border-radius: 8px; }
-  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-  .loading { text-align: center; padding: 60px; }
-  .spinner { width: 40px; height: 40px; border: 3px solid #e0e0e0; border-top-color: #B22222; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+  .loading { text-align: center; padding: 48px; color: #888; }
+  .spinner { width: 32px; height: 32px; border: 3px solid #e0e4eb; border-top-color: #1B3A6B; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .empty-state { text-align: center; padding: 32px; color: #aaa; font-size: 0.9rem; }
+  .empty-icon { font-size: 2rem; margin-bottom: 8px; }
 
-  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
-  .legend span { font-size: 12px; color: #666; }
-  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #555; }
-  .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+  .copy-btn { padding: 6px 14px; background: #f0f2f5; color: #333; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+  .copy-btn:hover { background: #e0e4eb; }
 </style>
 </head>
 <body>
 
-<div id="pw-overlay">
-  <div class="pw-box">
-    <div class="logo"><img src="/static/ba-logo.jpg" alt="Blue Alpha" style="width:180px;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;"></div>
-    <div class="sub">Kelly's Dashboard — Email Calendar</div>
-    <input type="password" id="pw-input" placeholder="Enter password" onkeydown="if(event.key==='Enter')checkPw()">
-    <button onclick="checkPw()">Unlock Dashboard</button>
-    <div class="error" id="pw-error">Incorrect password. Try again.</div>
+<div id="login-overlay">
+  <div class="login-card">
+    <img src="/static/ba-logo.jpg" alt="Blue Alpha">
+    <h2>Kelly's Dashboard</h2>
+    <p>Enter your password to continue</p>
+    <input type="password" id="login-pw" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()">Unlock Dashboard</button>
+    <div class="login-error" id="login-error">Incorrect password. Try again.</div>
   </div>
 </div>
 
-<div class="sidebar">
-  <div class="brand"><img src="/static/ba-logo.jpg" alt="Blue Alpha" style="width:140px;display:block;margin-bottom:4px;"><p>Email Calendar</p></div>
-  <nav>
-    <a href="kurt.html">📋 Kurt's Ideas</a>
-    <a href="#" class="active">📅 Email Calendar</a>
-    <a href="patty.html">📊 Patty's Pipeline</a>
-    <a href="jesse.html">👁 Jesse's Overview</a>
-  </nav>
-  <div class="logout"><button onclick="logout()">🔒 Lock Dashboard</button></div>
-</div>
-
-<div class="main">
-  <div class="topbar">
-    <h1>Kelly's Dashboard — Email Calendar</h1>
-    <div class="view-toggle">
-      <button class="view-btn active" id="btn-cal" onclick="switchView('cal')">📅 Calendar</button>
-      <button class="view-btn" id="btn-list" onclick="switchView('list')">☰ List</button>
+<div id="app" style="display:none">
+  <div id="sidebar">
+    <div class="sidebar-logo"><img src="/static/ba-logo.jpg" alt="Blue Alpha"></div>
+    <div class="sidebar-user">Kelly Sargent</div>
+    <nav>
+      <a onclick="showTab('pipeline')" id="nav-pipeline">📊 E-mail Pipeline</a>
+      <a onclick="showTab('calendar')" id="nav-calendar">📅 E-mail Calendar</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="lock-btn" onclick="lockDashboard()">🔒 Lock Dashboard</button>
     </div>
   </div>
+  <div id="main">
 
-  <div class="content">
-    <div id="view-cal">
-      <div class="cal-nav">
-        <div class="cal-nav-btns">
-          <button class="cal-nav-btn" onclick="changeMonth(-1)">← Prev</button>
-          <button class="cal-nav-btn" onclick="goToday()">Today</button>
-          <button class="cal-nav-btn" onclick="changeMonth(1)">Next →</button>
+    <!-- PIPELINE TAB -->
+    <div class="tab-panel" id="tab-pipeline">
+      <div class="page-header">
+        <h1>📊 E-mail Pipeline</h1>
+        <p>Manage email campaigns by status</p>
+      </div>
+      <div class="toolbar">
+        <button class="btn-primary" onclick="openPipelineModal(null)">+ Add New Email</button>
+      </div>
+      <div class="pipeline-columns" id="pipeline-cols"></div>
+    </div>
+
+    <!-- CALENDAR TAB -->
+    <div class="tab-panel" id="tab-calendar">
+      <div class="page-header">
+        <h1>📅 E-mail Calendar</h1>
+        <p>Scheduled email campaigns — click a date to schedule</p>
+      </div>
+      <div class="calendar-nav">
+        <button class="cal-btn" onclick="changeMonth(-1)">← Prev</button>
+        <h2 id="cal-title"></h2>
+        <button class="cal-btn" onclick="changeMonth(1)">Next →</button>
+      </div>
+      <div class="calendar-grid">
+        <div class="cal-header">
+          <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
         </div>
-        <h2 id="cal-title">Loading...</h2>
-        <button class="cal-nav-btn" onclick="loadPipeline()" style="border-color:#B22222;color:#B22222;">↻ Refresh</button>
+        <div class="cal-body" id="cal-body"></div>
       </div>
-      <div class="legend">
-        <span>Status:</span>
-        <div class="legend-item"><div class="legend-dot s-dev"></div> In Development</div>
-        <div class="legend-item"><div class="legend-dot s-written"></div> Copy Written</div>
-        <div class="legend-item"><div class="legend-dot s-review"></div> In Review</div>
-        <div class="legend-item"><div class="legend-dot s-scheduled"></div> Scheduled</div>
-        <div class="legend-item"><div class="legend-dot s-sent"></div> Sent</div>
-      </div>
-      <div id="cal-loading" class="loading"><div class="spinner"></div><div style="color:#888;">Loading calendar...</div></div>
-      <div id="cal-grid" style="display:none;"></div>
     </div>
 
-    <div id="view-list" style="display:none;">
-      <div id="list-loading" class="loading"><div class="spinner"></div><div style="color:#888;">Loading pipeline...</div></div>
-      <div id="list-table" style="display:none;"></div>
-    </div>
   </div>
 </div>
 
-<!-- Detail Modal -->
-<div class="modal-overlay" id="modal">
+<!-- PIPELINE MODAL -->
+<div class="modal-backdrop" id="pipeline-modal" style="display:none" onclick="closeModalOnBackdrop(event,'pipeline-modal')">
   <div class="modal">
     <div class="modal-header">
-      <h3 id="modal-title">Email Details</h3>
-      <button class="modal-close" onclick="closeModal()">✕</button>
+      <h2 id="pipeline-modal-title">Email Details</h2>
+      <button class="close-btn" onclick="closeModal('pipeline-modal')">×</button>
     </div>
-    <div id="modal-body"></div>
+    <div id="pipeline-modal-body"></div>
+    <div class="modal-actions" id="pipeline-modal-actions"></div>
+  </div>
+</div>
+
+<!-- CAL ITEM MODAL -->
+<div class="modal-backdrop" id="cal-modal" style="display:none" onclick="closeModalOnBackdrop(event,'cal-modal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="cal-modal-title">Scheduled Email</h2>
+      <button class="close-btn" onclick="closeModal('cal-modal')">×</button>
+    </div>
+    <div id="cal-modal-body"></div>
+    <div class="modal-actions" id="cal-modal-actions"></div>
+  </div>
+</div>
+
+<!-- ADD TO CALENDAR MODAL -->
+<div class="modal-backdrop" id="addcal-modal" style="display:none" onclick="closeModalOnBackdrop(event,'addcal-modal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Schedule Email for <span id="addcal-date-label"></span></h2>
+      <button class="close-btn" onclick="closeModal('addcal-modal')">×</button>
+    </div>
+    <div id="addcal-body"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal('addcal-modal')">Cancel</button>
+      <button class="btn-primary" onclick="saveScheduledDate()">Save</button>
+    </div>
   </div>
 </div>
 
@@ -180,250 +270,308 @@
 const AT_TOKEN = 'pat3wxVXHb3JhDBBn.e0ca55ff285ba026b093f4232320f63fff16252679f6a4c08cc85ea3425c4954';
 const BASE_ID = 'appTCZwoETAInVuiX';
 const PIPELINE_TABLE = 'tblrFJ5qikGN5H5X9';
+const AUTH_KEY = 'ba_kelly_auth';
 const PASSWORD = 'bluealpha2026';
-const PW_KEY = 'ba_kelly_auth';
 
 let pipelineData = [];
-let currentView = 'cal';
-let viewDate = new Date();
+let calYear, calMonth;
+let editingPipelineId = null;
+let addCalDate = null;
 
-const HOLIDAYS = {
-  '01-01': "New Year's Day", '01-20': 'MLK Day', '02-17': "Presidents Day",
-  '05-26': 'Memorial Day', '07-04': 'Independence Day', '09-01': 'Labor Day',
-  '11-11': "Veterans Day", '11-27': 'Thanksgiving', '12-25': 'Christmas'
-};
-
-// Generate holidays for a given year
-function getHolidaysForYear(year) {
-  const h = {};
-  // Static ones
-  h[`${year}-01-01`] = "New Year's Day";
-  h[`${year}-07-04`] = 'Independence Day';
-  h[`${year}-11-11`] = 'Veterans Day';
-  h[`${year}-12-25`] = 'Christmas';
-  
-  // MLK Day - 3rd Monday of January
-  h[nthWeekday(year, 1, 1, 3)] = 'MLK Day';
-  // Presidents Day - 3rd Monday of February
-  h[nthWeekday(year, 2, 1, 3)] = "Presidents Day";
-  // Memorial Day - last Monday of May
-  h[lastWeekday(year, 5, 1)] = 'Memorial Day';
-  // Labor Day - 1st Monday of September
-  h[nthWeekday(year, 9, 1, 1)] = 'Labor Day';
-  // Thanksgiving - 4th Thursday of November
-  h[nthWeekday(year, 11, 4, 4)] = 'Thanksgiving';
-  
-  return h;
-}
-
-function nthWeekday(year, month, dow, n) {
-  // dow: 0=Sun, 1=Mon... 4=Thu
-  let d = new Date(year, month-1, 1);
-  let count = 0;
-  while (true) {
-    if (d.getDay() === dow) { count++; if (count === n) return fmtDate(d); }
-    d.setDate(d.getDate()+1);
-    if (d.getMonth() !== month-1) break;
-  }
-  return null;
-}
-
-function lastWeekday(year, month, dow) {
-  let d = new Date(year, month, 0); // last day of month
-  while (d.getDay() !== dow) d.setDate(d.getDate()-1);
-  return fmtDate(d);
-}
-
-function fmtDate(d) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-
-function checkPw() {
-  const val = document.getElementById('pw-input').value;
-  if (val === PASSWORD) {
-    localStorage.setItem(PW_KEY, 'true');
-    document.getElementById('pw-overlay').style.display = 'none';
-    loadPipeline();
+function doLogin() {
+  const pw = document.getElementById('login-pw').value;
+  if (pw === PASSWORD) {
+    localStorage.setItem(AUTH_KEY, '1');
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    initApp();
   } else {
-    document.getElementById('pw-error').style.display = 'block';
-    document.getElementById('pw-input').value = '';
+    document.getElementById('login-error').style.display = 'block';
   }
 }
-function logout() { localStorage.removeItem(PW_KEY); location.reload(); }
+function lockDashboard() { localStorage.removeItem(AUTH_KEY); location.reload(); }
+function checkAuth() {
+  if (localStorage.getItem(AUTH_KEY) === '1') {
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    initApp();
+  }
+}
 
-if (localStorage.getItem(PW_KEY) === 'true') {
-  document.getElementById('pw-overlay').style.display = 'none';
+function initApp() {
+  const now = new Date();
+  calYear = now.getFullYear(); calMonth = now.getMonth();
+  showTab('pipeline');
   loadPipeline();
 }
 
+function showTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('nav-' + tab).classList.add('active');
+  if (tab === 'calendar') renderCalendar();
+}
+
+async function atFetch(table, params='') {
+  const url = `https://api.airtable.com/v0/${BASE_ID}/${table}?${params}`;
+  const resp = await fetch(url, { headers: { Authorization: `Bearer ${AT_TOKEN}` } });
+  if (!resp.ok) throw new Error('Airtable error: ' + resp.status);
+  return resp.json();
+}
+async function atCreate(table, fields) {
+  const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${table}`, {
+    method: 'POST', headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields })
+  });
+  return resp.json();
+}
+async function atUpdate(table, id, fields) {
+  const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${table}/${id}`, {
+    method: 'PATCH', headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields })
+  });
+  return resp.json();
+}
+async function atDelete(table, id) {
+  await fetch(`https://api.airtable.com/v0/${BASE_ID}/${table}/${id}`, {
+    method: 'DELETE', headers: { Authorization: `Bearer ${AT_TOKEN}` }
+  });
+}
+async function atFetchAll(table, params='') {
+  let records = [], offset = null;
+  do {
+    const p = offset ? params + '&offset=' + offset : params;
+    const data = await atFetch(table, p);
+    records = records.concat(data.records || []);
+    offset = data.offset || null;
+  } while (offset);
+  return records;
+}
+
 async function loadPipeline() {
+  const cols = document.getElementById('pipeline-cols');
+  cols.innerHTML = '<div class="loading"><div class="spinner"></div>Loading pipeline...</div>';
   try {
-    let records = [];
-    let offset = null;
-    do {
-      let url = `https://api.airtable.com/v0/${BASE_ID}/${PIPELINE_TABLE}?pageSize=100`;
-      if (offset) url += `&offset=${offset}`;
-      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${AT_TOKEN}` } });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error.message);
-      records = records.concat(data.records);
-      offset = data.offset;
-    } while (offset);
-    pipelineData = records;
-    renderCurrentView();
+    pipelineData = await atFetchAll(PIPELINE_TABLE, 'sort[0][field]=Priority Score&sort[0][direction]=desc');
+    renderPipeline();
   } catch(e) {
+    cols.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>Failed to load pipeline.</div>`;
     console.error(e);
   }
 }
 
-function switchView(v) {
-  currentView = v;
-  document.getElementById('view-cal').style.display = v === 'cal' ? '' : 'none';
-  document.getElementById('view-list').style.display = v === 'list' ? '' : 'none';
-  document.getElementById('btn-cal').className = 'view-btn' + (v==='cal'?' active':'');
-  document.getElementById('btn-list').className = 'view-btn' + (v==='list'?' active':'');
-  renderCurrentView();
-}
+const STATUSES = ['Draft','In Review','Approved','Scheduled','Sent'];
+const STATUS_CLASSES = { 'Draft':'col-draft','In Review':'col-review','Approved':'col-approved','Scheduled':'col-scheduled','Sent':'col-sent' };
 
-function renderCurrentView() {
-  if (currentView === 'cal') renderCalendar();
-  else renderList();
-}
-
-function changeMonth(delta) {
-  viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + delta, 1);
-  renderCalendar();
-}
-function goToday() { viewDate = new Date(); renderCalendar(); }
-
-function statusClass(status) {
-  const m = { 'In Development': 's-dev', 'Copy Written': 's-written', 'In Review': 's-review', 'Scheduled': 's-scheduled', 'Sent': 's-sent' };
-  return m[status] || 's-dev';
-}
-
-function renderCalendar() {
-  document.getElementById('cal-loading').style.display = 'none';
-  document.getElementById('cal-grid').style.display = '';
-
-  const year = viewDate.getFullYear();
-  const month = viewDate.getMonth();
-  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  document.getElementById('cal-title').textContent = `${months[month]} ${year}`;
-
-  const holidays = getHolidaysForYear(year);
-  const today = fmtDate(new Date());
-
-  // Build date-to-emails map
-  const emailsByDate = {};
+function renderPipeline() {
+  const grouped = {};
+  STATUSES.forEach(s => grouped[s] = []);
   pipelineData.forEach(r => {
-    const d = r.fields['Scheduled Date'];
-    if (d) {
-      if (!emailsByDate[d]) emailsByDate[d] = [];
-      emailsByDate[d].push(r);
-    }
+    const s = r.fields['Status'] || 'Draft';
+    if (grouped[s]) grouped[s].push(r); else grouped['Draft'].push(r);
   });
-
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month+1, 0).getDate();
-  const daysInPrev = new Date(year, month, 0).getDate();
-
-  let html = `<div class="cal-grid"><div class="cal-header">`;
-  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => html += `<div>${d}</div>`);
-  html += `</div><div class="cal-body">`;
-
-  // Prev month days
-  for (let i = firstDay - 1; i >= 0; i--) {
-    html += `<div class="cal-day other-month"><div class="day-num" style="color:#ccc;">${daysInPrev - i}</div></div>`;
-  }
-
-  // Current month
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const isToday = dateStr === today;
-    const holiday = holidays[dateStr];
-    const emails = emailsByDate[dateStr] || [];
-    
-    html += `<div class="cal-day ${holiday ? 'holiday' : ''} ${isToday ? 'today' : ''}">`;
-    html += `<div class="day-num ${isToday ? 'today-num' : ''}">${d}</div>`;
-    if (holiday) html += `<div class="holiday-name">🏛 ${holiday}</div>`;
-    emails.forEach(e => {
-      html += `<div class="email-chip ${statusClass(e.fields.Status)}" onclick="showDetail('${e.id}')" title="${escHtml(e.fields['Email Title']||'')}">${escHtml(e.fields['Email Title'] || 'Untitled')}</div>`;
-    });
-    html += `</div>`;
-  }
-
-  // Next month fill
-  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
-  for (let d = 1; d <= totalCells - firstDay - daysInMonth; d++) {
-    html += `<div class="cal-day other-month"><div class="day-num" style="color:#ccc;">${d}</div></div>`;
-  }
-
-  html += `</div></div>`;
-  document.getElementById('cal-grid').innerHTML = html;
+  const cols = document.getElementById('pipeline-cols');
+  cols.innerHTML = STATUSES.map(status => {
+    const items = grouped[status];
+    return `<div class="pipeline-col">
+      <div class="pipeline-col-header ${STATUS_CLASSES[status]}">
+        ${status} <span class="col-count">${items.length}</span>
+      </div>
+      <div class="pipeline-col-body">
+        ${items.length === 0 ? '<div class="empty-state"><div class="empty-icon">📭</div>Empty</div>' :
+          items.map(r => {
+            const f = r.fields;
+            return `<div class="pipeline-item" onclick="viewPipelineItem('${r.id}')">
+              <div class="pipeline-title">${f['Email Title']||'Untitled'}</div>
+              <div class="pipeline-subject">${f['Subject Line']||'No subject'}</div>
+              <div class="pipeline-meta">
+                <span class="pipeline-date">${f['Scheduled Date']||'No date'}</span>
+                ${f['Assigned To'] ? `<span class="badge-assignee">${f['Assigned To']}</span>` : ''}
+              </div>
+            </div>`;
+          }).join('')}
+      </div>
+    </div>`;
+  }).join('');
 }
 
-function renderList() {
-  document.getElementById('list-loading').style.display = 'none';
-  document.getElementById('list-table').style.display = '';
-
-  const sorted = [...pipelineData].sort((a,b) => {
-    const da = a.fields['Scheduled Date'] || '9999';
-    const db = b.fields['Scheduled Date'] || '9999';
-    return da.localeCompare(db);
-  });
-
-  if (!sorted.length) {
-    document.getElementById('list-table').innerHTML = '<div style="text-align:center;padding:40px;color:#aaa;">No pipeline items yet.</div>';
-    return;
-  }
-
-  let html = `<div class="list-view"><table>
-    <thead><tr><th>Title</th><th>Category</th><th>Status</th><th>Scheduled Date</th><th>Subject Line</th><th>Assigned To</th></tr></thead>
-    <tbody>`;
-  
-  sorted.forEach(r => {
-    const f = r.fields;
-    html += `<tr>
-      <td style="font-weight:600;color:#1B3A6B;">${escHtml(f['Email Title'] || '—')}</td>
-      <td><span style="background:#f0f2f5;padding:2px 8px;border-radius:12px;font-size:12px;">${escHtml(f.Category || '—')}</span></td>
-      <td><span class="status-badge ${statusClass(f.Status)}">${escHtml(f.Status || '—')}</span></td>
-      <td>${f['Scheduled Date'] ? new Date(f['Scheduled Date']+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'}</td>
-      <td style="color:#555;font-size:13px;">${escHtml(f['Subject Line'] || '—')}</td>
-      <td style="color:#666;">${escHtml(f['Assigned To'] || '—')}</td>
-    </tr>`;
-  });
-  
-  html += `</tbody></table></div>`;
-  document.getElementById('list-table').innerHTML = html;
-}
-
-function showDetail(id) {
+function viewPipelineItem(id) {
   const r = pipelineData.find(x => x.id === id);
   if (!r) return;
   const f = r.fields;
-  
-  document.getElementById('modal-title').textContent = f['Email Title'] || 'Email Details';
-  
-  let body = `<div class="detail-grid">
-    <div class="detail-row"><div class="detail-label">Status</div><div class="detail-val"><span class="status-badge ${statusClass(f.Status)}" style="font-size:12px;">${escHtml(f.Status||'—')}</span></div></div>
-    <div class="detail-row"><div class="detail-label">Category</div><div class="detail-val">${escHtml(f.Category||'—')}</div></div>
-    <div class="detail-row"><div class="detail-label">Scheduled Date</div><div class="detail-val">${f['Scheduled Date'] ? new Date(f['Scheduled Date']+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}) : '—'}</div></div>
-    <div class="detail-row"><div class="detail-label">Assigned To</div><div class="detail-val">${escHtml(f['Assigned To']||'—')}</div></div>
-  </div>`;
-  
-  if (f['Subject Line']) body += `<div class="detail-row"><div class="detail-label">Subject Line</div><div class="detail-val" style="font-weight:600;">${escHtml(f['Subject Line'])}</div></div>`;
-  if (f.Description) body += `<div class="detail-row"><div class="detail-label">Description</div><div class="detail-val">${escHtml(f.Description)}</div></div>`;
-  if (f['Copy Draft']) body += `<div class="detail-row"><div class="detail-label">Copy Draft</div><div class="detail-val" style="white-space:pre-wrap;font-size:13px;">${escHtml(f['Copy Draft'])}</div></div>`;
-  if (f.Notes) body += `<div class="detail-row"><div class="detail-label">Notes</div><div class="detail-val">${escHtml(f.Notes)}</div></div>`;
-  
-  document.getElementById('modal-body').innerHTML = body;
-  document.getElementById('modal').classList.add('show');
+  document.getElementById('pipeline-modal-title').textContent = f['Email Title']||'Email Details';
+  document.getElementById('pipeline-modal-body').innerHTML = `
+    <div class="modal-field"><label>Email Title</label><p>${f['Email Title']||'—'}</p></div>
+    <div class="modal-field"><label>Category</label><p>${f['Category']||'—'}</p></div>
+    <div class="modal-field"><label>Subject Line</label><p>${f['Subject Line']||'—'}</p></div>
+    <div class="modal-field"><label>Description</label><p>${f['Description']||'—'}</p></div>
+    <div class="modal-field"><label>Status</label><p>${f['Status']||'—'}</p></div>
+    <div class="modal-field"><label>Scheduled Date</label><p>${f['Scheduled Date']||'—'}</p></div>
+    <div class="modal-field"><label>Assigned To</label><p>${f['Assigned To']||'—'}</p></div>
+    <div class="modal-field"><label>Priority Score</label><p>${f['Priority Score']||'—'}</p></div>
+    <div class="modal-field"><label>Notes</label><p>${f['Notes']||'—'}</p></div>
+    ${f['Description'] ? `<div class="modal-field"><label>Draft Preview</label>
+      <div style="background:#f8f9fa;padding:12px;border-radius:8px;font-size:0.9rem;line-height:1.6">${f['Description']}</div>
+      <button class="copy-btn" style="margin-top:8px" onclick="navigator.clipboard.writeText('${(f['Description']||'').replace(/'/g,"\\'")}').then(()=>this.textContent='Copied!').catch(()=>{})">📋 Copy Draft</button>
+    </div>` : ''}
+  `;
+  document.getElementById('pipeline-modal-actions').innerHTML = `
+    <button class="btn-secondary" onclick="closeModal('pipeline-modal')">Close</button>
+    <button class="btn-primary" onclick="openPipelineModal('${id}')">Edit</button>
+    <button class="btn-danger" onclick="deletePipelineItem('${id}')">Delete</button>
+  `;
+  document.getElementById('pipeline-modal').style.display = 'flex';
 }
 
-function closeModal() { document.getElementById('modal').classList.remove('show'); }
-document.getElementById('modal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+function openPipelineModal(id) {
+  closeModal('pipeline-modal');
+  editingPipelineId = id;
+  const r = id ? pipelineData.find(x => x.id === id) : null;
+  const f = r ? r.fields : {};
+  document.getElementById('pipeline-modal-title').textContent = id ? 'Edit Email' : 'Add New Email';
+  document.getElementById('pipeline-modal-body').innerHTML = `
+    <div class="modal-field"><label>Email Title *</label><input id="f-title" value="${f['Email Title']||''}"></div>
+    <div class="modal-field"><label>Category</label><input id="f-cat" value="${f['Category']||''}"></div>
+    <div class="modal-field"><label>Subject Line</label><input id="f-subject" value="${f['Subject Line']||''}"></div>
+    <div class="modal-field"><label>Description / Draft</label><textarea id="f-desc">${f['Description']||''}</textarea></div>
+    <div class="modal-field"><label>Status</label>
+      <select id="f-status">
+        ${STATUSES.map(s=>`<option ${f['Status']===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+    </div>
+    <div class="modal-field"><label>Scheduled Date</label><input id="f-date" type="date" value="${f['Scheduled Date']||''}"></div>
+    <div class="modal-field"><label>Assigned To</label><input id="f-assigned" value="${f['Assigned To']||''}"></div>
+    <div class="modal-field"><label>Priority Score (1-10)</label><input id="f-priority" type="number" min="1" max="10" value="${f['Priority Score']||''}"></div>
+    <div class="modal-field"><label>Notes</label><textarea id="f-notes">${f['Notes']||''}</textarea></div>
+  `;
+  document.getElementById('pipeline-modal-actions').innerHTML = `
+    <button class="btn-secondary" onclick="closeModal('pipeline-modal')">Cancel</button>
+    <button class="btn-primary" onclick="savePipelineItem()">Save</button>
+  `;
+  document.getElementById('pipeline-modal').style.display = 'flex';
+}
 
-function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+async function savePipelineItem() {
+  const fields = {
+    'Email Title': document.getElementById('f-title').value,
+    'Category': document.getElementById('f-cat').value,
+    'Subject Line': document.getElementById('f-subject').value,
+    'Description': document.getElementById('f-desc').value,
+    'Status': document.getElementById('f-status').value,
+    'Assigned To': document.getElementById('f-assigned').value,
+    'Notes': document.getElementById('f-notes').value,
+  };
+  const d = document.getElementById('f-date').value;
+  if (d) fields['Scheduled Date'] = d;
+  const p = document.getElementById('f-priority').value;
+  if (p) fields['Priority Score'] = parseInt(p);
+  try {
+    if (editingPipelineId) { await atUpdate(PIPELINE_TABLE, editingPipelineId, fields); }
+    else { await atCreate(PIPELINE_TABLE, fields); }
+    closeModal('pipeline-modal');
+    loadPipeline();
+  } catch(e) { alert('Save failed: ' + e.message); }
+}
+
+async function deletePipelineItem(id) {
+  if (!confirm('Delete this email?')) return;
+  try { await atDelete(PIPELINE_TABLE, id); closeModal('pipeline-modal'); loadPipeline(); }
+  catch(e) { alert('Delete failed: ' + e.message); }
+}
+
+// CALENDAR
+function changeMonth(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-title').textContent = `${months[calMonth]} ${calYear}`;
+  const today = new Date();
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const daysInPrev = new Date(calYear, calMonth, 0).getDate();
+  const byDate = {};
+  pipelineData.forEach(r => {
+    const d = r.fields['Scheduled Date'];
+    if (d) { if (!byDate[d]) byDate[d] = []; byDate[d].push(r); }
+  });
+  let html = '', day = 1, nextDay = 1;
+  for (let i = 0; i < 42; i++) {
+    if (i < firstDay) {
+      html += `<div class="cal-cell other-month"><div class="cal-date">${daysInPrev - firstDay + i + 1}</div></div>`;
+    } else if (day > daysInMonth) {
+      html += `<div class="cal-cell other-month"><div class="cal-date">${nextDay++}</div></div>`;
+    } else {
+      const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      const isToday = calYear===today.getFullYear() && calMonth===today.getMonth() && day===today.getDate();
+      const items = byDate[dateStr] || [];
+      const d = day;
+      html += `<div class="cal-cell${isToday?' today':''}" onclick="handleCalCellClick('${dateStr}')">
+        <div class="cal-date">${d}</div>
+        ${items.map(r=>`<div class="cal-item" onclick="event.stopPropagation();viewCalItem('${r.id}')">${r.fields['Email Title']||'Email'}</div>`).join('')}
+      </div>`;
+      day++;
+    }
+  }
+  document.getElementById('cal-body').innerHTML = html;
+}
+
+function handleCalCellClick(dateStr) { openAddCalModal(dateStr); }
+
+function openAddCalModal(dateStr) {
+  addCalDate = dateStr;
+  const available = pipelineData.filter(r => !r.fields['Scheduled Date'] || r.fields['Scheduled Date'] !== dateStr);
+  document.getElementById('addcal-date-label').textContent = dateStr;
+  document.getElementById('addcal-body').innerHTML = available.length
+    ? `<div class="modal-field"><label>Select Email to Schedule</label>
+        <select id="addcal-select">
+          <option value="">-- Choose an email --</option>
+          ${available.map(r=>`<option value="${r.id}">${r.fields['Email Title']||'Untitled'}</option>`).join('')}
+        </select>
+       </div>`
+    : '<p style="color:#888">No unscheduled emails available.</p>';
+  document.getElementById('addcal-modal').style.display = 'flex';
+}
+
+async function saveScheduledDate() {
+  const sel = document.getElementById('addcal-select');
+  if (!sel || !sel.value) { closeModal('addcal-modal'); return; }
+  try {
+    await atUpdate(PIPELINE_TABLE, sel.value, { 'Scheduled Date': addCalDate });
+    closeModal('addcal-modal');
+    await loadPipeline();
+    renderCalendar();
+  } catch(e) { alert('Save failed: ' + e.message); }
+}
+
+function viewCalItem(id) {
+  const r = pipelineData.find(x => x.id === id);
+  if (!r) return;
+  const f = r.fields;
+  document.getElementById('cal-modal-title').textContent = f['Email Title']||'Email';
+  document.getElementById('cal-modal-body').innerHTML = `
+    <div class="modal-field"><label>Email Title</label><p>${f['Email Title']||'—'}</p></div>
+    <div class="modal-field"><label>Subject Line</label><p>${f['Subject Line']||'—'}</p></div>
+    <div class="modal-field"><label>Status</label><p>${f['Status']||'—'}</p></div>
+    <div class="modal-field"><label>Scheduled Date</label><p>${f['Scheduled Date']||'—'}</p></div>
+    <div class="modal-field"><label>Notes</label><p>${f['Notes']||'—'}</p></div>
+  `;
+  document.getElementById('cal-modal-actions').innerHTML = `
+    <button class="btn-secondary" onclick="closeModal('cal-modal')">Close</button>
+    <button class="btn-primary" onclick="openPipelineModal('${id}');closeModal('cal-modal')">Edit</button>
+  `;
+  document.getElementById('cal-modal').style.display = 'flex';
+}
+
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+function closeModalOnBackdrop(e, id) { if (e.target.classList.contains('modal-backdrop')) closeModal(id); }
+
+checkAuth();
 </script>
 </body>
 </html>
