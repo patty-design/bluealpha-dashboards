@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kelly's Dashboard — Email Calendar</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; min-height: 100vh; }
+
+  #pw-overlay { position: fixed; inset: 0; background: #1B2A4A; display: flex; align-items: center; justify-content: center; z-index: 9999; }
+  .pw-box { background: #fff; border-radius: 12px; padding: 40px; width: 360px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+  .pw-box .logo { font-size: 28px; font-weight: 700; color: #1B2A4A; margin-bottom: 4px; }
+  .pw-box .sub { color: #888; font-size: 14px; margin-bottom: 28px; }
+  .pw-box input { width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; outline: none; margin-bottom: 12px; transition: border-color 0.2s; }
+  .pw-box input:focus { border-color: #C8973A; }
+  .pw-box button { width: 100%; padding: 12px; background: #C8973A; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
+  .pw-box .error { color: #e53e3e; font-size: 13px; margin-top: 8px; display: none; }
+
+  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #1B2A4A; color: #fff; padding: 24px 0; display: flex; flex-direction: column; }
+  .sidebar .brand { padding: 0 24px 24px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .sidebar .brand h2 { font-size: 18px; font-weight: 700; color: #C8973A; }
+  .sidebar .brand p { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+  .sidebar nav { padding: 16px 0; }
+  .sidebar nav a { display: block; padding: 10px 24px; color: rgba(255,255,255,0.7); text-decoration: none; font-size: 14px; transition: all 0.2s; border-left: 3px solid transparent; }
+  .sidebar nav a.active, .sidebar nav a:hover { color: #fff; background: rgba(200,151,58,0.15); border-left-color: #C8973A; }
+  .sidebar .logout { margin-top: auto; padding: 16px 24px; }
+  .sidebar .logout button { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.6); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; width: 100%; transition: all 0.2s; }
+  .sidebar .logout button:hover { border-color: #C8973A; color: #C8973A; }
+
+  .main { margin-left: 220px; min-height: 100vh; }
+  .topbar { background: #fff; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e8ecf0; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .topbar h1 { font-size: 20px; font-weight: 700; color: #1B2A4A; }
+  .view-toggle { display: flex; gap: 8px; }
+  .view-btn { background: #f0f2f5; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; color: #666; transition: all 0.2s; }
+  .view-btn.active { background: #1B2A4A; color: #fff; }
+
+  .content { padding: 24px 32px; }
+
+  /* Calendar */
+  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .cal-nav h2 { font-size: 20px; font-weight: 700; color: #1B2A4A; }
+  .cal-nav-btns { display: flex; gap: 8px; }
+  .cal-nav-btn { background: #fff; border: 2px solid #e0e0e0; border-radius: 8px; padding: 6px 14px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; color: #444; }
+  .cal-nav-btn:hover { border-color: #C8973A; color: #C8973A; }
+
+  .cal-grid { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow: hidden; }
+  .cal-header { display: grid; grid-template-columns: repeat(7, 1fr); background: #1B2A4A; }
+  .cal-header div { padding: 10px; text-align: center; font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 0.5px; }
+  .cal-body { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .cal-day {
+    min-height: 100px; padding: 8px; border-right: 1px solid #f0f2f5; border-bottom: 1px solid #f0f2f5;
+    position: relative; transition: background 0.15s;
+  }
+  .cal-day:nth-child(7n) { border-right: none; }
+  .cal-day.other-month { background: #fafafa; }
+  .cal-day.today { background: rgba(200,151,58,0.06); }
+  .cal-day.holiday { background: rgba(0,0,0,0.03); }
+  .day-num { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 4px; }
+  .day-num.today-num { background: #C8973A; color: #fff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+  .holiday-name { font-size: 10px; color: #aaa; font-style: italic; margin-bottom: 3px; line-height: 1.2; }
+  .email-chip {
+    border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 600; color: #fff; margin-bottom: 2px;
+    cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: opacity 0.15s;
+  }
+  .email-chip:hover { opacity: 0.85; }
+
+  /* Status colors */
+  .s-dev { background: #d69e2e; }
+  .s-written { background: #3182ce; }
+  .s-review { background: #dd6b20; }
+  .s-scheduled { background: #805ad5; }
+  .s-sent { background: #38a169; }
+
+  /* List view */
+  .list-view { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow: hidden; }
+  .list-view table { width: 100%; border-collapse: collapse; }
+  .list-view th { background: #1B2A4A; color: rgba(255,255,255,0.85); padding: 12px 16px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+  .list-view td { padding: 12px 16px; border-bottom: 1px solid #f0f2f5; font-size: 14px; color: #333; }
+  .list-view tr:last-child td { border-bottom: none; }
+  .list-view tr:hover td { background: #fafafa; }
+  .status-badge { border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; color: #fff; white-space: nowrap; }
+
+  /* Detail modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: #fff; border-radius: 14px; padding: 28px; width: 560px; max-width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-height: 85vh; overflow-y: auto; }
+  .modal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
+  .modal-header h3 { font-size: 18px; font-weight: 700; color: #1B2A4A; flex: 1; padding-right: 16px; }
+  .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #aaa; line-height: 1; }
+  .detail-row { margin-bottom: 14px; }
+  .detail-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; font-weight: 700; margin-bottom: 4px; }
+  .detail-val { font-size: 14px; color: #333; line-height: 1.5; background: #f8f9fa; padding: 10px 12px; border-radius: 8px; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .loading { text-align: center; padding: 60px; }
+  .spinner { width: 40px; height: 40px; border: 3px solid #e0e0e0; border-top-color: #C8973A; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+  .legend span { font-size: 12px; color: #666; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #555; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div id="pw-overlay">
+  <div class="pw-box">
+    <div class="logo">🦅 Blue Alpha</div>
+    <div class="sub">Kelly's Dashboard — Email Calendar</div>
+    <input type="password" id="pw-input" placeholder="Enter password" onkeydown="if(event.key==='Enter')checkPw()">
+    <button onclick="checkPw()">Unlock Dashboard</button>
+    <div class="error" id="pw-error">Incorrect password. Try again.</div>
+  </div>
+</div>
+
+<div class="sidebar">
+  <div class="brand"><h2>Blue Alpha</h2><p>Email Calendar</p></div>
+  <nav>
+    <a href="kurt.html">📋 Kurt's Ideas</a>
+    <a href="#" class="active">📅 Email Calendar</a>
+    <a href="patty.html">📊 Patty's Pipeline</a>
+    <a href="jesse.html">👁 Jesse's Overview</a>
+  </nav>
+  <div class="logout"><button onclick="logout()">🔒 Lock Dashboard</button></div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <h1>Kelly's Dashboard — Email Calendar</h1>
+    <div class="view-toggle">
+      <button class="view-btn active" id="btn-cal" onclick="switchView('cal')">📅 Calendar</button>
+      <button class="view-btn" id="btn-list" onclick="switchView('list')">☰ List</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <div id="view-cal">
+      <div class="cal-nav">
+        <div class="cal-nav-btns">
+          <button class="cal-nav-btn" onclick="changeMonth(-1)">← Prev</button>
+          <button class="cal-nav-btn" onclick="goToday()">Today</button>
+          <button class="cal-nav-btn" onclick="changeMonth(1)">Next →</button>
+        </div>
+        <h2 id="cal-title">Loading...</h2>
+        <button class="cal-nav-btn" onclick="loadPipeline()" style="border-color:#C8973A;color:#C8973A;">↻ Refresh</button>
+      </div>
+      <div class="legend">
+        <span>Status:</span>
+        <div class="legend-item"><div class="legend-dot s-dev"></div> In Development</div>
+        <div class="legend-item"><div class="legend-dot s-written"></div> Copy Written</div>
+        <div class="legend-item"><div class="legend-dot s-review"></div> In Review</div>
+        <div class="legend-item"><div class="legend-dot s-scheduled"></div> Scheduled</div>
+        <div class="legend-item"><div class="legend-dot s-sent"></div> Sent</div>
+      </div>
+      <div id="cal-loading" class="loading"><div class="spinner"></div><div style="color:#888;">Loading calendar...</div></div>
+      <div id="cal-grid" style="display:none;"></div>
+    </div>
+
+    <div id="view-list" style="display:none;">
+      <div id="list-loading" class="loading"><div class="spinner"></div><div style="color:#888;">Loading pipeline...</div></div>
+      <div id="list-table" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Email Details</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+const AT_TOKEN = 'pat3wxVXHb3JhDBBn.e0ca55ff285ba026b093f4232320f63fff16252679f6a4c08cc85ea3425c4954';
+const BASE_ID = 'appTCZwoETAInVuiX';
+const PIPELINE_TABLE = 'tblrFJ5qikGN5H5X9';
+const PASSWORD = 'kelly2026';
+const PW_KEY = 'ba_kelly_auth';
+
+let pipelineData = [];
+let currentView = 'cal';
+let viewDate = new Date();
+
+const HOLIDAYS = {
+  '01-01': "New Year's Day", '01-20': 'MLK Day', '02-17': "Presidents Day",
+  '05-26': 'Memorial Day', '07-04': 'Independence Day', '09-01': 'Labor Day',
+  '11-11': "Veterans Day", '11-27': 'Thanksgiving', '12-25': 'Christmas'
+};
+
+// Generate holidays for a given year
+function getHolidaysForYear(year) {
+  const h = {};
+  // Static ones
+  h[`${year}-01-01`] = "New Year's Day";
+  h[`${year}-07-04`] = 'Independence Day';
+  h[`${year}-11-11`] = 'Veterans Day';
+  h[`${year}-12-25`] = 'Christmas';
+  
+  // MLK Day - 3rd Monday of January
+  h[nthWeekday(year, 1, 1, 3)] = 'MLK Day';
+  // Presidents Day - 3rd Monday of February
+  h[nthWeekday(year, 2, 1, 3)] = "Presidents Day";
+  // Memorial Day - last Monday of May
+  h[lastWeekday(year, 5, 1)] = 'Memorial Day';
+  // Labor Day - 1st Monday of September
+  h[nthWeekday(year, 9, 1, 1)] = 'Labor Day';
+  // Thanksgiving - 4th Thursday of November
+  h[nthWeekday(year, 11, 4, 4)] = 'Thanksgiving';
+  
+  return h;
+}
+
+function nthWeekday(year, month, dow, n) {
+  // dow: 0=Sun, 1=Mon... 4=Thu
+  let d = new Date(year, month-1, 1);
+  let count = 0;
+  while (true) {
+    if (d.getDay() === dow) { count++; if (count === n) return fmtDate(d); }
+    d.setDate(d.getDate()+1);
+    if (d.getMonth() !== month-1) break;
+  }
+  return null;
+}
+
+function lastWeekday(year, month, dow) {
+  let d = new Date(year, month, 0); // last day of month
+  while (d.getDay() !== dow) d.setDate(d.getDate()-1);
+  return fmtDate(d);
+}
+
+function fmtDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function checkPw() {
+  const val = document.getElementById('pw-input').value;
+  if (val === PASSWORD) {
+    localStorage.setItem(PW_KEY, 'true');
+    document.getElementById('pw-overlay').style.display = 'none';
+    loadPipeline();
+  } else {
+    document.getElementById('pw-error').style.display = 'block';
+    document.getElementById('pw-input').value = '';
+  }
+}
+function logout() { localStorage.removeItem(PW_KEY); location.reload(); }
+
+if (localStorage.getItem(PW_KEY) === 'true') {
+  document.getElementById('pw-overlay').style.display = 'none';
+  loadPipeline();
+}
+
+async function loadPipeline() {
+  try {
+    let records = [];
+    let offset = null;
+    do {
+      let url = `https://api.airtable.com/v0/${BASE_ID}/${PIPELINE_TABLE}?pageSize=100`;
+      if (offset) url += `&offset=${offset}`;
+      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${AT_TOKEN}` } });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      records = records.concat(data.records);
+      offset = data.offset;
+    } while (offset);
+    pipelineData = records;
+    renderCurrentView();
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+function switchView(v) {
+  currentView = v;
+  document.getElementById('view-cal').style.display = v === 'cal' ? '' : 'none';
+  document.getElementById('view-list').style.display = v === 'list' ? '' : 'none';
+  document.getElementById('btn-cal').className = 'view-btn' + (v==='cal'?' active':'');
+  document.getElementById('btn-list').className = 'view-btn' + (v==='list'?' active':'');
+  renderCurrentView();
+}
+
+function renderCurrentView() {
+  if (currentView === 'cal') renderCalendar();
+  else renderList();
+}
+
+function changeMonth(delta) {
+  viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + delta, 1);
+  renderCalendar();
+}
+function goToday() { viewDate = new Date(); renderCalendar(); }
+
+function statusClass(status) {
+  const m = { 'In Development': 's-dev', 'Copy Written': 's-written', 'In Review': 's-review', 'Scheduled': 's-scheduled', 'Sent': 's-sent' };
+  return m[status] || 's-dev';
+}
+
+function renderCalendar() {
+  document.getElementById('cal-loading').style.display = 'none';
+  document.getElementById('cal-grid').style.display = '';
+
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-title').textContent = `${months[month]} ${year}`;
+
+  const holidays = getHolidaysForYear(year);
+  const today = fmtDate(new Date());
+
+  // Build date-to-emails map
+  const emailsByDate = {};
+  pipelineData.forEach(r => {
+    const d = r.fields['Scheduled Date'];
+    if (d) {
+      if (!emailsByDate[d]) emailsByDate[d] = [];
+      emailsByDate[d].push(r);
+    }
+  });
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const daysInPrev = new Date(year, month, 0).getDate();
+
+  let html = `<div class="cal-grid"><div class="cal-header">`;
+  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => html += `<div>${d}</div>`);
+  html += `</div><div class="cal-body">`;
+
+  // Prev month days
+  for (let i = firstDay - 1; i >= 0; i--) {
+    html += `<div class="cal-day other-month"><div class="day-num" style="color:#ccc;">${daysInPrev - i}</div></div>`;
+  }
+
+  // Current month
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = dateStr === today;
+    const holiday = holidays[dateStr];
+    const emails = emailsByDate[dateStr] || [];
+    
+    html += `<div class="cal-day ${holiday ? 'holiday' : ''} ${isToday ? 'today' : ''}">`;
+    html += `<div class="day-num ${isToday ? 'today-num' : ''}">${d}</div>`;
+    if (holiday) html += `<div class="holiday-name">🏛 ${holiday}</div>`;
+    emails.forEach(e => {
+      html += `<div class="email-chip ${statusClass(e.fields.Status)}" onclick="showDetail('${e.id}')" title="${escHtml(e.fields['Email Title']||'')}">${escHtml(e.fields['Email Title'] || 'Untitled')}</div>`;
+    });
+    html += `</div>`;
+  }
+
+  // Next month fill
+  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+  for (let d = 1; d <= totalCells - firstDay - daysInMonth; d++) {
+    html += `<div class="cal-day other-month"><div class="day-num" style="color:#ccc;">${d}</div></div>`;
+  }
+
+  html += `</div></div>`;
+  document.getElementById('cal-grid').innerHTML = html;
+}
+
+function renderList() {
+  document.getElementById('list-loading').style.display = 'none';
+  document.getElementById('list-table').style.display = '';
+
+  const sorted = [...pipelineData].sort((a,b) => {
+    const da = a.fields['Scheduled Date'] || '9999';
+    const db = b.fields['Scheduled Date'] || '9999';
+    return da.localeCompare(db);
+  });
+
+  if (!sorted.length) {
+    document.getElementById('list-table').innerHTML = '<div style="text-align:center;padding:40px;color:#aaa;">No pipeline items yet.</div>';
+    return;
+  }
+
+  let html = `<div class="list-view"><table>
+    <thead><tr><th>Title</th><th>Category</th><th>Status</th><th>Scheduled Date</th><th>Subject Line</th><th>Assigned To</th></tr></thead>
+    <tbody>`;
+  
+  sorted.forEach(r => {
+    const f = r.fields;
+    html += `<tr>
+      <td style="font-weight:600;color:#1B2A4A;">${escHtml(f['Email Title'] || '—')}</td>
+      <td><span style="background:#f0f2f5;padding:2px 8px;border-radius:12px;font-size:12px;">${escHtml(f.Category || '—')}</span></td>
+      <td><span class="status-badge ${statusClass(f.Status)}">${escHtml(f.Status || '—')}</span></td>
+      <td>${f['Scheduled Date'] ? new Date(f['Scheduled Date']+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'}</td>
+      <td style="color:#555;font-size:13px;">${escHtml(f['Subject Line'] || '—')}</td>
+      <td style="color:#666;">${escHtml(f['Assigned To'] || '—')}</td>
+    </tr>`;
+  });
+  
+  html += `</tbody></table></div>`;
+  document.getElementById('list-table').innerHTML = html;
+}
+
+function showDetail(id) {
+  const r = pipelineData.find(x => x.id === id);
+  if (!r) return;
+  const f = r.fields;
+  
+  document.getElementById('modal-title').textContent = f['Email Title'] || 'Email Details';
+  
+  let body = `<div class="detail-grid">
+    <div class="detail-row"><div class="detail-label">Status</div><div class="detail-val"><span class="status-badge ${statusClass(f.Status)}" style="font-size:12px;">${escHtml(f.Status||'—')}</span></div></div>
+    <div class="detail-row"><div class="detail-label">Category</div><div class="detail-val">${escHtml(f.Category||'—')}</div></div>
+    <div class="detail-row"><div class="detail-label">Scheduled Date</div><div class="detail-val">${f['Scheduled Date'] ? new Date(f['Scheduled Date']+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}) : '—'}</div></div>
+    <div class="detail-row"><div class="detail-label">Assigned To</div><div class="detail-val">${escHtml(f['Assigned To']||'—')}</div></div>
+  </div>`;
+  
+  if (f['Subject Line']) body += `<div class="detail-row"><div class="detail-label">Subject Line</div><div class="detail-val" style="font-weight:600;">${escHtml(f['Subject Line'])}</div></div>`;
+  if (f.Description) body += `<div class="detail-row"><div class="detail-label">Description</div><div class="detail-val">${escHtml(f.Description)}</div></div>`;
+  if (f['Copy Draft']) body += `<div class="detail-row"><div class="detail-label">Copy Draft</div><div class="detail-val" style="white-space:pre-wrap;font-size:13px;">${escHtml(f['Copy Draft'])}</div></div>`;
+  if (f.Notes) body += `<div class="detail-row"><div class="detail-label">Notes</div><div class="detail-val">${escHtml(f.Notes)}</div></div>`;
+  
+  document.getElementById('modal-body').innerHTML = body;
+  document.getElementById('modal').classList.add('show');
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('show'); }
+document.getElementById('modal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+</body>
+</html>

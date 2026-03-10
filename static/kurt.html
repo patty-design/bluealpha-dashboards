@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kurt's Dashboard — Email Ideas</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; min-height: 100vh; }
+  
+  /* Password overlay */
+  #pw-overlay {
+    position: fixed; inset: 0; background: #1B2A4A; display: flex; align-items: center; justify-content: center; z-index: 9999;
+  }
+  .pw-box {
+    background: #fff; border-radius: 12px; padding: 40px; width: 360px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+  .pw-box .logo { font-size: 28px; font-weight: 700; color: #1B2A4A; margin-bottom: 4px; }
+  .pw-box .sub { color: #888; font-size: 14px; margin-bottom: 28px; }
+  .pw-box input {
+    width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; outline: none; margin-bottom: 12px;
+    transition: border-color 0.2s;
+  }
+  .pw-box input:focus { border-color: #C8973A; }
+  .pw-box button {
+    width: 100%; padding: 12px; background: #C8973A; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .pw-box button:hover { background: #b8872a; }
+  .pw-box .error { color: #e53e3e; font-size: 13px; margin-top: 8px; display: none; }
+
+  /* Layout */
+  .sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #1B2A4A; color: #fff; padding: 24px 0;
+    display: flex; flex-direction: column;
+  }
+  .sidebar .brand { padding: 0 24px 24px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .sidebar .brand h2 { font-size: 18px; font-weight: 700; color: #C8973A; }
+  .sidebar .brand p { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+  .sidebar nav { padding: 16px 0; }
+  .sidebar nav a {
+    display: block; padding: 10px 24px; color: rgba(255,255,255,0.7); text-decoration: none; font-size: 14px;
+    transition: all 0.2s; border-left: 3px solid transparent;
+  }
+  .sidebar nav a.active, .sidebar nav a:hover { color: #fff; background: rgba(200,151,58,0.15); border-left-color: #C8973A; }
+  .sidebar .logout { margin-top: auto; padding: 16px 24px; }
+  .sidebar .logout button {
+    background: transparent; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.6);
+    padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; width: 100%; transition: all 0.2s;
+  }
+  .sidebar .logout button:hover { border-color: #C8973A; color: #C8973A; }
+
+  .main { margin-left: 220px; min-height: 100vh; }
+  .topbar {
+    background: #fff; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid #e8ecf0; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .topbar h1 { font-size: 20px; font-weight: 700; color: #1B2A4A; }
+  .stats-pills { display: flex; gap: 12px; }
+  .pill {
+    background: #f0f2f5; border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 600; color: #1B2A4A;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .pill .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .pill.total .dot { background: #1B2A4A; }
+  .pill.pipeline .dot { background: #C8973A; }
+
+  .content { padding: 24px 32px; }
+  
+  /* Filter bar */
+  .filter-bar {
+    background: #fff; border-radius: 10px; padding: 16px 20px; margin-bottom: 24px;
+    display: flex; align-items: center; gap: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .filter-bar label { font-size: 13px; color: #666; font-weight: 500; white-space: nowrap; }
+  .filter-bar select {
+    padding: 8px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; outline: none;
+    background: #fff; cursor: pointer; min-width: 160px; transition: border-color 0.2s;
+  }
+  .filter-bar select:focus { border-color: #C8973A; }
+  .slider-wrap { display: flex; align-items: center; gap: 10px; flex: 1; }
+  .filter-bar input[type=range] { flex: 1; accent-color: #C8973A; cursor: pointer; }
+  .slider-val {
+    background: #C8973A; color: #fff; border-radius: 6px; padding: 3px 10px; font-size: 13px; font-weight: 700; min-width: 36px; text-align: center;
+  }
+  .btn-refresh {
+    background: #1B2A4A; color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: background 0.2s; margin-left: auto;
+  }
+  .btn-refresh:hover { background: #2a3d5c; }
+
+  /* Cards grid */
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+  .card {
+    background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    display: flex; flex-direction: column; gap: 10px; transition: transform 0.2s, box-shadow 0.2s;
+    border: 2px solid transparent;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
+  .card.in-pipeline { border-color: #C8973A; }
+  .card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .card-title { font-size: 15px; font-weight: 700; color: #1B2A4A; flex: 1; line-height: 1.3; }
+  .score-badge {
+    border-radius: 6px; padding: 3px 8px; font-size: 12px; font-weight: 700; color: #fff; white-space: nowrap; flex-shrink: 0;
+  }
+  .score-10 { background: #e53e3e; }
+  .score-9 { background: #ed8936; }
+  .score-8 { background: #3182ce; }
+  .score-7 { background: #718096; }
+  .score-low { background: #a0aec0; }
+  .cat-badge {
+    display: inline-block; background: rgba(27,42,74,0.08); color: #1B2A4A; border-radius: 20px;
+    padding: 3px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .card-desc { font-size: 13px; color: #555; line-height: 1.5; }
+  .card-why { font-size: 12px; color: #888; line-height: 1.4; background: #f8f9fa; padding: 8px 10px; border-radius: 6px; border-left: 3px solid #C8973A; }
+  .card-why strong { color: #C8973A; font-size: 11px; text-transform: uppercase; display: block; margin-bottom: 2px; }
+  .card-footer { margin-top: auto; display: flex; align-items: center; justify-content: space-between; }
+  .pipeline-tag {
+    font-size: 11px; color: #C8973A; font-weight: 600; background: rgba(200,151,58,0.1); padding: 3px 8px; border-radius: 12px;
+  }
+  .btn-add {
+    background: #1B2A4A; color: #fff; border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 5px;
+  }
+  .btn-add:hover { background: #C8973A; }
+  .btn-add.added { background: #38a169; cursor: default; }
+
+  .empty-state { text-align: center; padding: 60px; color: #aaa; }
+  .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+  
+  .loading { text-align: center; padding: 60px; }
+  .spinner {
+    width: 40px; height: 40px; border: 3px solid #e0e0e0; border-top-color: #C8973A;
+    border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Modal */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: #fff; border-radius: 14px; padding: 28px; width: 480px; max-width: 95vw;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-height: 90vh; overflow-y: auto;
+  }
+  .modal h3 { font-size: 18px; font-weight: 700; color: #1B2A4A; margin-bottom: 4px; }
+  .modal .modal-sub { font-size: 13px; color: #888; margin-bottom: 20px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 6px; }
+  .form-group input, .form-group textarea, .form-group select {
+    width: 100%; padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; outline: none;
+    font-family: inherit; transition: border-color 0.2s;
+  }
+  .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: #C8973A; }
+  .form-group textarea { resize: vertical; min-height: 80px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  .btn-cancel { background: #f0f2f5; color: #444; border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn-cancel:hover { background: #e0e2e5; }
+  .btn-confirm { background: #C8973A; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+  .btn-confirm:hover { background: #b8872a; }
+  .btn-confirm:disabled { background: #ccc; cursor: not-allowed; }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; background: #38a169; color: #fff; padding: 12px 20px; border-radius: 8px;
+    font-size: 14px; font-weight: 600; box-shadow: 0 4px 20px rgba(0,0,0,0.2); z-index: 9000;
+    transform: translateY(100px); opacity: 0; transition: all 0.3s;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.error { background: #e53e3e; }
+</style>
+</head>
+<body>
+
+<!-- Password Overlay -->
+<div id="pw-overlay">
+  <div class="pw-box">
+    <div class="logo">🦅 Blue Alpha</div>
+    <div class="sub">Kurt's Dashboard — Email Ideas</div>
+    <input type="password" id="pw-input" placeholder="Enter password" onkeydown="if(event.key==='Enter')checkPw()">
+    <button onclick="checkPw()">Unlock Dashboard</button>
+    <div class="error" id="pw-error">Incorrect password. Try again.</div>
+  </div>
+</div>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="brand">
+    <h2>Blue Alpha</h2>
+    <p>Email Ideas Bank</p>
+  </div>
+  <nav>
+    <a href="#" class="active">📋 Email Ideas</a>
+    <a href="kelly.html">📅 Kelly's Calendar</a>
+    <a href="patty.html">📊 Patty's Pipeline</a>
+    <a href="jesse.html">👁 Jesse's Overview</a>
+  </nav>
+  <div class="logout">
+    <button onclick="logout()">🔒 Lock Dashboard</button>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="main">
+  <div class="topbar">
+    <h1>Kurt's Dashboard — Email Ideas</h1>
+    <div class="stats-pills">
+      <div class="pill total"><span class="dot"></span><span id="total-count">—</span> Total Ideas</div>
+      <div class="pill pipeline"><span class="dot"></span><span id="pipeline-count">—</span> In Pipeline</div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="filter-bar">
+      <label>Category:</label>
+      <select id="cat-filter" onchange="applyFilters()">
+        <option value="">All Categories</option>
+        <option>Storytelling</option>
+        <option>Product Education</option>
+        <option>Behind the Scenes</option>
+        <option>Community</option>
+        <option>Seasonal</option>
+        <option>Brand Values</option>
+        <option>How-To</option>
+        <option>Customer Story</option>
+      </select>
+      <label>Min Priority:</label>
+      <div class="slider-wrap">
+        <input type="range" id="score-filter" min="1" max="10" value="1" oninput="document.getElementById('score-val').textContent=this.value; applyFilters()">
+        <div class="slider-val" id="score-val">1</div>
+      </div>
+      <button class="btn-refresh" onclick="loadIdeas()">↻ Refresh</button>
+    </div>
+
+    <div id="cards-container">
+      <div class="loading">
+        <div class="spinner"></div>
+        <div style="color:#888;">Loading ideas from Airtable...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add to Pipeline Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3>→ Add to Email Pipeline</h3>
+    <div class="modal-sub" id="modal-sub">Sending this idea to the pipeline</div>
+    <div class="form-group">
+      <label>Email Title</label>
+      <input type="text" id="modal-title" placeholder="Email title">
+    </div>
+    <div class="form-group">
+      <label>Scheduled Date</label>
+      <input type="date" id="modal-date">
+    </div>
+    <div class="form-group">
+      <label>Assigned To</label>
+      <input type="text" id="modal-assigned" placeholder="Team member name">
+    </div>
+    <div class="form-group">
+      <label>Notes</label>
+      <textarea id="modal-notes" placeholder="Any notes or context..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-confirm" id="confirm-btn" onclick="confirmAdd()">✓ Add to Pipeline</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const AT_TOKEN = 'pat3wxVXHb3JhDBBn.e0ca55ff285ba026b093f4232320f63fff16252679f6a4c08cc85ea3425c4954';
+const BASE_ID = 'appTCZwoETAInVuiX';
+const IDEAS_TABLE = 'tblXldjh2t3436DOO';
+const PIPELINE_TABLE = 'tblrFJ5qikGN5H5X9';
+const PASSWORD = 'kurt2026';
+const PW_KEY = 'ba_kurt_auth';
+
+let allIdeas = [];
+let currentIdeaId = null;
+let currentConcept = null;
+
+// Password check
+function checkPw() {
+  const val = document.getElementById('pw-input').value;
+  if (val === PASSWORD) {
+    localStorage.setItem(PW_KEY, 'true');
+    document.getElementById('pw-overlay').style.display = 'none';
+    loadIdeas();
+  } else {
+    document.getElementById('pw-error').style.display = 'block';
+    document.getElementById('pw-input').value = '';
+    document.getElementById('pw-input').focus();
+  }
+}
+
+function logout() {
+  localStorage.removeItem(PW_KEY);
+  location.reload();
+}
+
+// Init
+if (localStorage.getItem(PW_KEY) === 'true') {
+  document.getElementById('pw-overlay').style.display = 'none';
+  loadIdeas();
+}
+
+async function loadIdeas() {
+  document.getElementById('cards-container').innerHTML = '<div class="loading"><div class="spinner"></div><div style="color:#888;">Loading ideas...</div></div>';
+  
+  try {
+    let records = [];
+    let offset = null;
+    do {
+      let url = `https://api.airtable.com/v0/${BASE_ID}/${IDEAS_TABLE}?pageSize=100`;
+      if (offset) url += `&offset=${offset}`;
+      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${AT_TOKEN}` } });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      records = records.concat(data.records);
+      offset = data.offset;
+    } while (offset);
+    
+    allIdeas = records;
+    const pipelineCount = allIdeas.filter(r => ['Drafting', 'Ready', 'In Development', 'Copy Written', 'In Review', 'Scheduled'].includes(r.fields.Status)).length;
+    document.getElementById('total-count').textContent = allIdeas.length;
+    document.getElementById('pipeline-count').textContent = pipelineCount;
+    applyFilters();
+  } catch(e) {
+    document.getElementById('cards-container').innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><div>Error loading ideas: ${e.message}</div></div>`;
+  }
+}
+
+function applyFilters() {
+  const cat = document.getElementById('cat-filter').value;
+  const minScore = parseInt(document.getElementById('score-filter').value);
+  
+  let filtered = allIdeas.filter(r => {
+    const score = r.fields['Priority Score'] || 0;
+    const category = r.fields['Category'] || '';
+    return score >= minScore && (!cat || category === cat);
+  });
+  
+  filtered.sort((a, b) => (b.fields['Priority Score'] || 0) - (a.fields['Priority Score'] || 0));
+  renderCards(filtered);
+}
+
+function getScoreClass(score) {
+  if (score >= 10) return 'score-10';
+  if (score >= 9) return 'score-9';
+  if (score >= 8) return 'score-8';
+  if (score >= 7) return 'score-7';
+  return 'score-low';
+}
+
+function renderCards(ideas) {
+  if (!ideas.length) {
+    document.getElementById('cards-container').innerHTML = '<div class="empty-state"><div class="icon">🔍</div><div>No ideas match your filters.</div></div>';
+    return;
+  }
+  
+  const html = `<div class="cards-grid">${ideas.map(r => {
+    const f = r.fields;
+    const score = f['Priority Score'] || 0;
+    const inPipeline = ['Drafting', 'Ready', 'In Development', 'Copy Written', 'In Review', 'Scheduled', 'Sent'].includes(f.Status);
+    return `
+      <div class="card ${inPipeline ? 'in-pipeline' : ''}">
+        <div class="card-header">
+          <div class="card-title">${escHtml(f.Concept || 'Untitled')}</div>
+          <div class="score-badge ${getScoreClass(score)}">${score}</div>
+        </div>
+        <div><span class="cat-badge">${escHtml(f.Category || 'Uncategorized')}</span></div>
+        ${f.Description ? `<div class="card-desc">${escHtml(f.Description)}</div>` : ''}
+        ${f['Why It Works'] ? `<div class="card-why"><strong>Why It Works</strong>${escHtml(f['Why It Works'])}</div>` : ''}
+        <div class="card-footer">
+          ${inPipeline ? '<div class="pipeline-tag">✓ In Pipeline</div>' : '<div></div>'}
+          <button class="btn-add ${inPipeline ? 'added' : ''}" onclick="openModal('${r.id}', '${escAttr(f.Concept)}')"
+            ${inPipeline ? 'disabled' : ''}>
+            ${inPipeline ? '✓ Added' : '→ Add to Pipeline'}
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('')}</div>`;
+  
+  document.getElementById('cards-container').innerHTML = html;
+}
+
+function openModal(ideaId, concept) {
+  currentIdeaId = ideaId;
+  currentConcept = concept;
+  document.getElementById('modal-title').value = concept;
+  document.getElementById('modal-date').value = '';
+  document.getElementById('modal-assigned').value = '';
+  document.getElementById('modal-notes').value = '';
+  document.getElementById('modal-sub').textContent = `Adding "${concept}" to the Email Pipeline`;
+  document.getElementById('confirm-btn').disabled = false;
+  document.getElementById('confirm-btn').textContent = '✓ Add to Pipeline';
+  document.getElementById('modal').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('show');
+}
+
+async function confirmAdd() {
+  const btn = document.getElementById('confirm-btn');
+  btn.disabled = true;
+  btn.textContent = 'Adding...';
+  
+  const title = document.getElementById('modal-title').value.trim();
+  const date = document.getElementById('modal-date').value;
+  const assigned = document.getElementById('modal-assigned').value.trim();
+  const notes = document.getElementById('modal-notes').value.trim();
+  
+  if (!title) { showToast('Please enter an email title.', true); btn.disabled = false; btn.textContent = '✓ Add to Pipeline'; return; }
+  
+  try {
+    // Create pipeline record
+    const pipelineRes = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${PIPELINE_TABLE}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: {
+        'Email Title': title,
+        'Status': 'In Development',
+        'Scheduled Date': date || undefined,
+        'Assigned To': assigned || undefined,
+        'Notes': notes || undefined,
+        'Source Idea': currentConcept
+      }})
+    });
+    const pipelineData = await pipelineRes.json();
+    if (pipelineData.error) throw new Error(pipelineData.error.message);
+    
+    // Update idea status to Drafting
+    await fetch(`https://api.airtable.com/v0/${BASE_ID}/${IDEAS_TABLE}/${currentIdeaId}`, {
+      method: 'PATCH',
+      headers: { 'Authorization': `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: { 'Status': 'Drafting' } })
+    });
+    
+    closeModal();
+    showToast('✓ Added to Email Pipeline!');
+    await loadIdeas();
+  } catch(e) {
+    showToast(`Error: ${e.message}`, true);
+    btn.disabled = false;
+    btn.textContent = '✓ Add to Pipeline';
+  }
+}
+
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => t.className = 'toast', 3500);
+}
+
+function escHtml(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escAttr(s) { return String(s || '').replace(/'/g, "\\'").replace(/\n/g,' '); }
+
+// Close modal on overlay click
+document.getElementById('modal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+</script>
+</body>
+</html>
