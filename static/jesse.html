@@ -3,175 +3,289 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Jesse's Overview — Email Program</title>
+<title>Blue Alpha — Jesse's Dashboard</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; min-height: 100vh; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #222; }
 
-  #pw-overlay { position: fixed; inset: 0; background: #1B2A4A; display: flex; align-items: center; justify-content: center; z-index: 9999; }
-  .pw-box { background: #fff; border-radius: 12px; padding: 40px; width: 360px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
-  .pw-box .logo { font-size: 28px; font-weight: 700; color: #1B2A4A; margin-bottom: 4px; }
-  .pw-box .sub { color: #888; font-size: 14px; margin-bottom: 28px; }
-  .pw-box input { width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; outline: none; margin-bottom: 12px; transition: border-color 0.2s; }
-  .pw-box input:focus { border-color: #C8973A; }
-  .pw-box button { width: 100%; padding: 12px; background: #C8973A; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
-  .pw-box .error { color: #e53e3e; font-size: 13px; margin-top: 8px; display: none; }
+  #login-overlay {
+    position: fixed; inset: 0; background: #f0f2f5;
+    display: flex; align-items: center; justify-content: center; z-index: 1000;
+  }
+  .login-card {
+    background: #fff; border-radius: 12px; padding: 48px 40px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12); width: 360px; text-align: center;
+  }
+  .login-card img { width: 120px; margin-bottom: 24px; }
+  .login-card h2 { color: #1B3A6B; margin-bottom: 8px; font-size: 1.4rem; }
+  .login-card p { color: #666; margin-bottom: 24px; font-size: 0.9rem; }
+  .login-card input {
+    width: 100%; padding: 12px 14px; border: 1.5px solid #ddd; border-radius: 8px;
+    font-size: 1rem; margin-bottom: 16px; outline: none;
+  }
+  .login-card input:focus { border-color: #1B3A6B; }
+  .login-card button {
+    width: 100%; padding: 12px; background: #1B3A6B; color: #fff;
+    border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; font-weight: 600;
+  }
+  .login-card button:hover { background: #16305a; }
+  .login-error { color: #B22222; font-size: 0.85rem; margin-top: 8px; display: none; }
 
-  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #1B2A4A; color: #fff; padding: 24px 0; display: flex; flex-direction: column; }
-  .sidebar .brand { padding: 0 24px 24px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-  .sidebar .brand h2 { font-size: 18px; font-weight: 700; color: #C8973A; }
-  .sidebar .brand p { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 2px; }
-  .sidebar nav { padding: 16px 0; }
-  .sidebar nav a { display: block; padding: 10px 24px; color: rgba(255,255,255,0.7); text-decoration: none; font-size: 14px; transition: all 0.2s; border-left: 3px solid transparent; }
-  .sidebar nav a.active, .sidebar nav a:hover { color: #fff; background: rgba(200,151,58,0.15); border-left-color: #C8973A; }
-  .sidebar .logout { margin-top: auto; padding: 16px 24px; }
-  .sidebar .logout button { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.6); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; width: 100%; transition: all 0.2s; }
-  .sidebar .logout button:hover { border-color: #C8973A; color: #C8973A; }
+  #app { display: flex; height: 100vh; overflow: hidden; }
+  #sidebar {
+    width: 220px; min-width: 220px; background: #1B3A6B; color: #fff;
+    display: flex; flex-direction: column; height: 100vh; position: fixed; left: 0; top: 0;
+  }
+  .sidebar-logo { padding: 20px 16px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .sidebar-logo img { width: 100%; max-width: 140px; }
+  .sidebar-user { padding: 12px 16px; font-size: 0.8rem; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.05em; }
+  nav { flex: 1; padding: 8px 0; }
+  nav a {
+    display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+    color: rgba(255,255,255,0.8); text-decoration: none; font-size: 0.95rem;
+    cursor: pointer; border-left: 3px solid transparent; transition: all 0.15s;
+  }
+  nav a:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  nav a.active { background: rgba(255,255,255,0.12); color: #fff; border-left-color: #B22222; font-weight: 600; }
+  .sidebar-footer { padding: 16px; border-top: 1px solid rgba(255,255,255,0.1); }
+  .lock-btn {
+    width: 100%; padding: 10px; background: rgba(178,34,34,0.2); color: #fff;
+    border: 1px solid rgba(178,34,34,0.4); border-radius: 8px; cursor: pointer;
+    font-size: 0.85rem; transition: background 0.15s;
+  }
+  .lock-btn:hover { background: rgba(178,34,34,0.4); }
 
-  .main { margin-left: 220px; min-height: 100vh; }
-  .topbar { background: #fff; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e8ecf0; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-  .topbar h1 { font-size: 20px; font-weight: 700; color: #1B2A4A; }
-  .btn-refresh { background: #1B2A4A; color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
-  .btn-refresh:hover { background: #2a3d5c; }
+  #main { margin-left: 220px; flex: 1; overflow-y: auto; padding: 32px; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .page-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-start; }
+  .page-header-text h1 { color: #1B3A6B; font-size: 1.6rem; margin-bottom: 4px; }
+  .page-header-text p { color: #666; font-size: 0.9rem; }
+  .view-only-badge { background: #e8eef8; color: #1B3A6B; font-size: 0.78rem; font-weight: 700; padding: 4px 10px; border-radius: 20px; border: 1px solid #c8d8f0; }
 
-  /* Stats row */
-  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 24px 32px 0; }
-  .stat-card { background: #fff; border-radius: 12px; padding: 20px 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); display: flex; flex-direction: column; gap: 4px; border-top: 4px solid; }
-  .stat-card:nth-child(1) { border-color: #1B2A4A; }
-  .stat-card:nth-child(2) { border-color: #C8973A; }
-  .stat-card:nth-child(3) { border-color: #805ad5; }
-  .stat-card:nth-child(4) { border-color: #38a169; }
-  .stat-num { font-size: 32px; font-weight: 800; color: #1B2A4A; }
-  .stat-label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+  .toolbar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+  .toolbar select {
+    padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 8px;
+    font-size: 0.9rem; outline: none; background: #fff;
+  }
 
-  .content { padding: 24px 32px; }
-  
-  /* Two column layout */
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+  .badge { font-size: 0.72rem; padding: 3px 8px; border-radius: 20px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+  .badge-cat { background: #e8eef8; color: #1B3A6B; }
+  .badge-idea { background: #e8f0fe; color: #1967d2; }
+  .badge-review { background: #fef3cd; color: #856404; }
+  .badge-approved { background: #d1ecf1; color: #0c5460; }
+  .badge-live { background: #d4edda; color: #155724; }
+  .badge-archived { background: #e2e3e5; color: #383d41; }
+  .badge-priority-low { background: #d4edda; color: #155724; }
+  .badge-priority-mid { background: #fff3cd; color: #856404; }
+  .badge-priority-high { background: #f8d7da; color: #721c24; }
 
-  .section { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow: hidden; }
-  .section-header { background: #1B2A4A; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; }
-  .section-header h2 { font-size: 14px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; }
-  .section-header .count { background: rgba(200,151,58,0.3); color: #C8973A; border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
-  .section-body { overflow-y: auto; max-height: 480px; }
+  /* IDEAS GRID */
+  .cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .idea-card {
+    background: #fff; border-radius: 10px; padding: 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08); cursor: pointer;
+    transition: box-shadow 0.15s, transform 0.1s; border: 1px solid #e8e8e8;
+  }
+  .idea-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.12); transform: translateY(-1px); }
+  .card-title { font-weight: 700; color: #1B3A6B; margin-bottom: 8px; font-size: 1rem; }
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .card-desc { font-size: 0.85rem; color: #555; line-height: 1.5;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
-  /* Pipeline list */
-  .pipeline-item { padding: 12px 20px; border-bottom: 1px solid #f5f5f5; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }
-  .pipeline-item:last-child { border-bottom: none; }
-  .pi-title { font-size: 13px; font-weight: 600; color: #1B2A4A; margin-bottom: 3px; }
-  .pi-meta { font-size: 11px; color: #999; display: flex; gap: 8px; align-items: center; }
-  .pi-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-  
-  .status-badge { border-radius: 20px; padding: 3px 8px; font-size: 10px; font-weight: 700; color: #fff; white-space: nowrap; }
-  .s-dev { background: #d69e2e; }
-  .s-written { background: #3182ce; }
-  .s-review { background: #dd6b20; }
-  .s-scheduled { background: #805ad5; }
-  .s-sent { background: #38a169; }
+  /* PIPELINE */
+  .pipeline-columns { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; align-items: flex-start; }
+  .pipeline-col { min-width: 220px; flex: 1; }
+  .pipeline-col-header {
+    padding: 10px 14px; border-radius: 8px 8px 0 0; font-size: 0.85rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 8px;
+  }
+  .col-draft { background: #e2e3e5; color: #383d41; }
+  .col-review { background: #fff3cd; color: #856404; }
+  .col-approved { background: #d1ecf1; color: #0c5460; }
+  .col-scheduled { background: #d4edda; color: #155724; }
+  .col-sent { background: #e8eef8; color: #1B3A6B; }
+  .pipeline-col-body { background: #f8f9fa; border: 1px solid #e0e4eb; border-top: none; border-radius: 0 0 8px 8px; min-height: 200px; padding: 8px; }
+  .pipeline-item {
+    background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.07); cursor: pointer; border: 1px solid #e8e8e8; transition: box-shadow 0.15s;
+  }
+  .pipeline-item:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.12); }
+  .pipeline-title { font-weight: 700; color: #1B3A6B; font-size: 0.9rem; margin-bottom: 4px; }
+  .pipeline-subject { font-size: 0.8rem; color: #666; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pipeline-meta { display: flex; justify-content: space-between; align-items: center; }
+  .pipeline-date { font-size: 0.75rem; color: #999; }
+  .badge-assignee { background: #e8eef8; color: #1B3A6B; font-size: 0.72rem; padding: 2px 7px; border-radius: 12px; font-weight: 600; }
+  .col-count { background: rgba(0,0,0,0.1); border-radius: 10px; padding: 1px 7px; font-size: 0.78rem; }
 
-  /* Ideas bank */
-  .idea-item { padding: 10px 20px; border-bottom: 1px solid #f5f5f5; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .idea-item:last-child { border-bottom: none; }
-  .idea-num { font-size: 11px; color: #ccc; font-weight: 700; width: 20px; flex-shrink: 0; }
-  .idea-title { font-size: 13px; font-weight: 600; color: #1B2A4A; flex: 1; }
-  .idea-cat { font-size: 11px; color: #888; }
-  .score-pill { border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700; color: #fff; }
-  .s10 { background: #e53e3e; }
-  .s9 { background: #ed8936; }
-  .s8 { background: #3182ce; }
-  .s7 { background: #718096; }
-  .slow { background: #a0aec0; }
+  /* CALENDAR */
+  .calendar-nav { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+  .calendar-nav h2 { color: #1B3A6B; font-size: 1.2rem; min-width: 180px; text-align: center; }
+  .cal-btn { padding: 8px 16px; background: #fff; border: 1.5px solid #ddd; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+  .cal-btn:hover { background: #f0f2f5; }
+  .calendar-grid { background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .cal-header { display: grid; grid-template-columns: repeat(7, 1fr); background: #1B3A6B; }
+  .cal-header div { padding: 10px; text-align: center; color: #fff; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; }
+  .cal-body { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .cal-cell { min-height: 130px; padding: 6px; border-right: 1px solid #eee; border-bottom: 1px solid #eee; }
+  .cal-cell.other-month { background: #fafafa; }
+  .cal-cell.other-month .cal-date { color: #ccc; }
+  .cal-cell.today { background: #eef2ff; }
+  .cal-date { font-size: 0.85rem; font-weight: 600; color: #333; margin-bottom: 4px; }
+  .cal-cell.today .cal-date { background: #1B3A6B; color: #fff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .cal-item { font-size: 0.72rem; background: #1B3A6B; color: #fff; border-radius: 4px; padding: 2px 5px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  .cal-item:hover { background: #B22222; }
 
-  /* Mini calendar */
-  .mini-cal { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow: hidden; }
-  .mini-cal-header { background: #1B2A4A; padding: 14px 20px; }
-  .mini-cal-header h2 { font-size: 14px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; }
-  .mini-cal-body { padding: 16px 20px; }
-  .mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-  .mini-cal-dow { font-size: 10px; font-weight: 700; color: #aaa; text-align: center; text-transform: uppercase; padding: 4px 2px; }
-  .mini-day { height: 36px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #333; position: relative; }
-  .mini-day.other { color: #ddd; }
-  .mini-day.today { background: #C8973A; color: #fff; }
-  .mini-day.has-email { background: rgba(27,42,74,0.08); color: #1B2A4A; }
-  .mini-day.has-email::after { content: ''; width: 5px; height: 5px; background: #C8973A; border-radius: 50%; position: absolute; bottom: 3px; }
-  .mini-month { font-size: 13px; font-weight: 700; color: #666; margin: 8px 0 4px; text-align: center; }
+  /* MODAL */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    display: flex; align-items: center; justify-content: center; z-index: 500;
+  }
+  .modal {
+    background: #fff; border-radius: 12px; padding: 32px;
+    width: 580px; max-width: 95vw; max-height: 85vh; overflow-y: auto;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+  }
+  .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+  .modal-header h2 { color: #1B3A6B; font-size: 1.25rem; flex: 1; }
+  .close-btn { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #999; padding: 0 4px; }
+  .close-btn:hover { color: #333; }
+  .modal-field { margin-bottom: 16px; }
+  .modal-field label { display: block; font-size: 0.8rem; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .modal-field p { font-size: 0.95rem; color: #333; line-height: 1.6; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+  .btn-secondary { padding: 8px 18px; background: #f0f2f5; color: #333; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+  .btn-secondary:hover { background: #e0e4eb; }
 
-  .loading { text-align: center; padding: 40px; }
-  .spinner { width: 32px; height: 32px; border: 3px solid #e0e0e0; border-top-color: #C8973A; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+  .loading { text-align: center; padding: 48px; color: #888; }
+  .spinner { width: 32px; height: 32px; border: 3px solid #e0e4eb; border-top-color: #1B3A6B; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
   @keyframes spin { to { transform: rotate(360deg); } }
-
-  .empty { text-align: center; padding: 30px; color: #bbb; font-size: 13px; }
+  .empty-state { text-align: center; padding: 48px; color: #aaa; font-size: 0.95rem; }
+  .empty-icon { font-size: 2.5rem; margin-bottom: 12px; }
 </style>
 </head>
 <body>
 
-<div id="pw-overlay">
-  <div class="pw-box">
-    <div class="logo">🦅 Blue Alpha</div>
-    <div class="sub">Jesse's Overview — Email Program</div>
-    <input type="password" id="pw-input" placeholder="Enter password" onkeydown="if(event.key==='Enter')checkPw()">
-    <button onclick="checkPw()">Unlock Dashboard</button>
-    <div class="error" id="pw-error">Incorrect password. Try again.</div>
+<div id="login-overlay">
+  <div class="login-card">
+    <img src="/static/ba-logo.jpg" alt="Blue Alpha">
+    <h2>Jesse's Dashboard</h2>
+    <p>Enter your password to continue</p>
+    <input type="password" id="login-pw" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()">Unlock Dashboard</button>
+    <div class="login-error" id="login-error">Incorrect password. Try again.</div>
   </div>
 </div>
 
-<div class="sidebar">
-  <div class="brand"><h2>Blue Alpha</h2><p>Email Overview</p></div>
-  <nav>
-    <a href="kurt.html">📋 Kurt's Ideas</a>
-    <a href="kelly.html">📅 Kelly's Calendar</a>
-    <a href="patty.html">📊 Patty's Pipeline</a>
-    <a href="#" class="active">👁 Jesse's Overview</a>
-  </nav>
-  <div class="logout"><button onclick="logout()">🔒 Lock Dashboard</button></div>
-</div>
-
-<div class="main">
-  <div class="topbar">
-    <h1>Jesse's Overview — Email Program</h1>
-    <button class="btn-refresh" onclick="loadAll()">↻ Refresh</button>
+<div id="app" style="display:none">
+  <div id="sidebar">
+    <div class="sidebar-logo"><img src="/static/ba-logo.jpg" alt="Blue Alpha"></div>
+    <div class="sidebar-user">Jesse Frei</div>
+    <nav>
+      <a onclick="showTab('calendar')" id="nav-calendar">📅 E-mail Calendar</a>
+      <a onclick="showTab('ideas')" id="nav-ideas">📋 E-Mail Ideas</a>
+      <a onclick="showTab('pipeline')" id="nav-pipeline">📊 E-mail Pipeline</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="lock-btn" onclick="lockDashboard()">🔒 Lock Dashboard</button>
+    </div>
   </div>
+  <div id="main">
 
-  <div class="stats-row">
-    <div class="stat-card"><div class="stat-num" id="st-ideas">—</div><div class="stat-label">Total Ideas in Bank</div></div>
-    <div class="stat-card"><div class="stat-num" id="st-pipeline">—</div><div class="stat-label">In Pipeline</div></div>
-    <div class="stat-card"><div class="stat-num" id="st-scheduled">—</div><div class="stat-label">Scheduled</div></div>
-    <div class="stat-card"><div class="stat-num" id="st-sent">—</div><div class="stat-label">Sent This Month</div></div>
-  </div>
-
-  <div class="content">
-    <div class="two-col">
-      <!-- Pipeline -->
-      <div class="section">
-        <div class="section-header">
-          <h2>📧 Email Pipeline</h2>
-          <span class="count" id="pipeline-count-badge">0</span>
+    <!-- CALENDAR TAB (view only) -->
+    <div class="tab-panel" id="tab-calendar">
+      <div class="page-header">
+        <div class="page-header-text">
+          <h1>📅 E-mail Calendar</h1>
+          <p>Scheduled email campaigns overview</p>
         </div>
-        <div class="section-body" id="pipeline-list">
-          <div class="loading"><div class="spinner"></div></div>
-        </div>
+        <span class="view-only-badge">👁 View Only</span>
       </div>
-
-      <!-- Ideas Bank -->
-      <div class="section">
-        <div class="section-header">
-          <h2>💡 Ideas Bank — Top 15</h2>
-          <span class="count" id="ideas-count-badge">0</span>
+      <div class="calendar-nav">
+        <button class="cal-btn" onclick="changeMonth(-1)">← Prev</button>
+        <h2 id="cal-title"></h2>
+        <button class="cal-btn" onclick="changeMonth(1)">Next →</button>
+      </div>
+      <div class="calendar-grid">
+        <div class="cal-header">
+          <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
         </div>
-        <div class="section-body" id="ideas-list">
-          <div class="loading"><div class="spinner"></div></div>
-        </div>
+        <div class="cal-body" id="cal-body"></div>
       </div>
     </div>
 
-    <!-- Mini Calendar -->
-    <div class="mini-cal">
-      <div class="mini-cal-header">
-        <h2>📅 Next 30 Days — Scheduled Emails</h2>
+    <!-- IDEAS TAB (view only) -->
+    <div class="tab-panel" id="tab-ideas">
+      <div class="page-header">
+        <div class="page-header-text">
+          <h1>📋 E-Mail Ideas</h1>
+          <p>Email campaign concepts</p>
+        </div>
+        <span class="view-only-badge">👁 View Only</span>
       </div>
-      <div class="mini-cal-body" id="mini-cal-body">
-        <div class="loading"><div class="spinner"></div></div>
+      <div class="toolbar">
+        <select id="ideas-filter-cat" onchange="filterIdeas()"><option value="">All Categories</option></select>
+        <select id="ideas-filter-status" onchange="filterIdeas()">
+          <option value="">All Statuses</option>
+          <option>Idea</option><option>In Review</option><option>Approved</option><option>Live</option><option>Archived</option>
+        </select>
       </div>
+      <div class="cards-grid" id="ideas-grid"></div>
+    </div>
+
+    <!-- PIPELINE TAB (view only) -->
+    <div class="tab-panel" id="tab-pipeline">
+      <div class="page-header">
+        <div class="page-header-text">
+          <h1>📊 E-mail Pipeline</h1>
+          <p>Email campaigns by status</p>
+        </div>
+        <span class="view-only-badge">👁 View Only</span>
+      </div>
+      <div class="pipeline-columns" id="pipeline-cols"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- IDEA DETAIL MODAL (view only) -->
+<div class="modal-backdrop" id="idea-modal" style="display:none" onclick="closeModalOnBackdrop(event,'idea-modal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="idea-modal-title">Idea Details</h2>
+      <button class="close-btn" onclick="closeModal('idea-modal')">×</button>
+    </div>
+    <div id="idea-modal-body"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal('idea-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- PIPELINE DETAIL MODAL (view only) -->
+<div class="modal-backdrop" id="pipeline-modal" style="display:none" onclick="closeModalOnBackdrop(event,'pipeline-modal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="pipeline-modal-title">Email Details</h2>
+      <button class="close-btn" onclick="closeModal('pipeline-modal')">×</button>
+    </div>
+    <div id="pipeline-modal-body"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal('pipeline-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- CALENDAR ITEM MODAL (view only) -->
+<div class="modal-backdrop" id="cal-modal" style="display:none" onclick="closeModalOnBackdrop(event,'cal-modal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="cal-modal-title">Scheduled Email</h2>
+      <button class="close-btn" onclick="closeModal('cal-modal')">×</button>
+    </div>
+    <div id="cal-modal-body"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal('cal-modal')">Close</button>
     </div>
   </div>
 </div>
@@ -181,206 +295,266 @@ const AT_TOKEN = 'pat3wxVXHb3JhDBBn.e0ca55ff285ba026b093f4232320f63fff16252679f6
 const BASE_ID = 'appTCZwoETAInVuiX';
 const IDEAS_TABLE = 'tblXldjh2t3436DOO';
 const PIPELINE_TABLE = 'tblrFJ5qikGN5H5X9';
-const PASSWORD = 'jesse2026';
-const PW_KEY = 'ba_jesse_auth';
+const AUTH_KEY = 'ba_jesse_auth';
+const PASSWORD = 'bluealpha2026';
 
-let pipelineData = [];
-let ideasData = [];
+let ideasData = [], pipelineData = [];
+let calYear, calMonth;
+let ideasLoaded = false, pipelineLoaded = false;
 
-function checkPw() {
-  const val = document.getElementById('pw-input').value;
-  if (val === PASSWORD) {
-    localStorage.setItem(PW_KEY, 'true');
-    document.getElementById('pw-overlay').style.display = 'none';
-    loadAll();
+function doLogin() {
+  const pw = document.getElementById('login-pw').value;
+  if (pw === PASSWORD) {
+    localStorage.setItem(AUTH_KEY, '1');
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    initApp();
   } else {
-    document.getElementById('pw-error').style.display = 'block';
-    document.getElementById('pw-input').value = '';
+    document.getElementById('login-error').style.display = 'block';
   }
 }
-function logout() { localStorage.removeItem(PW_KEY); location.reload(); }
-
-if (localStorage.getItem(PW_KEY) === 'true') {
-  document.getElementById('pw-overlay').style.display = 'none';
-  loadAll();
+function lockDashboard() { localStorage.removeItem(AUTH_KEY); location.reload(); }
+function checkAuth() {
+  if (localStorage.getItem(AUTH_KEY) === '1') {
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    initApp();
+  }
 }
 
-async function fetchAll(tableId) {
-  let records = [];
-  let offset = null;
+function initApp() {
+  const now = new Date();
+  calYear = now.getFullYear(); calMonth = now.getMonth();
+  showTab('calendar');
+  loadPipeline();
+}
+
+function showTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('nav-' + tab).classList.add('active');
+  if (tab === 'calendar') renderCalendar();
+  if (tab === 'ideas' && !ideasLoaded) loadIdeas();
+  if (tab === 'pipeline' && !pipelineLoaded) { /* already loading */ }
+}
+
+async function atFetch(table, params='') {
+  const url = `https://api.airtable.com/v0/${BASE_ID}/${table}?${params}`;
+  const resp = await fetch(url, { headers: { Authorization: `Bearer ${AT_TOKEN}` } });
+  if (!resp.ok) throw new Error('Airtable error: ' + resp.status);
+  return resp.json();
+}
+async function atFetchAll(table, params='') {
+  let records = [], offset = null;
   do {
-    let url = `https://api.airtable.com/v0/${BASE_ID}/${tableId}?pageSize=100`;
-    if (offset) url += `&offset=${offset}`;
-    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${AT_TOKEN}` } });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-    records = records.concat(data.records);
-    offset = data.offset;
+    const p = offset ? params + '&offset=' + offset : params;
+    const data = await atFetch(table, p);
+    records = records.concat(data.records || []);
+    offset = data.offset || null;
   } while (offset);
   return records;
 }
 
-async function loadAll() {
+// IDEAS (view only)
+async function loadIdeas() {
+  const grid = document.getElementById('ideas-grid');
+  grid.innerHTML = '<div class="loading" style="grid-column:1/-1"><div class="spinner"></div>Loading ideas...</div>';
   try {
-    [pipelineData, ideasData] = await Promise.all([
-      fetchAll(PIPELINE_TABLE),
-      fetchAll(IDEAS_TABLE)
-    ]);
-    updateStats();
-    renderPipelineList();
-    renderIdeasList();
-    renderMiniCal();
+    ideasData = await atFetchAll(IDEAS_TABLE, 'sort[0][field]=Priority Score&sort[0][direction]=desc');
+    ideasLoaded = true;
+    const cats = [...new Set(ideasData.map(r => r.fields['Category']).filter(Boolean))];
+    const sel = document.getElementById('ideas-filter-cat');
+    sel.innerHTML = '<option value="">All Categories</option>' + cats.map(c=>`<option>${c}</option>`).join('');
+    filterIdeas();
   } catch(e) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">⚠️</div>Failed to load ideas.</div>`;
+  }
+}
+
+function getPriorityBadge(score) {
+  const n = parseInt(score) || 0;
+  if (n >= 7) return `<span class="badge badge-priority-high">🔴 ${n}</span>`;
+  if (n >= 4) return `<span class="badge badge-priority-mid">🟡 ${n}</span>`;
+  return `<span class="badge badge-priority-low">🟢 ${n || '—'}</span>`;
+}
+function getStatusBadge(status) {
+  const map = { 'Idea':'badge-idea','In Review':'badge-review','Approved':'badge-approved','Live':'badge-live','Archived':'badge-archived' };
+  return `<span class="badge ${map[status]||'badge-idea'}">${status||'Idea'}</span>`;
+}
+
+function filterIdeas() {
+  const cat = document.getElementById('ideas-filter-cat').value;
+  const status = document.getElementById('ideas-filter-status').value;
+  let filtered = ideasData;
+  if (cat) filtered = filtered.filter(r => r.fields['Category'] === cat);
+  if (status) filtered = filtered.filter(r => r.fields['Status'] === status);
+  const grid = document.getElementById('ideas-grid');
+  if (!filtered.length) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">💡</div>No ideas found.</div>';
+    return;
+  }
+  grid.innerHTML = filtered.map(r => {
+    const f = r.fields;
+    return `<div class="idea-card" onclick="viewIdea('${r.id}')">
+      <div class="card-title">${f['Concept']||'Untitled'}</div>
+      <div class="badges">
+        ${f['Category'] ? `<span class="badge badge-cat">${f['Category']}</span>` : ''}
+        ${getStatusBadge(f['Status'])}
+        ${f['Priority Score'] ? getPriorityBadge(f['Priority Score']) : ''}
+      </div>
+      <div class="card-desc">${f['Description']||'No description'}</div>
+    </div>`;
+  }).join('');
+}
+
+function viewIdea(id) {
+  const r = ideasData.find(x => x.id === id);
+  if (!r) return;
+  const f = r.fields;
+  document.getElementById('idea-modal-title').textContent = f['Concept']||'Idea Details';
+  document.getElementById('idea-modal-body').innerHTML = `
+    <div class="modal-field"><label>Concept</label><p>${f['Concept']||'—'}</p></div>
+    <div class="modal-field"><label>Category</label><p>${f['Category']||'—'}</p></div>
+    <div class="modal-field"><label>Status</label>${getStatusBadge(f['Status'])}</div>
+    <div class="modal-field"><label>Priority Score</label>${getPriorityBadge(f['Priority Score'])}</div>
+    <div class="modal-field"><label>Description</label><p>${f['Description']||'—'}</p></div>
+    <div class="modal-field"><label>Why It Works</label><p>${f['Why It Works']||'—'}</p></div>
+    <div class="modal-field"><label>Notes</label><p>${f['Notes']||'—'}</p></div>
+  `;
+  document.getElementById('idea-modal').style.display = 'flex';
+}
+
+// PIPELINE (view only)
+async function loadPipeline() {
+  const cols = document.getElementById('pipeline-cols');
+  cols.innerHTML = '<div class="loading"><div class="spinner"></div>Loading pipeline...</div>';
+  try {
+    pipelineData = await atFetchAll(PIPELINE_TABLE, 'sort[0][field]=Priority Score&sort[0][direction]=desc');
+    pipelineLoaded = true;
+    renderPipeline();
+    renderCalendar();
+  } catch(e) {
+    cols.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>Failed to load pipeline.</div>`;
     console.error(e);
   }
 }
 
-function updateStats() {
-  const now = new Date();
-  const thisMonth = now.getMonth();
-  const thisYear = now.getFullYear();
-  
-  const sentThisMonth = pipelineData.filter(r => {
-    if (r.fields.Status !== 'Sent') return false;
-    const d = r.fields['Scheduled Date'];
-    if (!d) return false;
-    const rd = new Date(d + 'T12:00:00');
-    return rd.getMonth() === thisMonth && rd.getFullYear() === thisYear;
-  }).length;
-  
-  document.getElementById('st-ideas').textContent = ideasData.length;
-  document.getElementById('st-pipeline').textContent = pipelineData.length;
-  document.getElementById('st-scheduled').textContent = pipelineData.filter(r => r.fields.Status === 'Scheduled').length;
-  document.getElementById('st-sent').textContent = sentThisMonth;
-}
+const STATUSES = ['Draft','In Review','Approved','Scheduled','Sent'];
+const STATUS_CLASSES = { 'Draft':'col-draft','In Review':'col-review','Approved':'col-approved','Scheduled':'col-scheduled','Sent':'col-sent' };
 
-function statusClass(status) {
-  const m = { 'In Development': 's-dev', 'Copy Written': 's-written', 'In Review': 's-review', 'Scheduled': 's-scheduled', 'Sent': 's-sent' };
-  return m[status] || 's-dev';
-}
-
-function renderPipelineList() {
-  const sorted = [...pipelineData].sort((a,b) => {
-    const da = a.fields['Scheduled Date'] || '9999';
-    const db = b.fields['Scheduled Date'] || '9999';
-    return da.localeCompare(db);
+function renderPipeline() {
+  const grouped = {};
+  STATUSES.forEach(s => grouped[s] = []);
+  pipelineData.forEach(r => {
+    const s = r.fields['Status'] || 'Draft';
+    if (grouped[s]) grouped[s].push(r); else grouped['Draft'].push(r);
   });
-  
-  document.getElementById('pipeline-count-badge').textContent = sorted.length;
-  
-  if (!sorted.length) {
-    document.getElementById('pipeline-list').innerHTML = '<div class="empty">No pipeline items yet.</div>';
-    return;
-  }
-  
-  const html = sorted.map(r => {
-    const f = r.fields;
-    const dateStr = f['Scheduled Date'] ? new Date(f['Scheduled Date']+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
-    return `<div class="pipeline-item">
-      <div>
-        <div class="pi-title">${escHtml(f['Email Title'] || 'Untitled')}</div>
-        <div class="pi-meta">
-          ${f.Category ? `<span>${escHtml(f.Category)}</span>` : ''}
-          <span>📅 ${dateStr}</span>
-        </div>
+  const cols = document.getElementById('pipeline-cols');
+  cols.innerHTML = STATUSES.map(status => {
+    const items = grouped[status];
+    return `<div class="pipeline-col">
+      <div class="pipeline-col-header ${STATUS_CLASSES[status]}">
+        ${status} <span class="col-count">${items.length}</span>
       </div>
-      <div class="pi-right">
-        <span class="status-badge ${statusClass(f.Status)}">${escHtml(f.Status || '—')}</span>
+      <div class="pipeline-col-body">
+        ${items.length === 0 ? '<div class="empty-state"><div class="empty-icon">📭</div>Empty</div>' :
+          items.map(r => {
+            const f = r.fields;
+            return `<div class="pipeline-item" onclick="viewPipelineItem('${r.id}')">
+              <div class="pipeline-title">${f['Email Title']||'Untitled'}</div>
+              <div class="pipeline-subject">${f['Subject Line']||'No subject'}</div>
+              <div class="pipeline-meta">
+                <span class="pipeline-date">${f['Scheduled Date']||'No date'}</span>
+                ${f['Assigned To'] ? `<span class="badge-assignee">${f['Assigned To']}</span>` : ''}
+              </div>
+            </div>`;
+          }).join('')}
       </div>
     </div>`;
   }).join('');
-  
-  document.getElementById('pipeline-list').innerHTML = html;
 }
 
-function renderIdeasList() {
-  const sorted = [...ideasData]
-    .sort((a,b) => (b.fields['Priority Score']||0) - (a.fields['Priority Score']||0))
-    .slice(0, 15);
-  
-  document.getElementById('ideas-count-badge').textContent = ideasData.length;
-  
-  if (!sorted.length) {
-    document.getElementById('ideas-list').innerHTML = '<div class="empty">No ideas yet.</div>';
-    return;
-  }
-  
-  const html = sorted.map((r, i) => {
-    const f = r.fields;
-    const score = f['Priority Score'] || 0;
-    const sc = score >= 10 ? 's10' : score >= 9 ? 's9' : score >= 8 ? 's8' : score >= 7 ? 's7' : 'slow';
-    return `<div class="idea-item">
-      <div class="idea-num">${i+1}</div>
-      <div>
-        <div class="idea-title">${escHtml(f.Concept || 'Untitled')}</div>
-        <div class="idea-cat">${escHtml(f.Category || '')}</div>
-      </div>
-      <span class="score-pill ${sc}">${score}</span>
-    </div>`;
-  }).join('');
-  
-  document.getElementById('ideas-list').innerHTML = html;
+function viewPipelineItem(id) {
+  const r = pipelineData.find(x => x.id === id);
+  if (!r) return;
+  const f = r.fields;
+  document.getElementById('pipeline-modal-title').textContent = f['Email Title']||'Email Details';
+  document.getElementById('pipeline-modal-body').innerHTML = `
+    <div class="modal-field"><label>Email Title</label><p>${f['Email Title']||'—'}</p></div>
+    <div class="modal-field"><label>Category</label><p>${f['Category']||'—'}</p></div>
+    <div class="modal-field"><label>Subject Line</label><p>${f['Subject Line']||'—'}</p></div>
+    <div class="modal-field"><label>Description</label><p>${f['Description']||'—'}</p></div>
+    <div class="modal-field"><label>Status</label><p>${f['Status']||'—'}</p></div>
+    <div class="modal-field"><label>Scheduled Date</label><p>${f['Scheduled Date']||'—'}</p></div>
+    <div class="modal-field"><label>Assigned To</label><p>${f['Assigned To']||'—'}</p></div>
+    <div class="modal-field"><label>Priority Score</label><p>${f['Priority Score']||'—'}</p></div>
+    <div class="modal-field"><label>Notes</label><p>${f['Notes']||'—'}</p></div>
+  `;
+  document.getElementById('pipeline-modal').style.display = 'flex';
 }
 
-function fmtDate(d) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+// CALENDAR (view only — no click-to-add)
+function changeMonth(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
 }
 
-function renderMiniCal() {
-  const emailDates = new Set();
-  const emailsByDate = {};
+function renderCalendar() {
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-title').textContent = `${months[calMonth]} ${calYear}`;
+  const today = new Date();
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const daysInPrev = new Date(calYear, calMonth, 0).getDate();
+  const byDate = {};
   pipelineData.forEach(r => {
     const d = r.fields['Scheduled Date'];
-    if (d) {
-      emailDates.add(d);
-      if (!emailsByDate[d]) emailsByDate[d] = [];
-      emailsByDate[d].push(r.fields['Email Title'] || 'Untitled');
+    if (d) { if (!byDate[d]) byDate[d] = []; byDate[d].push(r); }
+  });
+  let html = '', day = 1, nextDay = 1;
+  for (let i = 0; i < 42; i++) {
+    if (i < firstDay) {
+      html += `<div class="cal-cell other-month"><div class="cal-date">${daysInPrev - firstDay + i + 1}</div></div>`;
+    } else if (day > daysInMonth) {
+      html += `<div class="cal-cell other-month"><div class="cal-date">${nextDay++}</div></div>`;
+    } else {
+      const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      const isToday = calYear===today.getFullYear() && calMonth===today.getMonth() && day===today.getDate();
+      const items = byDate[dateStr] || [];
+      const d = day;
+      html += `<div class="cal-cell${isToday?' today':''}">
+        <div class="cal-date">${d}</div>
+        ${items.map(r=>`<div class="cal-item" onclick="viewCalItem('${r.id}')">${r.fields['Email Title']||'Email'}</div>`).join('')}
+      </div>`;
+      day++;
     }
-  });
-  
-  const today = new Date();
-  today.setHours(0,0,0,0);
-  const todayStr = fmtDate(today);
-  const endDate = new Date(today);
-  endDate.setDate(endDate.getDate() + 30);
-  
-  // Group by month
-  const months = {};
-  for (let d = new Date(today); d <= endDate; d.setDate(d.getDate()+1)) {
-    const m = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    if (!months[m]) months[m] = { year: d.getFullYear(), month: d.getMonth(), days: [] };
-    months[m].days.push(new Date(d));
   }
-  
-  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  
-  let html = '';
-  Object.values(months).forEach(({ year, month, days }) => {
-    html += `<div class="mini-month">${monthNames[month]} ${year}</div>`;
-    html += `<div class="mini-cal-grid">`;
-    ['S','M','T','W','T','F','S'].forEach(d => html += `<div class="mini-cal-dow">${d}</div>`);
-    
-    // Fill blanks at start
-    const firstDow = days[0].getDay();
-    for (let i = 0; i < firstDow; i++) html += `<div class="mini-day other"></div>`;
-    
-    days.forEach(d => {
-      const ds = fmtDate(d);
-      const isToday = ds === todayStr;
-      const hasEmail = emailDates.has(ds);
-      const titles = emailsByDate[ds] ? emailsByDate[ds].join(', ') : '';
-      html += `<div class="mini-day ${isToday?'today':''} ${hasEmail && !isToday?'has-email':''}" title="${titles || ''}">${d.getDate()}</div>`;
-    });
-    
-    html += `</div>`;
-  });
-  
-  if (!html) html = '<div class="empty">No scheduled emails in next 30 days.</div>';
-  
-  document.getElementById('mini-cal-body').innerHTML = html;
+  document.getElementById('cal-body').innerHTML = html;
 }
 
-function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function viewCalItem(id) {
+  const r = pipelineData.find(x => x.id === id);
+  if (!r) return;
+  const f = r.fields;
+  document.getElementById('cal-modal-title').textContent = f['Email Title']||'Email';
+  document.getElementById('cal-modal-body').innerHTML = `
+    <div class="modal-field"><label>Email Title</label><p>${f['Email Title']||'—'}</p></div>
+    <div class="modal-field"><label>Subject Line</label><p>${f['Subject Line']||'—'}</p></div>
+    <div class="modal-field"><label>Status</label><p>${f['Status']||'—'}</p></div>
+    <div class="modal-field"><label>Scheduled Date</label><p>${f['Scheduled Date']||'—'}</p></div>
+    <div class="modal-field"><label>Assigned To</label><p>${f['Assigned To']||'—'}</p></div>
+    <div class="modal-field"><label>Notes</label><p>${f['Notes']||'—'}</p></div>
+  `;
+  document.getElementById('cal-modal').style.display = 'flex';
+}
+
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+function closeModalOnBackdrop(e, id) { if (e.target.classList.contains('modal-backdrop')) closeModal(id); }
+
+checkAuth();
 </script>
 </body>
 </html>

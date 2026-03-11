@@ -3,388 +3,558 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Patty's Dashboard — Email Pipeline</title>
+<title>Blue Alpha — Patty's Dashboard</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; min-height: 100vh; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #222; }
 
-  #pw-overlay { position: fixed; inset: 0; background: #1B2A4A; display: flex; align-items: center; justify-content: center; z-index: 9999; }
-  .pw-box { background: #fff; border-radius: 12px; padding: 40px; width: 360px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
-  .pw-box .logo { font-size: 28px; font-weight: 700; color: #1B2A4A; margin-bottom: 4px; }
-  .pw-box .sub { color: #888; font-size: 14px; margin-bottom: 28px; }
-  .pw-box input { width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; outline: none; margin-bottom: 12px; transition: border-color 0.2s; }
-  .pw-box input:focus { border-color: #C8973A; }
-  .pw-box button { width: 100%; padding: 12px; background: #C8973A; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
-  .pw-box .error { color: #e53e3e; font-size: 13px; margin-top: 8px; display: none; }
-
-  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #1B2A4A; color: #fff; padding: 24px 0; display: flex; flex-direction: column; z-index: 200; }
-  .sidebar .brand { padding: 0 24px 24px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-  .sidebar .brand h2 { font-size: 18px; font-weight: 700; color: #C8973A; }
-  .sidebar .brand p { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 2px; }
-  .sidebar nav { padding: 16px 0; }
-  .sidebar nav a { display: block; padding: 10px 24px; color: rgba(255,255,255,0.7); text-decoration: none; font-size: 14px; transition: all 0.2s; border-left: 3px solid transparent; }
-  .sidebar nav a.active, .sidebar nav a:hover { color: #fff; background: rgba(200,151,58,0.15); border-left-color: #C8973A; }
-  .sidebar .logout { margin-top: auto; padding: 16px 24px; }
-  .sidebar .logout button { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.6); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; width: 100%; transition: all 0.2s; }
-  .sidebar .logout button:hover { border-color: #C8973A; color: #C8973A; }
-
-  .main { margin-left: 220px; min-height: 100vh; display: flex; flex-direction: column; }
-  .topbar { background: #fff; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e8ecf0; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-  .topbar h1 { font-size: 20px; font-weight: 700; color: #1B2A4A; }
-  .btn-refresh { background: #1B2A4A; color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-  .btn-refresh:hover { background: #2a3d5c; }
-
-  /* Stats bar */
-  .stats-bar { background: #1B2A4A; padding: 14px 32px; display: flex; gap: 32px; }
-  .stat { display: flex; flex-direction: column; }
-  .stat-val { font-size: 22px; font-weight: 700; color: #C8973A; }
-  .stat-label { font-size: 11px; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
-
-  /* Kanban */
-  .kanban-wrap { flex: 1; overflow-x: auto; padding: 24px 32px; }
-  .kanban { display: flex; gap: 16px; min-width: max-content; align-items: flex-start; }
-  .column { width: 260px; flex-shrink: 0; }
-  .col-header { padding: 10px 14px; border-radius: 8px 8px 0 0; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; }
-  .col-header .col-count { background: rgba(255,255,255,0.25); border-radius: 12px; padding: 2px 8px; font-size: 11px; }
-  .col-dev .col-header { background: #d69e2e; color: #fff; }
-  .col-written .col-header { background: #3182ce; color: #fff; }
-  .col-review .col-header { background: #dd6b20; color: #fff; }
-  .col-scheduled .col-header { background: #805ad5; color: #fff; }
-  .col-sent .col-header { background: #38a169; color: #fff; }
-  .col-body { background: rgba(0,0,0,0.03); border: 1px solid #e8ecf0; border-top: none; border-radius: 0 0 8px 8px; min-height: 200px; padding: 8px; }
-  
-  .card { background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 8px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); cursor: pointer; transition: all 0.2s; border-left: 3px solid transparent; }
-  .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.12); transform: translateY(-1px); border-left-color: #C8973A; }
-  .card-title { font-size: 13px; font-weight: 700; color: #1B2A4A; margin-bottom: 6px; line-height: 1.3; }
-  .card-meta { font-size: 11px; color: #888; display: flex; flex-direction: column; gap: 3px; }
-  .card-meta span { display: flex; align-items: center; gap: 4px; }
-  .cat-tag { display: inline-block; background: rgba(27,42,74,0.07); color: #1B2A4A; border-radius: 12px; padding: 2px 7px; font-size: 10px; font-weight: 600; }
-
-  /* Detail panel */
-  .detail-panel {
-    position: fixed; right: -520px; top: 0; bottom: 0; width: 500px; background: #fff;
-    box-shadow: -4px 0 30px rgba(0,0,0,0.15); z-index: 500; transition: right 0.3s ease; overflow-y: auto; padding: 0;
-    display: flex; flex-direction: column;
+  #login-overlay {
+    position: fixed; inset: 0; background: #f0f2f5;
+    display: flex; align-items: center; justify-content: center; z-index: 1000;
   }
-  .detail-panel.open { right: 0; }
-  .panel-header { background: #1B2A4A; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; }
-  .panel-header h3 { color: #fff; font-size: 16px; font-weight: 700; flex: 1; padding-right: 16px; }
-  .panel-close { background: rgba(255,255,255,0.15); border: none; color: #fff; width: 30px; height: 30px; border-radius: 6px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
-  .panel-body { flex: 1; padding: 24px; overflow-y: auto; }
-  .form-group { margin-bottom: 16px; }
-  .form-group label { display: block; font-size: 12px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-  .form-group input, .form-group textarea, .form-group select {
-    width: 100%; padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; outline: none;
-    font-family: inherit; transition: border-color 0.2s; color: #333;
+  .login-card {
+    background: #fff; border-radius: 12px; padding: 48px 40px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12); width: 360px; text-align: center;
   }
-  .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: #C8973A; }
-  .form-group textarea { resize: vertical; }
-  .panel-footer { padding: 16px 24px; border-top: 1px solid #f0f2f5; display: flex; gap: 10px; justify-content: flex-end; background: #fafafa; }
-  .btn-save { background: #C8973A; color: #fff; border: none; border-radius: 8px; padding: 10px 24px; font-size: 14px; font-weight: 700; cursor: pointer; transition: background 0.2s; }
-  .btn-save:hover { background: #b8872a; }
-  .btn-save:disabled { background: #ccc; cursor: not-allowed; }
-  .btn-cancel-panel { background: #f0f2f5; color: #444; border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .login-card img { width: 120px; margin-bottom: 24px; }
+  .login-card h2 { color: #1B3A6B; margin-bottom: 8px; font-size: 1.4rem; }
+  .login-card p { color: #666; margin-bottom: 24px; font-size: 0.9rem; }
+  .login-card input {
+    width: 100%; padding: 12px 14px; border: 1.5px solid #ddd; border-radius: 8px;
+    font-size: 1rem; margin-bottom: 16px; outline: none;
+  }
+  .login-card input:focus { border-color: #1B3A6B; }
+  .login-card button {
+    width: 100%; padding: 12px; background: #1B3A6B; color: #fff;
+    border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; font-weight: 600;
+  }
+  .login-card button:hover { background: #16305a; }
+  .login-error { color: #B22222; font-size: 0.85rem; margin-top: 8px; display: none; }
 
-  .overlay-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.2); z-index: 400; }
-  .overlay-bg.show { display: block; }
+  #app { display: flex; height: 100vh; overflow: hidden; }
+  #sidebar {
+    width: 220px; min-width: 220px; background: #1B3A6B; color: #fff;
+    display: flex; flex-direction: column; height: 100vh; position: fixed; left: 0; top: 0;
+  }
+  .sidebar-logo { padding: 20px 16px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .sidebar-logo img { width: 100%; max-width: 140px; }
+  .sidebar-user { padding: 12px 16px; font-size: 0.8rem; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.05em; }
+  nav { flex: 1; padding: 8px 0; }
+  nav a {
+    display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+    color: rgba(255,255,255,0.8); text-decoration: none; font-size: 0.95rem;
+    cursor: pointer; border-left: 3px solid transparent; transition: all 0.15s;
+  }
+  nav a:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  nav a.active { background: rgba(255,255,255,0.12); color: #fff; border-left-color: #B22222; font-weight: 600; }
+  .sidebar-footer { padding: 16px; border-top: 1px solid rgba(255,255,255,0.1); }
+  .lock-btn {
+    width: 100%; padding: 10px; background: rgba(178,34,34,0.2); color: #fff;
+    border: 1px solid rgba(178,34,34,0.4); border-radius: 8px; cursor: pointer;
+    font-size: 0.85rem; transition: background 0.15s;
+  }
+  .lock-btn:hover { background: rgba(178,34,34,0.4); }
 
-  .loading { text-align: center; padding: 60px; }
-  .spinner { width: 40px; height: 40px; border: 3px solid #e0e0e0; border-top-color: #C8973A; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+  #main { margin-left: 220px; flex: 1; overflow-y: auto; padding: 32px; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .page-header { margin-bottom: 24px; }
+  .page-header h1 { color: #1B3A6B; font-size: 1.6rem; margin-bottom: 4px; }
+  .page-header p { color: #666; font-size: 0.9rem; }
+
+  .toolbar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+  .toolbar select, .toolbar input {
+    padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 8px;
+    font-size: 0.9rem; outline: none; background: #fff;
+  }
+  .btn-primary {
+    padding: 8px 18px; background: #1B3A6B; color: #fff; border: none;
+    border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 600; margin-left: auto;
+  }
+  .btn-primary:hover { background: #16305a; }
+  .btn-secondary { padding: 8px 18px; background: #f0f2f5; color: #333; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+  .btn-secondary:hover { background: #e0e4eb; }
+  .btn-danger { background: #B22222; color: #fff; padding: 8px 18px; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+  .btn-danger:hover { background: #8b1a1a; }
+
+  .badge { font-size: 0.72rem; padding: 3px 8px; border-radius: 20px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+  .badge-cat { background: #e8eef8; color: #1B3A6B; }
+
+  .pipeline-columns { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; align-items: flex-start; }
+  .pipeline-col { min-width: 220px; flex: 1; }
+  .pipeline-col-header {
+    padding: 10px 14px; border-radius: 8px 8px 0 0; font-size: 0.85rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 8px;
+  }
+  .col-draft { background: #e2e3e5; color: #383d41; }
+  .col-review { background: #fff3cd; color: #856404; }
+  .col-approved { background: #d1ecf1; color: #0c5460; }
+  .col-scheduled { background: #d4edda; color: #155724; }
+  .col-sent { background: #e8eef8; color: #1B3A6B; }
+  .pipeline-col-body { background: #f8f9fa; border: 1px solid #e0e4eb; border-top: none; border-radius: 0 0 8px 8px; min-height: 200px; padding: 8px; }
+  .pipeline-item {
+    background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.07); cursor: pointer; border: 1px solid #e8e8e8; transition: box-shadow 0.15s;
+  }
+  .pipeline-item:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.12); }
+  .pipeline-title { font-weight: 700; color: #1B3A6B; font-size: 0.9rem; margin-bottom: 4px; }
+  .pipeline-subject { font-size: 0.8rem; color: #666; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pipeline-meta { display: flex; justify-content: space-between; align-items: center; }
+  .pipeline-date { font-size: 0.75rem; color: #999; }
+  .badge-assignee { background: #e8eef8; color: #1B3A6B; font-size: 0.72rem; padding: 2px 7px; border-radius: 12px; font-weight: 600; }
+  .col-count { background: rgba(0,0,0,0.1); border-radius: 10px; padding: 1px 7px; font-size: 0.78rem; }
+
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    display: flex; align-items: center; justify-content: center; z-index: 500;
+  }
+  .modal {
+    background: #fff; border-radius: 12px; padding: 32px;
+    width: 580px; max-width: 95vw; max-height: 85vh; overflow-y: auto;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+  }
+  .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+  .modal-header h2 { color: #1B3A6B; font-size: 1.25rem; flex: 1; }
+  .close-btn { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #999; padding: 0 4px; }
+  .close-btn:hover { color: #333; }
+  .modal-field { margin-bottom: 16px; }
+  .modal-field label { display: block; font-size: 0.8rem; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .modal-field p { font-size: 0.95rem; color: #333; line-height: 1.6; }
+  .modal-field input, .modal-field textarea, .modal-field select {
+    width: 100%; padding: 10px 12px; border: 1.5px solid #ddd; border-radius: 8px;
+    font-size: 0.95rem; outline: none; font-family: inherit;
+  }
+  .modal-field input:focus, .modal-field textarea:focus, .modal-field select:focus { border-color: #1B3A6B; }
+  .modal-field textarea { min-height: 80px; resize: vertical; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; flex-wrap: wrap; }
+
+  .calendar-nav { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+  .calendar-nav h2 { color: #1B3A6B; font-size: 1.2rem; min-width: 180px; text-align: center; }
+  .cal-btn { padding: 8px 16px; background: #fff; border: 1.5px solid #ddd; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+  .cal-btn:hover { background: #f0f2f5; }
+  .calendar-grid { background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .cal-header { display: grid; grid-template-columns: repeat(7, 1fr); background: #1B3A6B; }
+  .cal-header div { padding: 10px; text-align: center; color: #fff; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; }
+  .cal-body { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .cal-cell { min-height: 130px; padding: 6px; border-right: 1px solid #eee; border-bottom: 1px solid #eee; cursor: pointer; transition: background 0.1s; }
+  .cal-cell:hover { background: #f8f9ff; }
+  .cal-cell.other-month { background: #fafafa; }
+  .cal-cell.other-month .cal-date { color: #ccc; }
+  .cal-cell.today { background: #eef2ff; }
+  .cal-date { font-size: 0.85rem; font-weight: 600; color: #333; margin-bottom: 4px; }
+  .cal-cell.today .cal-date { background: #1B3A6B; color: #fff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .cal-item { font-size: 0.72rem; background: #1B3A6B; color: #fff; border-radius: 4px; padding: 2px 5px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  .cal-item:hover { background: #B22222; }
+
+  .loading { text-align: center; padding: 48px; color: #888; }
+  .spinner { width: 32px; height: 32px; border: 3px solid #e0e4eb; border-top-color: #1B3A6B; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  
-  .empty-col { text-align: center; padding: 20px; color: #bbb; font-size: 12px; }
+  .empty-state { text-align: center; padding: 32px; color: #aaa; font-size: 0.9rem; }
+  .empty-icon { font-size: 2rem; margin-bottom: 8px; }
 
-  .toast { position: fixed; bottom: 24px; right: 24px; background: #38a169; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; box-shadow: 0 4px 20px rgba(0,0,0,0.2); z-index: 9000; transform: translateY(100px); opacity: 0; transition: all 0.3s; }
-  .toast.show { transform: translateY(0); opacity: 1; }
-  .toast.error { background: #e53e3e; }
+  .copy-btn { padding: 6px 14px; background: #f0f2f5; color: #333; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+  .copy-btn:hover { background: #e0e4eb; }
 </style>
 </head>
 <body>
 
-<div id="pw-overlay">
-  <div class="pw-box">
-    <div class="logo">🦅 Blue Alpha</div>
-    <div class="sub">Patty's Dashboard — Email Pipeline</div>
-    <input type="password" id="pw-input" placeholder="Enter password" onkeydown="if(event.key==='Enter')checkPw()">
-    <button onclick="checkPw()">Unlock Dashboard</button>
-    <div class="error" id="pw-error">Incorrect password. Try again.</div>
+<div id="login-overlay">
+  <div class="login-card">
+    <img src="/static/ba-logo.jpg" alt="Blue Alpha">
+    <h2>Patty's Dashboard</h2>
+    <p>Enter your password to continue</p>
+    <input type="password" id="login-pw" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()">Unlock Dashboard</button>
+    <div class="login-error" id="login-error">Incorrect password. Try again.</div>
   </div>
 </div>
 
-<div class="sidebar">
-  <div class="brand"><h2>Blue Alpha</h2><p>Email Pipeline</p></div>
-  <nav>
-    <a href="kurt.html">📋 Kurt's Ideas</a>
-    <a href="kelly.html">📅 Kelly's Calendar</a>
-    <a href="#" class="active">📊 Email Pipeline</a>
-    <a href="jesse.html">👁 Jesse's Overview</a>
-  </nav>
-  <div class="logout"><button onclick="logout()">🔒 Lock Dashboard</button></div>
-</div>
-
-<div class="main">
-  <div class="topbar">
-    <h1>Patty's Dashboard — Email Pipeline</h1>
-    <button class="btn-refresh" onclick="loadPipeline()">↻ Refresh</button>
-  </div>
-
-  <div class="stats-bar">
-    <div class="stat"><div class="stat-val" id="st-total">—</div><div class="stat-label">Total in Pipeline</div></div>
-    <div class="stat"><div class="stat-val" id="st-scheduled">—</div><div class="stat-label">Scheduled</div></div>
-    <div class="stat"><div class="stat-val" id="st-sent">—</div><div class="stat-label">Sent This Month</div></div>
-    <div class="stat"><div class="stat-val" id="st-dev">—</div><div class="stat-label">In Development</div></div>
-  </div>
-
-  <div class="kanban-wrap">
-    <div id="kanban-loading" class="loading"><div class="spinner"></div><div style="color:#888;">Loading pipeline...</div></div>
-    <div class="kanban" id="kanban" style="display:none;"></div>
-  </div>
-</div>
-
-<!-- Overlay -->
-<div class="overlay-bg" id="overlay-bg" onclick="closePanel()"></div>
-
-<!-- Detail Panel -->
-<div class="detail-panel" id="detail-panel">
-  <div class="panel-header">
-    <h3 id="panel-title">Email Details</h3>
-    <button class="panel-close" onclick="closePanel()">✕</button>
-  </div>
-  <div class="panel-body">
-    <div class="form-group">
-      <label>Email Title</label>
-      <input type="text" id="p-title" placeholder="Email title">
-    </div>
-    <div class="form-group">
-      <label>Status</label>
-      <select id="p-status">
-        <option>In Development</option>
-        <option>Copy Written</option>
-        <option>In Review</option>
-        <option>Scheduled</option>
-        <option>Sent</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Subject Line</label>
-      <input type="text" id="p-subject" placeholder="Email subject line">
-    </div>
-    <div class="form-group">
-      <label>Assigned To</label>
-      <input type="text" id="p-assigned" placeholder="Team member">
-    </div>
-    <div class="form-group">
-      <label>Description</label>
-      <textarea id="p-desc" rows="3" placeholder="Description"></textarea>
-    </div>
-    <div class="form-group">
-      <label>Copy Draft</label>
-      <textarea id="p-copy" rows="6" placeholder="Email copy goes here..."></textarea>
-    </div>
-    <div class="form-group">
-      <label>Notes</label>
-      <textarea id="p-notes" rows="3" placeholder="Notes or comments..."></textarea>
+<div id="app" style="display:none">
+  <div id="sidebar">
+    <div class="sidebar-logo"><img src="/static/ba-logo.jpg" alt="Blue Alpha"></div>
+    <div class="sidebar-user">Patty Grey</div>
+    <nav>
+      <a onclick="showTab('pipeline')" id="nav-pipeline">📊 E-mail Pipeline</a>
+      <a onclick="showTab('calendar')" id="nav-calendar">📅 E-mail Calendar</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="lock-btn" onclick="lockDashboard()">🔒 Lock Dashboard</button>
     </div>
   </div>
-  <div class="panel-footer">
-    <button class="btn-cancel-panel" onclick="closePanel()">Cancel</button>
-    <button class="btn-save" id="panel-save-btn" onclick="saveRecord()">💾 Save Changes</button>
+  <div id="main">
+
+    <div class="tab-panel" id="tab-pipeline">
+      <div class="page-header">
+        <h1>📊 E-mail Pipeline</h1>
+        <p>Manage email campaigns by status</p>
+      </div>
+      <div class="toolbar">
+        <button class="btn-primary" onclick="openPipelineModal(null)">+ Add New Email</button>
+      </div>
+      <div class="pipeline-columns" id="pipeline-cols"></div>
+    </div>
+
+    <div class="tab-panel" id="tab-calendar">
+      <div class="page-header">
+        <h1>📅 E-mail Calendar</h1>
+        <p>Scheduled email campaigns — click a date to schedule</p>
+      </div>
+      <div class="calendar-nav">
+        <button class="cal-btn" onclick="changeMonth(-1)">← Prev</button>
+        <h2 id="cal-title"></h2>
+        <button class="cal-btn" onclick="changeMonth(1)">Next →</button>
+      </div>
+      <div class="calendar-grid">
+        <div class="cal-header">
+          <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+        </div>
+        <div class="cal-body" id="cal-body"></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="modal-backdrop" id="pipeline-modal" style="display:none" onclick="closeModalOnBackdrop(event,'pipeline-modal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="pipeline-modal-title">Email Details</h2>
+      <button class="close-btn" onclick="closeModal('pipeline-modal')">×</button>
+    </div>
+    <div id="pipeline-modal-body"></div>
+    <div class="modal-actions" id="pipeline-modal-actions"></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="cal-modal" style="display:none" onclick="closeModalOnBackdrop(event,'cal-modal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="cal-modal-title">Scheduled Email</h2>
+      <button class="close-btn" onclick="closeModal('cal-modal')">×</button>
+    </div>
+    <div id="cal-modal-body"></div>
+    <div class="modal-actions" id="cal-modal-actions"></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="addcal-modal" style="display:none" onclick="closeModalOnBackdrop(event,'addcal-modal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Schedule Email for <span id="addcal-date-label"></span></h2>
+      <button class="close-btn" onclick="closeModal('addcal-modal')">×</button>
+    </div>
+    <div id="addcal-body"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal('addcal-modal')">Cancel</button>
+      <button class="btn-primary" onclick="saveScheduledDate()">Save</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const AT_TOKEN = 'pat3wxVXHb3JhDBBn.e0ca55ff285ba026b093f4232320f63fff16252679f6a4c08cc85ea3425c4954';
 const BASE_ID = 'appTCZwoETAInVuiX';
 const PIPELINE_TABLE = 'tblrFJ5qikGN5H5X9';
-const PASSWORD = 'patty2026';
-const PW_KEY = 'ba_patty_auth';
+const AUTH_KEY = 'ba_patty_auth';
+const PASSWORD = 'bluealpha2026';
 
 let pipelineData = [];
-let editingId = null;
+let calYear, calMonth;
+let editingPipelineId = null;
+let addCalDate = null;
 
-function checkPw() {
-  const val = document.getElementById('pw-input').value;
-  if (val === PASSWORD) {
-    localStorage.setItem(PW_KEY, 'true');
-    document.getElementById('pw-overlay').style.display = 'none';
-    loadPipeline();
+function doLogin() {
+  const pw = document.getElementById('login-pw').value;
+  if (pw === PASSWORD) {
+    localStorage.setItem(AUTH_KEY, '1');
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    initApp();
   } else {
-    document.getElementById('pw-error').style.display = 'block';
-    document.getElementById('pw-input').value = '';
+    document.getElementById('login-error').style.display = 'block';
   }
 }
-function logout() { localStorage.removeItem(PW_KEY); location.reload(); }
+function lockDashboard() { localStorage.removeItem(AUTH_KEY); location.reload(); }
+function checkAuth() {
+  if (localStorage.getItem(AUTH_KEY) === '1') {
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    initApp();
+  }
+}
 
-if (localStorage.getItem(PW_KEY) === 'true') {
-  document.getElementById('pw-overlay').style.display = 'none';
+function initApp() {
+  const now = new Date();
+  calYear = now.getFullYear(); calMonth = now.getMonth();
+  showTab('pipeline');
   loadPipeline();
 }
 
+function showTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('nav-' + tab).classList.add('active');
+  if (tab === 'calendar') renderCalendar();
+}
+
+async function atFetch(table, params='') {
+  const url = `https://api.airtable.com/v0/${BASE_ID}/${table}?${params}`;
+  const resp = await fetch(url, { headers: { Authorization: `Bearer ${AT_TOKEN}` } });
+  if (!resp.ok) throw new Error('Airtable error: ' + resp.status);
+  return resp.json();
+}
+async function atCreate(table, fields) {
+  const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${table}`, {
+    method: 'POST', headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields })
+  });
+  return resp.json();
+}
+async function atUpdate(table, id, fields) {
+  const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${table}/${id}`, {
+    method: 'PATCH', headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields })
+  });
+  return resp.json();
+}
+async function atDelete(table, id) {
+  await fetch(`https://api.airtable.com/v0/${BASE_ID}/${table}/${id}`, {
+    method: 'DELETE', headers: { Authorization: `Bearer ${AT_TOKEN}` }
+  });
+}
+async function atFetchAll(table, params='') {
+  let records = [], offset = null;
+  do {
+    const p = offset ? params + '&offset=' + offset : params;
+    const data = await atFetch(table, p);
+    records = records.concat(data.records || []);
+    offset = data.offset || null;
+  } while (offset);
+  return records;
+}
+
 async function loadPipeline() {
-  document.getElementById('kanban-loading').style.display = 'block';
-  document.getElementById('kanban').style.display = 'none';
-  
+  const cols = document.getElementById('pipeline-cols');
+  cols.innerHTML = '<div class="loading"><div class="spinner"></div>Loading pipeline...</div>';
   try {
-    let records = [];
-    let offset = null;
-    do {
-      let url = `https://api.airtable.com/v0/${BASE_ID}/${PIPELINE_TABLE}?pageSize=100`;
-      if (offset) url += `&offset=${offset}`;
-      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${AT_TOKEN}` } });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error.message);
-      records = records.concat(data.records);
-      offset = data.offset;
-    } while (offset);
-    
-    pipelineData = records;
-    renderKanban();
-    updateStats();
+    pipelineData = await atFetchAll(PIPELINE_TABLE, 'sort[0][field]=Priority Score&sort[0][direction]=desc');
+    renderPipeline();
   } catch(e) {
-    document.getElementById('kanban-loading').innerHTML = `<div style="color:#e53e3e;">Error: ${e.message}</div>`;
+    cols.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>Failed to load pipeline.</div>`;
+    console.error(e);
   }
 }
 
-function updateStats() {
-  const now = new Date();
-  const thisMonth = now.getMonth();
-  const thisYear = now.getFullYear();
-  
-  const total = pipelineData.length;
-  const scheduled = pipelineData.filter(r => r.fields.Status === 'Scheduled').length;
-  const sentThisMonth = pipelineData.filter(r => {
-    if (r.fields.Status !== 'Sent') return false;
-    const d = r.fields['Scheduled Date'];
-    if (!d) return false;
-    const rd = new Date(d + 'T12:00:00');
-    return rd.getMonth() === thisMonth && rd.getFullYear() === thisYear;
-  }).length;
-  const inDev = pipelineData.filter(r => r.fields.Status === 'In Development').length;
-  
-  document.getElementById('st-total').textContent = total;
-  document.getElementById('st-scheduled').textContent = scheduled;
-  document.getElementById('st-sent').textContent = sentThisMonth;
-  document.getElementById('st-dev').textContent = inDev;
-}
+const STATUSES = ['Draft','In Review','Approved','Scheduled','Sent'];
+const STATUS_CLASSES = { 'Draft':'col-draft','In Review':'col-review','Approved':'col-approved','Scheduled':'col-scheduled','Sent':'col-sent' };
 
-const COLUMNS = [
-  { key: 'In Development', cls: 'col-dev', label: 'In Development' },
-  { key: 'Copy Written', cls: 'col-written', label: 'Copy Written' },
-  { key: 'In Review', cls: 'col-review', label: 'In Review' },
-  { key: 'Scheduled', cls: 'col-scheduled', label: 'Scheduled' },
-  { key: 'Sent', cls: 'col-sent', label: 'Sent' },
-];
-
-function renderKanban() {
-  document.getElementById('kanban-loading').style.display = 'none';
-  document.getElementById('kanban').style.display = 'flex';
-  
-  let html = '';
-  COLUMNS.forEach(col => {
-    const cards = pipelineData.filter(r => r.fields.Status === col.key);
-    cards.sort((a,b) => {
-      const da = a.fields['Scheduled Date'] || '9999';
-      const db = b.fields['Scheduled Date'] || '9999';
-      return da.localeCompare(db);
-    });
-    
-    html += `<div class="column ${col.cls}">
-      <div class="col-header">${col.label}<span class="col-count">${cards.length}</span></div>
-      <div class="col-body">`;
-    
-    if (!cards.length) {
-      html += `<div class="empty-col">No items</div>`;
-    } else {
-      cards.forEach(r => {
-        const f = r.fields;
-        html += `<div class="card" onclick="openPanel('${r.id}')">
-          <div class="card-title">${escHtml(f['Email Title'] || 'Untitled')}</div>
-          <div class="card-meta">
-            ${f.Category ? `<span>${escHtml(f.Category)}</span>` : ''}
-            ${f['Scheduled Date'] ? `<span>📅 ${new Date(f['Scheduled Date']+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>` : ''}
-            ${f['Assigned To'] ? `<span>👤 ${escHtml(f['Assigned To'])}</span>` : ''}
-          </div>
-        </div>`;
-      });
-    }
-    
-    html += `</div></div>`;
+function renderPipeline() {
+  const grouped = {};
+  STATUSES.forEach(s => grouped[s] = []);
+  pipelineData.forEach(r => {
+    const s = r.fields['Status'] || 'Draft';
+    if (grouped[s]) grouped[s].push(r); else grouped['Draft'].push(r);
   });
-  
-  document.getElementById('kanban').innerHTML = html;
+  const cols = document.getElementById('pipeline-cols');
+  cols.innerHTML = STATUSES.map(status => {
+    const items = grouped[status];
+    return `<div class="pipeline-col">
+      <div class="pipeline-col-header ${STATUS_CLASSES[status]}">
+        ${status} <span class="col-count">${items.length}</span>
+      </div>
+      <div class="pipeline-col-body">
+        ${items.length === 0 ? '<div class="empty-state"><div class="empty-icon">📭</div>Empty</div>' :
+          items.map(r => {
+            const f = r.fields;
+            return `<div class="pipeline-item" onclick="viewPipelineItem('${r.id}')">
+              <div class="pipeline-title">${f['Email Title']||'Untitled'}</div>
+              <div class="pipeline-subject">${f['Subject Line']||'No subject'}</div>
+              <div class="pipeline-meta">
+                <span class="pipeline-date">${f['Scheduled Date']||'No date'}</span>
+                ${f['Assigned To'] ? `<span class="badge-assignee">${f['Assigned To']}</span>` : ''}
+              </div>
+            </div>`;
+          }).join('')}
+      </div>
+    </div>`;
+  }).join('');
 }
 
-function openPanel(id) {
+function viewPipelineItem(id) {
   const r = pipelineData.find(x => x.id === id);
   if (!r) return;
   const f = r.fields;
-  
-  editingId = id;
-  document.getElementById('panel-title').textContent = f['Email Title'] || 'Edit Email';
-  document.getElementById('p-title').value = f['Email Title'] || '';
-  document.getElementById('p-status').value = f.Status || 'In Development';
-  document.getElementById('p-subject').value = f['Subject Line'] || '';
-  document.getElementById('p-assigned').value = f['Assigned To'] || '';
-  document.getElementById('p-desc').value = f.Description || '';
-  document.getElementById('p-copy').value = f['Copy Draft'] || '';
-  document.getElementById('p-notes').value = f.Notes || '';
-  
-  document.getElementById('panel-save-btn').disabled = false;
-  document.getElementById('panel-save-btn').textContent = '💾 Save Changes';
-  
-  document.getElementById('detail-panel').classList.add('open');
-  document.getElementById('overlay-bg').classList.add('show');
+  document.getElementById('pipeline-modal-title').textContent = f['Email Title']||'Email Details';
+  document.getElementById('pipeline-modal-body').innerHTML = `
+    <div class="modal-field"><label>Email Title</label><p>${f['Email Title']||'—'}</p></div>
+    <div class="modal-field"><label>Category</label><p>${f['Category']||'—'}</p></div>
+    <div class="modal-field"><label>Subject Line</label><p>${f['Subject Line']||'—'}</p></div>
+    <div class="modal-field"><label>Description</label><p>${f['Description']||'—'}</p></div>
+    <div class="modal-field"><label>Status</label><p>${f['Status']||'—'}</p></div>
+    <div class="modal-field"><label>Scheduled Date</label><p>${f['Scheduled Date']||'—'}</p></div>
+    <div class="modal-field"><label>Assigned To</label><p>${f['Assigned To']||'—'}</p></div>
+    <div class="modal-field"><label>Priority Score</label><p>${f['Priority Score']||'—'}</p></div>
+    <div class="modal-field"><label>Notes</label><p>${f['Notes']||'—'}</p></div>
+    ${f['Description'] ? `<div class="modal-field">
+      <button class="copy-btn" onclick="navigator.clipboard.writeText('${(f['Description']||'').replace(/'/g,"\\'")}').then(()=>this.textContent='Copied!').catch(()=>{})">📋 Copy Draft</button>
+    </div>` : ''}
+  `;
+  document.getElementById('pipeline-modal-actions').innerHTML = `
+    <button class="btn-secondary" onclick="closeModal('pipeline-modal')">Close</button>
+    <button class="btn-primary" onclick="openPipelineModal('${id}')">Edit</button>
+    <button class="btn-danger" onclick="deletePipelineItem('${id}')">Delete</button>
+  `;
+  document.getElementById('pipeline-modal').style.display = 'flex';
 }
 
-function closePanel() {
-  document.getElementById('detail-panel').classList.remove('open');
-  document.getElementById('overlay-bg').classList.remove('show');
-  editingId = null;
+function openPipelineModal(id) {
+  closeModal('pipeline-modal');
+  editingPipelineId = id;
+  const r = id ? pipelineData.find(x => x.id === id) : null;
+  const f = r ? r.fields : {};
+  document.getElementById('pipeline-modal-title').textContent = id ? 'Edit Email' : 'Add New Email';
+  document.getElementById('pipeline-modal-body').innerHTML = `
+    <div class="modal-field"><label>Email Title *</label><input id="f-title" value="${f['Email Title']||''}"></div>
+    <div class="modal-field"><label>Category</label><input id="f-cat" value="${f['Category']||''}"></div>
+    <div class="modal-field"><label>Subject Line</label><input id="f-subject" value="${f['Subject Line']||''}"></div>
+    <div class="modal-field"><label>Description / Draft</label><textarea id="f-desc">${f['Description']||''}</textarea></div>
+    <div class="modal-field"><label>Status</label>
+      <select id="f-status">
+        ${STATUSES.map(s=>`<option ${f['Status']===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+    </div>
+    <div class="modal-field"><label>Scheduled Date</label><input id="f-date" type="date" value="${f['Scheduled Date']||''}"></div>
+    <div class="modal-field"><label>Assigned To</label><input id="f-assigned" value="${f['Assigned To']||''}"></div>
+    <div class="modal-field"><label>Priority Score (1-10)</label><input id="f-priority" type="number" min="1" max="10" value="${f['Priority Score']||''}"></div>
+    <div class="modal-field"><label>Notes</label><textarea id="f-notes">${f['Notes']||''}</textarea></div>
+  `;
+  document.getElementById('pipeline-modal-actions').innerHTML = `
+    <button class="btn-secondary" onclick="closeModal('pipeline-modal')">Cancel</button>
+    <button class="btn-primary" onclick="savePipelineItem()">Save</button>
+  `;
+  document.getElementById('pipeline-modal').style.display = 'flex';
 }
 
-async function saveRecord() {
-  if (!editingId) return;
-  const btn = document.getElementById('panel-save-btn');
-  btn.disabled = true;
-  btn.textContent = 'Saving...';
-  
+async function savePipelineItem() {
+  const fields = {
+    'Email Title': document.getElementById('f-title').value,
+    'Category': document.getElementById('f-cat').value,
+    'Subject Line': document.getElementById('f-subject').value,
+    'Description': document.getElementById('f-desc').value,
+    'Status': document.getElementById('f-status').value,
+    'Assigned To': document.getElementById('f-assigned').value,
+    'Notes': document.getElementById('f-notes').value,
+  };
+  const d = document.getElementById('f-date').value;
+  if (d) fields['Scheduled Date'] = d;
+  const p = document.getElementById('f-priority').value;
+  if (p) fields['Priority Score'] = parseInt(p);
   try {
-    const res = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${PIPELINE_TABLE}/${editingId}`, {
-      method: 'PATCH',
-      headers: { 'Authorization': `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields: {
-        'Email Title': document.getElementById('p-title').value.trim(),
-        'Status': document.getElementById('p-status').value,
-        'Subject Line': document.getElementById('p-subject').value.trim(),
-        'Assigned To': document.getElementById('p-assigned').value.trim(),
-        'Description': document.getElementById('p-desc').value.trim(),
-        'Copy Draft': document.getElementById('p-copy').value.trim(),
-        'Notes': document.getElementById('p-notes').value.trim(),
-      }})
-    });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-    
-    showToast('✓ Saved successfully!');
-    closePanel();
-    await loadPipeline();
-  } catch(e) {
-    showToast(`Error: ${e.message}`, true);
-    btn.disabled = false;
-    btn.textContent = '💾 Save Changes';
+    if (editingPipelineId) { await atUpdate(PIPELINE_TABLE, editingPipelineId, fields); }
+    else { await atCreate(PIPELINE_TABLE, fields); }
+    closeModal('pipeline-modal');
+    loadPipeline();
+  } catch(e) { alert('Save failed: ' + e.message); }
+}
+
+async function deletePipelineItem(id) {
+  if (!confirm('Delete this email?')) return;
+  try { await atDelete(PIPELINE_TABLE, id); closeModal('pipeline-modal'); loadPipeline(); }
+  catch(e) { alert('Delete failed: ' + e.message); }
+}
+
+function changeMonth(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-title').textContent = `${months[calMonth]} ${calYear}`;
+  const today = new Date();
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const daysInPrev = new Date(calYear, calMonth, 0).getDate();
+  const byDate = {};
+  pipelineData.forEach(r => {
+    const d = r.fields['Scheduled Date'];
+    if (d) { if (!byDate[d]) byDate[d] = []; byDate[d].push(r); }
+  });
+  let html = '', day = 1, nextDay = 1;
+  for (let i = 0; i < 42; i++) {
+    if (i < firstDay) {
+      html += `<div class="cal-cell other-month"><div class="cal-date">${daysInPrev - firstDay + i + 1}</div></div>`;
+    } else if (day > daysInMonth) {
+      html += `<div class="cal-cell other-month"><div class="cal-date">${nextDay++}</div></div>`;
+    } else {
+      const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      const isToday = calYear===today.getFullYear() && calMonth===today.getMonth() && day===today.getDate();
+      const items = byDate[dateStr] || [];
+      const d = day;
+      html += `<div class="cal-cell${isToday?' today':''}" onclick="handleCalCellClick('${dateStr}')">
+        <div class="cal-date">${d}</div>
+        ${items.map(r=>`<div class="cal-item" onclick="event.stopPropagation();viewCalItem('${r.id}')">${r.fields['Email Title']||'Email'}</div>`).join('')}
+      </div>`;
+      day++;
+    }
   }
+  document.getElementById('cal-body').innerHTML = html;
 }
 
-function showToast(msg, isError) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast show' + (isError ? ' error' : '');
-  setTimeout(() => t.className = 'toast', 3500);
+function handleCalCellClick(dateStr) { openAddCalModal(dateStr); }
+
+function openAddCalModal(dateStr) {
+  addCalDate = dateStr;
+  const available = pipelineData.filter(r => !r.fields['Scheduled Date'] || r.fields['Scheduled Date'] !== dateStr);
+  document.getElementById('addcal-date-label').textContent = dateStr;
+  document.getElementById('addcal-body').innerHTML = available.length
+    ? `<div class="modal-field"><label>Select Email to Schedule</label>
+        <select id="addcal-select">
+          <option value="">-- Choose an email --</option>
+          ${available.map(r=>`<option value="${r.id}">${r.fields['Email Title']||'Untitled'}</option>`).join('')}
+        </select>
+       </div>`
+    : '<p style="color:#888">No unscheduled emails available.</p>';
+  document.getElementById('addcal-modal').style.display = 'flex';
 }
 
-function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+async function saveScheduledDate() {
+  const sel = document.getElementById('addcal-select');
+  if (!sel || !sel.value) { closeModal('addcal-modal'); return; }
+  try {
+    await atUpdate(PIPELINE_TABLE, sel.value, { 'Scheduled Date': addCalDate });
+    closeModal('addcal-modal');
+    await loadPipeline();
+    renderCalendar();
+  } catch(e) { alert('Save failed: ' + e.message); }
+}
+
+function viewCalItem(id) {
+  const r = pipelineData.find(x => x.id === id);
+  if (!r) return;
+  const f = r.fields;
+  document.getElementById('cal-modal-title').textContent = f['Email Title']||'Email';
+  document.getElementById('cal-modal-body').innerHTML = `
+    <div class="modal-field"><label>Email Title</label><p>${f['Email Title']||'—'}</p></div>
+    <div class="modal-field"><label>Subject Line</label><p>${f['Subject Line']||'—'}</p></div>
+    <div class="modal-field"><label>Status</label><p>${f['Status']||'—'}</p></div>
+    <div class="modal-field"><label>Scheduled Date</label><p>${f['Scheduled Date']||'—'}</p></div>
+    <div class="modal-field"><label>Notes</label><p>${f['Notes']||'—'}</p></div>
+  `;
+  document.getElementById('cal-modal-actions').innerHTML = `
+    <button class="btn-secondary" onclick="closeModal('cal-modal')">Close</button>
+    <button class="btn-primary" onclick="openPipelineModal('${id}');closeModal('cal-modal')">Edit</button>
+  `;
+  document.getElementById('cal-modal').style.display = 'flex';
+}
+
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+function closeModalOnBackdrop(e, id) { if (e.target.classList.contains('modal-backdrop')) closeModal(id); }
+
+checkAuth();
 </script>
 </body>
 </html>
