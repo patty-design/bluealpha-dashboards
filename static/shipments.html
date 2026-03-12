@@ -267,6 +267,44 @@
       flex-shrink: 0;
     }
 
+    /* ── Awaiting Banner ── */
+    .awaiting-banner {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--red);
+      border-radius: 4px;
+      padding: 16px 26px;
+      flex-shrink: 0;
+    }
+
+    .awaiting-label {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      flex: 1;
+    }
+
+    .awaiting-number {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 3.2rem;
+      font-weight: 900;
+      color: var(--red);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .awaiting-sub {
+      font-size: 0.85rem;
+      color: var(--muted);
+      width: 80px;
+    }
+
     /* ── Loading ── */
     .loading-overlay {
       position: fixed;
@@ -302,6 +340,13 @@
       </div>
     </div>
   </header>
+
+  <!-- Awaiting Shipment Banner -->
+  <div class="awaiting-banner" id="awaiting-banner">
+    <div class="awaiting-label">⏳ Awaiting Shipment</div>
+    <div class="awaiting-number" id="awaiting-count">—</div>
+    <div class="awaiting-sub">orders in queue</div>
+  </div>
 
   <!-- Stats: Orders + Components -->
   <div class="stats-row">
@@ -368,6 +413,20 @@ const CONFIG = {
   timezone:       'America/New_York',
   refreshSec:     60,
 };
+
+// ShipStation proxy — served by Railway
+const AWAITING_API = '/api/awaiting';
+
+async function refreshAwaiting() {
+  try {
+    const res = await fetch(AWAITING_API);
+    const data = await res.json();
+    const el = document.getElementById('awaiting-count');
+    if (el) el.textContent = (data.count ?? '—').toLocaleString();
+  } catch (e) {
+    console.warn('Awaiting fetch failed:', e);
+  }
+}
 
 // Known categories (in preferred display order)
 const CATEGORY_ORDER = [
@@ -631,6 +690,8 @@ function startCountdown() {
 updateClock();
 setInterval(updateClock, 1000);
 refresh().then(startCountdown);
+refreshAwaiting();
+setInterval(refreshAwaiting, 60000);
 </script>
 </body>
 </html>

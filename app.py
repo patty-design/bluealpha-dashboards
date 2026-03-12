@@ -1,8 +1,13 @@
 from flask import Flask, send_from_directory, abort, request, Response
 import os
 import functools
+import json
+import base64
+import requests as req_lib
 
-AIRTABLE_OPS_TOKEN = os.environ.get("AIRTABLE_OPS_TOKEN", "")
+AIRTABLE_OPS_TOKEN  = os.environ.get("AIRTABLE_OPS_TOKEN", "")
+SHIPSTATION_KEY     = os.environ.get("SHIPSTATION_KEY", "")
+SHIPSTATION_SECRET  = os.environ.get("SHIPSTATION_SECRET", "")
 
 app = Flask(__name__, static_folder="static")
 
@@ -61,6 +66,28 @@ def dashboard(name):
         content = content.replace("%%AIRTABLE_OPS_TOKEN%%", AIRTABLE_OPS_TOKEN)
         return Response(content, mimetype="text/html")
     abort(404)
+
+@app.route("/api/awaiting")
+def awaiting_shipment():
+    cors = {"Access-Control-Allow-Origin": "*"}
+    if not SHIPSTATION_KEY or not SHIPSTATION_SECRET:
+        return Response(json.dumps({"error": "ShipStation not configured"}),
+                        status=500, headers=cors, mimetype="application/json")
+    try:
+        creds = base64.b64encode(f"{SHIPSTATION_KEY}:{SHIPSTATION_SECRET}".encode()).decode()
+        r = req_lib.get(
+            "https://ssapi.shipstation.com/orders",
+            params={"orderStatus": "awaiting_shipment", "pageSize": 1},
+            headers={"Authorization": f"Basic {creds}"},
+            timeout=10
+        )
+        data = r.json()
+        return Response(json.dumps({"count": data.get("total", 0)}),
+                        headers=cors, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}),
+                        status=500, headers=cors, mimetype="application/json")
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
