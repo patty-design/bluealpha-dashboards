@@ -74,16 +74,28 @@ def awaiting_shipment():
         return Response(json.dumps({"error": "ShipStation not configured"}),
                         status=500, headers=cors, mimetype="application/json")
     try:
+        from datetime import datetime, timezone, timedelta
         creds = base64.b64encode(f"{SHIPSTATION_KEY}:{SHIPSTATION_SECRET}".encode()).decode()
-        r = req_lib.get(
+        headers = {"Authorization": f"Basic {creds}"}
+
+        # Today's date in Eastern time (UTC-5 / UTC-4)
+        eastern = timezone(timedelta(hours=-4))
+        today = datetime.now(eastern).strftime("%Y-%m-%d")
+
+        awaiting, placed = req_lib.get(
             "https://ssapi.shipstation.com/orders",
             params={"orderStatus": "awaiting_shipment", "pageSize": 1},
-            headers={"Authorization": f"Basic {creds}"},
-            timeout=10
+            headers=headers, timeout=10
+        ), req_lib.get(
+            "https://ssapi.shipstation.com/orders",
+            params={"orderDateStart": today, "orderDateEnd": today, "pageSize": 1},
+            headers=headers, timeout=10
         )
-        data = r.json()
-        return Response(json.dumps({"count": data.get("total", 0)}),
-                        headers=cors, mimetype="application/json")
+
+        return Response(json.dumps({
+            "count":       awaiting.json().get("total", 0),
+            "placedToday": placed.json().get("total", 0),
+        }), headers=cors, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}),
                         status=500, headers=cors, mimetype="application/json")

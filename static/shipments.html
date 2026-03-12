@@ -271,7 +271,7 @@
     .awaiting-banner {
       display: flex;
       align-items: center;
-      gap: 20px;
+      gap: 14px;
       background: var(--card);
       border: 1px solid var(--border);
       border-left: 4px solid var(--red);
@@ -287,14 +287,13 @@
       color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 2px;
-      flex: 1;
     }
 
     .awaiting-number {
       font-family: 'Montserrat', sans-serif;
       font-size: 3.2rem;
       font-weight: 900;
-      color: var(--red);
+      color: var(--cream);
       line-height: 1;
       font-variant-numeric: tabular-nums;
     }
@@ -302,7 +301,14 @@
     .awaiting-sub {
       font-size: 0.85rem;
       color: var(--muted);
-      width: 80px;
+      flex: 1;
+    }
+
+    .awaiting-divider {
+      width: 1px;
+      height: 40px;
+      background: var(--border);
+      margin: 0 12px;
     }
 
     /* ── Loading ── */
@@ -345,7 +351,9 @@
   <div class="awaiting-banner" id="awaiting-banner">
     <div class="awaiting-label">⏳ Awaiting Shipment</div>
     <div class="awaiting-number" id="awaiting-count">—</div>
-    <div class="awaiting-sub">orders in queue</div>
+    <div class="awaiting-divider"></div>
+    <div class="awaiting-label">📥 Orders Placed Today</div>
+    <div class="awaiting-number" id="placed-today">—</div>
   </div>
 
   <!-- Stats: Orders + Components -->
@@ -421,8 +429,10 @@ async function refreshAwaiting() {
   try {
     const res = await fetch(AWAITING_API);
     const data = await res.json();
-    const el = document.getElementById('awaiting-count');
-    if (el) el.textContent = (data.count ?? '—').toLocaleString();
+    const countEl = document.getElementById('awaiting-count');
+    const todayEl = document.getElementById('placed-today');
+    if (countEl) countEl.textContent = (data.count ?? '—').toLocaleString();
+    if (todayEl) todayEl.textContent = (data.placedToday ?? '—').toLocaleString();
   } catch (e) {
     console.warn('Awaiting fetch failed:', e);
   }
