@@ -184,14 +184,14 @@ def submit_return():
 
     fields = {
         "Order Number":            data.get("orderNumber", ""),
-        "Customer Name":           data.get("customerName", ""),
+        "Customer Name from Shipstation": data.get("customerName", ""),
         "Email Address":           data.get("email", ""),
         "Phone Number":            data.get("phone", ""),
         "Confirmed Shipping Address": address_str,
         "Items to Return":         data.get("itemsToReturn", ""),
         "Reason for Return":       data.get("reasonForReturn", ""),
         "Submission Date":         datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        "Ship Date":               data.get("shipDate", "")[:10] if data.get("shipDate") else "",
+        "Ship Date from Shipstation": data.get("shipDate", "")[:10] if data.get("shipDate") else "",
         "Eligible Until":          data.get("eligibleUntil", "")[:10] if data.get("eligibleUntil") else "",
         "Status":                  "New",
         "WooCommerce Order Link":  wc_link,
