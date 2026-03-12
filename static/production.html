@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, initial-scale=1.0">
+  <title>Blue Alpha — Production Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #1B2536;
+      --card:      #151d2b;
+      --border:    #253348;
+      --text:      #DDD8C4;
+      --muted:     #7a8599;
+      --rust:      #7B2318;
+      --red:       #BE3A33;
+      --steel:     #567899;
+      --cream:     #DDD8C4;
+      --gray:      #3d4f63;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Lato', sans-serif;
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      padding: 28px 36px 24px;
+      gap: 20px;
+      height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .logo img {
+      height: 52px;
+      width: auto;
+      filter: brightness(0) invert(1);
+    }
+
+    .logo-divider {
+      width: 2px;
+      height: 40px;
+      background: var(--red);
+      border-radius: 2px;
+    }
+
+    .logo-text {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 4px;
+    }
+
+    .header-right {
+      text-align: right;
+    }
+
+    .clock {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 4rem;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .pulse-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--steel);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .status-text {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    /* ── In-Progress Panel ──────────────────────────────── */
+    .in-progress-panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--steel);
+      border-radius: 4px;
+      padding: 22px 28px;
+      display: grid;
+      grid-template-columns: auto auto 1fr;
+      align-items: center;
+      gap: 32px;
+      flex-shrink: 0;
+    }
+
+    .ip-badge {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      white-space: nowrap;
+    }
+
+    .ip-live-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--steel);
+      animation: pulse 1.5s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    .ip-label {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--steel);
+      text-transform: uppercase;
+      letter-spacing: 2.5px;
+    }
+
+    .ip-count {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 7rem;
+      font-weight: 900;
+      color: var(--cream);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .ip-tasks {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 12px;
+      align-content: center;
+    }
+
+    .ip-task-chip {
+      background: rgba(86, 120, 153, 0.1);
+      border: 1px solid rgba(86, 120, 153, 0.25);
+      border-radius: 2px;
+      padding: 4px 12px;
+      font-size: 0.78rem;
+      color: var(--steel);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 300px;
+    }
+
+    .ip-task-chip .process-tag {
+      color: var(--muted);
+      margin-left: 4px;
+    }
+
+    .ip-more {
+      font-size: 0.75rem;
+      color: var(--muted);
+      padding: 4px 8px;
+    }
+
+    /* ── Stats Row ──────────────────────────────────────── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--steel);
+      border-radius: 4px;
+      padding: 22px 26px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .card-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title .icon { font-size: 1.3rem; }
+
+    .periods {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      flex: 1;
+    }
+
+    .period-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      padding: 14px 8px;
+      gap: 10px;
+    }
+
+    .period-label {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--muted);
+    }
+
+    .period-number {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 5rem;
+      font-weight: 900;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .period-number.today     { color: var(--cream); }
+    .period-number.this-week { color: var(--steel); }
+    .period-number.last-week { color: var(--gray); }
+
+    .period-change {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 2px;
+    }
+
+    .change-up   { color: #6aaa7a; background: rgba(106,170,122,0.1); }
+    .change-down { color: var(--red); background: rgba(190,58,51,0.1); }
+    .change-same { color: var(--muted); background: transparent; }
+
+    /* ── Hours Bar ──────────────────────────────────────── */
+    .hours-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--rust);
+      border-radius: 4px;
+      padding: 22px 26px;
+      flex-shrink: 0;
+    }
+
+    .hours-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .hours-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .hours-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .hours-row-label {
+      width: 140px;
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    .bar-track {
+      flex: 1;
+      height: 44px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      padding-left: 16px;
+      font-size: 1rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.5);
+      min-width: 0;
+    }
+
+    .bar-fill.this-week { background: linear-gradient(90deg, #2a3f52, var(--steel)); }
+    .bar-fill.last-week { background: linear-gradient(90deg, var(--rust), var(--red)); }
+
+    .hours-value {
+      width: 110px;
+      text-align: right;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 2.6rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+
+    .hours-value.this-week { color: var(--steel); }
+    .hours-value.last-week { color: var(--muted); }
+
+    /* ── Loading overlay ────────────────────────────────── */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      color: var(--muted);
+      z-index: 100;
+      transition: opacity 0.5s;
+    }
+
+    .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+
+    /* ── Divider ────────────────────────────────────────── */
+    .v-divider {
+      width: 1px;
+      background: var(--border);
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="loading-overlay" id="loader">Loading dashboard…</div>
+
+  <!-- ── Header ── -->
+  <header>
+    <div class="logo">
+      <img src="https://www.bluealphabelts.com/wp-content/uploads/2024/04/logo-1.png" alt="Blue Alpha">
+      <div class="logo-divider"></div>
+      <span class="logo-text">Production</span>
+    </div>
+    <div class="header-right">
+      <div class="clock" id="clock">--:-- --</div>
+      <div class="status-row">
+        <div class="pulse-dot"></div>
+        <span class="status-text" id="status-text">Connecting…</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── In Progress ── -->
+  <div class="in-progress-panel">
+    <div class="ip-badge">
+      <div class="ip-live-dot"></div>
+      <div class="ip-label">In Progress</div>
+    </div>
+    <div class="ip-count" id="ip-count">—</div>
+    <div class="ip-tasks" id="ip-tasks"></div>
+  </div>
+
+  <!-- ── Stats Row ── -->
+  <div class="stats-row">
+    <!-- Tasks Completed -->
+    <div class="stat-card">
+      <div class="card-title"><span class="icon">✅</span> Tasks Completed</div>
+      <div class="periods">
+        <div class="period-block">
+          <div class="period-label">Today</div>
+          <div class="period-number today" id="tasks-today">—</div>
+          <div class="period-change change-same" id="tasks-today-change"></div>
+        </div>
+        <div class="period-block">
+          <div class="period-label">This Week</div>
+          <div class="period-number this-week" id="tasks-week">—</div>
+          <div class="period-change change-same" id="tasks-week-change"></div>
+        </div>
+        <div class="period-block">
+          <div class="period-label">Last Week</div>
+          <div class="period-number last-week" id="tasks-lastweek">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Units Completed -->
+    <div class="stat-card">
+      <div class="card-title"><span class="icon">📦</span> Units Completed</div>
+      <div class="periods">
+        <div class="period-block">
+          <div class="period-label">Today</div>
+          <div class="period-number today" id="units-today">—</div>
+          <div class="period-change change-same" id="units-today-change"></div>
+        </div>
+        <div class="period-block">
+          <div class="period-label">This Week</div>
+          <div class="period-number this-week" id="units-week">—</div>
+          <div class="period-change change-same" id="units-week-change"></div>
+        </div>
+        <div class="period-block">
+          <div class="period-label">Last Week</div>
+          <div class="period-number last-week" id="units-lastweek">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Hours ── -->
+  <div class="hours-card">
+    <div class="hours-title"><span>⏱</span> Hours Logged</div>
+    <div class="hours-rows">
+      <div class="hours-row">
+        <div class="hours-row-label">This Week</div>
+        <div class="bar-track">
+          <div class="bar-fill this-week" id="bar-this-week" style="width:0%"></div>
+        </div>
+        <div class="hours-value this-week" id="hours-week">—</div>
+      </div>
+      <div class="hours-row">
+        <div class="hours-row-label">Last Week</div>
+        <div class="bar-track">
+          <div class="bar-fill last-week" id="bar-last-week" style="width:0%"></div>
+        </div>
+        <div class="hours-value last-week" id="hours-lastweek">—</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  CONFIG  (edit these if anything changes)
+// ═══════════════════════════════════════════════════════════════
+const CONFIG = {
+  pat:       '%%AIRTABLE_OPS_TOKEN%%',
+  baseId:    'appA13jo4b3TIn4yT',
+  tableId:   'tbloztf6y79U60mqQ',
+  timezone:  'America/New_York',       // Eastern Time
+  refreshSec: 60,
+  maxIPList:  10,  // max in-progress task chips to show
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  DATE HELPERS
+// ═══════════════════════════════════════════════════════════════
+function localDateStr(d) {
+  // Returns 'YYYY-MM-DD' in CONFIG.timezone
+  return d.toLocaleDateString('en-CA', { timeZone: CONFIG.timezone });
+}
+
+function getTimeBounds() {
+  const now  = new Date();
+  const today = localDateStr(now);
+
+  // day-of-week in target tz (0=Sun … 6=Sat)
+  const dayNames = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 };
+  const dayName  = now.toLocaleDateString('en-US', { timeZone: CONFIG.timezone, weekday: 'short' });
+  const dow      = dayNames[dayName] ?? 0;
+  const daysFromMon = (dow + 6) % 7;
+
+  const thisMonday = new Date(now);
+  thisMonday.setDate(now.getDate() - daysFromMon);
+
+  const lastMonday = new Date(thisMonday);
+  lastMonday.setDate(thisMonday.getDate() - 7);
+
+  const lastSunday = new Date(thisMonday);
+  lastSunday.setDate(thisMonday.getDate() - 1);
+
+  return {
+    today,
+    thisWeekStart: localDateStr(thisMonday),
+    lastWeekStart: localDateStr(lastMonday),
+    lastWeekEnd:   localDateStr(lastSunday),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  AIRTABLE FETCH
+// ═══════════════════════════════════════════════════════════════
+async function fetchRecords(filter, fields) {
+  const all = [];
+  let offset = null;
+  do {
+    const p = new URLSearchParams();
+    p.set('filterByFormula', filter);
+    fields.forEach(f => p.append('fields[]', f));
+    if (offset) p.set('offset', offset);
+
+    const res = await fetch(
+      `https://api.airtable.com/v0/${CONFIG.baseId}/${CONFIG.tableId}?${p}`,
+      { headers: { Authorization: `Bearer ${CONFIG.pat}` } }
+    );
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.error?.message || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    all.push(...(data.records || []));
+    offset = data.offset || null;
+  } while (offset);
+  return all;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  REFRESH
+// ═══════════════════════════════════════════════════════════════
+let countdownTimer = null;
+
+async function refresh() {
+  try {
+    const bounds = getTimeBounds();
+
+    // Three weeks back covers today + this week + last week
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 21);
+    const cutoffISO = cutoff.toISOString();
+
+    // Parallel fetches
+    const [ipRecords, recentRecords] = await Promise.all([
+      // 1) In-progress tasks (no date limit)
+      fetchRecords(
+        `{Status} = "In Progress"`,
+        ['Status', 'Name + Variations', 'Process (from Bill of Labor)']
+      ),
+      // 2) Completed/partial + hours (last 21 days)
+      fetchRecords(
+        `IS_AFTER({Start Time}, "${cutoffISO}")`,
+        ['Status', 'Start Time', 'End Time', 'Final Count', 'Production Type']
+      ),
+    ]);
+
+    // ── In Progress
+    setText('ip-count', ipRecords.length);
+    const ipEl = document.getElementById('ip-tasks');
+    const visible = ipRecords.slice(0, CONFIG.maxIPList);
+    ipEl.innerHTML = visible.map(r => {
+      const name    = (r.fields['Name + Variations'] || ['Unknown task'])[0];
+      const process = (r.fields['Process (from Bill of Labor)'] || [])[0] || '';
+      const shortName = name.length > 42 ? name.slice(0, 40) + '…' : name;
+      const procTag  = process ? `<span class="process-tag">${process}</span>` : '';
+      return `<div class="ip-task-chip">${shortName}${procTag}</div>`;
+    }).join('') + (ipRecords.length > CONFIG.maxIPList
+      ? `<div class="ip-more">+${ipRecords.length - CONFIG.maxIPList} more</div>` : '');
+
+    // ── Bucket completed records by End Time
+    let tasksToday = 0, tasksWeek = 0, tasksLastWeek = 0;
+    let unitsToday = 0, unitsWeek = 0, unitsLastWeek = 0;
+    let hoursWeek  = 0, hoursLastWeek = 0;
+
+    for (const r of recentRecords) {
+      const f   = r.fields;
+      const st  = f['Start Time'];
+      const et  = f['End Time'];
+      const status = f['Status'] || '';
+
+      // ── Hours: any record with both start + end
+      if (st && et) {
+        const startStr = localDateStr(new Date(st));
+        const diffMs   = new Date(et) - new Date(st);
+        const diffHrs  = diffMs / 3600000;
+        // Sanity: 1 min – 16 hrs
+        if (diffHrs >= (1/60) && diffHrs <= 16) {
+          if (startStr >= bounds.thisWeekStart && startStr <= bounds.today)
+            hoursWeek += diffHrs;
+          if (startStr >= bounds.lastWeekStart && startStr <= bounds.lastWeekEnd)
+            hoursLastWeek += diffHrs;
+        }
+      }
+
+      // ── Tasks & Units: Complete or Partial Complete
+      const isDone = status === 'Complete' || status === 'Partial Complete';
+      if (!isDone || !et) continue;
+
+      const endStr = localDateStr(new Date(et));
+      const inToday    = endStr === bounds.today;
+      const inThisWeek = endStr >= bounds.thisWeekStart && endStr <= bounds.today;
+      const inLastWeek = endStr >= bounds.lastWeekStart && endStr <= bounds.lastWeekEnd;
+
+      if (inToday)    tasksToday++;
+      if (inThisWeek) tasksWeek++;
+      if (inLastWeek) tasksLastWeek++;
+
+      // Units: Product SKU + has Final Count
+      const finalCount = f['Final Count'];
+      const isProductSKU = f['Production Type'] === 'Product SKU';
+      if (finalCount && isProductSKU) {
+        if (inToday)    unitsToday    += finalCount;
+        if (inThisWeek) unitsWeek     += finalCount;
+        if (inLastWeek) unitsLastWeek += finalCount;
+      }
+    }
+
+    // ── Render tasks
+    setText('tasks-today',    tasksToday);
+    setText('tasks-week',     tasksWeek);
+    setText('tasks-lastweek', tasksLastWeek);
+    setChange('tasks-today-change', tasksToday, null);
+    setChange('tasks-week-change',  tasksWeek,  tasksLastWeek);
+
+    // ── Render units
+    setText('units-today',    unitsToday.toLocaleString());
+    setText('units-week',     unitsWeek.toLocaleString());
+    setText('units-lastweek', unitsLastWeek.toLocaleString());
+    setChange('units-today-change', unitsToday, null);
+    setChange('units-week-change',  unitsWeek,  unitsLastWeek);
+
+    // ── Render hours
+    const maxHrs = Math.max(hoursWeek, hoursLastWeek, 0.1);
+    setText('hours-week',     hoursWeek.toFixed(1) + 'h');
+    setText('hours-lastweek', hoursLastWeek.toFixed(1) + 'h');
+    document.getElementById('bar-this-week').style.width = Math.min((hoursWeek / maxHrs) * 92, 92) + '%';
+    document.getElementById('bar-last-week').style.width = Math.min((hoursLastWeek / maxHrs) * 92, 92) + '%';
+
+    // ── Status
+    const now = new Date();
+    document.getElementById('status-text').textContent =
+      `Updated ${now.toLocaleTimeString('en-US', { timeZone: CONFIG.timezone, hour: '2-digit', minute: '2-digit', second: '2-digit' })} · Refreshing in ${CONFIG.refreshSec}s`;
+
+    document.getElementById('loader').classList.add('hidden');
+
+  } catch (err) {
+    console.error(err);
+    document.getElementById('status-text').textContent = `⚠ Error: ${err.message}`;
+  }
+}
+
+// ── helpers
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function setChange(id, current, compare) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (compare === null || compare === undefined) { el.textContent = ''; return; }
+  if (compare === 0 && current === 0) { el.textContent = ''; return; }
+  const diff = current - compare;
+  const pct  = compare > 0 ? Math.round((diff / compare) * 100) : null;
+  if (diff === 0) {
+    el.className = 'period-change change-same';
+    el.textContent = '↔ same';
+  } else if (diff > 0) {
+    el.className = 'period-change change-up';
+    el.textContent = pct !== null ? `▲ ${pct}% vs last wk` : `▲ ${diff}`;
+  } else {
+    el.className = 'period-change change-down';
+    el.textContent = pct !== null ? `▼ ${Math.abs(pct)}% vs last wk` : `▼ ${Math.abs(diff)}`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CLOCK  +  COUNTDOWN
+// ═══════════════════════════════════════════════════════════════
+function updateClock() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-US', {
+      timeZone: CONFIG.timezone,
+      hour: '2-digit', minute: '2-digit', hour12: true
+    });
+}
+
+let secondsLeft = CONFIG.refreshSec;
+
+function startCountdown() {
+  clearInterval(countdownTimer);
+  secondsLeft = CONFIG.refreshSec;
+  countdownTimer = setInterval(async () => {
+    secondsLeft--;
+    const statusEl = document.getElementById('status-text');
+    // update countdown portion of status text without overwriting the "Updated" part
+    if (statusEl.textContent.includes('·')) {
+      statusEl.textContent = statusEl.textContent.replace(
+        /Refreshing in \d+s/,
+        `Refreshing in ${secondsLeft}s`
+      );
+    }
+    if (secondsLeft <= 0) {
+      clearInterval(countdownTimer);
+      await refresh();
+      startCountdown();
+    }
+  }, 1000);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+updateClock();
+setInterval(updateClock, 1000);
+refresh().then(startCountdown);
+</script>
+</body>
+</html>

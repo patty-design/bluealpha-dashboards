@@ -2,6 +2,8 @@ from flask import Flask, send_from_directory, abort, request, Response
 import os
 import functools
 
+AIRTABLE_OPS_TOKEN = os.environ.get("AIRTABLE_OPS_TOKEN", "")
+
 app = Flask(__name__, static_folder="static")
 
 DASHBOARDS = {
@@ -9,6 +11,12 @@ DASHBOARDS = {
     "jesse": "jesse.html",
     "kelly": "kelly.html",
     "patty": "patty.html",
+}
+
+OPS_DASHBOARDS = {
+    "production": "production.html",
+    "shipments": "shipments.html",
+    "waiting": "waiting.html",
 }
 
 USERNAME = "bluealpha"
@@ -46,6 +54,12 @@ def index():
 def dashboard(name):
     if name in DASHBOARDS:
         return send_from_directory("static", DASHBOARDS[name])
+    if name in OPS_DASHBOARDS:
+        filepath = os.path.join(app.static_folder, OPS_DASHBOARDS[name])
+        with open(filepath, "r") as f:
+            content = f.read()
+        content = content.replace("%%AIRTABLE_OPS_TOKEN%%", AIRTABLE_OPS_TOKEN)
+        return Response(content, mimetype="text/html")
     abort(404)
 
 if __name__ == "__main__":

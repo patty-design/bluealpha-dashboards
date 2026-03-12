@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, initial-scale=1.0">
+  <title>Blue Alpha — Waiting Tasks</title>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #1B2536;
+      --card:      #151d2b;
+      --border:    #253348;
+      --text:      #DDD8C4;
+      --muted:     #7a8599;
+      --rust:      #7B2318;
+      --red:       #BE3A33;
+      --steel:     #567899;
+      --cream:     #DDD8C4;
+      --gray:      #3d4f63;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Lato', sans-serif;
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      padding: 28px 36px 24px;
+      gap: 20px;
+      height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .logo { display: flex; align-items: center; gap: 20px; }
+    .logo img {
+      height: 52px;
+      width: auto;
+      filter: brightness(0) invert(1);
+    }
+    .logo-divider {
+      width: 2px;
+      height: 40px;
+      background: var(--red);
+      border-radius: 2px;
+    }
+    .logo-text {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 4px;
+    }
+
+    .header-right { text-align: right; }
+    .clock {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 4rem;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .pulse-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: var(--steel);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .status-text {
+      font-size: 0.85rem;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Total banner ── */
+    .total-banner {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--steel);
+      border-radius: 4px;
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      flex-shrink: 0;
+    }
+
+    .total-label {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2.5px;
+      color: var(--steel);
+    }
+
+    .total-count {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 5.5rem;
+      font-weight: 900;
+      line-height: 1;
+      color: var(--cream);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .status-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-left: auto;
+      align-items: center;
+    }
+
+    .status-chip {
+      padding: 4px 14px;
+      border-radius: 2px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    .chip-todo      { background: rgba(86,120,153,0.15); color: var(--steel); border: 1px solid rgba(86,120,153,0.3); }
+    .chip-waiting   { background: rgba(190,58,51,0.12); color: var(--red); border: 1px solid rgba(190,58,51,0.3); }
+    .chip-blocked   { background: rgba(123,35,24,0.2); color: #e07060; border: 1px solid rgba(190,58,51,0.4); }
+    .chip-paused    { background: rgba(61,79,99,0.3); color: var(--muted); border: 1px solid var(--border); }
+
+    /* ── Process bars ── */
+    .bars-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--rust);
+      border-radius: 4px;
+      padding: 24px 32px;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      overflow: hidden;
+    }
+
+    .bars-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 18px;
+      flex-shrink: 0;
+    }
+
+    .bars-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-auto-flow: column;
+      gap: 8px 32px;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .bar-row .bar-count { margin-right: -6px; }
+    .bar-row .bar-divider { margin-right: -6px; }
+
+    .process-name {
+      width: 150px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--cream);
+      flex-shrink: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .bar-track {
+      flex: 1;
+      height: 30px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--rust), var(--red));
+      transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+      min-width: 4px;
+    }
+
+    .bar-divider {
+      width: 2px;
+      height: 60%;
+      min-height: 14px;
+      max-height: 22px;
+      background: var(--red);
+      border-radius: 1px;
+      flex-shrink: 0;
+    }
+
+    .bar-count {
+      width: 52px;
+      text-align: right;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 900;
+      color: var(--cream);
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+    }
+
+
+
+    /* ── Loading ── */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      color: var(--muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      font-family: 'Montserrat', sans-serif;
+      z-index: 999;
+      transition: opacity 0.5s;
+    }
+    .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+
+    /* ── No data ── */
+    .empty-state {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 1.4rem;
+      font-family: 'Montserrat', sans-serif;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="loading-overlay" id="loader">Loading…</div>
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <img src="https://www.bluealphabelts.com/wp-content/uploads/2024/04/logo-1.png" alt="Blue Alpha">
+      <div class="logo-divider"></div>
+      <span class="logo-text">Waiting Tasks</span>
+    </div>
+    <div class="header-right">
+      <div class="clock" id="clock">--:--</div>
+      <div class="status-row">
+        <div class="pulse-dot"></div>
+        <span class="status-text" id="last-updated">Updating…</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Total banner -->
+  <div class="total-banner">
+    <div class="total-label">Total Waiting</div>
+    <div class="total-count" id="total-count">—</div>
+    <div class="status-chips" id="status-chips"></div>
+  </div>
+
+  <!-- Process bars -->
+  <div class="bars-card">
+    <div class="bars-title">To-Do by Process</div>
+    <div class="bars-list" id="bars-list">
+      <div class="empty-state">Loading data…</div>
+    </div>
+  </div>
+
+<script>
+  const BASE_ID   = 'appA13jo4b3TIn4yT';
+  const TOKEN     = '%%AIRTABLE_OPS_TOKEN%%';
+  const PROD_TBL  = 'tbloztf6y79U60mqQ';
+  const PROC_TBL  = 'tbl1ctjm6HQmCQSf3';
+  const REFRESH_MS = 60000;
+
+  // Statuses to INCLUDE (everything except Complete, Partial Complete, In Progress)
+  const WAITING_STATUSES = new Set([
+    'To-Do',
+    'Waiting (Prior Steps)',
+    'Waiting (Machine)',
+    'Paused',
+    'Blocked (Product)',
+    'Blocked (Machine)',
+    'Needs Manager Attention',
+    'Admin To-Do',
+  ]);
+
+  const STATUS_GROUP = {
+    'To-Do':                    'todo',
+    'Admin To-Do':              'todo',
+    'Waiting (Prior Steps)':    'waiting',
+    'Waiting (Machine)':        'waiting',
+    'Paused':                   'paused',
+    'Blocked (Product)':        'blocked',
+    'Blocked (Machine)':        'blocked',
+    'Needs Manager Attention':  'blocked',
+  };
+
+  // ── Clock ──────────────────────────────────────────────
+  function updateClock() {
+    const now = new Date().toLocaleTimeString('en-US', {
+      timeZone: 'America/New_York',
+      hour: '2-digit', minute: '2-digit', hour12: true
+    });
+    document.getElementById('clock').textContent = now;
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  // ── Airtable fetch (paginated) ─────────────────────────
+  async function fetchAll(tableId, params = {}) {
+    const records = [];
+    let offset = null;
+    do {
+      const url = new URL(`https://api.airtable.com/v0/${BASE_ID}/${tableId}`);
+      Object.entries(params).forEach(([k, v]) => {
+        if (Array.isArray(v)) v.forEach(i => url.searchParams.append(k, i));
+        else url.searchParams.set(k, v);
+      });
+      if (offset) url.searchParams.set('offset', offset);
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${TOKEN}` } });
+      const data = await res.json();
+      if (data.records) records.push(...data.records);
+      offset = data.offset || null;
+    } while (offset);
+    return records;
+  }
+
+  // ── Main render ────────────────────────────────────────
+  async function refresh() {
+    try {
+      // 1. Fetch all processes to build id→name map
+      const procRecords = await fetchAll(PROC_TBL, {
+        'fields[]': ['Name'],
+        pageSize: 100,
+      });
+      const procNames = {};
+      procRecords.forEach(r => {
+        procNames[r.id] = r.fields['Name'] || 'Unknown';
+      });
+
+      // 2. Fetch waiting production records
+      const filterParts = [...WAITING_STATUSES].map(s => `{Status} = "${s}"`);
+      const filterFormula = `OR(${filterParts.join(',')})`;
+
+      const prodRecords = await fetchAll(PROD_TBL, {
+        'fields[]': ['Status', 'Process (from Bill of Labor)'],
+        filterByFormula: filterFormula,
+        pageSize: 100,
+      });
+
+      // 3. Group by process
+      const todoByProcess = {};
+      const statusGroupCounts = { todo: 0, waiting: 0, paused: 0, blocked: 0 };
+
+      prodRecords.forEach(r => {
+        const status = r.fields['Status'] || '';
+        const procs  = r.fields['Process (from Bill of Labor)'] || [];
+
+        // Status group tally (all waiting statuses)
+        const grp = STATUS_GROUP[status];
+        if (grp) statusGroupCounts[grp]++;
+
+        // To-Do by process (only To-Do status)
+        if (status === 'To-Do') {
+          if (procs.length === 0) {
+            todoByProcess['(No Process)'] = (todoByProcess['(No Process)'] || 0) + 1;
+          } else {
+            procs.forEach(recId => {
+              const name = procNames[recId] || recId;
+              todoByProcess[name] = (todoByProcess[name] || 0) + 1;
+            });
+          }
+        }
+      });
+
+      const total = prodRecords.length;
+
+      // 4. Sort processes by count descending (already only To-Do, already > 0)
+      const sorted = Object.entries(todoByProcess)
+        .sort((a, b) => b[1] - a[1]);
+
+      const maxCount = sorted[0]?.[1] || 1;
+
+      // 5. Render total
+      document.getElementById('total-count').textContent = total;
+
+      // 6. Render status chips
+      const chipDefs = [
+        { key: 'todo',    label: 'To-Do',   cls: 'chip-todo' },
+        { key: 'waiting', label: 'Waiting',  cls: 'chip-waiting' },
+        { key: 'blocked', label: 'Blocked',  cls: 'chip-blocked' },
+        { key: 'paused',  label: 'Paused',   cls: 'chip-paused' },
+      ];
+      const chipsEl = document.getElementById('status-chips');
+      chipsEl.innerHTML = chipDefs
+        .filter(d => statusGroupCounts[d.key] > 0)
+        .map(d => `<span class="status-chip ${d.cls}">${d.label} · ${statusGroupCounts[d.key]}</span>`)
+        .join('');
+
+      // 7. Render bars
+      const barsList = document.getElementById('bars-list');
+      if (sorted.length === 0) {
+        barsList.style.gridTemplateRows = '';
+        barsList.innerHTML = '<div class="empty-state" style="grid-column:1/-1">🎉 Nothing waiting right now</div>';
+      } else {
+        const numRows = Math.ceil(sorted.length / 3);
+        barsList.style.gridTemplateRows = `repeat(${numRows}, 1fr)`;
+        barsList.innerHTML = sorted.map(([name, count]) => `
+          <div class="bar-row">
+            <div class="bar-count">${count}</div>
+            <div class="bar-divider"></div>
+            <div class="process-name" title="${name}">${name}</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width: ${(count / maxCount * 100).toFixed(1)}%"></div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // 8. Update timestamp
+      const ts = new Date().toLocaleTimeString('en-US', {
+        timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: true
+      });
+      document.getElementById('last-updated').textContent = `Updated ${ts}`;
+
+    } catch (err) {
+      console.error('Refresh error:', err);
+      document.getElementById('last-updated').textContent = 'Update failed — retrying…';
+    } finally {
+      document.getElementById('loader').classList.add('hidden');
+    }
+  }
+
+  refresh();
+  setInterval(refresh, REFRESH_MS);
+</script>
+</body>
+</html>

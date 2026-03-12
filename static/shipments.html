@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, initial-scale=1.0">
+  <title>Blue Alpha — Shipments Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #1B2536;
+      --card:      #151d2b;
+      --border:    #253348;
+      --text:      #DDD8C4;
+      --muted:     #7a8599;
+      --rust:      #7B2318;
+      --red:       #BE3A33;
+      --steel:     #567899;
+      --cream:     #DDD8C4;
+      --navy:      #1B2536;
+      --gray:      #3d4f63;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Lato', sans-serif;
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      padding: 28px 36px 24px;
+      gap: 20px;
+      height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .logo { display: flex; align-items: center; gap: 20px; }
+    .logo img {
+      height: 52px;
+      width: auto;
+      filter: brightness(0) invert(1);
+    }
+    .logo-divider {
+      width: 2px;
+      height: 40px;
+      background: var(--red);
+      border-radius: 2px;
+    }
+    .logo-text {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 4px;
+    }
+
+    .header-right { text-align: right; }
+    .clock {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 4rem;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .pulse-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: var(--steel);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .status-text { font-size: 0.75rem; color: var(--muted); }
+
+    /* ── Stats Row ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      flex-shrink: 0;
+    }
+
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--steel);
+      border-radius: 4px;
+      padding: 22px 26px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .card-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .periods {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    .period-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      padding: 14px 8px;
+      gap: 10px;
+    }
+
+    .period-label {
+      font-size: 1.1rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--muted);
+    }
+
+    .period-number {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 5rem;
+      font-weight: 900;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .period-number.today     { color: var(--cream); }
+    .period-number.this-week { color: var(--steel); }
+    .period-number.last-week { color: var(--gray); }
+
+    .period-change {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    .change-up   { color: var(--green); background: rgba(34,197,94,0.1); }
+    .change-down { color: #ef4444;      background: rgba(239,68,68,0.1); }
+    .change-same { color: var(--muted); background: transparent; }
+
+    /* ── Category Section ── */
+    .category-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--rust);
+      border-radius: 4px;
+      padding: 22px 26px;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .category-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .category-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+      min-height: 0;
+      justify-content: space-evenly;
+    }
+
+    .category-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .cat-label {
+      width: 220px;
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: #94a3b8;
+      flex-shrink: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .cat-bar-track {
+      flex: 1;
+      height: 36px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .cat-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--rust), var(--red));
+      transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+      min-width: 0;
+    }
+
+    .cat-value {
+      width: 80px;
+      text-align: right;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--cream);
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+
+    .cat-sublabel {
+      width: 80px;
+      text-align: right;
+      font-size: 0.7rem;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    /* ── Loading ── */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      color: var(--muted);
+      z-index: 100;
+      transition: opacity 0.5s;
+    }
+    .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+  </style>
+</head>
+<body>
+
+  <div class="loading-overlay" id="loader">Loading dashboard…</div>
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <img src="https://www.bluealphabelts.com/wp-content/uploads/2024/04/logo-1.png" alt="Blue Alpha">
+      <div class="logo-divider"></div>
+      <span class="logo-text">Shipments</span>
+    </div>
+    <div class="header-right">
+      <div class="clock" id="clock">--:-- --</div>
+      <div class="status-row">
+        <div class="pulse-dot"></div>
+        <span class="status-text" id="status-text">Connecting…</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Stats: Orders + Components -->
+  <div class="stats-row">
+    <!-- Orders Shipped -->
+    <div class="stat-card">
+      <div class="card-title">🚚 Orders Shipped</div>
+      <div class="periods">
+        <div class="period-block">
+          <div class="period-label">Today</div>
+          <div class="period-number today" id="orders-today">—</div>
+          <div class="period-change change-same" id="orders-today-change"></div>
+        </div>
+        <div class="period-block">
+          <div class="period-label">This Week</div>
+          <div class="period-number this-week" id="orders-week">—</div>
+          <div class="period-change change-same" id="orders-week-change"></div>
+        </div>
+        <div class="period-block">
+          <div class="period-label">Last Week</div>
+          <div class="period-number last-week" id="orders-lastweek">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Components Shipped -->
+    <div class="stat-card">
+      <div class="card-title">🔩 Components Shipped</div>
+      <div class="periods">
+        <div class="period-block">
+          <div class="period-label">Today</div>
+          <div class="period-number today" id="components-today">—</div>
+          <div class="period-change change-same" id="components-today-change"></div>
+        </div>
+        <div class="period-block">
+          <div class="period-label">This Week</div>
+          <div class="period-number this-week" id="components-week">—</div>
+          <div class="period-change change-same" id="components-week-change"></div>
+        </div>
+        <div class="period-block">
+          <div class="period-label">Last Week</div>
+          <div class="period-number last-week" id="components-lastweek">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Category Breakdown -->
+  <div class="category-card">
+    <div class="category-title">🏷 Items Shipped by Category — This Week</div>
+    <div class="category-grid" id="category-grid">
+      <div style="color: var(--muted); font-size:1rem;">Loading categories…</div>
+    </div>
+  </div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════════════
+const CONFIG = {
+  pat:            '%%AIRTABLE_OPS_TOKEN%%',
+  baseId:         'appA13jo4b3TIn4yT',
+  shipmentsTable: 'tblI3XvUpsDIphcqp',
+  skusTable:      'tbljngm75r4Km2XIN',
+  timezone:       'America/New_York',
+  refreshSec:     60,
+};
+
+// Known categories (in preferred display order)
+const CATEGORY_ORDER = [
+  'Battle Belts', 'EDC Belts', 'Duty Belts',
+  'Accessories', 'Support Accessories', 'Apparel', 'Merch', 'Contract'
+];
+
+// ═══════════════════════════════════════════════════════
+//  DATE HELPERS
+// ═══════════════════════════════════════════════════════
+function localDateStr(d) {
+  return d.toLocaleDateString('en-CA', { timeZone: CONFIG.timezone });
+}
+
+function getTimeBounds() {
+  const now = new Date();
+  const today = localDateStr(now);
+  const dayNames = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 };
+  const dayName  = now.toLocaleDateString('en-US', { timeZone: CONFIG.timezone, weekday: 'short' });
+  const dow      = dayNames[dayName] ?? 0;
+  const daysFromMon = (dow + 6) % 7;
+
+  const thisMonday = new Date(now);
+  thisMonday.setDate(now.getDate() - daysFromMon);
+
+  const lastMonday = new Date(thisMonday);
+  lastMonday.setDate(thisMonday.getDate() - 7);
+
+  const lastSunday = new Date(thisMonday);
+  lastSunday.setDate(thisMonday.getDate() - 1);
+
+  return {
+    today,
+    thisWeekStart: localDateStr(thisMonday),
+    lastWeekStart: localDateStr(lastMonday),
+    lastWeekEnd:   localDateStr(lastSunday),
+  };
+}
+
+// ═══════════════════════════════════════════════════════
+//  AIRTABLE FETCH
+// ═══════════════════════════════════════════════════════
+async function fetchRecords(tableId, filter, fields) {
+  const all = [];
+  let offset = null;
+  do {
+    const p = new URLSearchParams();
+    if (filter) p.set('filterByFormula', filter);
+    fields.forEach(f => p.append('fields[]', f));
+    if (offset) p.set('offset', offset);
+
+    const res = await fetch(
+      `https://api.airtable.com/v0/${CONFIG.baseId}/${tableId}?${p}`,
+      { headers: { Authorization: `Bearer ${CONFIG.pat}` } }
+    );
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.error?.message || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    all.push(...(data.records || []));
+    offset = data.offset || null;
+  } while (offset);
+  return all;
+}
+
+// ═══════════════════════════════════════════════════════
+//  REFRESH
+// ═══════════════════════════════════════════════════════
+let countdownTimer = null;
+
+async function refresh() {
+  try {
+    const bounds = getTimeBounds();
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 21);
+
+    // Parallel fetch: shipments + SKU category map
+    const [shipments, skuRecords] = await Promise.all([
+      fetchRecords(
+        CONFIG.shipmentsTable,
+        `IS_AFTER({Date}, "${cutoff.toISOString()}")`,
+        ['Date', 'Total Components', 'Order Number', 'SKUs', 'SKU Quantities']
+      ),
+      fetchRecords(
+        CONFIG.skusTable,
+        '',
+        ['SKU ID', 'Category', 'Total SKU Components']
+      ),
+    ]);
+
+    // Build SKU → {category, totalSKUComponents} map
+    const skuMap = {};
+    for (const r of skuRecords) {
+      const id = r.fields['SKU ID'];
+      if (id) {
+        skuMap[id] = {
+          category:  r.fields['Category'] || 'Unknown',
+          components: r.fields['Total SKU Components'] || 0,
+        };
+      }
+    }
+
+    // Process shipments
+    let ordersToday = 0, ordersWeek = 0, ordersLastWeek = 0;
+    let compToday   = 0, compWeek   = 0, compLastWeek   = 0;
+    const catComponents = {}; // category → components this week
+
+    for (const r of shipments) {
+      const f    = r.fields;
+      const date = f['Date'];
+      if (!date) continue;
+
+      const dateStr    = localDateStr(new Date(date));
+      const totalComps = f['Total Components'] || 0;
+      const inToday    = dateStr === bounds.today;
+      const inThisWeek = dateStr >= bounds.thisWeekStart && dateStr <= bounds.today;
+      const inLastWeek = dateStr >= bounds.lastWeekStart && dateStr <= bounds.lastWeekEnd;
+
+      if (inToday)    { ordersToday++;  compToday    += totalComps; }
+      if (inThisWeek) { ordersWeek++;   compWeek     += totalComps; }
+      if (inLastWeek) { ordersLastWeek++; compLastWeek += totalComps; }
+
+      // Category breakdown for this week — count actual quantities per category
+      if (inThisWeek) {
+        const skusText = f['SKUs'] || '';
+        const qtyText  = f['SKU Quantities'] || '';
+        const skus = skusText.split(',').map(s => s.trim()).filter(Boolean);
+        const qtys = qtyText.split(',').map(q => parseInt(q.trim(), 10) || 1);
+
+        for (let i = 0; i < skus.length; i++) {
+          const category = skuMap[skus[i]]?.category;
+          if (!category) continue; // skip unrecognized SKUs (bad data)
+          const qty = qtys[i] ?? 1;
+          catComponents[category] = (catComponents[category] || 0) + qty;
+        }
+      }
+    }
+
+    // ── Render stats
+    setText('orders-today',    ordersToday);
+    setText('orders-week',     ordersWeek);
+    setText('orders-lastweek', ordersLastWeek);
+    setChange('orders-today-change', ordersToday, null);
+    setChange('orders-week-change',  ordersWeek,  ordersLastWeek);
+
+    setText('components-today',    compToday.toLocaleString());
+    setText('components-week',     compWeek.toLocaleString());
+    setText('components-lastweek', compLastWeek.toLocaleString());
+    setChange('components-today-change', compToday, null);
+    setChange('components-week-change',  compWeek,  compLastWeek);
+
+    // ── Render category bars
+    const gridEl = document.getElementById('category-grid');
+
+    // Sort by component count desc, but respect preferred order for ties
+    const catEntries = Object.entries(catComponents)
+      .map(([cat, val]) => ({ cat, val: Math.round(val) }))
+      .sort((a, b) => {
+        if (b.val !== a.val) return b.val - a.val;
+        return (CATEGORY_ORDER.indexOf(a.cat) ?? 99) - (CATEGORY_ORDER.indexOf(b.cat) ?? 99);
+      });
+
+    // Also add known categories with 0 if they have no data (optional — shows all categories)
+    const seen = new Set(catEntries.map(e => e.cat));
+    for (const cat of CATEGORY_ORDER) {
+      if (!seen.has(cat)) catEntries.push({ cat, val: 0 });
+    }
+
+    const maxVal = catEntries[0]?.val || 1;
+
+    if (catEntries.length === 0 || ordersWeek === 0) {
+      gridEl.innerHTML = '<div style="color: var(--muted); font-size:1.1rem;">No shipment data for this week yet</div>';
+    } else {
+      gridEl.innerHTML = catEntries.map(({ cat, val }) => {
+        const pct = Math.min((val / maxVal) * 92, 92);
+        return `
+          <div class="category-row">
+            <div class="cat-label">${cat}</div>
+            <div class="cat-bar-track">
+              <div class="cat-bar-fill" style="width: ${pct}%"></div>
+            </div>
+            <div class="cat-value">${val.toLocaleString()}</div>
+          </div>`;
+      }).join('');
+    }
+
+    // Update status
+    const now = new Date();
+    document.getElementById('status-text').textContent =
+      `Updated ${now.toLocaleTimeString('en-US', { timeZone: CONFIG.timezone, hour: '2-digit', minute: '2-digit', second: '2-digit' })} · Refreshing in ${CONFIG.refreshSec}s`;
+
+    document.getElementById('loader').classList.add('hidden');
+
+  } catch (err) {
+    console.error(err);
+    document.getElementById('status-text').textContent = `⚠ Error: ${err.message}`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function setChange(id, current, compare) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (compare === null) { el.textContent = ''; return; }
+  if (compare === 0 && current === 0) { el.textContent = ''; return; }
+  const diff = current - compare;
+  const pct  = compare > 0 ? Math.round((diff / compare) * 100) : null;
+  if (diff === 0) {
+    el.className = 'period-change change-same';
+    el.textContent = '↔ same';
+  } else if (diff > 0) {
+    el.className = 'period-change change-up';
+    el.textContent = pct !== null ? `▲ ${pct}% vs last wk` : `▲ ${diff}`;
+  } else {
+    el.className = 'period-change change-down';
+    el.textContent = pct !== null ? `▼ ${Math.abs(pct)}% vs last wk` : `▼ ${Math.abs(diff)}`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  CLOCK + COUNTDOWN
+// ═══════════════════════════════════════════════════════
+function updateClock() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-US', {
+      timeZone: CONFIG.timezone,
+      hour: '2-digit', minute: '2-digit', hour12: true
+    });
+}
+
+let secondsLeft = CONFIG.refreshSec;
+
+function startCountdown() {
+  clearInterval(countdownTimer);
+  secondsLeft = CONFIG.refreshSec;
+  countdownTimer = setInterval(async () => {
+    secondsLeft--;
+    const el = document.getElementById('status-text');
+    if (el.textContent.includes('·')) {
+      el.textContent = el.textContent.replace(/Refreshing in \d+s/, `Refreshing in ${secondsLeft}s`);
+    }
+    if (secondsLeft <= 0) {
+      clearInterval(countdownTimer);
+      await refresh();
+      startCountdown();
+    }
+  }, 1000);
+}
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+updateClock();
+setInterval(updateClock, 1000);
+refresh().then(startCountdown);
+</script>
+</body>
+</html>
