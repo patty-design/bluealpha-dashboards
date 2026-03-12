@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blue Alpha — Returns & Exchanges</title>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:   #003a6c;
+      --red:    #ae0000;
+      --light:  #f5f7fa;
+      --border: #dde3ea;
+      --text:   #1a2633;
+      --muted:  #6b7a8d;
+      --white:  #ffffff;
+      --success:#1a7a3c;
+      --error:  #ae0000;
+    }
+
+    body {
+      font-family: 'Lato', sans-serif;
+      background: var(--light);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--navy);
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    header img { height: 44px; width: auto; filter: brightness(0) invert(1); }
+    .header-divider { width: 2px; height: 36px; background: var(--red); border-radius: 2px; }
+    .header-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.75);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+
+    /* ── Container ── */
+    .container {
+      max-width: 620px;
+      margin: 48px auto;
+      padding: 0 20px 60px;
+    }
+
+    .page-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+    .page-subtitle {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 32px;
+      line-height: 1.5;
+    }
+
+    /* ── Progress ── */
+    .progress {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 36px;
+      align-items: center;
+    }
+    .progress-step {
+      flex: 1;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      transition: background 0.3s;
+    }
+    .progress-step.active { background: var(--navy); }
+    .progress-step.done   { background: var(--navy); opacity: 0.4; }
+
+    /* ── Card ── */
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 32px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+
+    .card-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 24px;
+    }
+
+    /* ── Form ── */
+    .field { margin-bottom: 20px; }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 7px;
+    }
+    label .req { color: var(--red); margin-left: 3px; }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    textarea,
+    select {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 11px 14px;
+      font-family: 'Lato', sans-serif;
+      font-size: 0.95rem;
+      color: var(--text);
+      background: var(--white);
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--navy);
+      box-shadow: 0 0 0 3px rgba(0,58,108,0.08);
+    }
+    textarea { resize: vertical; min-height: 90px; }
+
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-block;
+      padding: 12px 28px;
+      border-radius: 6px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn:hover { opacity: 0.88; }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: var(--navy); color: var(--white); width: 100%; text-align: center; }
+    .btn-secondary { background: transparent; color: var(--navy); border: 1.5px solid var(--navy); }
+    .btn-row { display: flex; gap: 12px; margin-top: 24px; }
+    .btn-row .btn-primary { flex: 1; }
+
+    /* ── Messages ── */
+    .message {
+      border-radius: 6px;
+      padding: 16px 20px;
+      margin-top: 20px;
+      font-size: 0.92rem;
+      line-height: 1.55;
+      display: none;
+    }
+    .message.show { display: block; }
+    .message-error   { background: #fff0f0; border: 1px solid #f5c2c2; color: #7a1515; }
+    .message-warning { background: #fff8ed; border: 1px solid #f5dca0; color: #7a4e00; }
+    .message-success { background: #edf7f1; border: 1px solid #a3d9b8; color: #145228; }
+
+    .message strong { display: block; margin-bottom: 4px; font-size: 1rem; }
+    .message a { color: inherit; font-weight: 700; }
+
+    /* ── Items ── */
+    .items-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 8px; }
+    .item-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .item-row:hover { border-color: var(--navy); background: #f0f5fb; }
+    .item-row.selected { border-color: var(--navy); background: #e8f0f9; }
+
+    .item-checkbox {
+      width: 20px; height: 20px;
+      border: 2px solid var(--border);
+      border-radius: 4px;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .item-row.selected .item-checkbox {
+      background: var(--navy);
+      border-color: var(--navy);
+    }
+    .item-checkbox::after {
+      content: '✓';
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      opacity: 0;
+    }
+    .item-row.selected .item-checkbox::after { opacity: 1; }
+
+    .item-info { flex: 1; }
+    .item-name { font-weight: 700; font-size: 0.95rem; color: var(--text); }
+    .item-sku  { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+    .item-qty  { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+
+    /* ── Address block ── */
+    .address-block {
+      background: var(--light);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px 16px;
+      font-size: 0.92rem;
+      line-height: 1.7;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    .address-note {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 20px;
+      margin-top: 6px;
+    }
+
+    /* ── Success screen ── */
+    .success-screen {
+      text-align: center;
+      padding: 12px 0 8px;
+    }
+    .success-icon {
+      width: 64px; height: 64px;
+      background: var(--navy);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 1.8rem;
+    }
+    .success-screen h2 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 10px;
+    }
+    .success-screen p {
+      color: var(--muted);
+      line-height: 1.6;
+      max-width: 420px;
+      margin: 0 auto 8px;
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 480px) {
+      .card { padding: 24px 18px; }
+      .field-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <img src="https://www.bluealphabelts.com/wp-content/uploads/2024/04/logo-1.png" alt="Blue Alpha">
+  <div class="header-divider"></div>
+  <span class="header-title">Returns &amp; Exchanges</span>
+</header>
+
+<div class="container">
+  <h1 class="page-title">Start a Return</h1>
+  <p class="page-subtitle">Enter your order details below to get started. Returns are accepted within 30 days of delivery.</p>
+
+  <div class="progress" id="progress">
+    <div class="progress-step active" id="prog-1"></div>
+    <div class="progress-step" id="prog-2"></div>
+    <div class="progress-step" id="prog-3"></div>
+  </div>
+
+  <!-- ── STEP 1: Verify ── -->
+  <div id="step-1" class="card">
+    <div class="card-title">Step 1 — Verify Your Order</div>
+    <div class="field">
+      <label>Order Number <span class="req">*</span></label>
+      <input type="text" id="order-number" placeholder="e.g. 267806" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Last Name <span class="req">*</span></label>
+      <input type="text" id="last-name" placeholder="Last name on the order" autocomplete="off">
+    </div>
+    <button class="btn btn-primary" id="btn-verify" onclick="verifyOrder()">
+      Continue
+    </button>
+    <div class="message message-error" id="msg-not-found">
+      <strong>Order not found</strong>
+      We couldn't find an order matching that order number and last name. Please double-check your details, or contact us at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">678-961-3304</a>.
+    </div>
+    <div class="message message-warning" id="msg-international">
+      <strong>International Order</strong>
+      International orders must be handled by our customer service team. Please contact us at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">678-961-3304</a> and we'll take care of you.
+    </div>
+    <div class="message message-warning" id="msg-outside-window">
+      <strong>Outside Return Window</strong>
+      Your order is outside our 30-day return window. If you have questions, please reach out at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">678-961-3304</a>.
+    </div>
+    <div class="message message-error" id="msg-error">
+      <strong>Something went wrong</strong>
+      We had trouble looking up your order. Please try again or contact us at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a>.
+    </div>
+  </div>
+
+  <!-- ── STEP 2: Select Items ── -->
+  <div id="step-2" class="card hidden">
+    <div class="card-title">Step 2 — Select Items to Return</div>
+    <div class="items-list" id="items-list"></div>
+    <div class="message message-error hidden" id="msg-no-selection">Please select at least one item to return.</div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="goBack(1)">Back</button>
+      <button class="btn btn-primary" onclick="goToStep3()">Continue</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 3: Details ── -->
+  <div id="step-3" class="card hidden">
+    <div class="card-title">Step 3 — Confirm Your Details</div>
+
+    <div class="field">
+      <label>Return Address</label>
+      <div class="address-block" id="address-display"></div>
+      <div class="address-note">This is the address your return label will be created for. If this is incorrect, please contact us before submitting.</div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Email Address <span class="req">*</span></label>
+        <input type="email" id="email" placeholder="you@example.com">
+      </div>
+      <div class="field">
+        <label>Phone Number</label>
+        <input type="tel" id="phone" placeholder="555-555-5555">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Reason for Return <span class="req">*</span></label>
+      <select id="reason">
+        <option value="">Select a reason…</option>
+        <option value="Wrong size">Wrong size</option>
+        <option value="Defective / damaged">Defective / damaged</option>
+        <option value="Not as described">Not as described</option>
+        <option value="Changed my mind">Changed my mind</option>
+        <option value="Ordered wrong item">Ordered wrong item</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+
+    <div class="field" id="reason-other-field" style="display:none;">
+      <label>Please describe <span class="req">*</span></label>
+      <textarea id="reason-other" placeholder="Tell us more…"></textarea>
+    </div>
+
+    <div class="message message-error hidden" id="msg-submit-error">
+      <strong>Submission failed</strong>
+      Something went wrong. Please try again or contact us at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a>.
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="goBack(2)">Back</button>
+      <button class="btn btn-primary" id="btn-submit" onclick="submitReturn()">Submit Return Request</button>
+    </div>
+  </div>
+
+  <!-- ── SUCCESS ── -->
+  <div id="step-success" class="card hidden">
+    <div class="success-screen">
+      <div class="success-icon">✓</div>
+      <h2>Request Received!</h2>
+      <p>Your return request has been submitted. Our customer service team will review it and send you a prepaid return label shortly.</p>
+      <p style="margin-top:12px; font-size:0.85rem;">Questions? <a href="mailto:info@bluealpha.us" style="color:var(--navy); font-weight:700;">info@bluealpha.us</a> · <a href="tel:6789613304" style="color:var(--navy); font-weight:700;">678-961-3304</a></p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API_BASE = '';  // same origin on Railway; override below for local
+let orderData = null;
+
+// ── Step management ──
+function showStep(n) {
+  [1,2,3,'success'].forEach(s => {
+    const el = document.getElementById('step-' + s);
+    if (el) el.classList.add('hidden');
+  });
+  document.getElementById('step-' + n).classList.remove('hidden');
+
+  // Progress bar
+  if (n !== 'success') {
+    [1,2,3].forEach(i => {
+      const p = document.getElementById('prog-' + i);
+      if (!p) return;
+      p.classList.remove('active','done');
+      if (i < n) p.classList.add('done');
+      else if (i === n) p.classList.add('active');
+    });
+    document.getElementById('progress').classList.remove('hidden');
+  } else {
+    document.getElementById('progress').classList.add('hidden');
+  }
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function goBack(toStep) { showStep(toStep); }
+
+function hideAllMessages(parent) {
+  parent.querySelectorAll('.message').forEach(m => m.classList.remove('show'));
+}
+
+// ── Step 1: Verify ──
+async function verifyOrder() {
+  const btn = document.getElementById('btn-verify');
+  const orderNum = document.getElementById('order-number').value.trim();
+  const lastName = document.getElementById('last-name').value.trim();
+
+  hideAllMessages(document.getElementById('step-1'));
+
+  if (!orderNum || !lastName) {
+    document.getElementById('msg-not-found').classList.add('show');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Looking up order…';
+
+  try {
+    const res = await fetch(API_BASE + '/api/verify-order', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({orderNumber: orderNum, lastName: lastName})
+    });
+    const data = await res.json();
+
+    if (data.status === 'eligible') {
+      orderData = data;
+      buildItemsList(data.items);
+      showStep(2);
+    } else if (data.status === 'not_found') {
+      document.getElementById('msg-not-found').classList.add('show');
+    } else if (data.status === 'international') {
+      document.getElementById('msg-international').classList.add('show');
+    } else if (data.status === 'outside_window') {
+      document.getElementById('msg-outside-window').classList.add('show');
+    } else {
+      document.getElementById('msg-error').classList.add('show');
+    }
+  } catch (e) {
+    document.getElementById('msg-error').classList.add('show');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = 'Continue';
+}
+
+document.getElementById('order-number').addEventListener('keydown', e => { if (e.key === 'Enter') verifyOrder(); });
+document.getElementById('last-name').addEventListener('keydown', e => { if (e.key === 'Enter') verifyOrder(); });
+
+// ── Step 2: Items ──
+function buildItemsList(items) {
+  const list = document.getElementById('items-list');
+  list.innerHTML = '';
+  items.forEach((item, idx) => {
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.dataset.idx = idx;
+    row.innerHTML = `
+      <div class="item-checkbox"></div>
+      <div class="item-info">
+        <div class="item-name">${item.name}</div>
+        <div class="item-sku">${item.sku}</div>
+      </div>
+      <div class="item-qty">Qty: ${item.quantity}</div>`;
+    row.addEventListener('click', () => row.classList.toggle('selected'));
+    list.appendChild(row);
+  });
+}
+
+function getSelectedItems() {
+  const selected = [];
+  document.querySelectorAll('.item-row.selected').forEach(row => {
+    const idx = parseInt(row.dataset.idx);
+    selected.push(orderData.items[idx]);
+  });
+  return selected;
+}
+
+function goToStep3() {
+  const selected = getSelectedItems();
+  const errEl = document.getElementById('msg-no-selection');
+  if (selected.length === 0) {
+    errEl.classList.remove('hidden');
+    return;
+  }
+  errEl.classList.add('hidden');
+
+  // Pre-fill address
+  const a = orderData.address;
+  const addrLines = [a.name, a.street1, a.street2, `${a.city}, ${a.state} ${a.postalCode}`].filter(Boolean);
+  document.getElementById('address-display').innerHTML = addrLines.join('<br>');
+
+  // Pre-fill email
+  if (orderData.email) document.getElementById('email').value = orderData.email;
+
+  showStep(3);
+}
+
+// Reason "Other" toggle
+document.getElementById('reason').addEventListener('change', function() {
+  document.getElementById('reason-other-field').style.display =
+    this.value === 'Other' ? 'block' : 'none';
+});
+
+// ── Step 3: Submit ──
+async function submitReturn() {
+  const btn = document.getElementById('btn-submit');
+  const email = document.getElementById('email').value.trim();
+  const reason = document.getElementById('reason').value;
+  const reasonOther = document.getElementById('reason-other').value.trim();
+  const errEl = document.getElementById('msg-submit-error');
+
+  errEl.classList.add('hidden');
+
+  if (!email || !reason || (reason === 'Other' && !reasonOther)) {
+    errEl.querySelector('strong').textContent = 'Missing required fields';
+    errEl.querySelector('strong').nextSibling.textContent = ' Please fill in all required fields.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const selectedItems = getSelectedItems();
+  const itemsSummary = selectedItems.map(i => `${i.quantity}x ${i.sku} — ${i.name}`).join('\n');
+  const finalReason = reason === 'Other' ? reasonOther : reason;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Submitting…';
+
+  try {
+    const res = await fetch(API_BASE + '/api/submit-return', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        orderNumber:      document.getElementById('order-number').value.trim(),
+        customerName:     orderData.customerName,
+        email:            email,
+        phone:            document.getElementById('phone').value.trim(),
+        address:          orderData.address,
+        itemsToReturn:    itemsSummary,
+        reasonForReturn:  finalReason,
+        shipDate:         orderData.shipDate,
+        eligibleUntil:    orderData.eligibleUntil,
+        orderId:          orderData.orderId,
+        orderKey:         orderData.orderKey,
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showStep('success');
+    } else {
+      throw new Error(data.error || 'Unknown error');
+    }
+  } catch (e) {
+    errEl.classList.remove('hidden');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = 'Submit Return Request';
+}
+</script>
+</body>
+</html>
