@@ -68,7 +68,11 @@ def dashboard(name):
         with open(filepath, "r") as f:
             content = f.read()
         content = content.replace("%%AIRTABLE_OPS_TOKEN%%", AIRTABLE_OPS_TOKEN)
-        return Response(content, mimetype="text/html")
+        return Response(content, mimetype="text/html", headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        })
     abort(404)
 
 def ss_headers():
