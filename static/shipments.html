@@ -569,7 +569,7 @@ async function refresh() {
 
         for (let i = 0; i < skus.length; i++) {
           const category = skuMap[skus[i]]?.category;
-          if (!category) continue; // skip unrecognized SKUs (bad data)
+          if (!category || category === 'Unknown') continue; // skip unrecognized/unknown SKUs
           const qty = qtys[i] ?? 1;
           catComponents[category] = (catComponents[category] || 0) + qty;
         }
