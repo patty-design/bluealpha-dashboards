@@ -233,7 +233,9 @@ def awaiting_shipment():
 
     # Today's date in Eastern time (UTC-4 DST / UTC-5 standard)
     eastern = timezone(timedelta(hours=-4))
-    today = datetime.now(eastern).strftime("%Y-%m-%d")
+    now_eastern = datetime.now(eastern)
+    today = now_eastern.strftime("%Y-%m-%d")
+    tomorrow = (now_eastern + timedelta(days=1)).strftime("%Y-%m-%d")
 
     # Fetch awaiting shipment count
     count = 0
@@ -253,7 +255,7 @@ def awaiting_shipment():
     try:
         r2 = req_lib.get(
             "https://ssapi.shipstation.com/orders",
-            params={"orderDateStart": today, "orderDateEnd": today, "pageSize": 1},
+            params={"orderDateStart": today, "orderDateEnd": tomorrow, "pageSize": 1},
             headers=ss_auth, timeout=10
         )
         body = r2.json()
