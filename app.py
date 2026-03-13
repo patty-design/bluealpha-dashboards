@@ -227,7 +227,7 @@ def awaiting_shipment():
         creds = base64.b64encode(f"{SHIPSTATION_KEY}:{SHIPSTATION_SECRET}".encode()).decode()
         headers = {"Authorization": f"Basic {creds}"}
 
-        # Today's date in Eastern time (UTC-5 / UTC-4)
+        # Today's date in Eastern time (UTC-4 DST / UTC-5 standard)
         eastern = timezone(timedelta(hours=-4))
         today = datetime.now(eastern).strftime("%Y-%m-%d")
 
