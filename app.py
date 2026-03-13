@@ -218,36 +218,54 @@ def submit_return():
 
 @app.route("/api/awaiting")
 def awaiting_shipment():
-    cors = {"Access-Control-Allow-Origin": "*"}
+    cors_headers = {"Access-Control-Allow-Origin": "*"}
     if not SHIPSTATION_KEY or not SHIPSTATION_SECRET:
         return Response(json.dumps({"error": "ShipStation not configured"}),
-                        status=500, headers=cors, mimetype="application/json")
+                        status=500, headers=cors_headers, mimetype="application/json")
+
+    from datetime import datetime, timezone, timedelta
+    creds = base64.b64encode(f"{SHIPSTATION_KEY}:{SHIPSTATION_SECRET}".encode()).decode()
+    ss_auth = {"Authorization": f"Basic {creds}"}
+
+    # Today's date in Eastern time (UTC-4 DST / UTC-5 standard)
+    eastern = timezone(timedelta(hours=-4))
+    today = datetime.now(eastern).strftime("%Y-%m-%d")
+
+    # Fetch awaiting shipment count
+    count = 0
     try:
-        from datetime import datetime, timezone, timedelta
-        creds = base64.b64encode(f"{SHIPSTATION_KEY}:{SHIPSTATION_SECRET}".encode()).decode()
-        headers = {"Authorization": f"Basic {creds}"}
-
-        # Today's date in Eastern time (UTC-4 DST / UTC-5 standard)
-        eastern = timezone(timedelta(hours=-4))
-        today = datetime.now(eastern).strftime("%Y-%m-%d")
-
-        awaiting, placed = req_lib.get(
+        r = req_lib.get(
             "https://ssapi.shipstation.com/orders",
             params={"orderStatus": "awaiting_shipment", "pageSize": 1},
-            headers=headers, timeout=10
-        ), req_lib.get(
+            headers=ss_auth, timeout=10
+        )
+        count = r.json().get("total", 0)
+    except Exception as e:
+        print(f"[awaiting] count fetch error: {e}")
+
+    # Fetch orders placed today
+    placed_today = 0
+    placed_error = None
+    try:
+        r2 = req_lib.get(
             "https://ssapi.shipstation.com/orders",
             params={"orderDateStart": today, "orderDateEnd": today, "pageSize": 1},
-            headers=headers, timeout=10
+            headers=ss_auth, timeout=10
         )
-
-        return Response(json.dumps({
-            "count":       awaiting.json().get("total", 0),
-            "placedToday": placed.json().get("total", 0),
-        }), headers=cors, mimetype="application/json")
+        body = r2.json()
+        if "total" in body:
+            placed_today = body["total"]
+        else:
+            placed_error = body.get("message", f"HTTP {r2.status_code}: {str(body)[:200]}")
     except Exception as e:
-        return Response(json.dumps({"error": str(e)}),
-                        status=500, headers=cors, mimetype="application/json")
+        placed_error = str(e)
+        print(f"[awaiting] placedToday fetch error: {e}")
+
+    result = {"count": count, "placedToday": placed_today}
+    if placed_error:
+        result["placedTodayError"] = placed_error
+
+    return Response(json.dumps(result), headers=cors_headers, mimetype="application/json")
 
 
 if __name__ == "__main__":
