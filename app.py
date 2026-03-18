@@ -133,7 +133,7 @@ def raw_material_cost():
         try:
             snap_records = at_get_all(
                 RM_SNAPSHOTS_TABLE_ID, AIRTABLE_OPS_TOKEN,
-                fields=["Month", "Total Unprocessed Cost", "Record Count", "Notes"],
+                fields=["Month", "Total Inventory Value", "Record Count", "Notes"],
                 base_id=RM_SNAPSHOTS_BASE_ID,
             )
             snapshots = sorted(
@@ -141,7 +141,7 @@ def raw_material_cost():
                     {
                         "id": r["id"],
                         "month": r["fields"].get("Month"),
-                        "total": r["fields"].get("Total Unprocessed Cost"),
+                        "total": r["fields"].get("Total Inventory Value"),
                         "count": r["fields"].get("Record Count"),
                         "notes": r["fields"].get("Notes", ""),
                     }
@@ -193,7 +193,7 @@ def capture_raw_material_cost():
             headers={**at_headers(AIRTABLE_WRITE_TOKEN), "Content-Type": "application/json"},
             json={"fields": {
                 "Month": snap_date,
-                "Total Unprocessed Cost": round(total, 2),
+                "Total Inventory Value": round(total, 2),
                 "Record Count": count,
                 "Notes": notes,
             }},
