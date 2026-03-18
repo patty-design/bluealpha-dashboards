@@ -5,10 +5,12 @@ import json
 import base64
 import requests as req_lib
 
-AIRTABLE_OPS_TOKEN   = os.environ.get("AIRTABLE_OPS_TOKEN", "")
-AIRTABLE_WRITE_TOKEN = os.environ.get("AIRTABLE_WRITE_TOKEN", "")
-AIRTABLE_BASE_ID     = "appA13jo4b3TIn4yT"
-RETURNS_TABLE_ID     = os.environ.get("RETURNS_TABLE_ID", "")
+AIRTABLE_OPS_TOKEN      = os.environ.get("AIRTABLE_OPS_TOKEN", "")
+AIRTABLE_WRITE_TOKEN    = os.environ.get("AIRTABLE_WRITE_TOKEN", "")
+AIRTABLE_BASE_ID        = "appA13jo4b3TIn4yT"
+RETURNS_TABLE_ID        = os.environ.get("RETURNS_TABLE_ID", "")
+RM_SNAPSHOTS_TABLE_ID   = os.environ.get("RM_SNAPSHOTS_TABLE_ID", "")
+RAW_MATERIALS_TABLE_ID  = "tblokid4GHQCvdXuQ"
 SHIPSTATION_KEY      = os.environ.get("SHIPSTATION_KEY", "")
 SHIPSTATION_SECRET   = os.environ.get("SHIPSTATION_SECRET", "")
 
@@ -81,6 +83,131 @@ def ss_headers():
 
 def cors():
     return {"Access-Control-Allow-Origin": "*"}
+
+def at_headers(token):
+    return {"Authorization": f"Bearer {token}"}
+
+def at_get_all(table_id, token, fields=None, formula=None):
+    """Paginate through all records in an Airtable table."""
+    records = []
+    offset = None
+    while True:
+        params = {"pageSize": 100}
+        if fields:
+            for i, f in enumerate(fields):
+                params[f"fields[{i}]"] = f
+        if formula:
+            params["filterByFormula"] = formula
+        if offset:
+            params["offset"] = offset
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{table_id}",
+            headers=at_headers(token),
+            params=params,
+            timeout=30,
+        )
+        data = r.json()
+        records.extend(data.get("records", []))
+        offset = data.get("offset")
+        if not offset:
+            break
+    return records
+
+
+@app.route("/api/raw-material-cost", methods=["GET"])
+def raw_material_cost():
+    c = cors()
+    try:
+        records = at_get_all(RAW_MATERIALS_TABLE_ID, AIRTABLE_OPS_TOKEN,
+                             fields=["Unprocessed Cost"])
+        total = sum(r["fields"].get("Unprocessed Cost") or 0 for r in records)
+        count = len(records)
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500,
+                        headers=c, mimetype="application/json")
+
+    snapshots = []
+    if RM_SNAPSHOTS_TABLE_ID:
+        try:
+            snap_records = at_get_all(
+                RM_SNAPSHOTS_TABLE_ID, AIRTABLE_OPS_TOKEN,
+                fields=["Month", "Total Unprocessed Cost", "Record Count", "Notes"],
+            )
+            snapshots = sorted(
+                [
+                    {
+                        "id": r["id"],
+                        "month": r["fields"].get("Month"),
+                        "total": r["fields"].get("Total Unprocessed Cost"),
+                        "count": r["fields"].get("Record Count"),
+                        "notes": r["fields"].get("Notes", ""),
+                    }
+                    for r in snap_records
+                    if r["fields"].get("Month")
+                ],
+                key=lambda x: x["month"],
+            )
+        except Exception:
+            snapshots = []
+
+    return Response(
+        json.dumps({"current": {"total": round(total, 2), "count": count},
+                    "snapshots": snapshots}),
+        headers=c, mimetype="application/json",
+    )
+
+
+@app.route("/api/raw-material-cost/capture", methods=["POST", "OPTIONS"])
+def capture_raw_material_cost():
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(),
+                                     "Access-Control-Allow-Headers": "Content-Type",
+                                     "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    if not RM_SNAPSHOTS_TABLE_ID or not AIRTABLE_WRITE_TOKEN:
+        return Response(
+            json.dumps({"error": "RM_SNAPSHOTS_TABLE_ID or AIRTABLE_WRITE_TOKEN not configured"}),
+            status=400, headers=c, mimetype="application/json",
+        )
+
+    try:
+        records = at_get_all(RAW_MATERIALS_TABLE_ID, AIRTABLE_OPS_TOKEN,
+                             fields=["Unprocessed Cost"])
+        total = sum(r["fields"].get("Unprocessed Cost") or 0 for r in records)
+        count = len(records)
+    except Exception as e:
+        return Response(json.dumps({"error": f"Airtable fetch failed: {str(e)}"}),
+                        status=500, headers=c, mimetype="application/json")
+
+    from datetime import date as dt_date
+    body = request.get_json() or {}
+    snap_date = body.get("date", dt_date.today().isoformat())
+    notes = body.get("notes", "Auto-captured snapshot")
+
+    try:
+        r = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RM_SNAPSHOTS_TABLE_ID}",
+            headers={**at_headers(AIRTABLE_WRITE_TOKEN), "Content-Type": "application/json"},
+            json={"fields": {
+                "Month": snap_date,
+                "Total Unprocessed Cost": round(total, 2),
+                "Record Count": count,
+                "Notes": notes,
+            }},
+            timeout=10,
+        )
+        if r.status_code in (200, 201):
+            return Response(
+                json.dumps({"success": True, "total": round(total, 2),
+                            "count": count, "date": snap_date}),
+                headers=c, mimetype="application/json",
+            )
+        else:
+            return Response(json.dumps({"error": r.text}),
+                            status=500, headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
 
 
 @app.route("/api/verify-order", methods=["POST", "OPTIONS"])
