@@ -218,7 +218,7 @@
       <!-- Chart -->
       <div style="background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:24px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-          <div style="font-size:1rem;font-weight:700;color:#1B2438;">Month-End Unprocessed Cost</div>
+          <div style="font-size:1rem;font-weight:700;color:#1B2438;">Month-End Total Inventory Value</div>
           <button class="btn-primary" onclick="captureSnapshot()" id="rm-capture-btn" style="font-size:0.82rem;padding:6px 14px;">📸 Capture Snapshot</button>
         </div>
         <div id="rm-chart-container" style="position:relative;height:300px;">
@@ -677,7 +677,7 @@ function renderRmChart(snaps) {
     data: {
       labels,
       datasets: [{
-        label: 'Total Unprocessed Cost',
+        label: 'Total Inventory Value',
         data: values,
         borderColor: '#7B2318',
         backgroundColor: 'rgba(123,35,24,0.08)',
@@ -733,7 +733,7 @@ function renderSnapTable(snaps, fmt) {
       <thead>
         <tr style="background:#f8f9fa;">
           <th style="padding:8px 14px;text-align:left;font-size:0.75rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em;">Month</th>
-          <th style="padding:8px 14px;text-align:left;font-size:0.75rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em;">Total Unprocessed Cost</th>
+          <th style="padding:8px 14px;text-align:left;font-size:0.75rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em;">Total Inventory Value</th>
           <th style="padding:8px 14px;text-align:left;font-size:0.75rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em;">Materials</th>
           <th style="padding:8px 14px;text-align:left;font-size:0.75rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em;">Notes</th>
         </tr>

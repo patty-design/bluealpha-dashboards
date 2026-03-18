@@ -119,8 +119,8 @@ def raw_material_cost():
     c = cors()
     try:
         records = at_get_all(RAW_MATERIALS_TABLE_ID, AIRTABLE_OPS_TOKEN,
-                             fields=["Unprocessed Cost"])
-        total = sum(r["fields"].get("Unprocessed Cost") or 0 for r in records)
+                             fields=["Total Inventory Value"])
+        total = sum(r["fields"].get("Total Inventory Value") or 0 for r in records)
         count = len(records)
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500,
@@ -131,14 +131,14 @@ def raw_material_cost():
         try:
             snap_records = at_get_all(
                 RM_SNAPSHOTS_TABLE_ID, AIRTABLE_OPS_TOKEN,
-                fields=["Month", "Total Unprocessed Cost", "Record Count", "Notes"],
+                fields=["Month", "Total Inventory Value", "Record Count", "Notes"],
             )
             snapshots = sorted(
                 [
                     {
                         "id": r["id"],
                         "month": r["fields"].get("Month"),
-                        "total": r["fields"].get("Total Unprocessed Cost"),
+                        "total": r["fields"].get("Total Inventory Value"),
                         "count": r["fields"].get("Record Count"),
                         "notes": r["fields"].get("Notes", ""),
                     }
@@ -172,8 +172,8 @@ def capture_raw_material_cost():
 
     try:
         records = at_get_all(RAW_MATERIALS_TABLE_ID, AIRTABLE_OPS_TOKEN,
-                             fields=["Unprocessed Cost"])
-        total = sum(r["fields"].get("Unprocessed Cost") or 0 for r in records)
+                             fields=["Total Inventory Value"])
+        total = sum(r["fields"].get("Total Inventory Value") or 0 for r in records)
         count = len(records)
     except Exception as e:
         return Response(json.dumps({"error": f"Airtable fetch failed: {str(e)}"}),
@@ -190,7 +190,7 @@ def capture_raw_material_cost():
             headers={**at_headers(AIRTABLE_WRITE_TOKEN), "Content-Type": "application/json"},
             json={"fields": {
                 "Month": snap_date,
-                "Total Unprocessed Cost": round(total, 2),
+                "Total Inventory Value": round(total, 2),
                 "Record Count": count,
                 "Notes": notes,
             }},
