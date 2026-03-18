@@ -10,6 +10,7 @@ AIRTABLE_WRITE_TOKEN    = os.environ.get("AIRTABLE_WRITE_TOKEN", "")
 AIRTABLE_BASE_ID        = "appA13jo4b3TIn4yT"
 RETURNS_TABLE_ID        = os.environ.get("RETURNS_TABLE_ID", "")
 RM_SNAPSHOTS_TABLE_ID   = os.environ.get("RM_SNAPSHOTS_TABLE_ID", "")
+RM_SNAPSHOTS_BASE_ID    = os.environ.get("RM_SNAPSHOTS_BASE_ID", AIRTABLE_BASE_ID)
 RAW_MATERIALS_TABLE_ID  = "tblokid4GHQCvdXuQ"
 SHIPSTATION_KEY      = os.environ.get("SHIPSTATION_KEY", "")
 SHIPSTATION_SECRET   = os.environ.get("SHIPSTATION_SECRET", "")
@@ -87,10 +88,11 @@ def cors():
 def at_headers(token):
     return {"Authorization": f"Bearer {token}"}
 
-def at_get_all(table_id, token, fields=None, formula=None):
+def at_get_all(table_id, token, fields=None, formula=None, base_id=None):
     """Paginate through all records in an Airtable table."""
     records = []
     offset = None
+    bid = base_id or AIRTABLE_BASE_ID
     while True:
         params = {"pageSize": 100}
         if fields:
@@ -101,7 +103,7 @@ def at_get_all(table_id, token, fields=None, formula=None):
         if offset:
             params["offset"] = offset
         r = req_lib.get(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{table_id}",
+            f"https://api.airtable.com/v0/{bid}/{table_id}",
             headers=at_headers(token),
             params=params,
             timeout=30,
@@ -132,6 +134,7 @@ def raw_material_cost():
             snap_records = at_get_all(
                 RM_SNAPSHOTS_TABLE_ID, AIRTABLE_OPS_TOKEN,
                 fields=["Month", "Total Unprocessed Cost", "Record Count", "Notes"],
+                base_id=RM_SNAPSHOTS_BASE_ID,
             )
             snapshots = sorted(
                 [
@@ -186,7 +189,7 @@ def capture_raw_material_cost():
 
     try:
         r = req_lib.post(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RM_SNAPSHOTS_TABLE_ID}",
+            f"https://api.airtable.com/v0/{RM_SNAPSHOTS_BASE_ID}/{RM_SNAPSHOTS_TABLE_ID}",
             headers={**at_headers(AIRTABLE_WRITE_TOKEN), "Content-Type": "application/json"},
             json={"fields": {
                 "Month": snap_date,
