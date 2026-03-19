@@ -292,7 +292,7 @@
 
 <div class="container">
   <h1 class="page-title">Start a Return</h1>
-  <p class="page-subtitle">Enter your order details below to get started. Returns are accepted within 30 days of delivery.</p>
+  <p class="page-subtitle">Enter your order details below to get started. Returns are accepted within 37 days of ship date.</p>
 
   <div class="progress" id="progress">
     <div class="progress-step active" id="prog-1"></div>
@@ -311,6 +311,10 @@
       <label>Last Name <span class="req">*</span></label>
       <input type="text" id="last-name" placeholder="Last name on the order" autocomplete="off">
     </div>
+    <div class="field">
+      <label>Email Address <span class="req">*</span></label>
+      <input type="email" id="email-verify" placeholder="Email used on the order" autocomplete="off">
+    </div>
     <button class="btn btn-primary" id="btn-verify" onclick="verifyOrder()">
       Continue
     </button>
@@ -324,7 +328,7 @@
     </div>
     <div class="message message-warning" id="msg-outside-window">
       <strong>Outside Return Window</strong>
-      Your order is outside our 30-day return window. If you have questions, please reach out at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">678-961-3304</a>.
+      Your order is outside our 37-day return window. If you have questions, please reach out at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">678-961-3304</a>.
     </div>
     <div class="message message-error" id="msg-error">
       <strong>Something went wrong</strong>
@@ -353,26 +357,18 @@
       <div class="address-note">This is the address your return label will be created for. If this is incorrect, please contact us before submitting.</div>
     </div>
 
-    <div class="field-row">
-      <div class="field">
-        <label>Email Address <span class="req">*</span></label>
-        <input type="email" id="email" placeholder="you@example.com">
-      </div>
-      <div class="field">
-        <label>Phone Number</label>
-        <input type="tel" id="phone" placeholder="555-555-5555">
-      </div>
+    <div class="field">
+      <label>Email Address <span class="req">*</span></label>
+      <input type="email" id="email" placeholder="you@example.com">
     </div>
 
     <div class="field">
       <label>Reason for Return <span class="req">*</span></label>
       <select id="reason">
         <option value="">Select a reason…</option>
-        <option value="Wrong size">Wrong size</option>
-        <option value="Defective / damaged">Defective / damaged</option>
-        <option value="Not as described">Not as described</option>
+        <option value="Wrong item received">Wrong item received</option>
         <option value="Changed my mind">Changed my mind</option>
-        <option value="Ordered wrong item">Ordered wrong item</option>
+        <option value="Doesn't work with my setup">Doesn't work with my setup</option>
         <option value="Other">Other</option>
       </select>
     </div>
@@ -397,8 +393,8 @@
   <div id="step-success" class="card hidden">
     <div class="success-screen">
       <div class="success-icon">✓</div>
-      <h2>Request Received!</h2>
-      <p>Your return request has been submitted. Our customer service team will review it and send you a prepaid return label shortly.</p>
+      <h2>Request Received.</h2>
+      <p>Your return has been submitted. A prepaid return label will be emailed to you within a few minutes. If you don't see it, check your spam folder.</p>
       <p style="margin-top:12px; font-size:0.85rem;">Questions? <a href="mailto:info@bluealpha.us" style="color:var(--navy); font-weight:700;">info@bluealpha.us</a> · <a href="tel:6789613304" style="color:var(--navy); font-weight:700;">678-961-3304</a></p>
     </div>
   </div>
@@ -444,10 +440,11 @@ async function verifyOrder() {
   const btn = document.getElementById('btn-verify');
   const orderNum = document.getElementById('order-number').value.trim();
   const lastName = document.getElementById('last-name').value.trim();
+  const emailVal = document.getElementById('email-verify').value.trim();
 
   hideAllMessages(document.getElementById('step-1'));
 
-  if (!orderNum || !lastName) {
+  if (!orderNum || (!lastName && !emailVal)) {
     document.getElementById('msg-not-found').classList.add('show');
     return;
   }
@@ -459,7 +456,7 @@ async function verifyOrder() {
     const res = await fetch(API_BASE + '/api/verify-order', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({orderNumber: orderNum, lastName: lastName})
+      body: JSON.stringify({orderNumber: orderNum, lastName: lastName, email: emailVal})
     });
     const data = await res.json();
 
@@ -486,6 +483,7 @@ async function verifyOrder() {
 
 document.getElementById('order-number').addEventListener('keydown', e => { if (e.key === 'Enter') verifyOrder(); });
 document.getElementById('last-name').addEventListener('keydown', e => { if (e.key === 'Enter') verifyOrder(); });
+document.getElementById('email-verify').addEventListener('keydown', e => { if (e.key === 'Enter') verifyOrder(); });
 
 // ── Step 2: Items ──
 function buildItemsList(items) {
@@ -530,8 +528,9 @@ function goToStep3() {
   const addrLines = [a.name, a.street1, a.street2, `${a.city}, ${a.state} ${a.postalCode}`].filter(Boolean);
   document.getElementById('address-display').innerHTML = addrLines.join('<br>');
 
-  // Pre-fill email
-  if (orderData.email) document.getElementById('email').value = orderData.email;
+  // Pre-fill email — prefer what they entered in step 1, fall back to ShipStation email
+  const emailEntered = document.getElementById('email-verify').value.trim();
+  document.getElementById('email').value = emailEntered || orderData.email || '';
 
   showStep(3);
 }
@@ -574,7 +573,7 @@ async function submitReturn() {
         orderNumber:      document.getElementById('order-number').value.trim(),
         customerName:     orderData.customerName,
         email:            email,
-        phone:            document.getElementById('phone').value.trim(),
+        phone:            orderData.phone || '',
         address:          orderData.address,
         itemsToReturn:    itemsSummary,
         reasonForReturn:  finalReason,

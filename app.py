@@ -221,8 +221,9 @@ def verify_order():
     data = request.get_json() or {}
     order_number = data.get("orderNumber", "").strip()
     last_name    = data.get("lastName", "").strip().lower()
+    email_input  = data.get("email", "").strip().lower()
 
-    if not order_number or not last_name:
+    if not order_number or (not last_name and not email_input):
         return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
 
     try:
@@ -239,10 +240,13 @@ def verify_order():
 
         order = orders[0]
 
-        # Verify last name
-        ship_name = order.get("shipTo", {}).get("name", "").strip()
-        order_last = ship_name.split()[-1].lower() if ship_name else ""
-        if last_name != order_last:
+        # Verify identity — last name OR email must match
+        ship_name   = order.get("shipTo", {}).get("name", "").strip()
+        order_last  = ship_name.split()[-1].lower() if ship_name else ""
+        order_email = (order.get("customerEmail") or "").strip().lower()
+        name_match  = last_name and last_name == order_last
+        email_match = email_input and email_input == order_email
+        if not name_match and not email_match:
             return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
 
         # Check international
@@ -272,6 +276,8 @@ def verify_order():
                  for i in order.get("items", []) if i.get("name")]
 
         ship_to = order.get("shipTo", {})
+        phone = (ship_to.get("phone") or
+                 (order.get("billTo") or {}).get("phone") or "")
         return Response(json.dumps({
             "status":        "eligible",
             "orderId":       order.get("orderId"),
@@ -280,6 +286,7 @@ def verify_order():
             "shipDate":      ship_date_str,
             "eligibleUntil": eligible_until.isoformat(),
             "email":         order.get("customerEmail", ""),
+            "phone":         phone,
             "address": {
                 "name":       ship_to.get("name", ""),
                 "street1":    ship_to.get("street1", ""),
@@ -296,6 +303,67 @@ def verify_order():
                         status=500, headers=c, mimetype="application/json")
 
 
+def create_return_label(order_id, customer_addr):
+    """Create a prepaid return label in ShipStation.
+    Returns (tracking_number, label_data_b64) or raises Exception."""
+    from datetime import datetime, timezone
+    # Get original shipment to inherit carrier/service/weight
+    sr = req_lib.get("https://ssapi.shipstation.com/shipments",
+                     params={"orderId": order_id},
+                     headers=ss_headers(), timeout=10)
+    ships = sr.json().get("shipments", [])
+    carrier = "stamps_com"
+    service = "usps_priority_mail"
+    weight  = {"value": 16, "units": "ounces"}
+    if ships:
+        s = ships[0]
+        carrier = s.get("carrierCode") or carrier
+        service = s.get("serviceCode") or service
+        if s.get("weight"):
+            weight = s["weight"]
+
+    payload = {
+        "carrierCode": carrier,
+        "serviceCode": service,
+        "packageCode": "package",
+        "shipDate":    datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "weight":      weight,
+        "shipFrom": {
+            "name":       customer_addr.get("name", ""),
+            "street1":    customer_addr.get("street1", ""),
+            "street2":    customer_addr.get("street2", ""),
+            "city":       customer_addr.get("city", ""),
+            "state":      customer_addr.get("state", ""),
+            "postalCode": customer_addr.get("postalCode", ""),
+            "country":    "US",
+            "phone":      customer_addr.get("phone", ""),
+        },
+        "shipTo": {
+            "name":       "Blue Alpha",
+            "company":    "Blue Alpha",
+            "street1":    "35 Andrew St",
+            "city":       "Newnan",
+            "state":      "GA",
+            "postalCode": "30263",
+            "country":    "US",
+            "phone":      "6789822442",
+        },
+        "isReturnLabel": True,
+        "testLabel":     False,
+    }
+    r = req_lib.post(
+        "https://ssapi.shipstation.com/shipments/createlabel",
+        headers={**ss_headers(), "Content-Type": "application/json"},
+        json=payload, timeout=20,
+    )
+    result = r.json()
+    if r.status_code not in (200, 201):
+        raise Exception(f"ShipStation {r.status_code}: {result}")
+    tracking  = result.get("trackingNumber", "")
+    label_b64 = result.get("labelData", "")
+    return tracking, label_b64
+
+
 @app.route("/api/submit-return", methods=["POST", "OPTIONS"])
 def submit_return():
     if request.method == "OPTIONS":
@@ -307,30 +375,58 @@ def submit_return():
         return Response(json.dumps({"success": False, "error": "Airtable not configured"}),
                         status=500, headers=c, mimetype="application/json")
 
+    from datetime import datetime, timezone
+
     addr = data.get("address", {})
     address_str = ", ".join(filter(None, [
-        addr.get("street1"), addr.get("street2"),
+        addr.get("name"), addr.get("street1"), addr.get("street2"),
         addr.get("city"), addr.get("state"), addr.get("postalCode")
     ]))
+    wc_link = (f"https://www.bluealphabelts.com/wp-admin/post.php"
+               f"?post={data.get('orderId', '')}&action=edit")
 
-    from datetime import datetime, timezone
-    wc_link = f"https://www.bluealphabelts.com/wp-admin/post.php?post={data.get('orderKey','')}&action=edit"
+    # ── Try to generate ShipStation return label ──────────────────────────
+    tracking_number = ""
+    label_url       = ""
+    status          = "Needs Review"
+    label_error     = None
+    try:
+        addr_for_label = {
+            "name":       addr.get("name", data.get("customerName", "")),
+            "street1":    addr.get("street1", ""),
+            "street2":    addr.get("street2", ""),
+            "city":       addr.get("city", ""),
+            "state":      addr.get("state", ""),
+            "postalCode": addr.get("postalCode", ""),
+            "phone":      data.get("phone", ""),
+        }
+        tracking_number, _ = create_return_label(data.get("orderId"), addr_for_label)
+        status = "Label Sent"
+        if tracking_number:
+            label_url = (f"https://tools.usps.com/go/TrackConfirmAction"
+                         f"?qtc_tLabels1={tracking_number}")
+    except Exception as e:
+        label_error = str(e)
+        print(f"[submit-return] Label generation failed: {e}")
 
     fields = {
-        "Order Number":            data.get("orderNumber", ""),
+        "Order Number":                   data.get("orderNumber", ""),
         "Customer Name from Shipstation": data.get("customerName", ""),
-        "Email Address":           data.get("email", ""),
-        "Phone Number":            data.get("phone", ""),
-        "Confirmed Shipping Address": address_str,
-        "Items to Return":         data.get("itemsToReturn", ""),
-        "Reason for Return":       data.get("reasonForReturn", ""),
-        "Submission Date":         datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        "Ship Date from Shipstation": data.get("shipDate", "")[:10] if data.get("shipDate") else "",
-        "Eligible Until":          data.get("eligibleUntil", "")[:10] if data.get("eligibleUntil") else "",
-        "Status":                  "New",
-        "WooCommerce Order Link":  wc_link,
+        "Email Address":                  data.get("email", ""),
+        "Phone Number":                   data.get("phone", ""),
+        "Confirmed Shipping Address":     address_str,
+        "Items to Return":                data.get("itemsToReturn", ""),
+        "Reason for Return":              data.get("reasonForReturn", ""),
+        "Submission Date":                datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "Ship Date from Shipstation":     data.get("shipDate", "")[:10] if data.get("shipDate") else "",
+        "Eligible Until":                 data.get("eligibleUntil", "")[:10] if data.get("eligibleUntil") else "",
+        "Status":                         status,
+        "WooCommerce Order Link":         wc_link,
+        "Return Tracking #":              tracking_number,
+        "Return Label URL":               label_url,
     }
-    # Remove empty fields
+    if label_error:
+        fields["Status Notes"] = f"Label generation failed: {label_error}"
     fields = {k: v for k, v in fields.items() if v}
 
     try:
@@ -338,10 +434,13 @@ def submit_return():
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
             headers={"Authorization": f"Bearer {AIRTABLE_WRITE_TOKEN}", "Content-Type": "application/json"},
             json={"fields": fields},
-            timeout=10
+            timeout=10,
         )
         if r.status_code in (200, 201):
-            return Response(json.dumps({"success": True}), headers=c, mimetype="application/json")
+            return Response(
+                json.dumps({"success": True, "labelGenerated": status == "Label Sent"}),
+                headers=c, mimetype="application/json",
+            )
         else:
             return Response(json.dumps({"success": False, "error": r.text}),
                             status=500, headers=c, mimetype="application/json")
