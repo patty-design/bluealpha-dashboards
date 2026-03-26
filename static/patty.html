@@ -1064,7 +1064,7 @@ function renderCampaignTab(tab) {
     }
     h += `${makeCell(rec.id,'File #',f['File #']||'','number',[],MKT_CAMPAIGNS_TABLE)}
       <td style="padding:10px 7px;text-align:center">
-        <button onclick="advanceCampaign('${rec.id}','${tab}')" style="background:#e0f2fe;color:#0369a1;border:none;border-radius:5px;padding:3px 9px;cursor:pointer;font-size:0.82rem;font-weight:700;margin-right:4px" title="Move to next stage">→</button>
+        ${NEXT_LABEL[tab] ? `<button onclick="advanceCampaign('${rec.id}','${tab}')" style="background:#1B3A6B;color:#fff;border:none;border-radius:6px;padding:3px 9px;cursor:pointer;font-size:0.78rem;font-weight:600;margin-right:4px" title="Move to next stage">${NEXT_LABEL[tab]}</button>` : ''}
         <button onclick="delCampaign('${rec.id}')" style="background:none;border:none;cursor:pointer;color:#d1d5db;font-size:1.1rem" title="Delete">🗑</button>
       </td></tr>`;
   }
@@ -1137,7 +1137,7 @@ function renderIdeas() {
   const THc = (s, w) => `<th style="padding:10px 7px;text-align:center;font-size:0.74rem;color:#6b7280;font-weight:700;width:${w}">${s}</th>`;
   let h = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;table-layout:fixed;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08)">
 <thead><tr style="background:#f8fafc;border-bottom:2px solid #e5e7eb">
-  ${TH('Idea','auto')}${TH('Category','130px')}${TH('Submitted By','110px')}${TH('Status','110px')}${TH('Campaign','150px')}${THc('','160px')}
+  ${TH('Idea','auto')}${TH('Category','130px')}${TH('Submitted By','110px')}${TH('Status','110px')}${THc('','140px')}
 </tr></thead><tbody>`;
   for (const rec of data) {
     const f = rec.fields;
@@ -1146,9 +1146,8 @@ function renderIdeas() {
       ${makeCell(rec.id,'Category',f['Category']||'','select',['New BA Product','Limited Run','Custom Shop','YouTube','New Other Product','General'],MKT_IDEAS_TABLE)}
       ${makeCell(rec.id,'Submitted By',f['Submitted By']||'','select',['Stephen','Kurt','Jesse','Kelly','Patty','Chris'],MKT_IDEAS_TABLE)}
       ${makeCell(rec.id,'Status',f['Status']||'','select',['New','Considering','Approved','Scheduled','Declined'],MKT_IDEAS_TABLE)}
-      ${makeCell(rec.id,'Campaign',f['Campaign']||'','text',[],MKT_IDEAS_TABLE)}
       <td style="padding:10px 7px;text-align:center;white-space:nowrap">
-        <button onclick="promoteIdea('${rec.id}')" style="background:#e0f2fe;color:#0369a1;border:none;border-radius:5px;padding:3px 9px;cursor:pointer;font-size:0.82rem;font-weight:700;margin-right:4px" title="Move to In Progress">→</button>
+        <button onclick="promoteIdea('${rec.id}')" style="background:#1B3A6B;color:#fff;border:none;border-radius:6px;padding:3px 9px;cursor:pointer;font-size:0.78rem;font-weight:600;margin-right:4px" title="Move to In Progress">→ In Progress</button>
         <button onclick="delIdea('${rec.id}')" style="background:none;border:none;cursor:pointer;color:#d1d5db;font-size:1.1rem" title="Delete">🗑</button>
       </td></tr>`;
   }
@@ -1207,6 +1206,11 @@ const NEXT_STATUS = {
   inprogress: 'Ready',
   ready:      'Scheduled',
   scheduled:  'Sent'
+};
+const NEXT_LABEL = {
+  inprogress: '→ Ready',
+  ready:      '→ Scheduled',
+  scheduled:  '→ Sent'
 };
 
 async function promoteIdea(id) {
