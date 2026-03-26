@@ -1115,7 +1115,8 @@ function renderIdeas() {
       ${makeCell(rec.id,'Submitted By',f['Submitted By']||'','select',['Stephen','Kurt','Jesse','Kelly','Patty','Chris'],MKT_IDEAS_TABLE)}
       ${makeCell(rec.id,'Status',f['Status']||'','select',['New','Considering','Approved','Scheduled','Declined'],MKT_IDEAS_TABLE)}
       ${makeCell(rec.id,'Campaign',f['Campaign']||'','text',[],MKT_IDEAS_TABLE)}
-      <td style="padding:10px 7px;text-align:center">
+      <td style="padding:10px 7px;text-align:center;white-space:nowrap">
+        <button onclick="promoteIdea('${rec.id}')" style="background:#1B3A6B;color:#fff;border:none;border-radius:6px;padding:3px 9px;cursor:pointer;font-size:0.78rem;font-weight:600;margin-right:4px" title="Promote to Campaign">→ Campaign</button>
         <button onclick="delIdea('${rec.id}')" style="background:none;border:none;cursor:pointer;color:#d1d5db;font-size:1.1rem" title="Delete">🗑</button>
       </td></tr>`;
   }
@@ -1154,6 +1155,49 @@ async function addIdea() {
     ['new-im-idea','new-im-cat','new-im-by','new-im-status'].forEach(id => document.getElementById(id).value='');
     await loadIdeas(); renderIdeas();
   } catch(e) { alert('Error: '+e.message); }
+}
+
+async function promoteIdea(id) {
+  const rec = mktIdeas.find(r => r.id === id);
+  if (!rec) return;
+  const f = rec.fields;
+
+  // Map idea category to campaign type
+  const catToType = {
+    'New BA Product':    'New Product',
+    'New Other Product': 'New Product',
+    'Limited Run':       'Limited Run',
+    'YouTube':           'YouTube',
+    'Custom Shop':       'General',
+    'General':           'General'
+  };
+
+  // Switch to campaigns tab and pre-fill the add row
+  showMktTab('campaigns');
+  await new Promise(r => setTimeout(r, 50)); // let DOM settle
+
+  const subjectEl = document.getElementById('new-cm-subject');
+  const typeEl    = document.getElementById('new-cm-type');
+  const statusEl  = document.getElementById('new-cm-status');
+
+  if (subjectEl) subjectEl.value = f['Idea'] || '';
+  if (typeEl)    typeEl.value    = catToType[f['Category']] || '';
+  if (statusEl)  statusEl.value  = 'Planning';
+
+  // Scroll add-row into view and focus
+  if (subjectEl) {
+    subjectEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    subjectEl.focus();
+    subjectEl.select();
+  }
+
+  // Mark idea as Scheduled if it wasn't already
+  if (f['Status'] !== 'Scheduled' && f['Status'] !== 'Declined') {
+    try {
+      await atUpdate(MKT_IDEAS_TABLE, id, { Status: 'Scheduled' });
+      rec.fields['Status'] = 'Scheduled';
+    } catch(e) { /* non-critical */ }
+  }
 }
 
 async function delIdea(id) {
