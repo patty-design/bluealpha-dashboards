@@ -128,6 +128,9 @@
   .modal-field textarea { min-height: 80px; resize: vertical; }
   .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; flex-wrap: wrap; }
 
+  .mkt-subtab { padding:10px 18px;border:none;background:none;font-size:0.9rem;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;color:#888;margin-bottom:-2px;white-space:nowrap; }
+  .mkt-subtab:hover { color:#1B3A6B; }
+  .mkt-subtab-active { border-bottom-color:#1B3A6B !important;color:#1B3A6B !important; }
   .calendar-nav { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
   .calendar-nav h2 { color: #1B3A6B; font-size: 1.2rem; min-width: 180px; text-align: center; }
   .cal-btn { padding: 8px 16px; background: #fff; border: 1.5px solid #ddd; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
@@ -269,37 +272,16 @@
       </div>
 
       <!-- Sub-tabs -->
-      <div style="display:flex;gap:4px;margin-bottom:24px;border-bottom:2px solid #e5e7eb;padding-bottom:0">
-        <button id="mkt-tab-campaigns" onclick="showMktTab('campaigns')"
-          style="padding:10px 20px;border:none;background:none;font-size:0.95rem;font-weight:600;cursor:pointer;border-bottom:3px solid #1B3A6B;color:#1B3A6B;margin-bottom:-2px">
-          📧 Campaigns
-        </button>
-        <button id="mkt-tab-ideas" onclick="showMktTab('ideas')"
-          style="padding:10px 20px;border:none;background:none;font-size:0.95rem;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;color:#888;margin-bottom:-2px">
-          💡 Ideas
-        </button>
+      <div style="display:flex;gap:0;margin-bottom:24px;border-bottom:2px solid #e5e7eb;flex-wrap:wrap">
+        <button id="mkt-tab-ideas"      onclick="showMktTab('ideas')"      class="mkt-subtab mkt-subtab-active">💡 Ideas</button>
+        <button id="mkt-tab-inprogress" onclick="showMktTab('inprogress')" class="mkt-subtab">🔧 In Progress</button>
+        <button id="mkt-tab-ready"      onclick="showMktTab('ready')"      class="mkt-subtab">✅ Ready</button>
+        <button id="mkt-tab-scheduled"  onclick="showMktTab('scheduled')"  class="mkt-subtab">📅 Scheduled</button>
+        <button id="mkt-tab-sent"       onclick="showMktTab('sent')"       class="mkt-subtab">📤 Sent</button>
       </div>
 
-      <!-- Campaigns sub-panel -->
-      <div id="mkt-panel-campaigns">
-        <div class="toolbar">
-          <select id="mkt-filter-status" onchange="renderCampaigns()">
-            <option value="">All Statuses</option>
-            <option>Idea</option><option>Planning</option>
-            <option>In Progress</option><option>Ready</option><option>Sent</option>
-          </select>
-          <select id="mkt-filter-type" onchange="renderCampaigns()">
-            <option value="">All Types</option>
-            <option>New Product</option><option>General</option>
-            <option>YouTube</option><option>Limited Run</option>
-          </select>
-          <input type="text" id="mkt-search" placeholder="Search..." oninput="renderCampaigns()" style="width:180px">
-        </div>
-        <div id="mkt-campaigns-table"><p style="color:#999;text-align:center;padding:40px">Loading…</p></div>
-      </div>
-
-      <!-- Ideas sub-panel -->
-      <div id="mkt-panel-ideas" style="display:none">
+      <!-- Ideas panel -->
+      <div id="mkt-panel-ideas">
         <div class="toolbar">
           <select id="mkt-ideas-filter-status" onchange="renderIdeas()">
             <option value="">All Statuses</option>
@@ -320,6 +302,47 @@
           <input type="text" id="mkt-ideas-search" placeholder="Search..." oninput="renderIdeas()" style="width:160px">
         </div>
         <div id="mkt-ideas-table"><p style="color:#999;text-align:center;padding:40px">Loading…</p></div>
+      </div>
+
+      <!-- Campaign panels (one per status group) -->
+      <div id="mkt-panel-inprogress" style="display:none">
+        <div class="toolbar">
+          <select id="mkt-fp-inprogress-type" onchange="renderCampaignTab('inprogress')">
+            <option value="">All Types</option><option>New Product</option><option>General</option><option>YouTube</option><option>Limited Run</option>
+          </select>
+          <input type="text" id="mkt-fp-inprogress-search" placeholder="Search..." oninput="renderCampaignTab('inprogress')" style="width:180px">
+        </div>
+        <div id="mkt-tbl-inprogress"><p style="color:#999;text-align:center;padding:40px">Loading…</p></div>
+      </div>
+
+      <div id="mkt-panel-ready" style="display:none">
+        <div class="toolbar">
+          <select id="mkt-fp-ready-type" onchange="renderCampaignTab('ready')">
+            <option value="">All Types</option><option>New Product</option><option>General</option><option>YouTube</option><option>Limited Run</option>
+          </select>
+          <input type="text" id="mkt-fp-ready-search" placeholder="Search..." oninput="renderCampaignTab('ready')" style="width:180px">
+        </div>
+        <div id="mkt-tbl-ready"><p style="color:#999;text-align:center;padding:40px">Loading…</p></div>
+      </div>
+
+      <div id="mkt-panel-scheduled" style="display:none">
+        <div class="toolbar">
+          <select id="mkt-fp-scheduled-type" onchange="renderCampaignTab('scheduled')">
+            <option value="">All Types</option><option>New Product</option><option>General</option><option>YouTube</option><option>Limited Run</option>
+          </select>
+          <input type="text" id="mkt-fp-scheduled-search" placeholder="Search..." oninput="renderCampaignTab('scheduled')" style="width:180px">
+        </div>
+        <div id="mkt-tbl-scheduled"><p style="color:#999;text-align:center;padding:40px">Loading…</p></div>
+      </div>
+
+      <div id="mkt-panel-sent" style="display:none">
+        <div class="toolbar">
+          <select id="mkt-fp-sent-type" onchange="renderCampaignTab('sent')">
+            <option value="">All Types</option><option>New Product</option><option>General</option><option>YouTube</option><option>Limited Run</option>
+          </select>
+          <input type="text" id="mkt-fp-sent-search" placeholder="Search..." oninput="renderCampaignTab('sent')" style="width:180px">
+        </div>
+        <div id="mkt-tbl-sent"><p style="color:#999;text-align:center;padding:40px">Loading…</p></div>
       </div>
     </div>
 
@@ -852,26 +875,34 @@ const MKT_IDEAS_TABLE     = 'tbldunjKUpRLtZAqW';
 let mktCampaigns = [];
 let mktIdeas     = [];
 
+const MKT_TABS = ['ideas','inprogress','ready','scheduled','sent'];
+
+// Status groups per tab
+const TAB_STATUSES = {
+  inprogress: ['Idea','Planning','In Progress'],
+  ready:      ['Ready'],
+  scheduled:  ['Scheduled'],
+  sent:       ['Sent']
+};
+
 function showMktTab(sub) {
-  ['campaigns','ideas'].forEach(s => {
+  MKT_TABS.forEach(s => {
     const btn   = document.getElementById('mkt-tab-' + s);
     const panel = document.getElementById('mkt-panel-' + s);
-    const on    = s === sub;
-    btn.style.borderBottomColor = on ? '#1B3A6B' : 'transparent';
-    btn.style.color             = on ? '#1B3A6B' : '#888';
-    panel.style.display         = on ? 'block'   : 'none';
+    if (btn)   { btn.classList.toggle('mkt-subtab-active', s === sub); }
+    if (panel) { panel.style.display = s === sub ? 'block' : 'none'; }
   });
+  if (sub !== 'ideas') renderCampaignTab(sub);
+  else renderIdeas();
 }
 
 async function loadMarketing() {
   try {
     await Promise.all([loadCampaigns(), loadIdeas()]);
-    renderCampaigns();
     renderIdeas();
   } catch(e) {
-    const msg = `<p style="color:#B22222;text-align:center;padding:40px">⚠️ Failed to load: ${e.message}</p>`;
-    document.getElementById('mkt-campaigns-table').innerHTML = msg;
-    document.getElementById('mkt-ideas-table').innerHTML = msg;
+    document.getElementById('mkt-ideas-table').innerHTML =
+      `<p style="color:#B22222;text-align:center;padding:40px">⚠️ Failed to load: ${e.message}</p>`;
     console.error('loadMarketing error:', e);
   }
 }
@@ -895,7 +926,7 @@ function badge(val, map) {
   return val ? `<span style="background:${c};color:#fff;padding:2px 9px;border-radius:12px;font-size:0.72rem;font-weight:600;white-space:nowrap">${val}</span>`
              : '<span style="color:#ccc;font-size:0.83rem">—</span>';
 }
-const STATUS_COLORS      = {Idea:'#9ca3af',Planning:'#f59e0b','In Progress':'#3b82f6',Ready:'#8b5cf6',Sent:'#22c55e'};
+const STATUS_COLORS      = {Idea:'#9ca3af',Planning:'#f59e0b','In Progress':'#3b82f6',Ready:'#8b5cf6',Scheduled:'#0ea5e9',Sent:'#22c55e'};
 const TYPE_COLORS        = {'New Product':'#3b82f6',General:'#6b7280',YouTube:'#ef4444','Limited Run':'#10b981'};
 const IDEA_STATUS_COLORS = {New:'#6b7280',Considering:'#f59e0b',Approved:'#3b82f6',Scheduled:'#8b5cf6',Declined:'#ef4444'};
 const CAT_COLORS         = {'New BA Product':'#3b82f6','Limited Run':'#10b981','Custom Shop':'#f59e0b',YouTube:'#ef4444','New Other Product':'#6366f1',General:'#6b7280'};
@@ -991,14 +1022,14 @@ async function cycleDot(td, recId, field, opts, tbl) {
 }
 
 // ---- Render Campaigns ----
-function renderCampaigns() {
-  const sf = document.getElementById('mkt-filter-status')?.value||'';
-  const tf = document.getElementById('mkt-filter-type')?.value||'';
-  const q  = (document.getElementById('mkt-search')?.value||'').toLowerCase();
+function renderCampaignTab(tab) {
+  const statuses = TAB_STATUSES[tab] || [];
+  const tf = document.getElementById(`mkt-fp-${tab}-type`)?.value || '';
+  const q  = (document.getElementById(`mkt-fp-${tab}-search`)?.value || '').toLowerCase();
   const data = mktCampaigns.filter(r => {
     const f = r.fields;
-    if (sf && f['Status'] !== sf) return false;
-    if (tf && f['Type']   !== tf) return false;
+    if (statuses.length && !statuses.includes(f['Status'])) return false;
+    if (tf && f['Type'] !== tf) return false;
     if (q  && !(f['Subject / Topic']||'').toLowerCase().includes(q)) return false;
     return true;
   });
@@ -1010,11 +1041,12 @@ function renderCampaigns() {
     ['Patty',   'Patty - Email',       ['Not Started','In Progress','Done']],
     ['Chris',   'Chris - SKU/BOM/BOL', ['Not Started','In Progress','Done','N/A']]
   ];
-  const TH = (s, w) => `<th style="padding:10px 10px;text-align:left;font-size:0.74rem;color:#6b7280;font-weight:700;white-space:nowrap;width:${w}">${s}</th>`;
+  const ALL_STATUSES = ['Idea','Planning','In Progress','Ready','Scheduled','Sent'];
+  const TH  = (s, w) => `<th style="padding:10px 10px;text-align:left;font-size:0.74rem;color:#6b7280;font-weight:700;white-space:nowrap;width:${w}">${s}</th>`;
   const THc = (s, w) => `<th style="padding:10px 7px;text-align:center;font-size:0.72rem;color:#6b7280;font-weight:700;white-space:nowrap;width:${w}">${s}</th>`;
   let h = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;table-layout:fixed;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08)">
 <thead><tr style="background:#f8fafc;border-bottom:2px solid #e5e7eb">
-  ${TH('Date','110px')}${TH('Subject / Topic','auto')}${TH('Type','110px')}${TH('Status','110px')}`;
+  ${TH('Date','110px')}${TH('Subject / Topic','auto')}${TH('Type','110px')}${TH('Status','115px')}`;
   for (const [lbl] of people) h += THc(lbl, '52px');
   h += `${THc('File#','52px')}${THc('','36px')}</tr></thead><tbody>`;
 
@@ -1024,7 +1056,7 @@ function renderCampaigns() {
       ${makeCell(rec.id,'Send Date',f['Send Date']||'','date',[],MKT_CAMPAIGNS_TABLE)}
       ${makeCell(rec.id,'Subject / Topic',f['Subject / Topic']||'','text',[],MKT_CAMPAIGNS_TABLE)}
       ${makeCell(rec.id,'Type',f['Type']||'','select',['New Product','General','YouTube','Limited Run'],MKT_CAMPAIGNS_TABLE)}
-      ${makeCell(rec.id,'Status',f['Status']||'','select',['Idea','Planning','In Progress','Ready','Sent'],MKT_CAMPAIGNS_TABLE)}`;
+      ${makeCell(rec.id,'Status',f['Status']||'','select',ALL_STATUSES,MKT_CAMPAIGNS_TABLE)}`;
     for (const [,field,opts] of people) {
       const val = f[field]||'';
       h += `<td style="padding:10px 7px;text-align:center;cursor:pointer" title="Click to cycle"
@@ -1036,48 +1068,54 @@ function renderCampaigns() {
       </td></tr>`;
   }
 
-  // Add row
   const iStyle = "width:100%;padding:4px 6px;border:1.5px solid #ddd;border-radius:6px;font-size:0.82rem;outline:none;font-family:inherit";
+  const defaultStatus = statuses[statuses.length - 1] || '';
   h += `<tr style="background:#f0f4ff;border-top:2px dashed #c7d2fe">
-    <td style="padding:7px 8px"><input type="date" id="new-cm-date" style="${iStyle}"></td>
-    <td style="padding:7px 8px"><input type="text" id="new-cm-subject" placeholder="New campaign…" style="${iStyle}"
-      onkeydown="if(event.key==='Enter') addCampaign()"></td>
-    <td style="padding:7px 8px"><select id="new-cm-type" style="${iStyle}">
+    <td style="padding:7px 8px"><input type="date" id="new-cm-date-${tab}" style="${iStyle}"></td>
+    <td style="padding:7px 8px"><input type="text" id="new-cm-subject-${tab}" placeholder="New campaign…" style="${iStyle}"
+      onkeydown="if(event.key==='Enter') addCampaign('${tab}')"></td>
+    <td style="padding:7px 8px"><select id="new-cm-type-${tab}" style="${iStyle}">
       <option value="">Type…</option><option>New Product</option><option>General</option><option>YouTube</option><option>Limited Run</option>
     </select></td>
-    <td style="padding:7px 8px"><select id="new-cm-status" style="${iStyle}">
-      <option value="">Status…</option><option>Idea</option><option>Planning</option><option>In Progress</option><option>Ready</option><option>Sent</option>
+    <td style="padding:7px 8px"><select id="new-cm-status-${tab}" style="${iStyle}">
+      ${ALL_STATUSES.map(s=>`<option value="${s}"${s===defaultStatus?' selected':''}>${s}</option>`).join('')}
     </select></td>
     ${people.map(()=>'<td></td>').join('')}
     <td></td>
     <td style="padding:7px 8px;text-align:center">
-      <button onclick="addCampaign()" style="background:#1B3A6B;color:#fff;border:none;border-radius:6px;padding:5px 14px;cursor:pointer;font-size:0.83rem;font-weight:700">+</button>
+      <button onclick="addCampaign('${tab}')" style="background:#1B3A6B;color:#fff;border:none;border-radius:6px;padding:5px 14px;cursor:pointer;font-size:0.83rem;font-weight:700">+</button>
     </td></tr></tbody></table></div>
   <div style="display:flex;gap:14px;margin-top:10px;flex-wrap:wrap;align-items:center">
     <span style="font-size:0.72rem;color:#aaa;font-weight:700">DOTS (click to cycle):</span>
     ${['Not Started','In Progress','Done','N/A'].map(v=>`<span style="display:flex;align-items:center;gap:5px;font-size:0.74rem;color:#6b7280">${dot(v)} ${v}</span>`).join('')}
   </div>`;
-  document.getElementById('mkt-campaigns-table').innerHTML = h;
+  document.getElementById(`mkt-tbl-${tab}`).innerHTML = h;
 }
 
-async function addCampaign() {
-  const sub = document.getElementById('new-cm-subject').value.trim();
-  if (!sub) { document.getElementById('new-cm-subject').focus(); return; }
+async function addCampaign(tab) {
+  const sub = document.getElementById(`new-cm-subject-${tab}`).value.trim();
+  if (!sub) { document.getElementById(`new-cm-subject-${tab}`).focus(); return; }
   const fields = {'Subject / Topic': sub};
-  const d = document.getElementById('new-cm-date').value;    if (d) fields['Send Date'] = d;
-  const t = document.getElementById('new-cm-type').value;    if (t) fields['Type'] = t;
-  const s = document.getElementById('new-cm-status').value;  if (s) fields['Status'] = s;
+  const d = document.getElementById(`new-cm-date-${tab}`).value;   if (d) fields['Send Date'] = d;
+  const t = document.getElementById(`new-cm-type-${tab}`).value;   if (t) fields['Type'] = t;
+  const s = document.getElementById(`new-cm-status-${tab}`).value; if (s) fields['Status'] = s;
   try {
     await atCreate(MKT_CAMPAIGNS_TABLE, fields);
-    ['new-cm-date','new-cm-subject','new-cm-type','new-cm-status'].forEach(id => document.getElementById(id).value='');
-    await loadCampaigns(); renderCampaigns();
+    [`new-cm-date-${tab}`,`new-cm-subject-${tab}`,`new-cm-type-${tab}`].forEach(id => document.getElementById(id).value='');
+    await loadCampaigns(); renderCampaignTab(tab);
   } catch(e) { alert('Error: '+e.message); }
 }
 
 async function delCampaign(id) {
   if (!confirm('Delete this campaign?')) return;
-  try { await atDelete(MKT_CAMPAIGNS_TABLE, id); await loadCampaigns(); renderCampaigns(); }
-  catch(e) { alert('Error: '+e.message); }
+  try {
+    await atDelete(MKT_CAMPAIGNS_TABLE, id);
+    await loadCampaigns();
+    // Re-render whichever campaign tab is active
+    const activeTab = MKT_TABS.find(t => t !== 'ideas' &&
+      document.getElementById('mkt-panel-'+t)?.style.display !== 'none');
+    if (activeTab) renderCampaignTab(activeTab);
+  } catch(e) { alert('Error: '+e.message); }
 }
 
 // ---- Render Ideas ----
@@ -1165,13 +1203,13 @@ async function promoteIdea(id) {
     'General':           'General'
   };
 
-  // Switch to campaigns tab and pre-fill the add row
-  showMktTab('campaigns');
+  // Switch to in-progress tab and pre-fill the add row
+  showMktTab('inprogress');
   await new Promise(r => setTimeout(r, 50)); // let DOM settle
 
-  const subjectEl = document.getElementById('new-cm-subject');
-  const typeEl    = document.getElementById('new-cm-type');
-  const statusEl  = document.getElementById('new-cm-status');
+  const subjectEl = document.getElementById('new-cm-subject-inprogress');
+  const typeEl    = document.getElementById('new-cm-type-inprogress');
+  const statusEl  = document.getElementById('new-cm-status-inprogress');
 
   if (subjectEl) subjectEl.value = f['Idea'] || '';
   if (typeEl)    typeEl.value    = catToType[f['Category']] || '';
