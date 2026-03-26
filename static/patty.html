@@ -1064,6 +1064,7 @@ function renderCampaignTab(tab) {
     }
     h += `${makeCell(rec.id,'File #',f['File #']||'','number',[],MKT_CAMPAIGNS_TABLE)}
       <td style="padding:10px 7px;text-align:center">
+        <button onclick="advanceCampaign('${rec.id}','${tab}')" style="background:#e0f2fe;color:#0369a1;border:none;border-radius:5px;padding:3px 9px;cursor:pointer;font-size:0.82rem;font-weight:700;margin-right:4px" title="Move to next stage">→</button>
         <button onclick="delCampaign('${rec.id}')" style="background:none;border:none;cursor:pointer;color:#d1d5db;font-size:1.1rem" title="Delete">🗑</button>
       </td></tr>`;
   }
@@ -1147,7 +1148,7 @@ function renderIdeas() {
       ${makeCell(rec.id,'Status',f['Status']||'','select',['New','Considering','Approved','Scheduled','Declined'],MKT_IDEAS_TABLE)}
       ${makeCell(rec.id,'Campaign',f['Campaign']||'','text',[],MKT_IDEAS_TABLE)}
       <td style="padding:10px 7px;text-align:center;white-space:nowrap">
-        <button onclick="promoteIdea('${rec.id}')" style="background:#1B3A6B;color:#fff;border:none;border-radius:6px;padding:3px 9px;cursor:pointer;font-size:0.78rem;font-weight:600;margin-right:4px" title="Promote to Campaign">→ Campaign</button>
+        <button onclick="promoteIdea('${rec.id}')" style="background:#e0f2fe;color:#0369a1;border:none;border-radius:5px;padding:3px 9px;cursor:pointer;font-size:0.82rem;font-weight:700;margin-right:4px" title="Move to In Progress">→</button>
         <button onclick="delIdea('${rec.id}')" style="background:none;border:none;cursor:pointer;color:#d1d5db;font-size:1.1rem" title="Delete">🗑</button>
       </td></tr>`;
   }
@@ -1188,47 +1189,64 @@ async function addIdea() {
   } catch(e) { alert('Error: '+e.message); }
 }
 
+const CAT_TO_TYPE = {
+  'New BA Product':    'New Product',
+  'New Other Product': 'New Product',
+  'Limited Run':       'Limited Run',
+  'YouTube':           'YouTube',
+  'Custom Shop':       'General',
+  'General':           'General'
+};
+
+const NEXT_TAB = {
+  inprogress: 'ready',
+  ready:      'scheduled',
+  scheduled:  'sent'
+};
+const NEXT_STATUS = {
+  inprogress: 'Ready',
+  ready:      'Scheduled',
+  scheduled:  'Sent'
+};
+
 async function promoteIdea(id) {
   const rec = mktIdeas.find(r => r.id === id);
   if (!rec) return;
   const f = rec.fields;
 
-  // Map idea category to campaign type
-  const catToType = {
-    'New BA Product':    'New Product',
-    'New Other Product': 'New Product',
-    'Limited Run':       'Limited Run',
-    'YouTube':           'YouTube',
-    'Custom Shop':       'General',
-    'General':           'General'
+  // Create campaign directly in "In Progress"
+  const campaignFields = {
+    'Subject / Topic': f['Idea'] || 'Untitled',
+    'Status': 'In Progress'
   };
+  const mapped = CAT_TO_TYPE[f['Category']];
+  if (mapped) campaignFields['Type'] = mapped;
 
-  // Switch to in-progress tab and pre-fill the add row
-  showMktTab('inprogress');
-  await new Promise(r => setTimeout(r, 50)); // let DOM settle
+  try {
+    await atCreate(MKT_CAMPAIGNS_TABLE, campaignFields);
 
-  const subjectEl = document.getElementById('new-cm-subject-inprogress');
-  const typeEl    = document.getElementById('new-cm-type-inprogress');
-  const statusEl  = document.getElementById('new-cm-status-inprogress');
-
-  if (subjectEl) subjectEl.value = f['Idea'] || '';
-  if (typeEl)    typeEl.value    = catToType[f['Category']] || '';
-  if (statusEl)  statusEl.value  = 'Planning';
-
-  // Scroll add-row into view and focus
-  if (subjectEl) {
-    subjectEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    subjectEl.focus();
-    subjectEl.select();
-  }
-
-  // Mark idea as Scheduled if it wasn't already
-  if (f['Status'] !== 'Scheduled' && f['Status'] !== 'Declined') {
-    try {
+    // Mark idea as Scheduled
+    if (f['Status'] !== 'Scheduled' && f['Status'] !== 'Declined') {
       await atUpdate(MKT_IDEAS_TABLE, id, { Status: 'Scheduled' });
       rec.fields['Status'] = 'Scheduled';
-    } catch(e) { /* non-critical */ }
-  }
+    }
+
+    await loadCampaigns();
+    renderIdeas();
+    showMktTab('inprogress');
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function advanceCampaign(id, currentTab) {
+  const nextStatus = NEXT_STATUS[currentTab];
+  if (!nextStatus) return;
+  try {
+    await atUpdate(MKT_CAMPAIGNS_TABLE, id, { Status: nextStatus });
+    const rec = mktCampaigns.find(r => r.id === id);
+    if (rec) rec.fields['Status'] = nextStatus;
+    renderCampaignTab(currentTab);         // remove from current tab view
+    showMktTab(NEXT_TAB[currentTab]);      // jump to next tab
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
 async function delIdea(id) {
