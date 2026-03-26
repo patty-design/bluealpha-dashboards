@@ -917,17 +917,31 @@ function cellDisplay(field, val) {
 // ---- Inline cell editing ----
 function makeCell(recId, field, val, type, opts, tbl) {
   const display = cellDisplay(field, val);
-  const esc = s => String(s||'').replace(/\/g,'\\').replace(/'/g,"\'");
-  const optsJ = JSON.stringify(opts||[]).replace(/\/g,'\\').replace(/'/g,"\'");
-  return `<td class="editable-cell"
-    onclick="startEdit(this,'${esc(recId)}','${esc(field)}','${type}','${optsJ}','${esc(val)}','${tbl}')"
-    style="padding:8px 12px;cursor:pointer" title="Click to edit">${display}</td>`;
+  // Use data attributes to avoid any escaping issues in onclick strings
+  const td = document.createElement('td');
+  td.className = 'editable-cell';
+  td.style.cssText = 'padding:8px 12px;cursor:pointer';
+  td.title = 'Click to edit';
+  td.dataset.recid = recId;
+  td.dataset.field = field;
+  td.dataset.type  = type;
+  td.dataset.opts  = JSON.stringify(opts || []);
+  td.dataset.tbl   = tbl;
+  td.dataset.val   = val || '';
+  td.innerHTML = display;
+  td.addEventListener('click', () => startEdit(td));
+  return td.outerHTML;
 }
 
-function startEdit(td, recId, field, type, optsJson, curVal, tbl) {
+function startEdit(td) {
   if (td.querySelector('input,select')) return;
-  const opts = JSON.parse(optsJson);
-  const prev = td.innerHTML;
+  const recId    = td.dataset.recid;
+  const field    = td.dataset.field;
+  const type     = td.dataset.type;
+  const opts     = JSON.parse(td.dataset.opts || '[]');
+  const tbl      = td.dataset.tbl;
+  const curVal   = td.dataset.val || '';
+  const prev     = td.innerHTML;
   let inp;
   const baseStyle = 'padding:4px 6px;border:1.5px solid #1B3A6B;border-radius:6px;font-size:0.83rem;outline:none;font-family:inherit';
   if (type === 'select') {
@@ -950,10 +964,8 @@ function startEdit(td, recId, field, type, optsJson, curVal, tbl) {
 
   const save = async () => {
     const newVal = inp.value;
-    const esc = s => String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    const optsEsc = optsJson.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    td.dataset.val = newVal;
     td.innerHTML = cellDisplay(field, newVal) || '<span style="color:#ddd">—</span>';
-    td.onclick = () => startEdit(td, recId, field, type, optsJson, newVal, tbl);
     if (newVal === curVal) return;
     const fields = {};
     if (type === 'number') fields[field] = newVal ? parseFloat(newVal) : null;
@@ -968,7 +980,7 @@ function startEdit(td, recId, field, type, optsJson, curVal, tbl) {
   inp.addEventListener('blur', save);
   inp.addEventListener('keydown', e => {
     if (e.key==='Enter')  { e.preventDefault(); inp.blur(); }
-    if (e.key==='Escape') { td.innerHTML = prev; td.onclick = () => startEdit(td,recId,field,type,optsJson,curVal,tbl); }
+    if (e.key==='Escape') { td.innerHTML = prev; td.dataset.val = curVal; }
   });
 }
 
