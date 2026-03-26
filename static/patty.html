@@ -917,20 +917,13 @@ function cellDisplay(field, val) {
 // ---- Inline cell editing ----
 function makeCell(recId, field, val, type, opts, tbl) {
   const display = cellDisplay(field, val);
-  // Use data attributes to avoid any escaping issues in onclick strings
-  const td = document.createElement('td');
-  td.className = 'editable-cell';
-  td.style.cssText = 'padding:8px 12px;cursor:pointer';
-  td.title = 'Click to edit';
-  td.dataset.recid = recId;
-  td.dataset.field = field;
-  td.dataset.type  = type;
-  td.dataset.opts  = JSON.stringify(opts || []);
-  td.dataset.tbl   = tbl;
-  td.dataset.val   = val || '';
-  td.innerHTML = display;
-  td.addEventListener('click', () => startEdit(td));
-  return td.outerHTML;
+  // HTML-encode values for safe use in data attributes (browser auto-decodes on read)
+  const enc = s => String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  return `<td class="editable-cell" onclick="startEdit(this)"
+    data-recid="${enc(recId)}" data-field="${enc(field)}"
+    data-type="${type}" data-opts="${enc(JSON.stringify(opts||[]))}"
+    data-tbl="${enc(tbl)}" data-val="${enc(val)}"
+    style="padding:8px 12px;cursor:pointer" title="Click to edit">${display}</td>`;
 }
 
 function startEdit(td) {
