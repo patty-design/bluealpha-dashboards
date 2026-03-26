@@ -936,21 +936,21 @@ function startEdit(td) {
   const curVal   = td.dataset.val || '';
   const prev     = td.innerHTML;
   let inp;
-  const baseStyle = 'padding:4px 6px;border:1.5px solid #1B3A6B;border-radius:6px;font-size:0.83rem;outline:none;font-family:inherit';
+  const baseStyle = 'padding:4px 6px;border:1.5px solid #1B3A6B;border-radius:6px;font-size:0.83rem;outline:none;font-family:inherit;box-sizing:border-box;width:100%;display:block';
   if (type === 'select') {
     inp = document.createElement('select');
-    inp.style.cssText = baseStyle + ';width:100%';
+    inp.style.cssText = baseStyle;
     const blank = new Option('—',''); inp.appendChild(blank);
     opts.forEach(o => { const opt = new Option(o,o); if(o===curVal) opt.selected=true; inp.appendChild(opt); });
   } else if (type === 'date') {
     inp = document.createElement('input'); inp.type='date'; inp.value=curVal;
-    inp.style.cssText = baseStyle + ';width:100%';
+    inp.style.cssText = baseStyle;
   } else if (type === 'number') {
     inp = document.createElement('input'); inp.type='number'; inp.value=curVal;
-    inp.style.cssText = baseStyle + ';width:80px';
+    inp.style.cssText = baseStyle;
   } else {
     inp = document.createElement('input'); inp.type='text'; inp.value=curVal;
-    inp.style.cssText = baseStyle + ';width:100%;min-width:120px';
+    inp.style.cssText = baseStyle;
   }
   td.innerHTML = ''; td.appendChild(inp); inp.focus();
   if (inp.select && type !== 'date') inp.select();
@@ -1010,13 +1010,13 @@ function renderCampaigns() {
     ['Patty',   'Patty - Email',       ['Not Started','In Progress','Done']],
     ['Chris',   'Chris - SKU/BOM/BOL', ['Not Started','In Progress','Done','N/A']]
   ];
-  const TH = s => `<th style="padding:10px 10px;text-align:left;font-size:0.74rem;color:#6b7280;font-weight:700;white-space:nowrap">${s}</th>`;
-  const THc = s => `<th style="padding:10px 7px;text-align:center;font-size:0.72rem;color:#6b7280;font-weight:700;white-space:nowrap">${s}</th>`;
-  let h = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08)">
+  const TH = (s, w) => `<th style="padding:10px 10px;text-align:left;font-size:0.74rem;color:#6b7280;font-weight:700;white-space:nowrap;width:${w}">${s}</th>`;
+  const THc = (s, w) => `<th style="padding:10px 7px;text-align:center;font-size:0.72rem;color:#6b7280;font-weight:700;white-space:nowrap;width:${w}">${s}</th>`;
+  let h = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;table-layout:fixed;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08)">
 <thead><tr style="background:#f8fafc;border-bottom:2px solid #e5e7eb">
-  ${TH('Date')}${TH('Subject / Topic')}${TH('Type')}${TH('Status')}`;
-  for (const [lbl] of people) h += THc(lbl);
-  h += `${THc('File#')}${THc('')}</tr></thead><tbody>`;
+  ${TH('Date','110px')}${TH('Subject / Topic','auto')}${TH('Type','110px')}${TH('Status','110px')}`;
+  for (const [lbl] of people) h += THc(lbl, '52px');
+  h += `${THc('File#','52px')}${THc('','36px')}</tr></thead><tbody>`;
 
   for (const rec of data) {
     const f = rec.fields;
@@ -1094,11 +1094,11 @@ function renderIdeas() {
     if (q  && !(f['Idea']||'').toLowerCase().includes(q)) return false;
     return true;
   });
-  const TH = s => `<th style="padding:10px 14px;text-align:left;font-size:0.74rem;color:#6b7280;font-weight:700">${s}</th>`;
-  const THc = s => `<th style="padding:10px 7px;text-align:center;font-size:0.74rem;color:#6b7280;font-weight:700">${s}</th>`;
-  let h = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08)">
+  const TH = (s, w) => `<th style="padding:10px 14px;text-align:left;font-size:0.74rem;color:#6b7280;font-weight:700;width:${w}">${s}</th>`;
+  const THc = (s, w) => `<th style="padding:10px 7px;text-align:center;font-size:0.74rem;color:#6b7280;font-weight:700;width:${w}">${s}</th>`;
+  let h = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;table-layout:fixed;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08)">
 <thead><tr style="background:#f8fafc;border-bottom:2px solid #e5e7eb">
-  ${TH('Idea')}${TH('Category')}${TH('Submitted By')}${TH('Status')}${TH('Campaign')}${THc('')}
+  ${TH('Idea','auto')}${TH('Category','130px')}${TH('Submitted By','110px')}${TH('Status','110px')}${TH('Campaign','150px')}${THc('','160px')}
 </tr></thead><tbody>`;
   for (const rec of data) {
     const f = rec.fields;
