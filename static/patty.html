@@ -294,9 +294,8 @@
             <option>YouTube</option><option>Limited Run</option>
           </select>
           <input type="text" id="mkt-search" placeholder="Search..." oninput="renderCampaigns()" style="width:180px">
-          <button class="btn-primary" onclick="openCampaignModal(null)">+ Add Campaign</button>
         </div>
-        <div id="mkt-campaigns-table"><p style="color:#999;text-align:center;padding:40px">Loading...</p></div>
+        <div id="mkt-campaigns-table"><p style="color:#999;text-align:center;padding:40px">Loading…</p></div>
       </div>
 
       <!-- Ideas sub-panel -->
@@ -319,9 +318,8 @@
             <option>Kelly</option><option>Patty</option><option>Chris</option>
           </select>
           <input type="text" id="mkt-ideas-search" placeholder="Search..." oninput="renderIdeas()" style="width:160px">
-          <button class="btn-primary" onclick="openIdeaModal(null)">+ Add Idea</button>
         </div>
-        <div id="mkt-ideas-table"><p style="color:#999;text-align:center;padding:40px">Loading...</p></div>
+        <div id="mkt-ideas-table"><p style="color:#999;text-align:center;padding:40px">Loading…</p></div>
       </div>
     </div>
 
@@ -866,14 +864,22 @@ function showMktTab(sub) {
 }
 
 async function loadMarketing() {
-  await Promise.all([loadCampaigns(), loadIdeas()]);
-  renderCampaigns();
-  renderIdeas();
+  try {
+    await Promise.all([loadCampaigns(), loadIdeas()]);
+    renderCampaigns();
+    renderIdeas();
+  } catch(e) {
+    const msg = `<p style="color:#B22222;text-align:center;padding:40px">⚠️ Failed to load: ${e.message}</p>`;
+    document.getElementById('mkt-campaigns-table').innerHTML = msg;
+    document.getElementById('mkt-ideas-table').innerHTML = msg;
+    console.error('loadMarketing error:', e);
+  }
 }
 
 async function loadCampaigns() {
-  mktCampaigns = await atFetchAll(MKT_CAMPAIGNS_TABLE,
-    'sort[0][field]=Send+Date&sort[0][direction]=asc');
+  const data = await atFetchAll(MKT_CAMPAIGNS_TABLE,
+    encodeURI('sort[0][field]=Send Date&sort[0][direction]=asc'));
+  mktCampaigns = data;
 }
 async function loadIdeas() {
   mktIdeas = await atFetchAll(MKT_IDEAS_TABLE, '');
