@@ -1113,22 +1113,14 @@ async function delCampaign(id) {
 }
 
 // ---- Render Ideas ----
-const WILL_NEED_FIELDS = [
-  ['Email',      'Kevin Email'],
-  ['Lifestyle',  'Lifestyle Photos'],
-  ['Video',      'Video'],
-  ['SKUs',       'Product SKUs'],
-  ['Web Photos', 'Website Photos'],
-  ['Web Listing','Website Listing'],
-  ['ShipStation','ShipStation Import']
-];
-const WILL_NEED_OPTS = ["Don't Need","Need","In Progress","Done"];
-const WILL_NEED_COLORS = {"Don't Need":'#e5e7eb',Need:'#fde68a','In Progress':'#93c5fd',Done:'#86efac'};
-const WILL_NEED_TEXT   = {"Don't Need":'#9ca3af',Need:'#92400e','In Progress':'#1e40af',Done:'#166534'};
+const WILL_NEED_FIELDS = [];
+const WILL_NEED_OPTS = [];
+const WILL_NEED_COLORS = {};
+const WILL_NEED_TEXT   = {};
 
 function willDot(val) {
-  const bg = WILL_NEED_COLORS[val] || '#e5e7eb';
-  const tx = WILL_NEED_TEXT[val]   || '#9ca3af';
+  const bg = '#e5e7eb';
+  const tx = '#9ca3af';
   const label = val === "Don't Need" ? '✕' : val === 'Need' ? '!' : val === 'In Progress' ? '…' : val === 'Done' ? '✓' : '·';
   return `<span title="${val||'—'}" style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:${bg};color:${tx};font-size:0.7rem;font-weight:800;border:1px solid rgba(0,0,0,0.08)">${label}</span>`;
 }
@@ -1146,22 +1138,22 @@ function renderIdeas() {
   const THc = (s, w) => `<th style="padding:10px 5px;text-align:center;font-size:0.68rem;color:#6b7280;font-weight:700;width:${w};white-space:nowrap;line-height:1.2">${s}</th>`;
   let h = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;table-layout:fixed;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08)">
 <thead><tr style="background:#f8fafc;border-bottom:2px solid #e5e7eb">
-  ${TH('Idea','220px')}${TH('Category','120px')}${TH('Notes','auto')}`;
-  for (const [lbl] of WILL_NEED_FIELDS) h += THc(lbl,'46px');
-  h += `${THc('','130px')}</tr></thead><tbody>`;
+  ${TH('Idea','220px')}${TH('Category','120px')}${TH('Notes','auto')}${THc('Need?','90px')}${THc('','130px')}</tr></thead><tbody>`;
 
   for (const rec of data) {
     const f = rec.fields;
+    const needVal = localStorage.getItem('idea_need_' + rec.id) || '';
+    const needBtn = needVal === 'Need'
+      ? `<button onclick="toggleIdeaNeed('${rec.id}')" style="border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:0.78rem;font-weight:600;background:#dcfce7;color:#166534">Need</button>`
+      : needVal === "Don't Need"
+      ? `<button onclick="toggleIdeaNeed('${rec.id}')" style="border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:0.78rem;font-weight:600;background:#fee2e2;color:#991b1b">Don't Need</button>`
+      : `<button onclick="toggleIdeaNeed('${rec.id}')" style="border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:0.78rem;color:#9ca3af;background:#fff">—</button>`;
     h += `<tr style="border-bottom:1px solid #f1f5f9" onmouseover="this.style.background='#fafafa'" onmouseout="this.style.background=''">
       ${makeCell(rec.id,'Idea',f['Idea']||'','text',[],MKT_IDEAS_TABLE)}
       ${makeCell(rec.id,'Category',f['Category']||'','select',['New BA Product','Limited Run','Custom Shop','YouTube','New Other Product','General'],MKT_IDEAS_TABLE)}
-      ${makeCell(rec.id,'Notes',f['Notes']||'','text',[],MKT_IDEAS_TABLE)}`;
-    for (const [,field] of WILL_NEED_FIELDS) {
-      const val = f[field]||'';
-      h += `<td style="padding:10px 5px;text-align:center;cursor:pointer" title="${field}: ${val||'—'}"
-        onclick="cycleWill(this,'${rec.id}','${field}','${MKT_IDEAS_TABLE}')">${willDot(val)}</td>`;
-    }
-    h += `<td style="padding:10px 7px;text-align:center;white-space:nowrap">
+      ${makeCell(rec.id,'Notes',f['Notes']||'','text',[],MKT_IDEAS_TABLE)}
+      <td style="padding:10px 5px;text-align:center">${needBtn}</td>
+      <td style="padding:10px 7px;text-align:center;white-space:nowrap">
         <button onclick="promoteIdea('${rec.id}')" style="background:#1B3A6B;color:#fff;border:none;border-radius:6px;padding:3px 9px;cursor:pointer;font-size:0.75rem;font-weight:600;margin-right:4px">→ In Progress</button>
         <button onclick="delIdea('${rec.id}')" style="background:none;border:none;cursor:pointer;color:#d1d5db;font-size:1rem">🗑</button>
       </td></tr>`;
@@ -1176,15 +1168,11 @@ function renderIdeas() {
       <option>Custom Shop</option><option>YouTube</option><option>New Other Product</option><option>General</option>
     </select></td>
     <td style="padding:7px 8px"><input type="text" id="new-im-notes" placeholder="Notes…" style="${iStyle}"></td>
-    ${WILL_NEED_FIELDS.map(()=>'<td></td>').join('')}
+    <td></td>
     <input type="hidden" id="new-im-status" value="New">
     <td style="padding:7px 8px;text-align:center">
       <button onclick="addIdea()" style="background:#1B3A6B;color:#fff;border:none;border-radius:6px;padding:5px 14px;cursor:pointer;font-size:0.83rem;font-weight:700">+</button>
-    </td></tr></tbody></table></div>
-  <div style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap;align-items:center">
-    <span style="font-size:0.72rem;color:#aaa;font-weight:700">WILL NEED (click to cycle):</span>
-    ${WILL_NEED_OPTS.map(v=>`<span style="display:flex;align-items:center;gap:5px;font-size:0.74rem;color:#6b7280">${willDot(v)} ${v}</span>`).join('')}
-  </div>`;
+    </td></tr></tbody></table></div>`;
   document.getElementById('mkt-ideas-table').innerHTML = h;
 }
 
@@ -1199,6 +1187,14 @@ async function cycleWill(td, recId, field, tbl) {
     const rec = mktIdeas.find(r => r.id === recId);
     if (rec) rec.fields[field] = next;
   } catch(e) { console.error(e); }
+}
+
+function toggleIdeaNeed(id) {
+  const cur = localStorage.getItem('idea_need_' + id) || '';
+  const next = cur === '' ? 'Need' : cur === 'Need' ? "Don't Need" : '';
+  if (next) localStorage.setItem('idea_need_' + id, next);
+  else localStorage.removeItem('idea_need_' + id);
+  renderIdeas();
 }
 
 async function addIdea() {
