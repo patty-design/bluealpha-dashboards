@@ -1040,16 +1040,17 @@ function renderCampaignTab(tab) {
   const ALL_STATUSES = ['Idea','Planning','In Progress','Ready','Scheduled','Sent'];
   const TH  = (s, w) => `<th style="padding:10px 10px;text-align:left;font-size:0.74rem;color:#6b7280;font-weight:700;white-space:nowrap;width:${w}">${s}</th>`;
   const THc = (s, w) => `<th style="padding:10px 7px;text-align:center;font-size:0.72rem;color:#6b7280;font-weight:700;white-space:nowrap;width:${w}">${s}</th>`;
+  const showDate = tab !== 'inprogress';
   let h = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;table-layout:fixed;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08)">
 <thead><tr style="background:#f8fafc;border-bottom:2px solid #e5e7eb">
-  ${TH('Date','110px')}${TH('Subject / Topic','auto')}${TH('Type','110px')}`;
+  ${showDate ? TH('Date','110px') : ''}${TH('Subject / Topic','auto')}${TH('Type','110px')}`;
   for (const [lbl] of people) h += THc(lbl, '52px');
   h += `${THc('File#','52px')}${THc('','36px')}</tr></thead><tbody>`;
 
   for (const rec of data) {
     const f = rec.fields;
     h += `<tr style="border-bottom:1px solid #f1f5f9" onmouseover="this.style.background='#fafafa'" onmouseout="this.style.background=''">
-      ${makeCell(rec.id,'Send Date',f['Send Date']||'','date',[],MKT_CAMPAIGNS_TABLE)}
+      ${showDate ? makeCell(rec.id,'Send Date',f['Send Date']||'','date',[],MKT_CAMPAIGNS_TABLE) : ''}
       ${makeCell(rec.id,'Subject / Topic',f['Subject / Topic']||'','text',[],MKT_CAMPAIGNS_TABLE)}
       ${makeCell(rec.id,'Type',f['Type']||'','select',['New Product','General','YouTube','Limited Run'],MKT_CAMPAIGNS_TABLE)}`;
     for (const [,field,opts] of people) {
@@ -1067,7 +1068,7 @@ function renderCampaignTab(tab) {
   const iStyle = "width:100%;padding:4px 6px;border:1.5px solid #ddd;border-radius:6px;font-size:0.82rem;outline:none;font-family:inherit";
   const defaultStatus = statuses[statuses.length - 1] || '';
   h += `<tr style="background:#f0f4ff;border-top:2px dashed #c7d2fe">
-    <td style="padding:7px 8px"><input type="date" id="new-cm-date-${tab}" style="${iStyle}"></td>
+    ${showDate ? `<td style="padding:7px 8px"><input type="date" id="new-cm-date-${tab}" style="${iStyle}"></td>` : ''}
     <td style="padding:7px 8px"><input type="text" id="new-cm-subject-${tab}" placeholder="New campaign…" style="${iStyle}"
       onkeydown="if(event.key==='Enter') addCampaign('${tab}')"></td>
     <td style="padding:7px 8px"><select id="new-cm-type-${tab}" style="${iStyle}">
