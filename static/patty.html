@@ -1114,13 +1114,13 @@ async function delCampaign(id) {
 
 // ---- Render Ideas ----
 const WILL_NEED_FIELDS = [
-  ['Email',      'Kevin Email'],
-  ['Lifestyle',  'Lifestyle Photos'],
-  ['Video',      'Video'],
-  ['SKUs',       'Product SKUs'],
-  ['Web Photos', 'Website Photos'],
-  ['Web Listing','Website Listing'],
-  ['ShipStation','ShipStation Import']
+  ['Email',    'Kevin Email'],
+  ['Lifestyle','Lifestyle Photos'],
+  ['Video',    'Video'],
+  ['SKUs',     'Product SKUs'],
+  ['Web Pics', 'Website Photos'],
+  ['Listing',  'Website Listing'],
+  ['Ship Sta', 'ShipStation Import']
 ];
 const WILL_NEED_OPTS = ["Don't Need","Need"];
 const WILL_NEED_COLORS = {"Don't Need":'#fee2e2',Need:'#dcfce7'};
@@ -1147,7 +1147,7 @@ function renderIdeas() {
   let h = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;table-layout:fixed;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08)">
 <thead><tr style="background:#f8fafc;border-bottom:2px solid #e5e7eb">
   ${TH('Idea','220px')}${TH('Category','120px')}${TH('Notes','auto')}`;
-  for (const [lbl] of WILL_NEED_FIELDS) h += THc(lbl,'46px');
+  for (const [lbl] of WILL_NEED_FIELDS) h += THc(lbl,'58px');
   h += `${THc('','130px')}</tr></thead><tbody>`;
 
   for (const rec of data) {
