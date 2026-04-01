@@ -278,7 +278,7 @@ def verify_order():
             od = order.get("orderDate", "")
             ship_date = parse_dt(od) if od else datetime.now(timezone.utc)
 
-        eligible_until = ship_date + timedelta(days=37)
+        eligible_until = ship_date + timedelta(days=30)
         if datetime.now(timezone.utc) > eligible_until:
             return Response(json.dumps({"status": "outside_window"}), headers=c, mimetype="application/json")
 
