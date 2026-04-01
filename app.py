@@ -252,9 +252,12 @@ def verify_order():
         if not name_match and not email_match:
             return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
 
-        # Check international
+        # Check international — also block military overseas (APO/FPO/DPO)
+        # which use state codes AA, AE, AP and are USPS-domestic but overseas
+        MILITARY_STATES = {"AA", "AE", "AP"}
         country = order.get("shipTo", {}).get("country", "US")
-        if country not in ("US", "USA"):
+        state   = order.get("shipTo", {}).get("state", "").upper()
+        if country not in ("US", "USA") or state in MILITARY_STATES:
             return Response(json.dumps({"status": "international"}), headers=c, mimetype="application/json")
 
         # Get ship date from shipments
