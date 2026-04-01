@@ -317,11 +317,12 @@ def verify_order():
                         status=500, headers=c, mimetype="application/json")
 
 
-def create_return_label(order_id, customer_addr):
-    """Create a prepaid return label in ShipStation.
-    Returns (tracking_number, label_data_b64) or raises Exception."""
+def create_return_label(order_id, customer_addr, customer_email="", order_number=""):
+    """Create a return order in ShipStation linked to the original order, then create a label.
+    Returns (tracking_number, return_order_id) or raises Exception."""
     from datetime import datetime, timezone
-    # Get original shipment to inherit carrier/service/weight
+
+    # Inherit carrier/service/weight from original shipment
     sr = req_lib.get("https://ssapi.shipstation.com/shipments",
                      params={"orderId": order_id},
                      headers=ss_headers(), timeout=10)
@@ -336,46 +337,74 @@ def create_return_label(order_id, customer_addr):
         if s.get("weight"):
             weight = s["weight"]
 
-    payload = {
-        "carrierCode": carrier,
-        "serviceCode": service,
-        "packageCode": "package",
-        "shipDate":    datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        "weight":      weight,
-        "shipFrom": {
-            "name":       customer_addr.get("name", ""),
-            "street1":    customer_addr.get("street1", ""),
-            "street2":    customer_addr.get("street2", ""),
-            "city":       customer_addr.get("city", ""),
-            "state":      customer_addr.get("state", ""),
-            "postalCode": customer_addr.get("postalCode", ""),
-            "country":    "US",
-            "phone":      customer_addr.get("phone", ""),
-        },
-        "shipTo": {
-            "name":       "Blue Alpha",
-            "company":    "Blue Alpha",
-            "street1":    "35 Andrew St",
-            "city":       "Newnan",
-            "state":      "GA",
-            "postalCode": "30263",
-            "country":    "US",
-            "phone":      "6789822442",
-        },
-        "isReturnLabel": True,
-        "testLabel":     False,
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    ba_address = {
+        "name":       "Blue Alpha",
+        "company":    "Blue Alpha",
+        "street1":    "35 Andrew St",
+        "city":       "Newnan",
+        "state":      "GA",
+        "postalCode": "30263",
+        "country":    "US",
+        "phone":      "6789822442",
     }
+    customer_ss_addr = {
+        "name":       customer_addr.get("name", ""),
+        "street1":    customer_addr.get("street1", ""),
+        "street2":    customer_addr.get("street2", ""),
+        "city":       customer_addr.get("city", ""),
+        "state":      customer_addr.get("state", ""),
+        "postalCode": customer_addr.get("postalCode", ""),
+        "country":    "US",
+        "phone":      customer_addr.get("phone", ""),
+    }
+
+    # Step 1 — Create a return order linked to the original
+    return_order_number = f"RETURN-{order_number}-{int(datetime.now(timezone.utc).timestamp())}"
+    ro = req_lib.post(
+        "https://ssapi.shipstation.com/orders/createorder",
+        headers={**ss_headers(), "Content-Type": "application/json"},
+        json={
+            "orderNumber":  return_order_number,
+            "orderDate":    f"{today}T00:00:00",
+            "orderStatus":  "awaiting_shipment",
+            "isReturn":     True,
+            "customerEmail": customer_email,
+            "shipTo":       ba_address,
+            "billTo":       customer_ss_addr,
+            "advancedOptions": {"parentId": int(order_id) if order_id else None},
+            "items":        [],
+        },
+        timeout=15,
+    )
+    if ro.status_code not in (200, 201):
+        raise Exception(f"ShipStation return order {ro.status_code}: {ro.text}")
+    return_order_id = ro.json().get("orderId")
+
+    # Step 2 — Create the label for the return order
     r = req_lib.post(
         "https://ssapi.shipstation.com/shipments/createlabel",
         headers={**ss_headers(), "Content-Type": "application/json"},
-        json=payload, timeout=20,
+        json={
+            "orderId":      return_order_id,
+            "carrierCode":  carrier,
+            "serviceCode":  service,
+            "packageCode":  "package",
+            "shipDate":     today,
+            "weight":       weight,
+            "shipFrom":     customer_ss_addr,
+            "shipTo":       ba_address,
+            "isReturnLabel": True,
+            "testLabel":    False,
+        },
+        timeout=20,
     )
     result = r.json()
     if r.status_code not in (200, 201):
-        raise Exception(f"ShipStation {r.status_code}: {result}")
-    tracking  = result.get("trackingNumber", "")
-    label_b64 = result.get("labelData", "")
-    return tracking, label_b64
+        raise Exception(f"ShipStation label {r.status_code}: {result}")
+
+    tracking = result.get("trackingNumber", "")
+    return tracking, return_order_id
 
 
 @app.route("/api/submit-return", methods=["POST", "OPTIONS"])
@@ -400,10 +429,11 @@ def submit_return():
                f"?post={data.get('orderId', '')}&action=edit")
 
     # ── Try to generate ShipStation return label ──────────────────────────
-    tracking_number = ""
-    label_url       = ""
-    status          = "Needs Review"
-    label_error     = None
+    tracking_number  = ""
+    label_url        = ""
+    ss_return_url    = ""
+    status           = "Needs Review"
+    label_error      = None
     try:
         addr_for_label = {
             "name":       addr.get("name", data.get("customerName", "")),
@@ -414,11 +444,18 @@ def submit_return():
             "postalCode": addr.get("postalCode", ""),
             "phone":      data.get("phone", ""),
         }
-        tracking_number, _ = create_return_label(data.get("orderId"), addr_for_label)
+        tracking_number, return_order_id = create_return_label(
+            data.get("orderId"),
+            addr_for_label,
+            customer_email=data.get("email", ""),
+            order_number=data.get("orderNumber", ""),
+        )
         status = "Label Sent"
         if tracking_number:
             label_url = (f"https://tools.usps.com/go/TrackConfirmAction"
                          f"?qtc_tLabels1={tracking_number}")
+        if return_order_id:
+            ss_return_url = f"https://ship7.shipstation.com/orders/order-details/{return_order_id}"
     except Exception as e:
         label_error = str(e)
         print(f"[submit-return] Label generation failed: {e}")
@@ -437,7 +474,7 @@ def submit_return():
         "Status":                         status,
         "WooCommerce Order Link":         wc_link,
         "Return Tracking #":              tracking_number,
-        "Return Label URL":               label_url,
+        "Return Label URL":               ss_return_url or label_url,
     }
     if label_error:
         fields["Status Notes"] = f"Label generation failed: {label_error}"
