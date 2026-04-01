@@ -262,11 +262,19 @@ def verify_order():
         shipments = sr.json().get("shipments", [])
         ship_date_str = shipments[0].get("shipDate", "") if shipments else ""
 
+        def parse_dt(s):
+            """Parse ISO date/datetime string, always return UTC-aware datetime."""
+            s = s.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(s)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+
         if ship_date_str:
-            ship_date = datetime.fromisoformat(ship_date_str.replace("Z", "+00:00"))
+            ship_date = parse_dt(ship_date_str)
         else:
             od = order.get("orderDate", "")
-            ship_date = datetime.fromisoformat(od.replace("Z", "+00:00")) if od else datetime.now(timezone.utc)
+            ship_date = parse_dt(od) if od else datetime.now(timezone.utc)
 
         eligible_until = ship_date + timedelta(days=37)
         if datetime.now(timezone.utc) > eligible_until:
