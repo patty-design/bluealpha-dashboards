@@ -322,6 +322,12 @@ def create_return_label(order_id, customer_addr, customer_email="", order_number
     Returns (tracking_number, return_order_id) or raises Exception."""
     from datetime import datetime, timezone
 
+    # Get original order to inherit storeId
+    or_ = req_lib.get(f"https://ssapi.shipstation.com/orders/{order_id}",
+                      headers=ss_headers(), timeout=10)
+    orig_order = or_.json() if or_.status_code == 200 else {}
+    store_id = (orig_order.get("advancedOptions") or {}).get("storeId")
+
     # Inherit carrier/service/weight from original shipment
     sr = req_lib.get("https://ssapi.shipstation.com/shipments",
                      params={"orderId": order_id},
@@ -372,7 +378,7 @@ def create_return_label(order_id, customer_addr, customer_email="", order_number
             "customerEmail": customer_email,
             "shipTo":       ba_address,
             "billTo":       customer_ss_addr,
-            "advancedOptions": {"parentId": int(order_id) if order_id else None},
+            "advancedOptions": {"parentId": int(order_id) if order_id else None, "storeId": store_id},
             "items":        [],
         },
         timeout=15,
