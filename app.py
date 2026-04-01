@@ -7,6 +7,7 @@ import requests as req_lib
 
 AIRTABLE_OPS_TOKEN      = os.environ.get("AIRTABLE_OPS_TOKEN", "")
 AIRTABLE_WRITE_TOKEN    = os.environ.get("AIRTABLE_WRITE_TOKEN", "")
+RETURNS_WRITE_TOKEN     = os.environ.get("AIRTABLE_WRITE_TOKEN_2", AIRTABLE_WRITE_TOKEN)
 AIRTABLE_BASE_ID        = "appA13jo4b3TIn4yT"
 RETURNS_TABLE_ID        = os.environ.get("RETURNS_TABLE_ID", "")
 RM_SNAPSHOTS_TABLE_ID   = os.environ.get("RM_SNAPSHOTS_TABLE_ID", "")
@@ -371,7 +372,7 @@ def submit_return():
     c = cors()
     data = request.get_json() or {}
 
-    if not RETURNS_TABLE_ID or not AIRTABLE_WRITE_TOKEN:
+    if not RETURNS_TABLE_ID or not RETURNS_WRITE_TOKEN:
         return Response(json.dumps({"success": False, "error": "Airtable not configured"}),
                         status=500, headers=c, mimetype="application/json")
 
@@ -432,7 +433,7 @@ def submit_return():
     try:
         r = req_lib.post(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
-            headers={"Authorization": f"Bearer {AIRTABLE_WRITE_TOKEN}", "Content-Type": "application/json"},
+            headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
             json={"fields": fields},
             timeout=10,
         )
