@@ -400,7 +400,8 @@
   <div id="step-success" class="card hidden">
     <!-- Pending state (shown while polling) -->
     <div id="success-pending" class="success-screen">
-      <div style="font-size:2rem; margin-bottom:16px;">⏳</div>
+      <div style="margin-bottom:20px;"><svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="animation:spin 1s linear infinite;display:inline-block"><circle cx="24" cy="24" r="20" stroke="#DDD8C4" stroke-width="4"/><path d="M24 4a20 20 0 0 1 20 20" stroke="#1B2438" stroke-width="4" stroke-linecap="round"/></svg></div>
+      <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
       <h2>Request Received.</h2>
       <p>Processing your return label — this usually takes just a moment…</p>
     </div>
