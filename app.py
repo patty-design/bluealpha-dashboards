@@ -755,6 +755,51 @@ def return_status(record_id):
     return Response(json.dumps({"status": "New"}), headers=cors(), mimetype="application/json")
 
 
+@app.route("/api/mark-all-received/<record_id>")
+def mark_all_received(record_id):
+    """Mark all Return Items linked to a return record as Received, Qty Received = Qty Submitted."""
+    if not RETURN_ITEMS_TABLE_ID or not AIRTABLE_OPS_TOKEN:
+        return Response("<h2>Not configured</h2>", status=500, mimetype="text/html")
+    try:
+        # Fetch all Return Items linked to this return record
+        filter_formula = f"FIND('{record_id}', ARRAYJOIN({{Return}}))"
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURN_ITEMS_TABLE_ID}",
+            params={"filterByFormula": filter_formula,
+                    "fields[]": ["Item Name", "Qty Submitted", "Received"]},
+            headers={"Authorization": f"Bearer {AIRTABLE_OPS_TOKEN}"},
+            timeout=10,
+        )
+        items = r.json().get("records", [])
+        if not items:
+            return Response("<h2 style='font-family:sans-serif'>No items found for this return.</h2>",
+                            status=404, mimetype="text/html")
+        # Patch each item
+        updated = []
+        for item in items:
+            item_id = item["id"]
+            qty_submitted = item.get("fields", {}).get("Qty Submitted", 1) or 1
+            req_lib.patch(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURN_ITEMS_TABLE_ID}/{item_id}",
+                headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
+                json={"fields": {"Received": True, "Qty Received": qty_submitted}},
+                timeout=10,
+            )
+            updated.append(item.get("fields", {}).get("Item Name", item_id))
+        html = """<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>body{{font-family:sans-serif;max-width:500px;margin:60px auto;text-align:center}}
+h2{{color:#2d7a2d}}ul{{text-align:left;display:inline-block}}
+p{{color:#555;margin-top:20px}}</style></head><body>
+<h2>✓ All Items Marked as Received</h2>
+<ul>{items}</ul>
+<p>You can close this tab and refresh the interface.</p>
+</body></html>""".format(items="".join(f"<li>{name}</li>" for name in updated))
+        return Response(html, mimetype="text/html")
+    except Exception as e:
+        return Response(f"<h2>Error: {e}</h2>", status=500, mimetype="text/html")
+
+
 @app.route("/api/return-label/<record_id>")
 def return_label_pdf(record_id):
     """Serve a return label PDF from the base64 data stored in Airtable."""
