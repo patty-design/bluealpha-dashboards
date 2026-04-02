@@ -450,7 +450,6 @@ def submit_return():
     # ── Try to generate ShipStation return label ──────────────────────────
     tracking_number  = ""
     label_pdf_b64    = ""
-    status           = "Needs Review"
     label_error      = None
     try:
         addr_for_label = {
@@ -468,16 +467,14 @@ def submit_return():
             customer_email=data.get("email", ""),
             order_number=data.get("orderNumber", ""),
         )
-        if label_pdf_b64:
-            status = "Label Sent"
-        else:
-            # Label created but no PDF data returned — fall back to Needs Review
+        if not label_pdf_b64:
             label_error = "Label generated but no PDF data returned by ShipStation"
             print(f"[submit-return] {label_error}")
     except Exception as e:
         label_error = str(e)
         print(f"[submit-return] Label generation failed: {e}")
 
+    # Record starts as "New" — status updated to "Label Sent" or "Needs Review" after email attempt
     fields = {
         "Order Number":                   data.get("orderNumber", ""),
         "Customer Name from Shipstation": data.get("customerName", ""),
@@ -489,7 +486,7 @@ def submit_return():
         "Submission Date":                datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "Ship Date from Shipstation":     data.get("shipDate", "")[:10] if data.get("shipDate") else "",
         "Eligible Until":                 data.get("eligibleUntil", "")[:10] if data.get("eligibleUntil") else "",
-        "Status":                         status,
+        "Status":                         "New",
         "WooCommerce Order Link":         wc_link,
         "Return Tracking #":              tracking_number,
         "Label PDF Data":                 label_pdf_b64,
@@ -511,6 +508,15 @@ def submit_return():
                             status=500, headers=c, mimetype="application/json")
 
         record_id = r.json().get("id", "")
+
+        # ── If label generation failed, mark as Needs Review immediately ─────
+        if record_id and label_error:
+            req_lib.patch(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
+                headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
+                json={"fields": {"Status": "Needs Review"}},
+                timeout=10,
+            )
 
         # ── Patch the record with the label download URL now that we have the record ID ──
         email_sent = False
@@ -534,10 +540,12 @@ def submit_return():
                 )
                 if email_error:
                     print(f"[submit-return] Email failed: {email_error}")
-                # Update Airtable status to reflect email outcome
+                # Update Airtable status: "Label Sent" on success, "Needs Review" on failure
                 status_update = {"Status": "Label Sent" if email_sent else "Needs Review"}
                 if email_error:
                     status_update["Status Notes"] = f"Label generated but email failed: {email_error}"
+                elif not data.get("email"):
+                    status_update = {"Status": "Needs Review", "Status Notes": "No customer email on file"}
                 req_lib.patch(
                     f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
                     headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
