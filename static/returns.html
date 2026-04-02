@@ -177,6 +177,9 @@
 
     /* ── Items ── */
     .items-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 8px; }
+    .item-row.already-returned { opacity: 0.5; cursor: not-allowed; background: #f5f5f5; }
+    .item-row.already-returned .item-checkbox { background: #ccc; border-color: #ccc; }
+    .returned-badge { display: inline-block; font-size: 11px; background: #f0e0e0; color: #7b2318; border-radius: 4px; padding: 1px 6px; margin-left: 6px; font-weight: 600; }
     .item-row {
       display: flex;
       align-items: center;
@@ -465,7 +468,7 @@ async function verifyOrder() {
 
     if (data.status === 'eligible') {
       orderData = data;
-      buildItemsList(data.items);
+      buildItemsList(data.items, data.existingReturnItems || []);
       showStep(2);
     } else if (data.status === 'not_found') {
       document.getElementById('msg-not-found').classList.add('show');
@@ -489,21 +492,35 @@ document.getElementById('last-name').addEventListener('keydown', e => { if (e.ke
 document.getElementById('email-verify').addEventListener('keydown', e => { if (e.key === 'Enter') verifyOrder(); });
 
 // ── Step 2: Items ──
-function buildItemsList(items) {
+function buildItemsList(items, existingReturnItems) {
   const list = document.getElementById('items-list');
   list.innerHTML = '';
+
+  // Build set of already-returned SKUs from existing return text
+  const alreadyReturnedSkus = new Set();
+  (existingReturnItems || []).forEach(returnText => {
+    returnText.split('\n').forEach(line => {
+      const match = line.match(/\dx\s+(\S+)\s+—/);
+      if (match) alreadyReturnedSkus.add(match[1].trim());
+    });
+  });
+
   items.forEach((item, idx) => {
+    const alreadyReturned = alreadyReturnedSkus.has(item.sku);
     const row = document.createElement('div');
-    row.className = 'item-row';
+    row.className = 'item-row' + (alreadyReturned ? ' already-returned' : '');
     row.dataset.idx = idx;
+    row.dataset.alreadyReturned = alreadyReturned ? '1' : '0';
     row.innerHTML = `
       <div class="item-checkbox"></div>
       <div class="item-info">
         <div class="item-name">${item.name}</div>
-        <div class="item-sku">${item.sku}</div>
+        <div class="item-sku">${item.sku}${alreadyReturned ? ' <span class="returned-badge">Return already requested</span>' : ''}</div>
       </div>
       <div class="item-qty">Qty: ${item.quantity}</div>`;
-    row.addEventListener('click', () => row.classList.toggle('selected'));
+    if (!alreadyReturned) {
+      row.addEventListener('click', () => row.classList.toggle('selected'));
+    }
     list.appendChild(row);
   });
 }

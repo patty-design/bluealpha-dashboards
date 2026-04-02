@@ -293,6 +293,24 @@ def verify_order():
         items = [{"sku": i.get("sku",""), "name": i.get("name",""), "quantity": i.get("quantity",1)}
                  for i in order.get("items", []) if i.get("name")]
 
+        # Check for existing active returns for this order
+        existing_return_items = []
+        if RETURNS_TABLE_ID and RETURNS_WRITE_TOKEN:
+            try:
+                filter_formula = f"AND({{Order Number}}='{order_number}',OR({{Status}}='New',{{Status}}='Label Sent'))"
+                ar = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
+                    params={"filterByFormula": filter_formula, "fields[]": ["Items to Return", "Status"]},
+                    headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
+                    timeout=10,
+                )
+                for rec in ar.json().get("records", []):
+                    items_text = rec.get("fields", {}).get("Items to Return", "")
+                    if items_text:
+                        existing_return_items.append(items_text)
+            except Exception:
+                pass  # Don't block the flow if this check fails
+
         ship_to = order.get("shipTo", {})
         phone = (ship_to.get("phone") or
                  (order.get("billTo") or {}).get("phone") or "")
@@ -314,6 +332,7 @@ def verify_order():
                 "postalCode": ship_to.get("postalCode", ""),
             },
             "items": items,
+            "existingReturnItems": existing_return_items,
         }), headers=c, mimetype="application/json")
 
     except Exception as e:
@@ -483,6 +502,41 @@ def submit_return():
     # ── Kick off label generation + email in background ──────────────────
     def process_label(record_id, data, addr):
         try:
+            # ── Duplicate guard: check for existing Label Sent return for same order+items ──
+            order_number = data.get("orderNumber", "")
+            items_submitted = data.get("itemsToReturn", "")
+            if order_number and RETURNS_TABLE_ID and RETURNS_WRITE_TOKEN:
+                try:
+                    filter_formula = (f"AND({{Order Number}}='{order_number}',"
+                                      f"OR({{Status}}='New',{{Status}}='Label Sent'),"
+                                      f"NOT(RECORD_ID()='{record_id}'))")
+                    dup_r = req_lib.get(
+                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
+                        params={"filterByFormula": filter_formula, "fields[]": ["Items to Return"]},
+                        headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
+                        timeout=10,
+                    )
+                    existing = dup_r.json().get("records", [])
+                    for rec in existing:
+                        prev_items = rec.get("fields", {}).get("Items to Return", "")
+                        # Check for any SKU overlap
+                        submitted_skus = {part.split("—")[0].split("x")[-1].strip()
+                                          for part in items_submitted.split("\n") if "—" in part}
+                        prev_skus = {part.split("—")[0].split("x")[-1].strip()
+                                     for part in prev_items.split("\n") if "—" in part}
+                        if submitted_skus & prev_skus:
+                            req_lib.patch(
+                                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
+                                headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
+                                json={"fields": {"Status": "Needs Review",
+                                                 "Status Notes": "Duplicate — return already requested for these items"}},
+                                timeout=10,
+                            )
+                            print(f"[process_label] Duplicate return blocked for order {order_number}")
+                            return
+                except Exception as dup_e:
+                    print(f"[process_label] Duplicate check failed (continuing): {dup_e}")
+
             addr_for_label = {
                 "name":       addr.get("name", data.get("customerName", "")),
                 "street1":    addr.get("street1", ""),
