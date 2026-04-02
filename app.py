@@ -776,7 +776,6 @@ def mark_all_received(record_id):
         for item_id in item_ids:
             ir = req_lib.get(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURN_ITEMS_TABLE_ID}/{item_id}",
-                params={"fields[]": ["Item Name", "Qty Submitted"]},
                 headers={"Authorization": f"Bearer {AIRTABLE_OPS_TOKEN}"},
                 timeout=10,
             )
