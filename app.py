@@ -300,8 +300,8 @@ def verify_order():
         items = [{"sku": i.get("sku","").strip(), "name": i.get("name",""), "quantity": i.get("quantity",1)}
                  for i in order.get("items", []) if is_returnable_item(i)]
 
-        # Check for existing active returns for this order
-        existing_return_items = []
+        # Check for existing active returns — build set of already-returned SKUs
+        already_returned_skus = []
         if RETURNS_TABLE_ID and RETURNS_WRITE_TOKEN:
             try:
                 filter_formula = f"AND({{Order Number}}='{order_number}',OR({{Status}}='New',{{Status}}='Label Sent'))"
@@ -311,10 +311,14 @@ def verify_order():
                     headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
                     timeout=10,
                 )
+                import re as re_lib
                 for rec in ar.json().get("records", []):
                     items_text = rec.get("fields", {}).get("Items to Return", "")
-                    if items_text:
-                        existing_return_items.append(items_text)
+                    for line in items_text.split("\n"):
+                        # Format: "1x SKU-123 — Item Name"
+                        m = re_lib.match(r'\d+x\s+(\S+)\s+[—\-]', line.strip())
+                        if m:
+                            already_returned_skus.append(m.group(1).strip())
             except Exception:
                 pass  # Don't block the flow if this check fails
 
@@ -339,7 +343,7 @@ def verify_order():
                 "postalCode": ship_to.get("postalCode", ""),
             },
             "items": items,
-            "existingReturnItems": existing_return_items,
+            "alreadyReturnedSkus": already_returned_skus,
         }), headers=c, mimetype="application/json")
 
     except Exception as e:

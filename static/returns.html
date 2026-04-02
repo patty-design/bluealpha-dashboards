@@ -483,7 +483,7 @@ async function verifyOrder() {
 
     if (data.status === 'eligible') {
       orderData = data;
-      buildItemsList(data.items, data.existingReturnItems || []);
+      buildItemsList(data.items, data.alreadyReturnedSkus || []);
       showStep(2);
     } else if (data.status === 'not_found') {
       document.getElementById('msg-not-found').classList.add('show');
@@ -507,18 +507,10 @@ document.getElementById('last-name').addEventListener('keydown', e => { if (e.ke
 document.getElementById('email-verify').addEventListener('keydown', e => { if (e.key === 'Enter') verifyOrder(); });
 
 // ── Step 2: Items ──
-function buildItemsList(items, existingReturnItems) {
+function buildItemsList(items, alreadyReturnedSkuList) {
   const list = document.getElementById('items-list');
   list.innerHTML = '';
-
-  // Build set of already-returned SKUs from existing return text
-  const alreadyReturnedSkus = new Set();
-  (existingReturnItems || []).forEach(returnText => {
-    returnText.split('\n').forEach(line => {
-      const match = line.match(/\dx\s+(\S+)\s+—/);
-      if (match) alreadyReturnedSkus.add(match[1].trim());
-    });
-  });
+  const alreadyReturnedSkus = new Set(alreadyReturnedSkuList || []);
 
   items.forEach((item, idx) => {
     const alreadyReturned = alreadyReturnedSkus.has(item.sku);
