@@ -16,6 +16,8 @@ RM_SNAPSHOTS_BASE_ID    = os.environ.get("RM_SNAPSHOTS_BASE_ID", AIRTABLE_BASE_I
 RAW_MATERIALS_TABLE_ID  = "tblokid4GHQCvdXuQ"
 SHIPSTATION_KEY      = os.environ.get("SHIPSTATION_KEY", "")
 SHIPSTATION_SECRET   = os.environ.get("SHIPSTATION_SECRET", "")
+SENDGRID_API_KEY     = os.environ.get("SENDGRID_API_KEY", "")
+SENDGRID_FROM_EMAIL  = os.environ.get("SENDGRID_FROM_EMAIL", "info@bluealpha.us")
 
 app = Flask(__name__, static_folder="static")
 
@@ -318,6 +320,45 @@ def verify_order():
                         status=500, headers=c, mimetype="application/json")
 
 
+def send_return_label_email(to_email, customer_name, order_number, label_pdf_b64):
+    """Send return label PDF to customer via SendGrid. Returns (success, error_message)."""
+    if not SENDGRID_API_KEY:
+        return False, "SendGrid not configured"
+    try:
+        first_name = customer_name.split()[0] if customer_name else "there"
+        payload = {
+            "personalizations": [{"to": [{"email": to_email}]}],
+            "from": {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
+            "subject": f"Your Blue Alpha Return Label — Order #{order_number}",
+            "content": [{"type": "text/plain", "value": (
+                f"Hi {first_name},\n\n"
+                "Your return label is attached. Drop the package at any USPS location — "
+                "no printer needed if you use USPS Label Broker (just show the barcode on your phone).\n\n"
+                "Once we receive your return, we'll process it within 3–5 business days.\n\n"
+                "Questions? Reply to this email and our team will help you out.\n\n"
+                "— Blue Alpha"
+            )}],
+            "attachments": [{
+                "content": label_pdf_b64,
+                "type": "application/pdf",
+                "filename": f"return-label-{order_number}.pdf",
+                "disposition": "attachment",
+            }],
+        }
+        r = req_lib.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=15,
+        )
+        if r.status_code == 202:
+            return True, None
+        else:
+            return False, f"SendGrid {r.status_code}: {r.text}"
+    except Exception as e:
+        return False, str(e)
+
+
 def create_return_label(order_id, customer_addr, customer_email="", order_number=""):
     """Create a return label in ShipStation tied to the original order (no new order created).
     Returns (tracking_number, label_pdf_b64) or raises Exception.
@@ -472,6 +513,8 @@ def submit_return():
         record_id = r.json().get("id", "")
 
         # ── Patch the record with the label download URL now that we have the record ID ──
+        email_sent = False
+        email_error = None
         if record_id and label_pdf_b64:
             label_download_url = f"{FLASK_BASE_URL}/api/return-label/{record_id}"
             req_lib.patch(
@@ -480,9 +523,30 @@ def submit_return():
                 json={"fields": {"Return Label URL": label_download_url}},
                 timeout=10,
             )
+            # ── Auto-email the label to the customer ──────────────────────────
+            customer_email = data.get("email", "")
+            if customer_email:
+                email_sent, email_error = send_return_label_email(
+                    to_email=customer_email,
+                    customer_name=data.get("customerName", ""),
+                    order_number=data.get("orderNumber", ""),
+                    label_pdf_b64=label_pdf_b64,
+                )
+                if email_error:
+                    print(f"[submit-return] Email failed: {email_error}")
+                # Update Airtable status to reflect email outcome
+                status_update = {"Status": "Label Sent" if email_sent else "Needs Review"}
+                if email_error:
+                    status_update["Status Notes"] = f"Label generated but email failed: {email_error}"
+                req_lib.patch(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
+                    headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
+                    json={"fields": status_update},
+                    timeout=10,
+                )
 
         return Response(
-            json.dumps({"success": True, "labelGenerated": status == "Label Sent"}),
+            json.dumps({"success": True, "labelGenerated": status == "Label Sent", "emailSent": email_sent}),
             headers=c, mimetype="application/json",
         )
     except Exception as e:
