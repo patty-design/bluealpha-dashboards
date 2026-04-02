@@ -22,6 +22,9 @@ SENDGRID_FROM_EMAIL  = os.environ.get("SENDGRID_FROM_EMAIL", "info@bluealpha.us"
 
 app = Flask(__name__, static_folder="static")
 
+# In-memory status cache for return submissions (cleared on restart, only needed during ~60s poll window)
+_return_status_cache = {}
+
 DASHBOARDS = {
     "kurt": "kurt.html",
     "jesse": "jesse.html",
@@ -602,8 +605,11 @@ def submit_return():
                 json={"fields": status_update},
                 timeout=10,
             )
+            # Cache result so the poll endpoint can read it without needing Airtable read scope
+            _return_status_cache[record_id] = status_update.get("Status", "Needs Review")
         except Exception as e:
             print(f"[process_label] Failed for record {record_id}: {e}")
+            _return_status_cache[record_id] = "Needs Review"
             try:
                 req_lib.patch(
                     f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
@@ -622,23 +628,12 @@ def submit_return():
 
 @app.route("/api/return-status/<record_id>")
 def return_status(record_id):
-    """Poll for the current status of a return record."""
-    if not RETURNS_TABLE_ID or not RETURNS_WRITE_TOKEN:
-        return Response(json.dumps({"status": "unknown"}), mimetype="application/json")
-    try:
-        r = req_lib.get(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
-            headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
-            timeout=10,
-        )
-        fields = r.json().get("fields", {})
-        return Response(json.dumps({
-            "status": fields.get("Status", "New"),
-            "notes":  fields.get("Status Notes", ""),
-        }), headers=cors(), mimetype="application/json")
-    except Exception as e:
-        return Response(json.dumps({"status": "unknown", "error": str(e)}),
-                        headers=cors(), mimetype="application/json")
+    """Poll for the current status of a return record (reads from in-memory cache set by background thread)."""
+    status = _return_status_cache.get(record_id)
+    if status:
+        return Response(json.dumps({"status": status}), headers=cors(), mimetype="application/json")
+    # Not in cache yet — background thread still processing
+    return Response(json.dumps({"status": "New"}), headers=cors(), mimetype="application/json")
 
 
 @app.route("/api/return-label/<record_id>")
