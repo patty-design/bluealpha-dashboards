@@ -289,9 +289,16 @@ def verify_order():
         if datetime.now(timezone.utc) > eligible_until:
             return Response(json.dumps({"status": "outside_window"}), headers=c, mimetype="application/json")
 
-        # Build items list
-        items = [{"sku": i.get("sku",""), "name": i.get("name",""), "quantity": i.get("quantity",1)}
-                 for i in order.get("items", []) if i.get("name")]
+        # Build items list — exclude empty SKUs and discount/fee line items
+        def is_returnable_item(i):
+            sku = (i.get("sku") or "").strip()
+            if not sku:
+                return False
+            if "total-discount" in sku.lower():
+                return False
+            return bool(i.get("name"))
+        items = [{"sku": i.get("sku","").strip(), "name": i.get("name",""), "quantity": i.get("quantity",1)}
+                 for i in order.get("items", []) if is_returnable_item(i)]
 
         # Check for existing active returns for this order
         existing_return_items = []
