@@ -3,6 +3,7 @@ import os
 import functools
 import json
 import base64
+import threading
 import requests as req_lib
 
 AIRTABLE_OPS_TOKEN      = os.environ.get("AIRTABLE_OPS_TOKEN", "")
@@ -447,34 +448,7 @@ def submit_return():
     wc_link = (f"https://www.bluealphabelts.com/wp-admin/post.php"
                f"?post={data.get('orderId', '')}&action=edit")
 
-    # ── Try to generate ShipStation return label ──────────────────────────
-    tracking_number  = ""
-    label_pdf_b64    = ""
-    label_error      = None
-    try:
-        addr_for_label = {
-            "name":       addr.get("name", data.get("customerName", "")),
-            "street1":    addr.get("street1", ""),
-            "street2":    addr.get("street2", ""),
-            "city":       addr.get("city", ""),
-            "state":      addr.get("state", ""),
-            "postalCode": addr.get("postalCode", ""),
-            "phone":      data.get("phone", ""),
-        }
-        tracking_number, label_pdf_b64 = create_return_label(
-            data.get("orderId"),
-            addr_for_label,
-            customer_email=data.get("email", ""),
-            order_number=data.get("orderNumber", ""),
-        )
-        if not label_pdf_b64:
-            label_error = "Label generated but no PDF data returned by ShipStation"
-            print(f"[submit-return] {label_error}")
-    except Exception as e:
-        label_error = str(e)
-        print(f"[submit-return] Label generation failed: {e}")
-
-    # Record starts as "New" — status updated to "Label Sent" or "Needs Review" after email attempt
+    # ── Create Airtable record immediately (Status: "New") ───────────────
     fields = {
         "Order Number":                   data.get("orderNumber", ""),
         "Customer Name from Shipstation": data.get("customerName", ""),
@@ -488,12 +462,7 @@ def submit_return():
         "Eligible Until":                 data.get("eligibleUntil", "")[:10] if data.get("eligibleUntil") else "",
         "Status":                         "New",
         "WooCommerce Order Link":         wc_link,
-        "Return Tracking #":              tracking_number,
-        "Label PDF Data":                 label_pdf_b64,
-        # Return Label URL is set after record creation (we need the record ID for the download link)
     }
-    if label_error:
-        fields["Status Notes"] = f"Label generation failed: {label_error}"
     fields = {k: v for k, v in fields.items() if v}
 
     try:
@@ -506,31 +475,48 @@ def submit_return():
         if r.status_code not in (200, 201):
             return Response(json.dumps({"success": False, "error": r.text}),
                             status=500, headers=c, mimetype="application/json")
-
         record_id = r.json().get("id", "")
+    except Exception as e:
+        return Response(json.dumps({"success": False, "error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
 
-        # ── If label generation failed, mark as Needs Review immediately ─────
-        if record_id and label_error:
-            req_lib.patch(
-                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
-                headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
-                json={"fields": {"Status": "Needs Review"}},
-                timeout=10,
+    # ── Kick off label generation + email in background ──────────────────
+    def process_label(record_id, data, addr):
+        try:
+            addr_for_label = {
+                "name":       addr.get("name", data.get("customerName", "")),
+                "street1":    addr.get("street1", ""),
+                "street2":    addr.get("street2", ""),
+                "city":       addr.get("city", ""),
+                "state":      addr.get("state", ""),
+                "postalCode": addr.get("postalCode", ""),
+                "phone":      data.get("phone", ""),
+            }
+            tracking_number, label_pdf_b64 = create_return_label(
+                data.get("orderId"),
+                addr_for_label,
+                customer_email=data.get("email", ""),
+                order_number=data.get("orderNumber", ""),
             )
+            if not label_pdf_b64:
+                raise Exception("Label generated but no PDF data returned by ShipStation")
 
-        # ── Patch the record with the label download URL now that we have the record ID ──
-        email_sent = False
-        email_error = None
-        if record_id and label_pdf_b64:
+            # Store tracking + PDF, build download URL
             label_download_url = f"{FLASK_BASE_URL}/api/return-label/{record_id}"
             req_lib.patch(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
                 headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
-                json={"fields": {"Return Label URL": label_download_url}},
+                json={"fields": {
+                    "Return Tracking #": tracking_number,
+                    "Label PDF Data":    label_pdf_b64,
+                    "Return Label URL":  label_download_url,
+                }},
                 timeout=10,
             )
-            # ── Auto-email the label to the customer ──────────────────────────
+
+            # Send email
             customer_email = data.get("email", "")
+            status_update = {"Status": "Needs Review", "Status Notes": "No customer email on file"}
             if customer_email:
                 email_sent, email_error = send_return_label_email(
                     to_email=customer_email,
@@ -538,28 +524,35 @@ def submit_return():
                     order_number=data.get("orderNumber", ""),
                     label_pdf_b64=label_pdf_b64,
                 )
-                if email_error:
-                    print(f"[submit-return] Email failed: {email_error}")
-                # Update Airtable status: "Label Sent" on success, "Needs Review" on failure
-                status_update = {"Status": "Label Sent" if email_sent else "Needs Review"}
-                if email_error:
-                    status_update["Status Notes"] = f"Label generated but email failed: {email_error}"
-                elif not data.get("email"):
-                    status_update = {"Status": "Needs Review", "Status Notes": "No customer email on file"}
+                if email_sent:
+                    status_update = {"Status": "Label Sent"}
+                else:
+                    status_update = {"Status": "Needs Review",
+                                     "Status Notes": f"Label generated but email failed: {email_error}"}
+                    print(f"[process_label] Email failed: {email_error}")
+
+            req_lib.patch(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
+                headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
+                json={"fields": status_update},
+                timeout=10,
+            )
+        except Exception as e:
+            print(f"[process_label] Failed for record {record_id}: {e}")
+            try:
                 req_lib.patch(
                     f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
                     headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
-                    json={"fields": status_update},
+                    json={"fields": {"Status": "Needs Review", "Status Notes": f"Label generation failed: {e}"}},
                     timeout=10,
                 )
+            except Exception:
+                pass
 
-        return Response(
-            json.dumps({"success": True, "labelGenerated": status == "Label Sent", "emailSent": email_sent}),
-            headers=c, mimetype="application/json",
-        )
-    except Exception as e:
-        return Response(json.dumps({"success": False, "error": str(e)}),
-                        status=500, headers=c, mimetype="application/json")
+    threading.Thread(target=process_label, args=(record_id, data, addr), daemon=True).start()
+
+    # ── Respond immediately — label + email handled in background ─────────
+    return Response(json.dumps({"success": True}), headers=c, mimetype="application/json")
 
 
 @app.route("/api/return-label/<record_id>")
