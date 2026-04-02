@@ -373,6 +373,7 @@
         <option value="Doesn't work with my setup">Doesn't work with my setup</option>
         <option value="Other">Other</option>
       </select>
+      <div id="msg-no-reason" style="display:none; margin-top:6px; color:#7b2318; font-size:0.875rem; font-weight:600;">⚠ Please select a reason for your return.</div>
     </div>
 
     <div class="field" id="reason-other-field" style="display:none;">
@@ -564,6 +565,7 @@ function goToStep3() {
 
 // Reason "Other" toggle
 document.getElementById('reason').addEventListener('change', function() {
+  document.getElementById('msg-no-reason').style.display = 'none';
   document.getElementById('reason-other-field').style.display =
     this.value === 'Other' ? 'block' : 'none';
 });
@@ -578,9 +580,16 @@ async function submitReturn() {
 
   errEl.classList.add('hidden');
 
-  if (!email || !reason || (reason === 'Other' && !reasonOther)) {
-    errEl.querySelector('strong').textContent = 'Missing required fields';
-    errEl.querySelector('strong').nextSibling.textContent = ' Please fill in all required fields.';
+  const noReasonEl = document.getElementById('msg-no-reason');
+  noReasonEl.style.display = 'none';
+  if (!reason || (reason === 'Other' && !reasonOther)) {
+    noReasonEl.style.display = 'block';
+    document.getElementById('reason').focus();
+    return;
+  }
+  if (!email) {
+    errEl.querySelector('strong').textContent = 'Email required';
+    errEl.querySelector('p') ? errEl.querySelector('p').textContent = 'Please enter your email address.' : null;
     errEl.classList.remove('hidden');
     return;
   }
