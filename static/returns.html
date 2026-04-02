@@ -489,7 +489,7 @@ async function verifyOrder() {
 
     if (data.status === 'eligible') {
       orderData = data;
-      buildItemsList(data.items, data.alreadyReturnedSkus || []);
+      buildItemsList(data.items, data.alreadyReturnedQtys || {});
       showStep(2);
     } else if (data.status === 'not_found') {
       document.getElementById('msg-not-found').classList.add('show');
@@ -513,30 +513,36 @@ document.getElementById('last-name').addEventListener('keydown', e => { if (e.ke
 document.getElementById('email-verify').addEventListener('keydown', e => { if (e.key === 'Enter') verifyOrder(); });
 
 // ── Step 2: Items ──
-function buildItemsList(items, alreadyReturnedSkuList) {
+function buildItemsList(items, alreadyReturnedQtys) {
   const list = document.getElementById('items-list');
   list.innerHTML = '';
-  const alreadyReturnedSkus = new Set(alreadyReturnedSkuList || []);
+  const returnedQtys = alreadyReturnedQtys || {};
 
   items.forEach((item, idx) => {
-    const alreadyReturned = alreadyReturnedSkus.has(item.sku);
+    const returnedQty = returnedQtys[item.sku] || 0;
+    const remainingQty = item.quantity - returnedQty;
+    const fullyReturned = remainingQty <= 0;
+    const partiallyReturned = returnedQty > 0 && remainingQty > 0;
     const row = document.createElement('div');
-    row.className = 'item-row' + (alreadyReturned ? ' already-returned' : '') + (item.quantity > 1 ? ' multi-qty' : '');
+    row.className = 'item-row' + (fullyReturned ? ' already-returned' : '') + (remainingQty > 1 ? ' multi-qty' : '');
     row.dataset.idx = idx;
-    row.dataset.alreadyReturned = alreadyReturned ? '1' : '0';
+    row.dataset.remainingQty = remainingQty;
+    let badge = '';
+    if (fullyReturned) badge = ' <span class="returned-badge">Return already requested</span>';
+    else if (partiallyReturned) badge = ` <span class="returned-badge">${returnedQty} of ${item.quantity} already requested</span>`;
     row.innerHTML = `
       <div class="item-checkbox"></div>
       <div class="item-info">
         <div class="item-name">${item.name}</div>
-        <div class="item-sku">${item.sku}${alreadyReturned ? ' <span class="returned-badge">Return already requested</span>' : ''}</div>
+        <div class="item-sku">${item.sku}${badge}</div>
       </div>
-      <div class="item-qty">Qty: ${item.quantity}</div>
+      <div class="item-qty">Qty: ${remainingQty}</div>
       <div class="item-qty-selector">
-        ${item.quantity > 1
-          ? `<input type="number" min="1" max="${item.quantity}" value="${item.quantity}" class="return-qty-input" onclick="event.stopPropagation()" oninput="this.value=Math.min(${item.quantity},Math.max(1,parseInt(this.value)||1))"> of ${item.quantity}`
+        ${remainingQty > 1
+          ? `<input type="number" min="1" max="${remainingQty}" value="${remainingQty}" class="return-qty-input" onclick="event.stopPropagation()" oninput="this.value=Math.min(${remainingQty},Math.max(1,parseInt(this.value)||1))"> of ${remainingQty}`
           : ''}
       </div>`;
-    if (!alreadyReturned) {
+    if (!fullyReturned) {
       row.addEventListener('click', () => row.classList.toggle('selected'));
     }
     list.appendChild(row);
@@ -548,8 +554,10 @@ function getSelectedItems() {
   document.querySelectorAll('.item-row.selected').forEach(row => {
     const idx = parseInt(row.dataset.idx);
     const item = Object.assign({}, orderData.items[idx]);
+    const remainingQty = parseInt(row.dataset.remainingQty) || item.quantity;
     const qtyInput = row.querySelector('.return-qty-input');
-    if (qtyInput) item.quantity = Math.min(item.quantity, Math.max(1, parseInt(qtyInput.value) || 1));
+    if (qtyInput) item.quantity = Math.min(remainingQty, Math.max(1, parseInt(qtyInput.value) || 1));
+    else item.quantity = remainingQty;
     selected.push(item);
   });
   return selected;

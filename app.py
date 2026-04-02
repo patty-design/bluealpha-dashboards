@@ -305,10 +305,10 @@ def verify_order():
         items = [{"sku": i.get("sku","").strip(), "name": i.get("name",""), "quantity": i.get("quantity",1)}
                  for i in order.get("items", []) if is_returnable_item(i)]
 
-        # Check for existing active returns — build set of already-returned SKUs
+        # Check for existing active returns — build qty-per-SKU of already-requested returns
         # Use AIRTABLE_OPS_TOKEN for reads (write token may not have read scope)
         airtable_read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-        already_returned_skus = []
+        already_returned_qtys = {}  # {sku: total_qty_already_requested}
         if RETURNS_TABLE_ID and airtable_read_token:
             try:
                 filter_formula = f"AND({{Order Number}}='{order_number}',OR({{Status}}='New',{{Status}}='Label Sent'))"
@@ -323,9 +323,11 @@ def verify_order():
                     items_text = rec.get("fields", {}).get("Items to Return", "")
                     for line in items_text.split("\n"):
                         # Format: "1x SKU-123 — Item Name"
-                        m = re_lib.match(r'\d+x\s+(\S+)\s+[—\-]', line.strip())
+                        m = re_lib.match(r'(\d+)x\s+(\S+)\s+[—\-]', line.strip())
                         if m:
-                            already_returned_skus.append(m.group(1).strip())
+                            qty  = int(m.group(1))
+                            sku  = m.group(2).strip()
+                            already_returned_qtys[sku] = already_returned_qtys.get(sku, 0) + qty
             except Exception:
                 pass  # Don't block the flow if this check fails
 
@@ -350,7 +352,7 @@ def verify_order():
                 "postalCode": ship_to.get("postalCode", ""),
             },
             "items": items,
-            "alreadyReturnedSkus": already_returned_skus,
+            "alreadyReturnedQtys": already_returned_qtys,
         }), headers=c, mimetype="application/json")
 
     except Exception as e:
