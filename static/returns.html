@@ -218,6 +218,10 @@
     .item-name { font-weight: 700; font-size: 0.95rem; color: var(--text); }
     .item-sku  { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
     .item-qty  { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+    .item-qty-selector { display:none; align-items:center; gap:6px; font-size:0.85rem; font-weight:600; white-space:nowrap; }
+    .item-qty-selector input { width:42px; text-align:center; border:1.5px solid var(--navy); border-radius:6px; padding:3px 4px; font-size:0.85rem; font-weight:600; }
+    .item-row.selected .item-qty { display:none; }
+    .item-row.selected .item-qty-selector { display:flex; }
 
     /* ── Address block ── */
     .address-block {
@@ -525,7 +529,12 @@ function buildItemsList(items, alreadyReturnedSkuList) {
         <div class="item-name">${item.name}</div>
         <div class="item-sku">${item.sku}${alreadyReturned ? ' <span class="returned-badge">Return already requested</span>' : ''}</div>
       </div>
-      <div class="item-qty">Qty: ${item.quantity}</div>`;
+      <div class="item-qty">Qty: ${item.quantity}</div>
+      <div class="item-qty-selector">
+        ${item.quantity > 1
+          ? `<input type="number" min="1" max="${item.quantity}" value="${item.quantity}" class="return-qty-input" onclick="event.stopPropagation()" oninput="this.value=Math.min(${item.quantity},Math.max(1,parseInt(this.value)||1))"> of ${item.quantity}`
+          : ''}
+      </div>`;
     if (!alreadyReturned) {
       row.addEventListener('click', () => row.classList.toggle('selected'));
     }
@@ -537,7 +546,10 @@ function getSelectedItems() {
   const selected = [];
   document.querySelectorAll('.item-row.selected').forEach(row => {
     const idx = parseInt(row.dataset.idx);
-    selected.push(orderData.items[idx]);
+    const item = Object.assign({}, orderData.items[idx]);
+    const qtyInput = row.querySelector('.return-qty-input');
+    if (qtyInput) item.quantity = Math.min(item.quantity, Math.max(1, parseInt(qtyInput.value) || 1));
+    selected.push(item);
   });
   return selected;
 }
