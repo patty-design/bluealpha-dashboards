@@ -12,6 +12,8 @@ RETURNS_WRITE_TOKEN     = os.environ.get("AIRTABLE_WRITE_TOKEN_2", AIRTABLE_WRIT
 FLASK_BASE_URL          = os.environ.get("FLASK_BASE_URL", "https://bluealpha-dashboards-production.up.railway.app")
 AIRTABLE_BASE_ID        = "appA13jo4b3TIn4yT"
 RETURNS_TABLE_ID        = os.environ.get("RETURNS_TABLE_ID", "")
+RETURN_ITEMS_TABLE_ID   = "tblThFm0UA6gLQShV"
+PRODUCT_SKUS_TABLE_ID   = "tbljngm75r4Km2XIN"
 RM_SNAPSHOTS_TABLE_ID   = os.environ.get("RM_SNAPSHOTS_TABLE_ID", "")
 RM_SNAPSHOTS_BASE_ID    = os.environ.get("RM_SNAPSHOTS_BASE_ID", AIRTABLE_BASE_ID)
 RAW_MATERIALS_TABLE_ID  = "tblokid4GHQCvdXuQ"
@@ -356,6 +358,102 @@ def verify_order():
                         status=500, headers=c, mimetype="application/json")
 
 
+LEAF_PRODUCT_TYPES = {"Base Product", "Resell", "Made-to-Order Base Product", "x-Base Product"}
+
+def _expand_record(record_id, qty, visited, depth):
+    """Recursively expand a Product SKUs record into leaf (base/resell) items.
+    Returns list of (name, sku, qty)."""
+    if depth > 6 or record_id in visited:
+        return []
+    visited.add(record_id)
+    try:
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}/{record_id}",
+            headers={"Authorization": f"Bearer {AIRTABLE_OPS_TOKEN}"},
+            timeout=10,
+        )
+        f = r.json().get("fields", {})
+        name        = f.get("Name + Variations", "")
+        sku         = f.get("SKU ID", "")
+        ptype       = f.get("Product Type", "")
+        components  = f.get("Component(s)", [])
+        if ptype in LEAF_PRODUCT_TYPES or not components:
+            return [(name, sku, qty)]
+        result = []
+        for comp_id in components:
+            result.extend(_expand_record(comp_id, qty, visited, depth + 1))
+        return result if result else [(name, sku, qty)]
+    except Exception as e:
+        print(f"[expand_record] Error on {record_id}: {e}")
+        return []
+
+def expand_sku_to_leaf_items(sku, qty):
+    """Look up a SKU in Product SKUs and recursively expand combos to base/resell items.
+    Returns list of (name, sku, qty). Falls back to [(sku, sku, qty)] if not found."""
+    if not AIRTABLE_OPS_TOKEN:
+        return [(sku, sku, qty)]
+    try:
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}",
+            params={"filterByFormula": f"{{SKU ID}}='{sku}'", "maxRecords": 1,
+                    "fields[]": ["SKU ID", "Name + Variations", "Product Type", "Component(s)"]},
+            headers={"Authorization": f"Bearer {AIRTABLE_OPS_TOKEN}"},
+            timeout=10,
+        )
+        records = r.json().get("records", [])
+        if not records:
+            return [(sku, sku, qty)]
+        rec = records[0]
+        f = rec.get("fields", {})
+        ptype      = f.get("Product Type", "")
+        components = f.get("Component(s)", [])
+        name       = f.get("Name + Variations", sku)
+        if ptype in LEAF_PRODUCT_TYPES or not components:
+            return [(name, sku, qty)]
+        # Combo — expand components
+        result = []
+        for comp_id in components:
+            result.extend(_expand_record(comp_id, qty, {rec["id"]}, 1))
+        return result if result else [(name, sku, qty)]
+    except Exception as e:
+        print(f"[expand_sku] Error expanding {sku}: {e}")
+        return [(sku, sku, qty)]
+
+def create_return_items(return_record_id, items_to_return_text):
+    """Parse submitted items text, expand combos, and create Return Items records in Airtable."""
+    import re as re_lib
+    if not return_record_id or not items_to_return_text:
+        return
+    leaf_items = []
+    for line in items_to_return_text.strip().split("\n"):
+        m = re_lib.match(r'(\d+)x\s+(\S+)\s+[—\-]\s*(.*)', line.strip())
+        if m:
+            qty  = int(m.group(1))
+            sku  = m.group(2).strip()
+            name = m.group(3).strip()
+            expanded = expand_sku_to_leaf_items(sku, qty)
+            # If expansion found nothing useful, fall back to the original item
+            leaf_items.extend(expanded if expanded else [(name, sku, qty)])
+        else:
+            print(f"[create_return_items] Could not parse line: {line!r}")
+
+    for (item_name, item_sku, item_qty) in leaf_items:
+        try:
+            req_lib.post(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURN_ITEMS_TABLE_ID}",
+                headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
+                json={"fields": {
+                    "Item Name":     item_name or item_sku,
+                    "SKU":           item_sku,
+                    "Qty Submitted": item_qty,
+                    "Return":        [return_record_id],
+                }},
+                timeout=10,
+            )
+        except Exception as e:
+            print(f"[create_return_items] Failed to create item record for {item_sku}: {e}")
+
+
 def send_return_label_email(to_email, customer_name, order_number, label_pdf_b64):
     """Send return label PDF to customer via SendGrid. Returns (success, error_message)."""
     if not SENDGRID_API_KEY:
@@ -553,6 +651,9 @@ def submit_return():
                             return
                 except Exception as dup_e:
                     print(f"[process_label] Duplicate check failed (continuing): {dup_e}")
+
+            # ── Create Return Items (combo-expanded checklist for CS) ─────────
+            create_return_items(record_id, data.get("itemsToReturn", ""))
 
             addr_for_label = {
                 "name":       addr.get("name", data.get("customerName", "")),
