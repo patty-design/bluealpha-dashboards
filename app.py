@@ -764,7 +764,6 @@ def mark_all_received(record_id):
         # Fetch the return record to get linked Return Items record IDs
         ret_r = req_lib.get(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
-            params={"fields[]": ["Return Items"]},
             headers={"Authorization": f"Bearer {AIRTABLE_OPS_TOKEN}"},
             timeout=10,
         )
