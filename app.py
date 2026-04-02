@@ -437,7 +437,15 @@ def create_return_items(return_record_id, items_to_return_text):
         else:
             print(f"[create_return_items] Could not parse line: {line!r}")
 
+    # Deduplicate by SKU — combine quantities if same SKU appears via multiple combo paths
+    seen = {}
     for (item_name, item_sku, item_qty) in leaf_items:
+        if item_sku in seen:
+            seen[item_sku] = (item_name, item_sku, seen[item_sku][2] + item_qty)
+        else:
+            seen[item_sku] = (item_name, item_sku, item_qty)
+
+    for (item_name, item_sku, item_qty) in seen.values():
         try:
             req_lib.post(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURN_ITEMS_TABLE_ID}",
