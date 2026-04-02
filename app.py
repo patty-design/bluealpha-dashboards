@@ -606,7 +606,28 @@ def submit_return():
     threading.Thread(target=process_label, args=(record_id, data, addr), daemon=True).start()
 
     # ── Respond immediately — label + email handled in background ─────────
-    return Response(json.dumps({"success": True}), headers=c, mimetype="application/json")
+    return Response(json.dumps({"success": True, "recordId": record_id}), headers=c, mimetype="application/json")
+
+
+@app.route("/api/return-status/<record_id>")
+def return_status(record_id):
+    """Poll for the current status of a return record."""
+    if not RETURNS_TABLE_ID or not RETURNS_WRITE_TOKEN:
+        return Response(json.dumps({"status": "unknown"}), mimetype="application/json")
+    try:
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
+            headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
+            timeout=10,
+        )
+        fields = r.json().get("fields", {})
+        return Response(json.dumps({
+            "status": fields.get("Status", "New"),
+            "notes":  fields.get("Status Notes", ""),
+        }), headers=cors(), mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"status": "unknown", "error": str(e)}),
+                        headers=cors(), mimetype="application/json")
 
 
 @app.route("/api/return-label/<record_id>")

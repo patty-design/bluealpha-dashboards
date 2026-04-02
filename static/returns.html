@@ -393,15 +393,30 @@
 
   <!-- ── SUCCESS ── -->
   <div id="step-success" class="card hidden">
-    <div class="success-screen">
-      <div class="success-icon">✓</div>
+    <!-- Pending state (shown while polling) -->
+    <div id="success-pending" class="success-screen">
+      <div style="font-size:2rem; margin-bottom:16px;">⏳</div>
       <h2>Request Received.</h2>
-      <p>Your return has been submitted. A prepaid return label will be emailed to you within a few minutes. If you don't see it, check your spam folder.</p>
+      <p>Processing your return label — this usually takes just a moment…</p>
+    </div>
+    <!-- Label sent state -->
+    <div id="success-sent" class="success-screen hidden">
+      <div class="success-icon">✓</div>
+      <h2>Label Sent!</h2>
+      <p>Your prepaid return label has been emailed to you. If you don't see it within a few minutes, check your spam folder.</p>
       <p style="margin-top:12px; font-size:0.85rem;">Questions? <a href="mailto:info@bluealpha.us" style="color:var(--navy); font-weight:700;">info@bluealpha.us</a> · <a href="tel:6789613304" style="color:var(--navy); font-weight:700;">678-961-3304</a></p>
       <div style="margin-top:28px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
         <a href="https://www.bluealphabelts.com" style="display:inline-block; padding:12px 24px; background:var(--navy); color:#fff; border-radius:6px; font-weight:700; text-decoration:none; font-size:0.95rem;">Back to bluealphabelts.com</a>
         <button onclick="location.reload()" style="padding:12px 24px; background:transparent; color:var(--navy); border:2px solid var(--navy); border-radius:6px; font-weight:700; font-size:0.95rem; cursor:pointer;">Start Another Return</button>
       </div>
+    </div>
+    <!-- Needs review state -->
+    <div id="success-review" class="success-screen hidden">
+      <div style="font-size:2rem; margin-bottom:16px;">⚠️</div>
+      <h2>Something went wrong.</h2>
+      <p>Your return request was received, but we ran into an issue processing your label. Our team will follow up with you within one business day.</p>
+      <p style="margin-top:12px;">If you'd prefer, you can <button onclick="location.reload()" style="background:none; border:none; color:var(--navy); font-weight:700; font-size:1rem; cursor:pointer; text-decoration:underline; padding:0;">try submitting again</button> and it may go through.</p>
+      <p style="margin-top:12px; font-size:0.85rem;">Questions? <a href="mailto:info@bluealpha.us" style="color:var(--navy); font-weight:700;">info@bluealpha.us</a> · <a href="tel:6789613304" style="color:var(--navy); font-weight:700;">678-961-3304</a></p>
     </div>
   </div>
 
@@ -606,6 +621,7 @@ async function submitReturn() {
     const data = await res.json();
     if (data.success) {
       showStep('success');
+      pollReturnStatus(data.recordId);
     } else {
       throw new Error(data.error || 'Unknown error');
     }
@@ -615,6 +631,43 @@ async function submitReturn() {
 
   btn.disabled = false;
   btn.innerHTML = 'Submit Return Request';
+}
+
+async function pollReturnStatus(recordId, attempts) {
+  if (!recordId) {
+    // No record ID — fall back to generic pending→sent after timeout
+    setTimeout(() => showSuccessState('sent'), 20000);
+    return;
+  }
+  attempts = attempts || 0;
+  const maxAttempts = 12; // 12 × 5s = 60s max
+  try {
+    const res = await fetch(API_BASE + '/api/return-status/' + recordId);
+    const data = await res.json();
+    if (data.status === 'Label Sent') {
+      showSuccessState('sent');
+    } else if (data.status === 'Needs Review') {
+      showSuccessState('review');
+    } else if (attempts < maxAttempts) {
+      setTimeout(() => pollReturnStatus(recordId, attempts + 1), 5000);
+    } else {
+      // Timed out — show the sent state (optimistic; CS will catch any real issues)
+      showSuccessState('sent');
+    }
+  } catch (e) {
+    if (attempts < maxAttempts) {
+      setTimeout(() => pollReturnStatus(recordId, attempts + 1), 5000);
+    } else {
+      showSuccessState('sent');
+    }
+  }
+}
+
+function showSuccessState(state) {
+  document.getElementById('success-pending').classList.add('hidden');
+  document.getElementById('success-sent').classList.add('hidden');
+  document.getElementById('success-review').classList.add('hidden');
+  document.getElementById('success-' + state).classList.remove('hidden');
 }
 </script>
 </body>
