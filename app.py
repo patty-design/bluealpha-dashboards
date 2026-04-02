@@ -8,6 +8,7 @@ import requests as req_lib
 AIRTABLE_OPS_TOKEN      = os.environ.get("AIRTABLE_OPS_TOKEN", "")
 AIRTABLE_WRITE_TOKEN    = os.environ.get("AIRTABLE_WRITE_TOKEN", "")
 RETURNS_WRITE_TOKEN     = os.environ.get("AIRTABLE_WRITE_TOKEN_2", AIRTABLE_WRITE_TOKEN)
+FLASK_BASE_URL          = os.environ.get("FLASK_BASE_URL", "https://bluealpha-dashboards-production.up.railway.app")
 AIRTABLE_BASE_ID        = "appA13jo4b3TIn4yT"
 RETURNS_TABLE_ID        = os.environ.get("RETURNS_TABLE_ID", "")
 RM_SNAPSHOTS_TABLE_ID   = os.environ.get("RM_SNAPSHOTS_TABLE_ID", "")
@@ -319,7 +320,8 @@ def verify_order():
 
 def create_return_label(order_id, customer_addr, customer_email="", order_number=""):
     """Create a return label in ShipStation tied to the original order (no new order created).
-    Returns (tracking_number, order_id) or raises Exception."""
+    Returns (tracking_number, label_pdf_b64) or raises Exception.
+    label_pdf_b64 is the base64-encoded PDF from ShipStation (may be empty string if not returned)."""
     from datetime import datetime, timezone
 
     # Inherit carrier/service/weight from original shipment
@@ -378,8 +380,9 @@ def create_return_label(order_id, customer_addr, customer_email="", order_number
     if r.status_code not in (200, 201):
         raise Exception(f"ShipStation {r.status_code}: {result}")
 
-    tracking = result.get("trackingNumber", "")
-    return tracking, order_id
+    tracking   = result.get("trackingNumber", "")
+    label_pdf  = result.get("labelData", "")   # base64-encoded PDF
+    return tracking, label_pdf
 
 
 @app.route("/api/submit-return", methods=["POST", "OPTIONS"])
@@ -405,8 +408,7 @@ def submit_return():
 
     # ── Try to generate ShipStation return label ──────────────────────────
     tracking_number  = ""
-    label_url        = ""
-    ss_return_url    = ""
+    label_pdf_b64    = ""
     status           = "Needs Review"
     label_error      = None
     try:
@@ -419,18 +421,18 @@ def submit_return():
             "postalCode": addr.get("postalCode", ""),
             "phone":      data.get("phone", ""),
         }
-        tracking_number, return_order_id = create_return_label(
+        tracking_number, label_pdf_b64 = create_return_label(
             data.get("orderId"),
             addr_for_label,
             customer_email=data.get("email", ""),
             order_number=data.get("orderNumber", ""),
         )
-        status = "Label Sent"
-        if tracking_number:
-            label_url = (f"https://tools.usps.com/go/TrackConfirmAction"
-                         f"?qtc_tLabels1={tracking_number}")
-        if return_order_id:
-            ss_return_url = f"https://ship7.shipstation.com/orders/order-details/{data.get('orderId', '')}"
+        if label_pdf_b64:
+            status = "Label Sent"
+        else:
+            # Label created but no PDF data returned — fall back to Needs Review
+            label_error = "Label generated but no PDF data returned by ShipStation"
+            print(f"[submit-return] {label_error}")
     except Exception as e:
         label_error = str(e)
         print(f"[submit-return] Label generation failed: {e}")
@@ -449,7 +451,8 @@ def submit_return():
         "Status":                         status,
         "WooCommerce Order Link":         wc_link,
         "Return Tracking #":              tracking_number,
-        "Return Label URL":               ss_return_url or label_url,
+        "Label PDF Data":                 label_pdf_b64,
+        # Return Label URL is set after record creation (we need the record ID for the download link)
     }
     if label_error:
         fields["Status Notes"] = f"Label generation failed: {label_error}"
@@ -462,17 +465,57 @@ def submit_return():
             json={"fields": fields},
             timeout=10,
         )
-        if r.status_code in (200, 201):
-            return Response(
-                json.dumps({"success": True, "labelGenerated": status == "Label Sent"}),
-                headers=c, mimetype="application/json",
-            )
-        else:
+        if r.status_code not in (200, 201):
             return Response(json.dumps({"success": False, "error": r.text}),
                             status=500, headers=c, mimetype="application/json")
+
+        record_id = r.json().get("id", "")
+
+        # ── Patch the record with the label download URL now that we have the record ID ──
+        if record_id and label_pdf_b64:
+            label_download_url = f"{FLASK_BASE_URL}/api/return-label/{record_id}"
+            req_lib.patch(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
+                headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
+                json={"fields": {"Return Label URL": label_download_url}},
+                timeout=10,
+            )
+
+        return Response(
+            json.dumps({"success": True, "labelGenerated": status == "Label Sent"}),
+            headers=c, mimetype="application/json",
+        )
     except Exception as e:
         return Response(json.dumps({"success": False, "error": str(e)}),
                         status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/return-label/<record_id>")
+def return_label_pdf(record_id):
+    """Serve a return label PDF from the base64 data stored in Airtable."""
+    if not RETURNS_TABLE_ID or not RETURNS_WRITE_TOKEN:
+        return Response("Not configured", status=500)
+    try:
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
+            headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
+            timeout=10,
+        )
+        if r.status_code != 200:
+            return Response("Label not found", status=404)
+        pdf_b64 = r.json().get("fields", {}).get("Label PDF Data", "")
+        if not pdf_b64:
+            return Response("No label PDF on file — please contact support", status=404)
+        pdf_bytes = base64.b64decode(pdf_b64)
+        order_num = r.json().get("fields", {}).get("Order Number", record_id)
+        filename = f"return-label-{order_num}.pdf"
+        return Response(
+            pdf_bytes,
+            mimetype="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except Exception as e:
+        return Response(f"Error: {e}", status=500)
 
 
 @app.route("/api/awaiting")
