@@ -761,19 +761,27 @@ def mark_all_received(record_id):
     if not RETURN_ITEMS_TABLE_ID or not AIRTABLE_OPS_TOKEN:
         return Response("<h2>Not configured</h2>", status=500, mimetype="text/html")
     try:
-        # Fetch all Return Items linked to this return record
-        filter_formula = f"FIND('{record_id}', ARRAYJOIN({{Return}}))"
-        r = req_lib.get(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURN_ITEMS_TABLE_ID}",
-            params={"filterByFormula": filter_formula,
-                    "fields[]": ["Item Name", "Qty Submitted", "Received"]},
+        # Fetch the return record to get linked Return Items record IDs
+        ret_r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
+            params={"fields[]": ["Return Items"]},
             headers={"Authorization": f"Bearer {AIRTABLE_OPS_TOKEN}"},
             timeout=10,
         )
-        items = r.json().get("records", [])
-        if not items:
+        item_ids = ret_r.json().get("fields", {}).get("Return Items", [])
+        if not item_ids:
             return Response("<h2 style='font-family:sans-serif'>No items found for this return.</h2>",
                             status=404, mimetype="text/html")
+        # Fetch each Return Item to get Qty Submitted and Item Name
+        items = []
+        for item_id in item_ids:
+            ir = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURN_ITEMS_TABLE_ID}/{item_id}",
+                params={"fields[]": ["Item Name", "Qty Submitted"]},
+                headers={"Authorization": f"Bearer {AIRTABLE_OPS_TOKEN}"},
+                timeout=10,
+            )
+            items.append({"id": item_id, "fields": ir.json().get("fields", {})})
         # Patch each item
         updated = []
         for item in items:
