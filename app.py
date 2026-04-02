@@ -304,14 +304,16 @@ def verify_order():
                  for i in order.get("items", []) if is_returnable_item(i)]
 
         # Check for existing active returns — build set of already-returned SKUs
+        # Use AIRTABLE_OPS_TOKEN for reads (write token may not have read scope)
+        airtable_read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
         already_returned_skus = []
-        if RETURNS_TABLE_ID and RETURNS_WRITE_TOKEN:
+        if RETURNS_TABLE_ID and airtable_read_token:
             try:
                 filter_formula = f"AND({{Order Number}}='{order_number}',OR({{Status}}='New',{{Status}}='Label Sent'))"
                 ar = req_lib.get(
                     f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
                     params={"filterByFormula": filter_formula, "fields[]": ["Items to Return", "Status"]},
-                    headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
+                    headers={"Authorization": f"Bearer {airtable_read_token}"},
                     timeout=10,
                 )
                 import re as re_lib
@@ -519,7 +521,8 @@ def submit_return():
             # ── Duplicate guard: check for existing Label Sent return for same order+items ──
             order_number = data.get("orderNumber", "")
             items_submitted = data.get("itemsToReturn", "")
-            if order_number and RETURNS_TABLE_ID and RETURNS_WRITE_TOKEN:
+            read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+            if order_number and RETURNS_TABLE_ID and read_token:
                 try:
                     filter_formula = (f"AND({{Order Number}}='{order_number}',"
                                       f"OR({{Status}}='New',{{Status}}='Label Sent'),"
@@ -527,7 +530,7 @@ def submit_return():
                     dup_r = req_lib.get(
                         f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
                         params={"filterByFormula": filter_formula, "fields[]": ["Items to Return"]},
-                        headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
+                        headers={"Authorization": f"Bearer {read_token}"},
                         timeout=10,
                     )
                     existing = dup_r.json().get("records", [])
