@@ -636,44 +636,6 @@ def submit_return():
     # ── Kick off label generation + email in background ──────────────────
     def process_label(record_id, data, addr):
         try:
-            # ── Duplicate guard: check for existing Label Sent return for same order+items ──
-            order_number = data.get("orderNumber", "")
-            items_submitted = data.get("itemsToReturn", "")
-            read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-            if order_number and RETURNS_TABLE_ID and read_token:
-                try:
-                    filter_formula = (f"AND({{Order Number}}='{order_number}',"
-                                      f"OR({{Status}}='New',{{Status}}='Label Sent',"
-                                      f"{{Status}}='Items Received',{{Status}}='Partial Received',"
-                                      f"{{Status}}='Refunded'),"
-                                      f"NOT(RECORD_ID()='{record_id}'))")
-                    dup_r = req_lib.get(
-                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
-                        params={"filterByFormula": filter_formula, "fields[]": ["Items to Return"]},
-                        headers={"Authorization": f"Bearer {read_token}"},
-                        timeout=10,
-                    )
-                    existing = dup_r.json().get("records", [])
-                    for rec in existing:
-                        prev_items = rec.get("fields", {}).get("Items to Return", "")
-                        # Check for any SKU overlap
-                        submitted_skus = {part.split("—")[0].split("x")[-1].strip()
-                                          for part in items_submitted.split("\n") if "—" in part}
-                        prev_skus = {part.split("—")[0].split("x")[-1].strip()
-                                     for part in prev_items.split("\n") if "—" in part}
-                        if submitted_skus & prev_skus:
-                            req_lib.patch(
-                                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
-                                headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
-                                json={"fields": {"Status": "Needs Review",
-                                                 "Status Notes": "Duplicate — return already requested for these items"}},
-                                timeout=10,
-                            )
-                            print(f"[process_label] Duplicate return blocked for order {order_number}")
-                            return
-                except Exception as dup_e:
-                    print(f"[process_label] Duplicate check failed (continuing): {dup_e}")
-
             # ── Create Return Items (combo-expanded checklist for CS) ─────────
             create_return_items(record_id, data.get("itemsToReturn", ""))
 
