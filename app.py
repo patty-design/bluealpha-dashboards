@@ -481,8 +481,8 @@ def send_return_label_email(to_email, customer_name, order_number, label_pdf_b64
             "subject": f"Your Blue Alpha Return Label — Order #{order_number}",
             "content": [{"type": "text/plain", "value": (
                 f"Hi {first_name},\n\n"
-                "Your return label is attached. Drop the package at any USPS location — "
-                "no printer needed if you use USPS Label Broker (just show the barcode on your phone).\n\n"
+                "Your return label is attached. Print it, attach it to your package, and drop it off at any USPS location.\n\n"
+                "Please note: this label will expire 30 days from today. Be sure to ship your return before then.\n\n"
                 "Once we receive your return, we'll process it within 3–5 business days.\n\n"
                 "Questions? Reply to this email and our team will help you out.\n\n"
                 "— Blue Alpha"
