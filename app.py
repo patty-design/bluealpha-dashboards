@@ -311,7 +311,10 @@ def verify_order():
         already_returned_qtys = {}  # {sku: total_qty_already_requested}
         if RETURNS_TABLE_ID and airtable_read_token:
             try:
-                filter_formula = f"AND({{Order Number}}='{order_number}',OR({{Status}}='New',{{Status}}='Label Sent'))"
+                filter_formula = (f"AND({{Order Number}}='{order_number}',"
+                                 f"OR({{Status}}='New',{{Status}}='Label Sent',"
+                                 f"{{Status}}='Items Received',{{Status}}='Partial Received',"
+                                 f"{{Status}}='Refunded'))")
                 ar = req_lib.get(
                     f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
                     params={"filterByFormula": filter_formula, "fields[]": ["Items to Return", "Status"]},
@@ -640,7 +643,9 @@ def submit_return():
             if order_number and RETURNS_TABLE_ID and read_token:
                 try:
                     filter_formula = (f"AND({{Order Number}}='{order_number}',"
-                                      f"OR({{Status}}='New',{{Status}}='Label Sent'),"
+                                      f"OR({{Status}}='New',{{Status}}='Label Sent',"
+                                      f"{{Status}}='Items Received',{{Status}}='Partial Received',"
+                                      f"{{Status}}='Refunded'),"
                                       f"NOT(RECORD_ID()='{record_id}'))")
                     dup_r = req_lib.get(
                         f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
