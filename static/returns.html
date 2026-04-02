@@ -220,8 +220,8 @@
     .item-qty  { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
     .item-qty-selector { display:none; align-items:center; gap:6px; font-size:0.85rem; font-weight:600; white-space:nowrap; }
     .item-qty-selector input { width:42px; text-align:center; border:1.5px solid var(--navy); border-radius:6px; padding:3px 4px; font-size:0.85rem; font-weight:600; }
-    .item-row.selected .item-qty { display:none; }
-    .item-row.selected .item-qty-selector { display:flex; }
+    .item-row.selected.multi-qty .item-qty { display:none; }
+    .item-row.selected.multi-qty .item-qty-selector { display:flex; }
 
     /* ── Address block ── */
     .address-block {
@@ -520,7 +520,7 @@ function buildItemsList(items, alreadyReturnedSkuList) {
   items.forEach((item, idx) => {
     const alreadyReturned = alreadyReturnedSkus.has(item.sku);
     const row = document.createElement('div');
-    row.className = 'item-row' + (alreadyReturned ? ' already-returned' : '');
+    row.className = 'item-row' + (alreadyReturned ? ' already-returned' : '') + (item.quantity > 1 ? ' multi-qty' : '');
     row.dataset.idx = idx;
     row.dataset.alreadyReturned = alreadyReturned ? '1' : '0';
     row.innerHTML = `
