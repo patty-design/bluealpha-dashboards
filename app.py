@@ -377,6 +377,10 @@ def _expand_record(record_id, qty, visited, depth):
         sku         = f.get("SKU ID", "")
         ptype       = f.get("Product Type", "")
         components  = f.get("Component(s)", [])
+        # x-Base Products are leaves but multiply qty by Multi-Component Qty.
+        if ptype == "x-Base Product":
+            multi_qty = f.get("Multi-Component Qty.", 1) or 1
+            return [(name, sku, qty * int(multi_qty))]
         if ptype in LEAF_PRODUCT_TYPES or not components:
             return [(name, sku, qty)]
         result = []
@@ -408,6 +412,9 @@ def expand_sku_to_leaf_items(sku, qty):
         ptype      = f.get("Product Type", "")
         components = f.get("Component(s)", [])
         name       = f.get("Name + Variations", sku)
+        if ptype == "x-Base Product":
+            multi_qty = f.get("Multi-Component Qty.", 1) or 1
+            return [(name, sku, qty * int(multi_qty))]
         if ptype in LEAF_PRODUCT_TYPES or not components:
             return [(name, sku, qty)]
         # Combo — expand components
