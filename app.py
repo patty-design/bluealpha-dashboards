@@ -21,6 +21,7 @@ SHIPSTATION_KEY      = os.environ.get("SHIPSTATION_KEY", "")
 SHIPSTATION_SECRET   = os.environ.get("SHIPSTATION_SECRET", "")
 SENDGRID_API_KEY     = os.environ.get("SENDGRID_API_KEY", "")
 SENDGRID_FROM_EMAIL  = os.environ.get("SENDGRID_FROM_EMAIL", "info@bluealpha.us")
+CS_ADMIN_PASSWORD    = os.environ.get("CS_ADMIN_PASSWORD", "")
 
 app = Flask(__name__, static_folder="static")
 
@@ -72,6 +73,10 @@ def index():
     if host in DASHBOARDS:
         return dashboard(host)
     return "Blue Alpha Dashboards", 200
+
+@app.route("/cs")
+def cs_returns():
+    return send_from_directory("static", "cs-returns.html")
 
 @app.route("/<name>")
 @require_auth
@@ -363,6 +368,77 @@ def verify_order():
                         status=500, headers=c, mimetype="application/json")
 
 
+@app.route("/api/cs-lookup-order", methods=["POST", "OPTIONS"])
+def cs_lookup_order():
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    data = request.get_json() or {}
+
+    # Validate CS password
+    if not CS_ADMIN_PASSWORD or data.get("password", "") != CS_ADMIN_PASSWORD:
+        return Response(json.dumps({"status": "unauthorized"}), status=401, headers=c, mimetype="application/json")
+
+    order_number = data.get("orderNumber", "").strip()
+    if not order_number:
+        return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
+
+    try:
+        # Fetch order — no eligibility check, just pull the data
+        r = req_lib.get("https://ssapi.shipstation.com/orders",
+                        params={"orderNumber": order_number},
+                        headers=ss_headers(), timeout=10)
+        orders = r.json().get("orders", [])
+        if not orders:
+            return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
+
+        order = orders[0]
+        ship_to = order.get("shipTo", {})
+
+        def is_returnable_item(i):
+            sku = (i.get("sku") or "").strip()
+            if not sku:
+                return False
+            if "total-discount" in sku.lower():
+                return False
+            return bool(i.get("name"))
+
+        items = [{"sku": i.get("sku", "").strip(), "name": i.get("name", ""), "quantity": i.get("quantity", 1)}
+                 for i in order.get("items", []) if is_returnable_item(i)]
+
+        # Get ship date from shipments
+        sr = req_lib.get("https://ssapi.shipstation.com/shipments",
+                         params={"orderNumber": order_number},
+                         headers=ss_headers(), timeout=10)
+        shipments = sr.json().get("shipments", [])
+        ship_date_str = shipments[0].get("shipDate", "") if shipments else ""
+
+        phone = (ship_to.get("phone") or (order.get("billTo") or {}).get("phone") or "")
+
+        return Response(json.dumps({
+            "status":       "found",
+            "orderId":      order.get("orderId"),
+            "orderKey":     order.get("orderKey", ""),
+            "customerName": ship_to.get("name", ""),
+            "email":        order.get("customerEmail", ""),
+            "phone":        phone,
+            "shipDate":     ship_date_str,
+            "address": {
+                "name":       ship_to.get("name", ""),
+                "street1":    ship_to.get("street1", ""),
+                "street2":    ship_to.get("street2", ""),
+                "city":       ship_to.get("city", ""),
+                "state":      ship_to.get("state", ""),
+                "postalCode": ship_to.get("postalCode", ""),
+            },
+            "items": items,
+        }), headers=c, mimetype="application/json")
+
+    except Exception as e:
+        return Response(json.dumps({"status": "error", "error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
+
+
 LEAF_PRODUCT_TYPES = {"Base Product", "Resell", "Made-to-Order Base Product", "x-Base Product"}
 
 def _expand_record(record_id, qty, visited, depth):
@@ -587,6 +663,12 @@ def submit_return():
     c = cors()
     data = request.get_json() or {}
 
+    # If this is a CS exception submission, validate the CS password
+    if data.get("csException"):
+        if not CS_ADMIN_PASSWORD or data.get("csPassword", "") != CS_ADMIN_PASSWORD:
+            return Response(json.dumps({"success": False, "error": "Unauthorized"}),
+                            status=401, headers=c, mimetype="application/json")
+
     if not RETURNS_TABLE_ID or not RETURNS_WRITE_TOKEN:
         return Response(json.dumps({"success": False, "error": "Airtable not configured"}),
                         status=500, headers=c, mimetype="application/json")
@@ -602,6 +684,12 @@ def submit_return():
                f"?post={data.get('orderId', '')}&action=edit")
 
     # ── Create Airtable record immediately (Status: "New") ───────────────
+    # Build reason string — CS exceptions get a visible prefix
+    reason_for_return = data.get("reasonForReturn", "")
+    if data.get("csException"):
+        cs_notes = data.get("csNotes", "").strip()
+        reason_for_return = "[CS Exception] " + reason_for_return + (f" — Notes: {cs_notes}" if cs_notes else "")
+
     fields = {
         "Order Number":                   data.get("orderNumber", ""),
         "Customer Name from Shipstation": data.get("customerName", ""),
@@ -609,7 +697,7 @@ def submit_return():
         "Phone Number":                   data.get("phone", ""),
         "Confirmed Shipping Address":     address_str,
         "Items to Return":                data.get("itemsToReturn", ""),
-        "Reason for Return":              data.get("reasonForReturn", ""),
+        "Reason for Return":              reason_for_return,
         "Submission Date":                datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "Ship Date from Shipstation":     data.get("shipDate", "")[:10] if data.get("shipDate") else "",
         "Eligible Until":                 data.get("eligibleUntil", "")[:10] if data.get("eligibleUntil") else "",
