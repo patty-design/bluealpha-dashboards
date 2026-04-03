@@ -174,7 +174,39 @@
     .lookup-bar input { flex: 1; margin: 0; }
     .lookup-bar .btn { width: auto; }
 
-    .item-select-note { font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
+    /* ── Item rows (same as customer form) ── */
+    .items-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 8px; }
+    .item-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .item-row:hover { border-color: var(--navy); background: #f0f5fb; }
+    .item-row.selected { border-color: var(--navy); background: #e8f0f9; }
+    .item-checkbox {
+      width: 20px; height: 20px;
+      border: 2px solid var(--border);
+      border-radius: 4px;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .item-row.selected .item-checkbox { background: var(--navy); border-color: var(--navy); }
+    .item-checkbox::after { content: '✓'; color: white; font-size: 12px; font-weight: 700; opacity: 0; }
+    .item-row.selected .item-checkbox::after { opacity: 1; }
+    .item-info { flex: 1; }
+    .item-name { font-weight: 700; font-size: 0.95rem; color: var(--text); }
+    .item-sku  { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+    .item-qty  { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+    .item-qty-selector { display: none; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; white-space: nowrap; }
+    .item-qty-selector input { width: 42px; text-align: center; border: 1.5px solid var(--navy); border-radius: 6px; padding: 3px 4px; font-size: 0.85rem; font-weight: 600; }
+    .item-row.selected.multi-qty .item-qty { display: none; }
+    .item-row.selected.multi-qty .item-qty-selector { display: flex; }
 
     .address-block {
       background: var(--light);
@@ -290,17 +322,9 @@
         <div class="order-info" id="order-info-text"></div>
 
         <div class="field">
-          <label>Item to Return <span class="req">*</span></label>
-          <select id="cs-item-select">
-            <option value="">Select an item…</option>
-          </select>
-          <div class="item-select-note">Items pulled from this order in ShipStation.</div>
-          <div id="msg-no-item" style="display:none; margin-top:6px; color:#7a1515; font-size:0.875rem; font-weight:600;">⚠ Please select an item.</div>
-        </div>
-
-        <div class="field hidden" id="cs-qty-field">
-          <label>Quantity to Return <span class="req">*</span></label>
-          <input type="number" id="cs-qty" min="1" value="1">
+          <label>Items to Return <span class="req">*</span></label>
+          <div class="items-list" id="cs-items-list"></div>
+          <div id="msg-no-item" style="display:none; margin-top:6px; color:#7a1515; font-size:0.875rem; font-weight:600;">⚠ Please select at least one item.</div>
         </div>
 
         <div class="field">
@@ -404,7 +428,6 @@ async function csLogin() {
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cs-password').addEventListener('keydown', e => { if (e.key === 'Enter') csLogin(); });
   document.getElementById('cs-order-number').addEventListener('keydown', e => { if (e.key === 'Enter') lookupOrder(); });
-  document.getElementById('cs-item-select').addEventListener('change', onItemSelect);
 });
 
 async function lookupOrder() {
@@ -443,14 +466,7 @@ function populateOrderInfo(data) {
     '<strong>Order #' + document.getElementById('cs-order-number').value.trim() + '</strong> — ' + (data.customerName || 'Unknown customer') + '<br>' +
     (data.email ? '📧 ' + data.email + '<br>' : '') +
     (data.shipDate ? '📦 Shipped: ' + data.shipDate.slice(0,10) + '<br>' : '');
-  const sel = document.getElementById('cs-item-select');
-  sel.innerHTML = '<option value="">Select an item…</option>';
-  (data.items || []).forEach(function(item, idx) {
-    const opt = document.createElement('option');
-    opt.value = idx;
-    opt.textContent = item.name + ' (' + item.sku + ') — Qty ' + item.quantity;
-    sel.appendChild(opt);
-  });
+  buildItemsList(data.items || []);
   document.getElementById('cs-email').value = data.email || '';
   const a = data.address;
   const addrLines = [a.name, a.street1, a.street2, a.city + ', ' + a.state + ' ' + a.postalCode].filter(Boolean);
@@ -458,40 +474,57 @@ function populateOrderInfo(data) {
   document.getElementById('order-info-block').classList.remove('hidden');
 }
 
-function onItemSelect() {
-  const idx = document.getElementById('cs-item-select').value;
-  document.getElementById('msg-no-item').style.display = 'none';
-  if (idx === '' || !orderData) { document.getElementById('cs-qty-field').classList.add('hidden'); return; }
-  const item = orderData.items[parseInt(idx)];
-  if (item && item.quantity > 1) {
-    const qtyInput = document.getElementById('cs-qty');
-    qtyInput.max = item.quantity;
-    qtyInput.value = item.quantity;
-    document.getElementById('cs-qty-field').classList.remove('hidden');
-  } else {
-    document.getElementById('cs-qty-field').classList.add('hidden');
-  }
+function buildItemsList(items) {
+  const list = document.getElementById('cs-items-list');
+  list.innerHTML = '';
+  items.forEach(function(item, idx) {
+    const isMulti = item.quantity > 1;
+    const row = document.createElement('div');
+    row.className = 'item-row' + (isMulti ? ' multi-qty' : '');
+    row.dataset.idx = idx;
+    row.innerHTML =
+      '<div class="item-checkbox"></div>' +
+      '<div class="item-info">' +
+        '<div class="item-name">' + item.name + '</div>' +
+        '<div class="item-sku">' + item.sku + '</div>' +
+      '</div>' +
+      '<div class="item-qty">Qty: ' + item.quantity + '</div>' +
+      (isMulti
+        ? '<div class="item-qty-selector"><input type="number" min="1" max="' + item.quantity + '" value="' + item.quantity + '" class="return-qty-input" onclick="event.stopPropagation()" oninput="this.value=Math.min(' + item.quantity + ',Math.max(1,parseInt(this.value)||1))"> of ' + item.quantity + '</div>'
+        : '');
+    row.addEventListener('click', function() { row.classList.toggle('selected'); });
+    list.appendChild(row);
+  });
+}
+
+function getSelectedItems() {
+  const selected = [];
+  document.querySelectorAll('#cs-items-list .item-row.selected').forEach(function(row) {
+    const idx = parseInt(row.dataset.idx);
+    const item = Object.assign({}, orderData.items[idx]);
+    const qtyInput = row.querySelector('.return-qty-input');
+    if (qtyInput) item.quantity = Math.min(item.quantity, Math.max(1, parseInt(qtyInput.value) || 1));
+    selected.push(item);
+  });
+  return selected;
 }
 
 async function csSubmitReturn() {
   const btn = document.getElementById('btn-cs-submit');
   const errEl = document.getElementById('msg-submit-error');
   errEl.classList.add('hidden');
-  const itemIdx = document.getElementById('cs-item-select').value;
+  const selectedItems = getSelectedItems();
   const email = document.getElementById('cs-email').value.trim();
   const reason = document.getElementById('cs-reason').value;
   let valid = true;
-  if (itemIdx === '') { document.getElementById('msg-no-item').style.display = 'block'; valid = false; }
+  if (selectedItems.length === 0) { document.getElementById('msg-no-item').style.display = 'block'; valid = false; }
   if (!email) { document.getElementById('msg-no-email').style.display = 'block'; valid = false; }
   if (!reason) { document.getElementById('msg-no-reason').style.display = 'block'; valid = false; }
   if (!valid) return;
   document.getElementById('msg-no-item').style.display = 'none';
   document.getElementById('msg-no-email').style.display = 'none';
   document.getElementById('msg-no-reason').style.display = 'none';
-  const item = orderData.items[parseInt(itemIdx)];
-  const qtyField = document.getElementById('cs-qty-field');
-  const qty = qtyField.classList.contains('hidden') ? item.quantity : Math.min(item.quantity, Math.max(1, parseInt(document.getElementById('cs-qty').value) || 1));
-  const itemsSummary = qty + 'x ' + item.sku + ' — ' + item.name;
+  const itemsSummary = selectedItems.map(function(i) { return i.quantity + 'x ' + i.sku + ' — ' + i.name; }).join('\n');
   const csNotes = document.getElementById('cs-notes').value.trim();
   const orderNum = document.getElementById('cs-order-number').value.trim();
   btn.disabled = true;
@@ -559,11 +592,10 @@ function resetForm() {
   orderData = null;
   document.getElementById('cs-order-number').value = '';
   document.getElementById('order-info-block').classList.add('hidden');
-  document.getElementById('cs-item-select').innerHTML = '<option value="">Select an item…</option>';
+  document.getElementById('cs-items-list').innerHTML = '';
   document.getElementById('cs-email').value = '';
   document.getElementById('cs-reason').value = '';
   document.getElementById('cs-notes').value = '';
-  document.getElementById('cs-qty-field').classList.add('hidden');
   document.getElementById('screen-success').classList.add('hidden');
   document.getElementById('screen-main').classList.remove('hidden');
 }
