@@ -1056,6 +1056,7 @@ def verify_exchange():
             eligible_items.append({
                 "name":            item.get("name", ""),
                 "sku":             sku,
+                "quantity":        int(item.get("quantity", 1)),
                 "airtableId":      rec["id"],
                 "parentProductId": parent_product_id,
             })
@@ -1136,11 +1137,12 @@ def submit_exchange():
 
     original_order_id     = data.get("originalOrderId")
     original_order_number = data.get("originalOrderNumber", "")
-    customer_email        = data.get("customerEmail", "")
+    customer_email        = data.get("customerEmail", "").strip()
     customer_name         = data.get("customerName", "")
     ship_to               = data.get("shipTo", {})
     selected_sku          = data.get("selectedSku", "")
     selected_name         = data.get("selectedName", "")
+    quantity              = int(data.get("quantity", 1))
     notes                 = data.get("notes", "")
 
     # Determine routing from selected belt name
@@ -1153,9 +1155,8 @@ def submit_exchange():
         user_id = "62230ab9-eefe-4dd9-8175-949f097fa363"  # Janna Frei
 
     today = datetime.now(timezone.utc)
-    today_str             = today.strftime("%Y%m%d")
     today_iso             = today.isoformat()
-    exchange_order_number = f"EX-{original_order_number}-{today_str}"
+    exchange_order_number = f"{original_order_number}-E"
 
     try:
         # Create ShipStation exchange order
@@ -1177,7 +1178,7 @@ def submit_exchange():
                 "lineItemKey":    "exchange-1",
                 "name":          selected_name,
                 "sku":           selected_sku,
-                "quantity":      1,
+                "quantity":      quantity,
                 "unitPrice":     0.00,
                 "taxAmount":     0.00,
                 "shippingAmount": 0.00,

@@ -389,6 +389,16 @@
         </select>
       </div>
 
+      <div class="field" id="qty-field" class="hidden" style="display:none;">
+        <label>Quantity <span class="req">*</span></label>
+        <select id="qty-select"></select>
+      </div>
+
+      <div class="field">
+        <label>Confirmation Email <span class="req">*</span></label>
+        <input type="email" id="confirm-email" placeholder="Email address for confirmation" autocomplete="off">
+      </div>
+
       <div class="field">
         <label>Notes <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></label>
         <textarea id="notes" placeholder="Any additional notes for our team…"></textarea>
@@ -606,6 +616,27 @@ async function loadOptions(item) {
   sel.innerHTML = '<option value="">Loading options…</option>';
   wrap.classList.remove('hidden');
 
+  // Pre-populate email
+  const emailEl = document.getElementById('confirm-email');
+  if (emailEl && !emailEl.value) emailEl.value = verifyData.customerEmail || '';
+
+  // Show quantity selector if item qty > 1
+  const qtyField = document.getElementById('qty-field');
+  const qtySel   = document.getElementById('qty-select');
+  const itemQty  = item.quantity || 1;
+  if (itemQty > 1) {
+    qtySel.innerHTML = '';
+    for (let i = 1; i <= itemQty; i++) {
+      const o = document.createElement('option');
+      o.value = i; o.textContent = i;
+      qtySel.appendChild(o);
+    }
+    qtyField.style.display = '';
+  } else {
+    qtyField.style.display = 'none';
+    qtySel.innerHTML = '<option value="1">1</option>';
+  }
+
   try {
     const res  = await fetch(API_BASE + '/api/exchange-options', {
       method: 'POST',
@@ -636,6 +667,8 @@ async function submitExchange() {
   const btn      = document.getElementById('btn-submit');
   const selVal   = document.getElementById('new-belt-select').value;
   const notes    = document.getElementById('notes').value.trim();
+  const emailVal = document.getElementById('confirm-email').value.trim();
+  const quantity = parseInt(document.getElementById('qty-select').value) || 1;
   const noOptEl  = document.getElementById('msg-no-option');
   const errEl    = document.getElementById('msg-submit-error');
 
@@ -663,11 +696,12 @@ async function submitExchange() {
       body: JSON.stringify({
         originalOrderId:     verifyData.orderId,
         originalOrderNumber: verifyData.orderNumber,
-        customerEmail:       verifyData.customerEmail,
+        customerEmail:       emailVal || verifyData.customerEmail,
         customerName:        verifyData.customerName,
         shipTo:              verifyData.shipTo,
         selectedSku:         parsed.sku,
         selectedName:        parsed.name,
+        quantity:            quantity,
         notes:               notes,
       })
     });
