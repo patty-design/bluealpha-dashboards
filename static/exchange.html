@@ -699,6 +699,8 @@ async function submitExchange() {
         customerEmail:       emailVal || verifyData.customerEmail,
         customerName:        verifyData.customerName,
         shipTo:              verifyData.shipTo,
+        originalSku:         selectedItem.sku,
+        originalAirtableId:  selectedItem.airtableId,
         selectedSku:         parsed.sku,
         selectedName:        parsed.name,
         quantity:            quantity,
