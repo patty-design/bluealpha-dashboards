@@ -1015,30 +1015,50 @@ def verify_exchange():
             return Response(json.dumps({"status": "outside_window"}), headers=c, mimetype="application/json")
 
         # Find exchange-eligible items via Airtable
+        # "Can Exchange = TRUE" marks exchange *targets* (options), not the customer's item.
+        # Eligibility = customer's SKU exists in Airtable with a parent that has Can Exchange options.
         airtable_read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+
+        # Fetch all exchange options once (used to check parent eligibility per item)
+        all_exchange_options = at_get_all(
+            PRODUCT_SKUS_TABLE_ID,
+            airtable_read_token,
+            fields=["Parent Product"],
+            formula="{Can Exchange}=TRUE()",
+        )
+        eligible_parent_ids = set()
+        for opt in all_exchange_options:
+            for pid in opt["fields"].get("Parent Product", []):
+                eligible_parent_ids.add(pid)
+
         eligible_items = []
         for item in order.get("items", []):
             sku = (item.get("sku") or "").strip()
             if not sku:
                 continue
-            formula = f'AND({{Can Exchange}}=TRUE(),{{SKU ID}}="{sku}")'
+            # Look up the SKU without Can Exchange filter
             at_r = req_lib.get(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}",
-                params={"filterByFormula": formula, "maxRecords": 1},
+                params={"filterByFormula": f'{{SKU ID}}="{sku}"', "maxRecords": 1,
+                        "fields[]": ["Name + Variations", "SKU ID", "Parent Product"]},
                 headers=at_headers(airtable_read_token),
                 timeout=10,
             )
             records = at_r.json().get("records", [])
-            if records:
-                rec = records[0]
-                parent_products = rec["fields"].get("Parent Product", [])
-                parent_product_id = parent_products[0] if parent_products else ""
-                eligible_items.append({
-                    "name":            item.get("name", ""),
-                    "sku":             sku,
-                    "airtableId":      rec["id"],
-                    "parentProductId": parent_product_id,
-                })
+            if not records:
+                continue
+            rec = records[0]
+            parent_products = rec["fields"].get("Parent Product", [])
+            parent_product_id = parent_products[0] if parent_products else ""
+            # Only eligible if parent has exchange options available
+            if not parent_product_id or parent_product_id not in eligible_parent_ids:
+                continue
+            eligible_items.append({
+                "name":            item.get("name", ""),
+                "sku":             sku,
+                "airtableId":      rec["id"],
+                "parentProductId": parent_product_id,
+            })
 
         if not eligible_items:
             return Response(json.dumps({"status": "no_eligible_items"}), headers=c, mimetype="application/json")
