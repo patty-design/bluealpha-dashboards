@@ -330,7 +330,11 @@
       <input type="text" id="order-number" placeholder="e.g. 265160" autocomplete="off">
     </div>
     <div class="field">
-      <label>Email Address <span class="req">*</span></label>
+      <label>Last Name <span class="req">*</span></label>
+      <input type="text" id="last-name-input" placeholder="Last name on the order" autocomplete="off">
+    </div>
+    <div class="field-group">
+      <label>Email Address <span class="hint">(or last name above)</span></label>
       <input type="email" id="email-input" placeholder="Email used on the order" autocomplete="off">
     </div>
 
@@ -465,14 +469,15 @@ function hideAllMessages(parent) {
 
 // ── Step 1: Verify ────────────────────────────────────────────────────────────
 async function verifyExchange() {
-  const btn       = document.getElementById('btn-verify');
-  const orderNum  = document.getElementById('order-number').value.trim();
-  const emailVal  = document.getElementById('email-input').value.trim();
-  const step1     = document.getElementById('step-1');
+  const btn         = document.getElementById('btn-verify');
+  const orderNum    = document.getElementById('order-number').value.trim();
+  const emailVal    = document.getElementById('email-input').value.trim();
+  const lastNameVal = document.getElementById('last-name-input').value.trim();
+  const step1       = document.getElementById('step-1');
 
   hideAllMessages(step1);
 
-  if (!orderNum || !emailVal) {
+  if (!orderNum || (!emailVal && !lastNameVal)) {
     document.getElementById('msg-not-found').classList.add('show');
     document.getElementById('msg-not-found').classList.remove('hidden');
     return;
@@ -485,7 +490,7 @@ async function verifyExchange() {
     const res  = await fetch(API_BASE + '/api/verify-exchange', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ orderNumber: orderNum, email: emailVal })
+      body: JSON.stringify({ orderNumber: orderNum, email: emailVal, lastName: lastNameVal })
     });
     const data = await res.json();
 
@@ -517,8 +522,9 @@ function showMsg(id) {
   el.classList.remove('hidden');
 }
 
-document.getElementById('order-number').addEventListener('keydown', e => { if (e.key === 'Enter') verifyExchange(); });
-document.getElementById('email-input').addEventListener('keydown',  e => { if (e.key === 'Enter') verifyExchange(); });
+document.getElementById('order-number').addEventListener('keydown',   e => { if (e.key === 'Enter') verifyExchange(); });
+document.getElementById('last-name-input').addEventListener('keydown', e => { if (e.key === 'Enter') verifyExchange(); });
+document.getElementById('email-input').addEventListener('keydown',     e => { if (e.key === 'Enter') verifyExchange(); });
 
 // ── Step 2: Build ─────────────────────────────────────────────────────────────
 async function buildStep2(data) {

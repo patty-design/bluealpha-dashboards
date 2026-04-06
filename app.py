@@ -961,10 +961,11 @@ def verify_exchange():
         return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
     c = cors()
     data = request.get_json() or {}
-    order_number = data.get("orderNumber", "").strip().lstrip("#")
-    email_input  = data.get("email", "").strip().lower()
+    order_number  = data.get("orderNumber", "").strip().lstrip("#")
+    email_input   = data.get("email", "").strip().lower()
+    last_name_input = data.get("lastName", "").strip().lower()
 
-    if not order_number or not email_input:
+    if not order_number or (not email_input and not last_name_input):
         return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
 
     try:
@@ -980,9 +981,13 @@ def verify_exchange():
 
         order = orders[0]
 
-        # Verify email matches (case-insensitive)
+        # Verify identity — last name OR email must match (same logic as returns)
+        ship_name   = order.get("shipTo", {}).get("name", "").strip()
+        order_last  = ship_name.split()[-1].lower() if ship_name else ""
         order_email = (order.get("customerEmail") or "").strip().lower()
-        if not email_input or email_input != order_email:
+        name_match  = last_name_input and last_name_input == order_last
+        email_match = email_input and email_input == order_email
+        if not name_match and not email_match:
             return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
 
         # Check ship date within 37 days
