@@ -69,7 +69,10 @@ def serve_static(filename):
 
 @app.route("/")
 def index():
+    from flask import redirect
     host = request.host.split(".")[0].lower()
+    if host == "exchange":
+        return redirect("/exchange")
     if host == "return":
         return send_from_directory("static", "returns.html")
     if host in DASHBOARDS:
