@@ -1163,60 +1163,48 @@ def submit_exchange():
 
     try:
         # ── LP Inner lookup for combo belts ───────────────────────────────────
-        # Outer-only SKUs (-O or -ONB suffix) → no LP inner
-        # All others → check Component(s) for LP inner and add to order
+        # Outer-only original SKUs (-O or -ONB suffix) → no LP inner
+        # All others → find the full-combo version of the SELECTED new belt,
+        #   look up its Component(s) for the LP inner, and add to order.
         airtable_read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
         is_outer_only = bool(re.search(r'(-ONB|-O)$', original_sku, re.IGNORECASE))
         lp_inner_items = []
 
-        if not is_outer_only and original_airtable_id:
+        if not is_outer_only and selected_sku:
             try:
-                orig_rec = req_lib.get(
-                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}/{original_airtable_id}",
+                # Derive the full-combo SKU from the selected new belt:
+                # "RAN-30-ONB" → "RAN-30"  |  "GTB-MCA-34-O" → "GTB-MCA-34"
+                combo_sku = re.sub(r'(-ONB|-O)$', '', selected_sku, flags=re.IGNORECASE).strip()
+
+                combo_recs = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}",
+                    params={"filterByFormula": f'{{SKU ID}}="{combo_sku}"', "maxRecords": 1,
+                            "fields[]": ["Component(s)"]},
                     headers=at_headers(airtable_read_token), timeout=10
-                ).json()
-                component_ids = orig_rec.get("fields", {}).get("Component(s)", [])
+                ).json().get("records", [])
+
+                component_ids = combo_recs[0]["fields"].get("Component(s)", []) if combo_recs else []
 
                 for comp_id in component_ids:
                     comp_rec = req_lib.get(
                         f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}/{comp_id}",
                         headers=at_headers(airtable_read_token), timeout=10
                     ).json()
-                    comp_name = comp_rec.get("fields", {}).get("Name + Variations", "")
+                    comp_fields = comp_rec.get("fields", {})
+                    comp_name   = comp_fields.get("Name + Variations", "")
+                    comp_sku    = comp_fields.get("SKU ID", "")
                     if "inner" not in comp_name.lower():
                         continue
-
-                    # Extract color: "LP INNER ONLY Belt Coyote Brown 30" → "Coyote Brown"
-                    color_raw = re.sub(r'^LP INNER ONLY Belt\s*', '', comp_name, flags=re.IGNORECASE).strip()
-                    color = re.sub(r'\s+\d+$', '', color_raw).strip()
-
-                    # Extract size from selected new belt name (last 2-digit number)
-                    size_matches = re.findall(r'\b(\d{2})\b', selected_name)
-                    new_size = size_matches[-1] if size_matches else None
-
-                    if color and new_size:
-                        formula = (
-                            f'AND(SEARCH("INNER",{{Name + Variations}}),'
-                            f'SEARCH("{color}",{{Name + Variations}}),'
-                            f'SEARCH(" {new_size}",{{Name + Variations}}))'
-                        )
-                        lp_recs = req_lib.get(
-                            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}",
-                            params={"filterByFormula": formula, "maxRecords": 1,
-                                    "fields[]": ["Name + Variations", "SKU ID"]},
-                            headers=at_headers(airtable_read_token), timeout=10
-                        ).json().get("records", [])
-                        if lp_recs:
-                            lp_f = lp_recs[0]["fields"]
-                            lp_inner_items.append({
-                                "lineItemKey":    "exchange-inner",
-                                "name":          lp_f.get("Name + Variations", "LP Inner Belt"),
-                                "sku":           lp_f.get("SKU ID", ""),
-                                "quantity":      quantity,
-                                "unitPrice":     0.00,
-                                "taxAmount":     0.00,
-                                "shippingAmount": 0.00,
-                            })
+                    # Found the LP inner for the selected new belt — add it
+                    lp_inner_items.append({
+                        "lineItemKey":    "exchange-inner",
+                        "name":          comp_name,
+                        "sku":           comp_sku,
+                        "quantity":      quantity,
+                        "unitPrice":     0.00,
+                        "taxAmount":     0.00,
+                        "shippingAmount": 0.00,
+                    })
                     break  # only one LP inner per order
             except Exception as lp_err:
                 print(f"[submit-exchange] LP inner lookup failed: {lp_err}")
