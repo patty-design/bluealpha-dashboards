@@ -17,6 +17,8 @@ PRODUCT_SKUS_TABLE_ID   = "tbljngm75r4Km2XIN"
 RM_SNAPSHOTS_TABLE_ID   = os.environ.get("RM_SNAPSHOTS_TABLE_ID", "")
 RM_SNAPSHOTS_BASE_ID    = os.environ.get("RM_SNAPSHOTS_BASE_ID", AIRTABLE_BASE_ID)
 RAW_MATERIALS_TABLE_ID  = "tblokid4GHQCvdXuQ"
+SIZING_EXCHANGE_STORE_ID = 185018
+
 SHIPSTATION_KEY      = os.environ.get("SHIPSTATION_KEY", "")
 SHIPSTATION_SECRET   = os.environ.get("SHIPSTATION_SECRET", "")
 SENDGRID_API_KEY     = os.environ.get("SENDGRID_API_KEY", "")
@@ -943,6 +945,297 @@ def awaiting_shipment():
         result["placedTodayError"] = placed_error
 
     return Response(json.dumps(result), headers=cors_headers, mimetype="application/json")
+
+
+@app.route("/exchange")
+def exchange_portal():
+    return send_from_directory("static", "exchange.html")
+
+
+@app.route("/api/verify-exchange", methods=["POST", "OPTIONS"])
+def verify_exchange():
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    data = request.get_json() or {}
+    order_number = data.get("orderNumber", "").strip().lstrip("#")
+    email_input  = data.get("email", "").strip().lower()
+
+    if not order_number or not email_input:
+        return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
+
+    try:
+        from datetime import datetime, timezone, timedelta
+
+        r = req_lib.get("https://ssapi.shipstation.com/orders",
+                         params={"orderNumber": order_number},
+                         headers=ss_headers(), timeout=10)
+        orders = r.json().get("orders", [])
+
+        if not orders:
+            return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
+
+        order = orders[0]
+
+        # Verify email matches (case-insensitive)
+        order_email = (order.get("customerEmail") or "").strip().lower()
+        if not email_input or email_input != order_email:
+            return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
+
+        # Check ship date within 37 days
+        sr = req_lib.get("https://ssapi.shipstation.com/shipments",
+                          params={"orderNumber": order_number},
+                          headers=ss_headers(), timeout=10)
+        shipments = sr.json().get("shipments", [])
+        ship_date_str = shipments[0].get("shipDate", "") if shipments else ""
+
+        def parse_dt(s):
+            s = s.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(s)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+
+        if ship_date_str:
+            ship_date = parse_dt(ship_date_str)
+        else:
+            od = order.get("orderDate", "")
+            ship_date = parse_dt(od) if od else datetime.now(timezone.utc)
+
+        eligible_until = ship_date + timedelta(days=37)
+        if datetime.now(timezone.utc) > eligible_until:
+            return Response(json.dumps({"status": "outside_window"}), headers=c, mimetype="application/json")
+
+        # Find exchange-eligible items via Airtable
+        airtable_read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        eligible_items = []
+        for item in order.get("items", []):
+            sku = (item.get("sku") or "").strip()
+            if not sku:
+                continue
+            formula = f'AND({{Can Exchange}}=TRUE(),{{SKU ID}}="{sku}")'
+            at_r = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}",
+                params={"filterByFormula": formula, "maxRecords": 1},
+                headers=at_headers(airtable_read_token),
+                timeout=10,
+            )
+            records = at_r.json().get("records", [])
+            if records:
+                rec = records[0]
+                parent_products = rec["fields"].get("Parent Product", [])
+                parent_product_id = parent_products[0] if parent_products else ""
+                eligible_items.append({
+                    "name":            item.get("name", ""),
+                    "sku":             sku,
+                    "airtableId":      rec["id"],
+                    "parentProductId": parent_product_id,
+                })
+
+        if not eligible_items:
+            return Response(json.dumps({"status": "no_eligible_items"}), headers=c, mimetype="application/json")
+
+        ship_to = order.get("shipTo", {})
+        return Response(json.dumps({
+            "status":        "eligible",
+            "orderId":       order.get("orderId"),
+            "orderNumber":   order_number,
+            "customerName":  ship_to.get("name", ""),
+            "customerEmail": order.get("customerEmail", ""),
+            "shipTo": {
+                "name":       ship_to.get("name", ""),
+                "street1":    ship_to.get("street1", ""),
+                "street2":    ship_to.get("street2", ""),
+                "city":       ship_to.get("city", ""),
+                "state":      ship_to.get("state", ""),
+                "postalCode": ship_to.get("postalCode", ""),
+                "country":    ship_to.get("country", "US"),
+            },
+            "eligibleItems": eligible_items,
+        }), headers=c, mimetype="application/json")
+
+    except Exception as e:
+        return Response(json.dumps({"status": "error", "error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/exchange-options", methods=["POST", "OPTIONS"])
+def exchange_options():
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    data = request.get_json() or {}
+    parent_product_id = data.get("parentProductId", "").strip()
+
+    if not parent_product_id:
+        return Response(json.dumps({"options": []}), headers=c, mimetype="application/json")
+
+    try:
+        airtable_read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        records = at_get_all(
+            PRODUCT_SKUS_TABLE_ID,
+            airtable_read_token,
+            fields=["Name + Variations", "SKU ID", "Parent Product"],
+            formula="{Can Exchange}=TRUE()",
+        )
+        options = []
+        for rec in records:
+            fields = rec.get("fields", {})
+            if parent_product_id in fields.get("Parent Product", []):
+                options.append({
+                    "id":   rec["id"],
+                    "name": fields.get("Name + Variations", ""),
+                    "sku":  fields.get("SKU ID", ""),
+                })
+        options.sort(key=lambda x: x["name"])
+        return Response(json.dumps({"options": options}), headers=c, mimetype="application/json")
+
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/submit-exchange", methods=["POST", "OPTIONS"])
+def submit_exchange():
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    data = request.get_json() or {}
+
+    from datetime import datetime, timezone
+
+    original_order_id     = data.get("originalOrderId")
+    original_order_number = data.get("originalOrderNumber", "")
+    customer_email        = data.get("customerEmail", "")
+    customer_name         = data.get("customerName", "")
+    ship_to               = data.get("shipTo", {})
+    selected_sku          = data.get("selectedSku", "")
+    selected_name         = data.get("selectedName", "")
+    notes                 = data.get("notes", "")
+
+    # Determine routing from selected belt name
+    name_lower = selected_name.lower()
+    if any(k in name_lower for k in ["edc", "low profile", "inner only", "1.5"]):
+        tag_id  = 105813
+        user_id = "c2fc99de-a9ec-4dfb-8b74-1d263eab34b8"  # Lisa Barnes
+    else:
+        tag_id  = 102014
+        user_id = "62230ab9-eefe-4dd9-8175-949f097fa363"  # Janna Frei
+
+    today = datetime.now(timezone.utc)
+    today_str             = today.strftime("%Y%m%d")
+    today_iso             = today.isoformat()
+    exchange_order_number = f"EX-{original_order_number}-{today_str}"
+
+    try:
+        # Create ShipStation exchange order
+        order_payload = {
+            "orderNumber":  exchange_order_number,
+            "orderDate":    today_iso,
+            "orderStatus":  "awaiting_shipment",
+            "customerEmail": customer_email,
+            "billTo": {
+                "name":       ship_to.get("name", ""),
+                "street1":    ship_to.get("street1", ""),
+                "city":       ship_to.get("city", ""),
+                "state":      ship_to.get("state", ""),
+                "postalCode": ship_to.get("postalCode", ""),
+                "country":    "US",
+            },
+            "shipTo": ship_to,
+            "items": [{
+                "lineItemKey":    "exchange-1",
+                "name":          selected_name,
+                "sku":           selected_sku,
+                "quantity":      1,
+                "unitPrice":     0.00,
+                "taxAmount":     0.00,
+                "shippingAmount": 0.00,
+            }],
+            "amountPaid":     0.00,
+            "taxAmount":      0.00,
+            "shippingAmount": 0.00,
+            "internalNotes":  f"Exchange for original order #{original_order_number}. Include return label. Customer note: {notes}",
+            "advancedOptions": {
+                "storeId":      SIZING_EXCHANGE_STORE_ID,
+                "customField1": f"Exchange for order #{original_order_number}",
+                "customField2": notes,
+            },
+        }
+
+        r = req_lib.post(
+            "https://ssapi.shipstation.com/orders/createorder",
+            headers={**ss_headers(), "Content-Type": "application/json"},
+            json=order_payload,
+            timeout=20,
+        )
+        if r.status_code not in (200, 201):
+            raise Exception(f"ShipStation order creation failed: {r.status_code} {r.text}")
+
+        new_order    = r.json()
+        new_order_id = new_order.get("orderId")
+
+        # Add tag
+        try:
+            req_lib.post(
+                "https://ssapi.shipstation.com/orders/addtag",
+                headers={**ss_headers(), "Content-Type": "application/json"},
+                json={"orderId": new_order_id, "tagId": tag_id},
+                timeout=10,
+            )
+        except Exception as tag_err:
+            print(f"[submit-exchange] Tag failed: {tag_err}")
+
+        # Assign user
+        try:
+            req_lib.post(
+                "https://ssapi.shipstation.com/orders/assignuser",
+                headers={**ss_headers(), "Content-Type": "application/json"},
+                json={"orderIds": [new_order_id], "userId": user_id},
+                timeout=10,
+            )
+        except Exception as assign_err:
+            print(f"[submit-exchange] User assign failed: {assign_err}")
+
+        # Send confirmation email via SendGrid
+        if SENDGRID_API_KEY and customer_email:
+            first_name = customer_name.split()[0] if customer_name else "there"
+            email_body = (
+                f"Hi {first_name},\n\n"
+                f"Your size exchange request has been received!\n\n"
+                f"Original Order: #{original_order_number}\n"
+                f"New Belt: {selected_name}\n\n"
+                f"We'll ship your new belt to the address on your original order. "
+                f"Your package will include a prepaid return label — please use it to send back "
+                f"your original belt within 30 days.\n\n"
+                f"Questions? Reply to this email and our team will help you out.\n\n"
+                f"— Blue Alpha"
+            )
+            try:
+                req_lib.post(
+                    "https://api.sendgrid.com/v3/mail/send",
+                    headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+                    json={
+                        "personalizations": [{"to": [{"email": customer_email}]}],
+                        "from":    {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
+                        "subject": f"Your Blue Alpha Size Exchange — Order #{original_order_number}",
+                        "content": [{"type": "text/plain", "value": email_body}],
+                    },
+                    timeout=15,
+                )
+            except Exception as email_err:
+                print(f"[submit-exchange] Email failed: {email_err}")
+
+        return Response(
+            json.dumps({"success": True, "exchangeOrderNumber": exchange_order_number}),
+            headers=c, mimetype="application/json",
+        )
+
+    except Exception as e:
+        return Response(
+            json.dumps({"success": False, "error": str(e)}),
+            status=500, headers=c, mimetype="application/json",
+        )
 
 
 if __name__ == "__main__":

@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blue Alpha — Belt Size Exchange</title>
+  <link rel="icon" href="https://www.bluealphabelts.com/wp-content/uploads/2019/05/cropped-BAG-FAV-32x32.png">
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:   #003a6c;
+      --red:    #ae0000;
+      --light:  #f5f7fa;
+      --border: #dde3ea;
+      --text:   #1a2633;
+      --muted:  #6b7a8d;
+      --white:  #ffffff;
+      --success:#1a7a3c;
+      --error:  #ae0000;
+    }
+
+    body {
+      font-family: 'Lato', sans-serif;
+      background: var(--light);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--navy);
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    header img { height: 44px; width: auto; filter: brightness(0) invert(1); }
+    .header-divider { width: 2px; height: 36px; background: var(--red); border-radius: 2px; }
+    .header-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.75);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+
+    /* ── Container ── */
+    .container {
+      max-width: 620px;
+      margin: 48px auto;
+      padding: 0 20px 60px;
+    }
+
+    .page-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+    .page-subtitle {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 32px;
+      line-height: 1.5;
+    }
+
+    /* ── Progress ── */
+    .progress {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 36px;
+      align-items: center;
+    }
+    .progress-step {
+      flex: 1;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      transition: background 0.3s;
+    }
+    .progress-step.active { background: var(--navy); }
+    .progress-step.done   { background: var(--navy); opacity: 0.4; }
+
+    /* ── Card ── */
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 32px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+
+    .card-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+    .card-subtitle {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 24px;
+    }
+
+    /* ── Form ── */
+    .field { margin-bottom: 20px; }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 7px;
+    }
+    label .req { color: var(--red); margin-left: 3px; }
+
+    input[type="text"],
+    input[type="email"],
+    textarea,
+    select {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 11px 14px;
+      font-family: 'Lato', sans-serif;
+      font-size: 0.95rem;
+      color: var(--text);
+      background: var(--white);
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--navy);
+      box-shadow: 0 0 0 3px rgba(0,58,108,0.08);
+    }
+    textarea { resize: vertical; min-height: 90px; }
+
+    /* ── Exchanging-item block ── */
+    .exchanging-block {
+      background: var(--light);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+    }
+    .exchanging-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .exchanging-name {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .exchanging-sku {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* ── Eligible-item selector (Step 1b — if multiple items) ── */
+    .eligible-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+    .eligible-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .eligible-row:hover { border-color: var(--navy); background: #f0f5fb; }
+    .eligible-row.selected { border-color: var(--navy); background: #e8f0f9; }
+    .eligible-radio {
+      width: 20px; height: 20px;
+      border: 2px solid var(--border);
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .eligible-row.selected .eligible-radio {
+      border-color: var(--navy);
+    }
+    .eligible-radio::after {
+      content: '';
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--navy);
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .eligible-row.selected .eligible-radio::after { opacity: 1; }
+    .eligible-info { flex: 1; }
+    .eligible-name { font-weight: 700; font-size: 0.95rem; color: var(--text); }
+    .eligible-sku  { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-block;
+      padding: 12px 28px;
+      border-radius: 6px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn:hover { opacity: 0.88; }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: var(--navy); color: var(--white); width: 100%; text-align: center; }
+    .btn-secondary { background: transparent; color: var(--navy); border: 1.5px solid var(--navy); }
+    .btn-row { display: flex; gap: 12px; margin-top: 24px; }
+    .btn-row .btn-primary { flex: 1; }
+
+    /* ── Messages ── */
+    .message {
+      border-radius: 6px;
+      padding: 16px 20px;
+      margin-top: 20px;
+      font-size: 0.92rem;
+      line-height: 1.55;
+      display: none;
+    }
+    .message.show { display: block; }
+    .message-error   { background: #fff0f0; border: 1px solid #f5c2c2; color: #7a1515; }
+    .message-warning { background: #fff8ed; border: 1px solid #f5dca0; color: #7a4e00; }
+    .message-success { background: #edf7f1; border: 1px solid #a3d9b8; color: #145228; }
+    .message strong { display: block; margin-bottom: 4px; font-size: 1rem; }
+    .message a { color: inherit; font-weight: 700; }
+
+    /* ── Success screen ── */
+    .success-screen {
+      text-align: center;
+      padding: 12px 0 8px;
+    }
+    .success-icon {
+      width: 72px; height: 72px;
+      background: var(--success);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 2rem;
+      color: white;
+    }
+    .success-screen h2 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 10px;
+    }
+    .success-screen p {
+      color: var(--muted);
+      line-height: 1.6;
+      max-width: 440px;
+      margin: 0 auto 8px;
+    }
+    .exchange-order-pill {
+      display: inline-block;
+      margin-top: 18px;
+      background: var(--light);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 8px 20px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--navy);
+      letter-spacing: 0.3px;
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 480px) {
+      .card { padding: 24px 18px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="https://www.bluealphabelts.com" target="_blank"><img src="https://www.bluealphabelts.com/wp-content/uploads/2024/04/logo-1.png" alt="Blue Alpha"></a>
+  <div class="header-divider"></div>
+  <span class="header-title">Size Exchange</span>
+</header>
+
+<div class="container">
+  <h1 class="page-title">Belt Size Exchange</h1>
+  <p class="page-subtitle">Enter your order details to check eligibility. Exchanges are accepted within 37 days of ship date.</p>
+
+  <div class="progress" id="progress">
+    <div class="progress-step active" id="prog-1"></div>
+    <div class="progress-step" id="prog-2"></div>
+    <div class="progress-step" id="prog-3"></div>
+  </div>
+
+  <!-- ── STEP 1: Verify Order ── -->
+  <div id="step-1" class="card">
+    <div class="card-title">Step 1 — Check Eligibility</div>
+    <p class="card-subtitle">Enter your order details to check eligibility</p>
+
+    <div class="field">
+      <label>Order Number <span class="req">*</span></label>
+      <input type="text" id="order-number" placeholder="e.g. 265160" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Email Address <span class="req">*</span></label>
+      <input type="email" id="email-input" placeholder="Email used on the order" autocomplete="off">
+    </div>
+
+    <button class="btn btn-primary" id="btn-verify" onclick="verifyExchange()">
+      Check Eligibility
+    </button>
+
+    <div class="message message-error" id="msg-not-found">
+      <strong>Order not found</strong>
+      We couldn't find that order. Please check your order number and email, or contact us at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">678-961-3304</a>.
+    </div>
+    <div class="message message-warning" id="msg-outside-window">
+      <strong>Outside Exchange Window</strong>
+      This order is outside the 37-day exchange window. If you have questions, please reach out at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">(678) 961-3304</a>.
+    </div>
+    <div class="message message-warning" id="msg-no-eligible-items">
+      <strong>No Eligible Items</strong>
+      No exchange-eligible items were found in this order. For help, contact us at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">(678) 961-3304</a>.
+    </div>
+    <div class="message message-error" id="msg-error-1">
+      <strong>Something went wrong</strong>
+      We had trouble looking up your order. Please try again or contact us at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a>.
+    </div>
+  </div>
+
+  <!-- ── STEP 2: Select New Belt ── -->
+  <div id="step-2" class="card hidden">
+    <div class="card-title">Step 2 — Select Your New Belt</div>
+    <p class="card-subtitle" id="step2-subheading"></p>
+
+    <!-- If multiple eligible items, show picker -->
+    <div id="item-picker-wrap" class="hidden">
+      <div class="field">
+        <label>Which belt are you exchanging? <span class="req">*</span></label>
+        <div class="eligible-list" id="eligible-list"></div>
+        <div class="message message-error hidden" id="msg-no-item-selected" style="margin-top:0;">Please select the belt you want to exchange.</div>
+      </div>
+    </div>
+
+    <!-- Current belt display (shown once item is known) -->
+    <div id="exchanging-block" class="exchanging-block hidden">
+      <div class="exchanging-label">Exchanging:</div>
+      <div class="exchanging-name" id="exchanging-name"></div>
+      <div class="exchanging-sku" id="exchanging-sku"></div>
+    </div>
+
+    <div id="options-wrap" class="hidden">
+      <div class="field">
+        <label>Select your new size/color <span class="req">*</span></label>
+        <select id="new-belt-select">
+          <option value="">Loading options…</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Notes <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></label>
+        <textarea id="notes" placeholder="Any additional notes for our team…"></textarea>
+      </div>
+
+      <div class="message message-error hidden" id="msg-no-option">Please select a new belt size/color.</div>
+      <div class="message message-error hidden" id="msg-submit-error">
+        <strong>Submission failed</strong>
+        Something went wrong. Please try again or contact us at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a>.
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="goBack(1)">Back</button>
+        <button class="btn btn-primary" id="btn-submit" onclick="submitExchange()">Submit Exchange Request</button>
+      </div>
+    </div>
+
+    <!-- Continue button shown when multiple items are listed -->
+    <div id="item-picker-btn-row" class="btn-row hidden">
+      <button class="btn btn-secondary" onclick="goBack(1)">Back</button>
+      <button class="btn btn-primary" onclick="confirmItemSelection()">Continue</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 3 / SUCCESS ── -->
+  <div id="step-success" class="card hidden">
+    <div class="success-screen">
+      <div class="success-icon">✓</div>
+      <h2>Exchange Request Submitted!</h2>
+      <p id="success-body"></p>
+      <p style="margin-top:10px; font-size:0.88rem; color:var(--muted);">Your package will include a prepaid return label — please use it to send back your original belt within 30 days.</p>
+      <div class="exchange-order-pill" id="success-order-number"></div>
+      <div style="margin-top:28px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+        <a href="https://www.bluealphabelts.com" style="display:inline-block; padding:12px 24px; background:var(--navy); color:#fff; border-radius:6px; font-weight:700; text-decoration:none; font-size:0.95rem;">Back to bluealphabelts.com</a>
+        <button onclick="location.reload()" style="padding:12px 24px; background:transparent; color:var(--navy); border:2px solid var(--navy); border-radius:6px; font-weight:700; font-size:0.95rem; cursor:pointer;">Start Another Exchange</button>
+      </div>
+      <p style="margin-top:20px; font-size:0.85rem;">Questions? <a href="mailto:info@bluealpha.us" style="color:var(--navy); font-weight:700;">info@bluealpha.us</a> · <a href="tel:6789613304" style="color:var(--navy); font-weight:700;">678-961-3304</a></p>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = '';
+let verifyData = null;         // full response from /api/verify-exchange
+let selectedItem = null;       // { name, sku, airtableId, parentProductId }
+
+// ── Utility ──────────────────────────────────────────────────────────────────
+function showStep(n) {
+  ['1','2','success'].forEach(s => {
+    const el = document.getElementById('step-' + s);
+    if (el) el.classList.add('hidden');
+  });
+  document.getElementById('step-' + n).classList.remove('hidden');
+
+  if (n !== 'success') {
+    [1,2,3].forEach(i => {
+      const p = document.getElementById('prog-' + i);
+      if (!p) return;
+      p.classList.remove('active','done');
+      if (i < n) p.classList.add('done');
+      else if (i === n) p.classList.add('active');
+    });
+    document.getElementById('progress').classList.remove('hidden');
+  } else {
+    document.getElementById('progress').classList.add('hidden');
+  }
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function goBack(toStep) { showStep(toStep); }
+
+function hideAllMessages(parent) {
+  parent.querySelectorAll('.message').forEach(m => {
+    m.classList.remove('show');
+    m.classList.add('hidden');
+  });
+}
+
+// ── Step 1: Verify ────────────────────────────────────────────────────────────
+async function verifyExchange() {
+  const btn       = document.getElementById('btn-verify');
+  const orderNum  = document.getElementById('order-number').value.trim();
+  const emailVal  = document.getElementById('email-input').value.trim();
+  const step1     = document.getElementById('step-1');
+
+  hideAllMessages(step1);
+
+  if (!orderNum || !emailVal) {
+    document.getElementById('msg-not-found').classList.add('show');
+    document.getElementById('msg-not-found').classList.remove('hidden');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Checking eligibility…';
+
+  try {
+    const res  = await fetch(API_BASE + '/api/verify-exchange', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ orderNumber: orderNum, email: emailVal })
+    });
+    const data = await res.json();
+
+    if (data.status === 'eligible') {
+      verifyData = data;
+      await buildStep2(data);
+      showStep(2);
+    } else if (data.status === 'not_found') {
+      showMsg('msg-not-found');
+    } else if (data.status === 'outside_window') {
+      showMsg('msg-outside-window');
+    } else if (data.status === 'no_eligible_items') {
+      showMsg('msg-no-eligible-items');
+    } else {
+      showMsg('msg-error-1');
+    }
+  } catch (e) {
+    showMsg('msg-error-1');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = 'Check Eligibility';
+}
+
+function showMsg(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.add('show');
+  el.classList.remove('hidden');
+}
+
+document.getElementById('order-number').addEventListener('keydown', e => { if (e.key === 'Enter') verifyExchange(); });
+document.getElementById('email-input').addEventListener('keydown',  e => { if (e.key === 'Enter') verifyExchange(); });
+
+// ── Step 2: Build ─────────────────────────────────────────────────────────────
+async function buildStep2(data) {
+  // Set subheading
+  document.getElementById('step2-subheading').textContent =
+    `Order #${data.orderNumber} — ${data.customerName}`;
+
+  const items = data.eligibleItems || [];
+
+  if (items.length === 1) {
+    // Only one eligible item — skip the picker, go straight to options
+    selectedItem = items[0];
+    showExchangingBlock(selectedItem);
+    await loadOptions(selectedItem);
+    document.getElementById('item-picker-wrap').classList.add('hidden');
+    document.getElementById('item-picker-btn-row').classList.add('hidden');
+  } else {
+    // Multiple items — show radio picker
+    selectedItem = null;
+    document.getElementById('exchanging-block').classList.add('hidden');
+    document.getElementById('options-wrap').classList.add('hidden');
+    buildEligibleList(items);
+    document.getElementById('item-picker-wrap').classList.remove('hidden');
+    document.getElementById('item-picker-btn-row').classList.remove('hidden');
+  }
+}
+
+function buildEligibleList(items) {
+  const list = document.getElementById('eligible-list');
+  list.innerHTML = '';
+  items.forEach((item, idx) => {
+    const row = document.createElement('div');
+    row.className = 'eligible-row';
+    row.dataset.idx = idx;
+    row.innerHTML = `
+      <div class="eligible-radio"></div>
+      <div class="eligible-info">
+        <div class="eligible-name">${item.name}</div>
+        <div class="eligible-sku">${item.sku}</div>
+      </div>`;
+    row.addEventListener('click', () => {
+      list.querySelectorAll('.eligible-row').forEach(r => r.classList.remove('selected'));
+      row.classList.add('selected');
+    });
+    list.appendChild(row);
+  });
+}
+
+async function confirmItemSelection() {
+  const selected = document.querySelector('#eligible-list .eligible-row.selected');
+  const errEl = document.getElementById('msg-no-item-selected');
+  if (!selected) {
+    errEl.classList.remove('hidden');
+    errEl.classList.add('show');
+    return;
+  }
+  errEl.classList.add('hidden');
+  errEl.classList.remove('show');
+
+  const idx = parseInt(selected.dataset.idx);
+  selectedItem = verifyData.eligibleItems[idx];
+
+  document.getElementById('item-picker-wrap').classList.add('hidden');
+  document.getElementById('item-picker-btn-row').classList.add('hidden');
+
+  showExchangingBlock(selectedItem);
+  await loadOptions(selectedItem);
+}
+
+function showExchangingBlock(item) {
+  document.getElementById('exchanging-name').textContent = item.name;
+  document.getElementById('exchanging-sku').textContent  = item.sku;
+  document.getElementById('exchanging-block').classList.remove('hidden');
+}
+
+async function loadOptions(item) {
+  const wrap   = document.getElementById('options-wrap');
+  const sel    = document.getElementById('new-belt-select');
+  sel.innerHTML = '<option value="">Loading options…</option>';
+  wrap.classList.remove('hidden');
+
+  try {
+    const res  = await fetch(API_BASE + '/api/exchange-options', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ parentProductId: item.parentProductId })
+    });
+    const data = await res.json();
+    const opts = (data.options || []).filter(o => o.sku !== item.sku);
+
+    sel.innerHTML = '<option value="">Select a size/color…</option>';
+    opts.forEach(opt => {
+      const o = document.createElement('option');
+      o.value = JSON.stringify({ sku: opt.sku, name: opt.name });
+      o.textContent = opt.name;
+      sel.appendChild(o);
+    });
+
+    if (opts.length === 0) {
+      sel.innerHTML = '<option value="">No other sizes available — contact us</option>';
+    }
+  } catch (e) {
+    sel.innerHTML = '<option value="">Error loading options — please refresh</option>';
+  }
+}
+
+// ── Submit Exchange ───────────────────────────────────────────────────────────
+async function submitExchange() {
+  const btn      = document.getElementById('btn-submit');
+  const selVal   = document.getElementById('new-belt-select').value;
+  const notes    = document.getElementById('notes').value.trim();
+  const noOptEl  = document.getElementById('msg-no-option');
+  const errEl    = document.getElementById('msg-submit-error');
+
+  noOptEl.classList.add('hidden');
+  noOptEl.classList.remove('show');
+  errEl.classList.add('hidden');
+  errEl.classList.remove('show');
+
+  if (!selVal) {
+    noOptEl.classList.remove('hidden');
+    noOptEl.classList.add('show');
+    return;
+  }
+
+  let parsed;
+  try { parsed = JSON.parse(selVal); } catch(e) { return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Submitting…';
+
+  try {
+    const res  = await fetch(API_BASE + '/api/submit-exchange', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        originalOrderId:     verifyData.orderId,
+        originalOrderNumber: verifyData.orderNumber,
+        customerEmail:       verifyData.customerEmail,
+        customerName:        verifyData.customerName,
+        shipTo:              verifyData.shipTo,
+        selectedSku:         parsed.sku,
+        selectedName:        parsed.name,
+        notes:               notes,
+      })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      document.getElementById('success-body').textContent =
+        `We'll ship ${parsed.name} to you.`;
+      document.getElementById('success-order-number').textContent =
+        `Exchange Order: ${data.exchangeOrderNumber}`;
+      showStep('success');
+    } else {
+      throw new Error(data.error || 'Unknown error');
+    }
+  } catch (e) {
+    errEl.classList.remove('hidden');
+    errEl.classList.add('show');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = 'Submit Exchange Request';
+}
+</script>
+</body>
+</html>
