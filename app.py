@@ -1110,9 +1110,11 @@ def exchange_options():
         for rec in records:
             fields = rec.get("fields", {})
             if parent_product_id in fields.get("Parent Product", []):
+                raw_name = fields.get("Name + Variations", "")
+                clean_name = raw_name.replace(" - Base Only (-ONB)", "").replace(" - Base Only", "").replace(" (-ONB)", "").strip()
                 options.append({
                     "id":   rec["id"],
-                    "name": fields.get("Name + Variations", ""),
+                    "name": clean_name,
                     "sku":  fields.get("SKU ID", ""),
                 })
         options.sort(key=lambda x: x["name"])
