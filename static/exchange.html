@@ -322,7 +322,7 @@
 
   <!-- ── STEP 1: Verify Order ── -->
   <div id="step-1" class="card">
-    <div class="card-title">Step 1 — Check Eligibility</div>
+    <div class="card-title">Step 1 — Verify Your Order</div>
     <p class="card-subtitle">Enter your order details to check eligibility</p>
 
     <div class="field">
@@ -334,12 +334,12 @@
       <input type="text" id="last-name-input" placeholder="Last name on the order" autocomplete="off">
     </div>
     <div class="field-group">
-      <label>Email Address <span class="hint">(or last name above)</span></label>
+      <label>Email Address <span class="req">*</span></label>
       <input type="email" id="email-input" placeholder="Email used on the order" autocomplete="off">
     </div>
 
     <button class="btn btn-primary" id="btn-verify" onclick="verifyExchange()">
-      Check Eligibility
+      Continue
     </button>
 
     <div class="message message-error" id="msg-not-found">
