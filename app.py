@@ -587,7 +587,7 @@ def submit_cancellation():
         "Reason for Return":              reason_str,
         "Submission Date":                datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "Status":                         "Needs Refund",
-        "Type":                           "Cancellation",
+        "Type":                           "Canceled",
         "WooCommerce Order Link":         wc_link,
     }
     fields = {k: v for k, v in fields.items() if v}
@@ -916,6 +916,7 @@ def submit_return():
         "Ship Date from Shipstation":     data.get("shipDate", "")[:10] if data.get("shipDate") else "",
         "Eligible Until":                 data.get("eligibleUntil", "")[:10] if data.get("eligibleUntil") else "",
         "Status":                         "New",
+        "Type":                           "Returned",
         "WooCommerce Order Link":         wc_link,
     }
     fields = {k: v for k, v in fields.items() if v}
