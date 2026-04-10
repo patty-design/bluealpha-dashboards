@@ -425,6 +425,7 @@ def cs_lookup_order():
             "status":       "found",
             "orderId":      order.get("orderId"),
             "orderKey":     order.get("orderKey", ""),
+            "orderStatus":  order.get("orderStatus", ""),
             "customerName": ship_to.get("name", ""),
             "email":        order.get("customerEmail", ""),
             "phone":        phone,
@@ -443,6 +444,192 @@ def cs_lookup_order():
     except Exception as e:
         return Response(json.dumps({"status": "error", "error": str(e)}),
                         status=500, headers=c, mimetype="application/json")
+
+
+def cancel_in_shipstation(order_id, items_to_cancel):
+    """Void full order or remove specific items and re-save. Returns (success, note)."""
+    try:
+        # Fetch current order by ID
+        r = req_lib.get(
+            f"https://ssapi.shipstation.com/orders/{order_id}",
+            headers=ss_headers(), timeout=15,
+        )
+        if r.status_code != 200:
+            return False, f"Could not fetch order from ShipStation (HTTP {r.status_code})"
+        order = r.json()
+
+        current_items = order.get("items", [])
+
+        # Build cancel map: sku → qty to remove
+        cancel_map = {}
+        for item in items_to_cancel:
+            sku = (item.get("sku") or "").strip()
+            if sku:
+                cancel_map[sku] = cancel_map.get(sku, 0) + int(item.get("quantity", 1))
+
+        # Determine remaining items after cancellation
+        remaining = []
+        for item in current_items:
+            sku = (item.get("sku") or "").strip()
+            qty = item.get("quantity", 1)
+            if sku in cancel_map:
+                remaining_qty = qty - cancel_map[sku]
+                if remaining_qty > 0:
+                    item = dict(item)
+                    item["quantity"] = remaining_qty
+                    remaining.append(item)
+                # else: fully cancelled — omit from remaining
+            else:
+                remaining.append(item)
+
+        if not remaining:
+            # All items cancelled — void the entire order
+            void_r = req_lib.post(
+                f"https://ssapi.shipstation.com/orders/{order_id}/void",
+                headers=ss_headers(), timeout=10,
+            )
+            if void_r.status_code in (200, 201):
+                return True, "Order voided in ShipStation"
+            return False, f"Void failed (HTTP {void_r.status_code})"
+        else:
+            # Partial: update order with only the remaining items
+            internal_note = (order.get("internalNotes") or "").strip()
+            internal_note += (" | " if internal_note else "") + "Partial cancellation — some items removed"
+            payload = {
+                "orderId":         order.get("orderId"),
+                "orderNumber":     order.get("orderNumber"),
+                "orderKey":        order.get("orderKey"),
+                "orderDate":       order.get("orderDate"),
+                "orderStatus":     order.get("orderStatus", "awaiting_shipment"),
+                "customerEmail":   order.get("customerEmail", ""),
+                "billTo":          order.get("billTo", {}),
+                "shipTo":          order.get("shipTo", {}),
+                "items":           remaining,
+                "amountPaid":      order.get("amountPaid", 0),
+                "taxAmount":       order.get("taxAmount", 0),
+                "shippingAmount":  order.get("shippingAmount", 0),
+                "internalNotes":   internal_note,
+                "advancedOptions": order.get("advancedOptions", {}),
+            }
+            upd_r = req_lib.post(
+                "https://ssapi.shipstation.com/orders/createorder",
+                headers={**ss_headers(), "Content-Type": "application/json"},
+                json=payload, timeout=20,
+            )
+            if upd_r.status_code in (200, 201):
+                return True, "Partial cancellation applied in ShipStation"
+            return False, f"Order update failed (HTTP {upd_r.status_code}): {upd_r.text[:200]}"
+
+    except Exception as e:
+        return False, f"Exception during ShipStation cancellation: {e}"
+
+
+@app.route("/api/submit-cancellation", methods=["POST", "OPTIONS"])
+def submit_cancellation():
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    data = request.get_json() or {}
+
+    # Validate CS password
+    if not CS_ADMIN_PASSWORD or data.get("csPassword", "") != CS_ADMIN_PASSWORD:
+        return Response(json.dumps({"success": False, "error": "Unauthorized"}),
+                        status=401, headers=c, mimetype="application/json")
+
+    if not RETURNS_TABLE_ID or not RETURNS_WRITE_TOKEN:
+        return Response(json.dumps({"success": False, "error": "Airtable not configured"}),
+                        status=500, headers=c, mimetype="application/json")
+
+    from datetime import datetime, timezone
+
+    order_number  = data.get("orderNumber", "")
+    order_id      = data.get("orderId")
+    customer_name = data.get("customerName", "")
+    items         = data.get("items", [])   # [{sku, name, quantity}]
+    reason        = data.get("reason", "")
+    cs_notes      = data.get("csNotes", "").strip()
+
+    items_text = "\n".join(
+        f"{i.get('quantity', 1)}x {i.get('sku', '')} — {i.get('name', '')}"
+        for i in items
+    )
+
+    wc_link = (f"https://www.bluealphabelts.com/wp-admin/post.php"
+               f"?post={order_id}&action=edit")
+
+    reason_str = f"[CANCELLATION] {reason}" + (f" — {cs_notes}" if cs_notes else "")
+
+    fields = {
+        "Order Number":                   order_number,
+        "Customer Name from Shipstation": customer_name,
+        "Items to Return":                items_text,
+        "Reason for Return":              reason_str,
+        "Submission Date":                datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "Status":                         "Needs Refund",
+        "Type":                           "Cancellation",
+        "WooCommerce Order Link":         wc_link,
+    }
+    fields = {k: v for k, v in fields.items() if v}
+
+    # Create Airtable record
+    try:
+        r = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
+            headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
+            json={"fields": fields},
+            timeout=10,
+        )
+        if r.status_code not in (200, 201):
+            return Response(json.dumps({"success": False, "error": r.text}),
+                            status=500, headers=c, mimetype="application/json")
+        record_id = r.json().get("id", "")
+    except Exception as e:
+        return Response(json.dumps({"success": False, "error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
+
+    # Handle Return Items creation + ShipStation cancellation in background
+    def process_cancellation(record_id, order_id, items):
+        # Create Return Items with Received auto-checked (items never shipped)
+        for item in items:
+            try:
+                qty = int(item.get("quantity", 1))
+                req_lib.post(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURN_ITEMS_TABLE_ID}",
+                    headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}",
+                             "Content-Type": "application/json"},
+                    json={"fields": {
+                        "Item Name":     item.get("name") or item.get("sku", ""),
+                        "SKU":           item.get("sku", ""),
+                        "Qty Submitted": qty,
+                        "Qty Received":  qty,
+                        "Received":      True,
+                        "Return":        [record_id],
+                    }},
+                    timeout=10,
+                )
+            except Exception as e:
+                print(f"[submit_cancellation] Return Item creation failed: {e}")
+
+        # Cancel / update in ShipStation
+        ss_success, ss_note = cancel_in_shipstation(order_id, items)
+        status_notes = ss_note if not ss_success else ""
+
+        try:
+            patch_fields = {"Status Notes": (ss_note if not ss_success else "Cancelled in ShipStation")}
+            req_lib.patch(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
+                headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}",
+                         "Content-Type": "application/json"},
+                json={"fields": patch_fields},
+                timeout=10,
+            )
+        except Exception as e:
+            print(f"[submit_cancellation] Airtable status update failed: {e}")
+
+    threading.Thread(target=process_cancellation, args=(record_id, order_id, items), daemon=True).start()
+
+    return Response(json.dumps({"success": True, "recordId": record_id}),
+                    headers=c, mimetype="application/json")
 
 
 LEAF_PRODUCT_TYPES = {"Base Product", "Resell", "Made-to-Order Base Product", "x-Base Product"}

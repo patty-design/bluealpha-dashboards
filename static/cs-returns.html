@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Blue Alpha — CS Returns Portal</title>
+  <title>Blue Alpha — CS Portal</title>
   <link rel="icon" href="https://www.bluealphabelts.com/wp-content/uploads/2019/05/cropped-BAG-FAV-32x32.png">
   <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
   <style>
@@ -20,6 +20,9 @@
       --amber:  #7a4e00;
       --amber-bg: #fff8ed;
       --amber-border: #f5dca0;
+      --green:  #1a5c2a;
+      --green-bg: #f0faf3;
+      --green-border: #a3d4b0;
     }
 
     body {
@@ -79,6 +82,36 @@
       line-height: 1.5;
     }
 
+    /* Mode toggle */
+    .mode-toggle {
+      display: flex;
+      background: #eef1f5;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px;
+      margin-bottom: 28px;
+      gap: 4px;
+    }
+    .mode-btn {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      cursor: pointer;
+      background: transparent;
+      color: var(--muted);
+      transition: all 0.18s;
+    }
+    .mode-btn.active {
+      background: var(--navy);
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(0,58,108,0.18);
+    }
+
     .card {
       background: var(--white);
       border: 1px solid var(--border);
@@ -95,16 +128,15 @@
       margin-bottom: 24px;
     }
 
-    .exception-banner {
-      background: var(--amber-bg);
-      border: 1px solid var(--amber-border);
+    .info-banner {
       border-radius: 6px;
       padding: 12px 16px;
       font-size: 0.88rem;
-      color: var(--amber);
-      margin-bottom: 24px;
       line-height: 1.5;
+      margin-bottom: 24px;
     }
+    .banner-amber { background: var(--amber-bg); border: 1px solid var(--amber-border); color: var(--amber); }
+    .banner-green { background: var(--green-bg); border: 1px solid var(--green-border); color: var(--green); }
 
     .field { margin-bottom: 20px; }
     label {
@@ -174,7 +206,7 @@
     .lookup-bar input { flex: 1; margin: 0; }
     .lookup-bar .btn { width: auto; }
 
-    /* ── Item rows (same as customer form) ── */
+    /* Item rows */
     .items-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 8px; }
     .item-row {
       display: flex;
@@ -229,6 +261,17 @@
     }
     .order-info strong { color: var(--navy); }
 
+    .already-shipped-banner {
+      background: #fff0f0;
+      border: 1px solid #f5c2c2;
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      font-size: 0.88rem;
+      color: #7a1515;
+      line-height: 1.5;
+    }
+
     .success-screen { text-align: center; padding: 12px 0 8px; }
     .success-icon {
       width: 64px; height: 64px;
@@ -261,6 +304,8 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     .hidden { display: none !important; }
+    .field-hint { font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
+    .validation-msg { display: none; margin-top: 6px; color: #7a1515; font-size: 0.875rem; font-weight: 600; }
 
     @media (max-width: 480px) {
       .card { padding: 24px 18px; }
@@ -274,15 +319,15 @@
 <header>
   <a href="https://www.bluealphabelts.com" target="_blank"><img src="https://www.bluealphabelts.com/wp-content/uploads/2024/04/logo-1.png" alt="Blue Alpha"></a>
   <div class="header-divider"></div>
-  <span class="header-title">Returns</span>
-  <span class="cs-badge">CS Portal</span>
+  <span class="header-title">CS Portal</span>
+  <span class="cs-badge">Internal Only</span>
 </header>
 
 <div class="container">
 
   <!-- LOGIN -->
   <div id="screen-login">
-    <h1 class="page-title">CS Returns Portal</h1>
+    <h1 class="page-title">CS Portal</h1>
     <p class="page-subtitle">Internal use only. Enter your CS portal password to continue.</p>
     <div class="card">
       <div class="card-title">Sign In</div>
@@ -300,14 +345,28 @@
 
   <!-- MAIN FORM -->
   <div id="screen-main" class="hidden">
-    <h1 class="page-title">CS Exception Return</h1>
-    <p class="page-subtitle">Use this form for customers whose orders don't pass normal eligibility — exception already approved.</p>
+    <h1 class="page-title" id="form-title">CS Exception Return</h1>
+    <p class="page-subtitle" id="form-subtitle">For customers whose orders don't pass normal eligibility — exception already approved.</p>
+
+    <!-- Mode Toggle -->
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="btn-mode-return" onclick="setMode('return')">↩ Return</button>
+      <button class="mode-btn" id="btn-mode-cancel" onclick="setMode('cancel')">✕ Cancellation</button>
+    </div>
 
     <div class="card">
-      <div class="exception-banner">
+
+      <!-- Return banner -->
+      <div id="banner-return" class="info-banner banner-amber">
         ⚠️ <strong>Exception flow</strong> — Order eligibility checks are bypassed. Only use this after the exception has been approved.
       </div>
 
+      <!-- Cancellation banner -->
+      <div id="banner-cancel" class="info-banner banner-green hidden">
+        ✓ <strong>Cancellation request</strong> — For unshipped orders only. Select which items the customer wants cancelled. The order will be updated in ShipStation and flagged for refund.
+      </div>
+
+      <!-- Order lookup (shared) -->
       <div class="field">
         <label>Order Number <span class="req">*</span></label>
         <div class="lookup-bar">
@@ -319,29 +378,39 @@
       </div>
 
       <div id="order-info-block" class="hidden">
+
+        <!-- Already shipped warning (cancellation mode only) -->
+        <div id="already-shipped-warning" class="already-shipped-banner hidden">
+          ⚠️ <strong>This order may have already shipped.</strong> Confirm with the warehouse before proceeding with a cancellation.
+        </div>
+
         <div class="order-info" id="order-info-text"></div>
 
+        <!-- Items (shared, label changes by mode) -->
         <div class="field">
-          <label>Items to Return <span class="req">*</span></label>
+          <label id="items-label">Items to Return <span class="req">*</span></label>
           <div class="items-list" id="cs-items-list"></div>
-          <div id="msg-no-item" style="display:none; margin-top:6px; color:#7a1515; font-size:0.875rem; font-weight:600;">⚠ Please select at least one item.</div>
+          <div class="validation-msg" id="msg-no-item">⚠ Please select at least one item.</div>
         </div>
 
-        <div class="field">
+        <!-- Email (return only) -->
+        <div class="field" id="field-email">
           <label>Customer Email <span class="req">*</span></label>
           <input type="email" id="cs-email" placeholder="Customer's email for label delivery">
-          <div id="msg-no-email" style="display:none; margin-top:6px; color:#7a1515; font-size:0.875rem; font-weight:600;">⚠ Email required to send the label.</div>
+          <div class="validation-msg" id="msg-no-email">⚠ Email required to send the label.</div>
         </div>
 
-        <div class="field">
+        <!-- Address (return only) -->
+        <div class="field" id="field-address">
           <label>Return Label Address</label>
           <div class="address-block" id="cs-address-display"></div>
-          <div style="font-size:0.8rem; color:var(--muted); margin-top:6px;">Pulled from ShipStation. Label will ship from this address.</div>
+          <p class="field-hint">Pulled from ShipStation. Label will ship from this address.</p>
         </div>
 
-        <div class="field">
+        <!-- Reason (return) -->
+        <div class="field" id="field-reason-return">
           <label>Return Reason <span class="req">*</span></label>
-          <select id="cs-reason">
+          <select id="cs-reason-return">
             <option value="">Select a reason…</option>
             <option value="Changed my mind">Changed my mind</option>
             <option value="Doesn't work with my setup">Doesn't work with my setup</option>
@@ -349,11 +418,27 @@
             <option value="International — exception approved">International — exception approved</option>
             <option value="Other exception">Other exception</option>
           </select>
-          <div id="msg-no-reason" style="display:none; margin-top:6px; color:#7a1515; font-size:0.875rem; font-weight:600;">⚠ Please select a reason.</div>
+          <div class="validation-msg" id="msg-no-reason-return">⚠ Please select a reason.</div>
         </div>
 
+        <!-- Reason (cancellation) -->
+        <div class="field hidden" id="field-reason-cancel">
+          <label>Cancellation Reason <span class="req">*</span></label>
+          <select id="cs-reason-cancel">
+            <option value="">Select a reason…</option>
+            <option value="Customer changed mind">Customer changed mind</option>
+            <option value="Wrong item ordered">Wrong item ordered</option>
+            <option value="Delivery time too long">Delivery time too long</option>
+            <option value="Found better price">Found better price</option>
+            <option value="Duplicate order">Duplicate order</option>
+            <option value="Other">Other</option>
+          </select>
+          <div class="validation-msg" id="msg-no-reason-cancel">⚠ Please select a reason.</div>
+        </div>
+
+        <!-- Notes (shared) -->
         <div class="field">
-          <label>Exception Notes</label>
+          <label id="notes-label">Exception Notes</label>
           <textarea id="cs-notes" placeholder="Who approved it, why, any relevant context…"></textarea>
         </div>
 
@@ -363,36 +448,57 @@
         </div>
 
         <div style="margin-top: 24px;">
-          <button class="btn btn-primary" id="btn-cs-submit" onclick="csSubmitReturn()">Submit &amp; Send Label</button>
+          <button class="btn btn-primary" id="btn-cs-submit" onclick="handleSubmit()">
+            Submit &amp; Send Label
+          </button>
         </div>
+
       </div>
     </div>
   </div>
 
-  <!-- SUCCESS -->
+  <!-- SUCCESS (shared container, different inner screens) -->
   <div id="screen-success" class="hidden">
     <div class="card">
-      <div id="cs-success-pending" class="success-screen">
+
+      <!-- Return: processing -->
+      <div id="return-success-pending" class="success-screen hidden">
         <div style="margin-bottom:20px;"><svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="animation:spin 1s linear infinite;display:inline-block"><circle cx="24" cy="24" r="20" stroke="#DDD8C4" stroke-width="4"/><path d="M24 4a20 20 0 0 1 20 20" stroke="#1B2438" stroke-width="4" stroke-linecap="round"/></svg></div>
         <h2>Processing…</h2>
         <p>Creating return label and sending to customer…</p>
       </div>
-      <div id="cs-success-sent" class="success-screen hidden">
+
+      <!-- Return: label sent -->
+      <div id="return-success-sent" class="success-screen hidden">
         <div class="success-icon">✓</div>
         <h2>Label Sent!</h2>
         <p id="cs-success-msg">The return label has been emailed to the customer.</p>
         <div style="margin-top:28px;">
-          <button onclick="resetForm()" class="btn btn-primary">Submit Another Return</button>
+          <button onclick="resetForm()" class="btn btn-primary">Submit Another</button>
         </div>
       </div>
-      <div id="cs-success-review" class="success-screen hidden">
+
+      <!-- Return: needs review -->
+      <div id="return-success-review" class="success-screen hidden">
         <div style="font-size:2rem; margin-bottom:16px;">⚠️</div>
         <h2>Needs Manual Review</h2>
         <p>Return was saved to Airtable, but the label couldn't be auto-generated. Please create the label manually in ShipStation and send it to the customer.</p>
         <div style="margin-top:28px;">
-          <button onclick="resetForm()" class="btn btn-primary">Submit Another Return</button>
+          <button onclick="resetForm()" class="btn btn-primary">Submit Another</button>
         </div>
       </div>
+
+      <!-- Cancellation: logged -->
+      <div id="cancel-success" class="success-screen hidden">
+        <div class="success-icon">✓</div>
+        <h2>Cancellation Logged</h2>
+        <p id="cancel-success-msg">The cancellation request has been recorded in Airtable and the order is being updated in ShipStation.</p>
+        <p style="margin-top:8px; font-size:0.85rem;">The manager will see this on the refund queue and process the refund.</p>
+        <div style="margin-top:28px;">
+          <button onclick="resetForm()" class="btn btn-primary">Submit Another</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -401,8 +507,10 @@
 <script>
 const API_BASE = '';
 let csPassword = '';
-let orderData = null;
+let orderData  = null;
+let currentMode = 'return'; // 'return' | 'cancel'
 
+// ── Login ──────────────────────────────────────────────────────────────────
 async function csLogin() {
   const pw = document.getElementById('cs-password').value;
   document.getElementById('msg-wrong-password').classList.remove('show');
@@ -430,6 +538,50 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cs-order-number').addEventListener('keydown', e => { if (e.key === 'Enter') lookupOrder(); });
 });
 
+// ── Mode toggle ────────────────────────────────────────────────────────────
+function setMode(mode) {
+  currentMode = mode;
+  const isReturn = mode === 'return';
+
+  document.getElementById('btn-mode-return').classList.toggle('active', isReturn);
+  document.getElementById('btn-mode-cancel').classList.toggle('active', !isReturn);
+
+  // Titles
+  document.getElementById('form-title').textContent     = isReturn ? 'CS Exception Return'          : 'CS Cancellation Request';
+  document.getElementById('form-subtitle').textContent  = isReturn ? "For customers whose orders don't pass normal eligibility — exception already approved."
+                                                                    : 'For unshipped orders the customer wants cancelled. Select items to cancel and submit.';
+  // Banners
+  document.getElementById('banner-return').classList.toggle('hidden', !isReturn);
+  document.getElementById('banner-cancel').classList.toggle('hidden', isReturn);
+
+  // Items label
+  document.getElementById('items-label').innerHTML = (isReturn ? 'Items to Return' : 'Items to Cancel') + ' <span class="req">*</span>';
+
+  // Return-only fields
+  document.getElementById('field-email').classList.toggle('hidden', !isReturn);
+  document.getElementById('field-address').classList.toggle('hidden', !isReturn);
+
+  // Reason fields
+  document.getElementById('field-reason-return').classList.toggle('hidden', !isReturn);
+  document.getElementById('field-reason-cancel').classList.toggle('hidden', isReturn);
+
+  // Notes label
+  document.getElementById('notes-label').textContent = isReturn ? 'Exception Notes' : 'CS Notes';
+  document.getElementById('cs-notes').placeholder    = isReturn ? 'Who approved it, why, any relevant context…'
+                                                                 : 'Any additional context from the customer…';
+
+  // Submit button
+  document.getElementById('btn-cs-submit').innerHTML = isReturn ? 'Submit &amp; Send Label' : 'Submit Cancellation Request';
+
+  // Reset order info if mode changes mid-lookup
+  document.getElementById('order-info-block').classList.add('hidden');
+  document.getElementById('msg-order-not-found').classList.remove('show');
+  document.getElementById('msg-lookup-error').classList.remove('show');
+  document.getElementById('cs-order-number').value = '';
+  orderData = null;
+}
+
+// ── Order lookup ───────────────────────────────────────────────────────────
 async function lookupOrder() {
   const btn = document.getElementById('btn-lookup');
   const orderNum = document.getElementById('cs-order-number').value.trim();
@@ -462,15 +614,24 @@ async function lookupOrder() {
 }
 
 function populateOrderInfo(data) {
+  const orderNum = document.getElementById('cs-order-number').value.trim();
   document.getElementById('order-info-text').innerHTML =
-    '<strong>Order #' + document.getElementById('cs-order-number').value.trim() + '</strong> — ' + (data.customerName || 'Unknown customer') + '<br>' +
-    (data.email ? '📧 ' + data.email + '<br>' : '') +
+    '<strong>Order #' + orderNum + '</strong> — ' + (data.customerName || 'Unknown customer') + '<br>' +
+    (data.email    ? '📧 ' + data.email + '<br>'                  : '') +
     (data.shipDate ? '📦 Shipped: ' + data.shipDate.slice(0,10) + '<br>' : '');
+
   buildItemsList(data.items || []);
+
+  // Email + address (return mode)
   document.getElementById('cs-email').value = data.email || '';
-  const a = data.address;
-  const addrLines = [a.name, a.street1, a.street2, a.city + ', ' + a.state + ' ' + a.postalCode].filter(Boolean);
+  const a = data.address || {};
+  const addrLines = [a.name, a.street1, a.street2, a.city && (a.city + ', ' + a.state + ' ' + a.postalCode)].filter(Boolean);
   document.getElementById('cs-address-display').innerHTML = addrLines.join('<br>');
+
+  // Show "already shipped" warning in cancellation mode if order isn't awaiting shipment
+  const shipped = data.orderStatus && data.orderStatus !== 'awaiting_shipment' && data.orderStatus !== 'on_hold';
+  document.getElementById('already-shipped-warning').classList.toggle('hidden', currentMode !== 'cancel' || !shipped);
+
   document.getElementById('order-info-block').classList.remove('hidden');
 }
 
@@ -490,7 +651,7 @@ function buildItemsList(items) {
       '</div>' +
       '<div class="item-qty">Qty: ' + item.quantity + '</div>' +
       (isMulti
-        ? '<div class="item-qty-selector"><input type="number" min="1" max="' + item.quantity + '" value="' + item.quantity + '" class="return-qty-input" onclick="event.stopPropagation()" oninput="this.value=Math.min(' + item.quantity + ',Math.max(1,parseInt(this.value)||1))"> of ' + item.quantity + '</div>'
+        ? '<div class="item-qty-selector"><input type="number" min="1" max="' + item.quantity + '" value="' + item.quantity + '" class="cancel-qty-input" onclick="event.stopPropagation()" oninput="this.value=Math.min(' + item.quantity + ',Math.max(1,parseInt(this.value)||1))"> of ' + item.quantity + '</div>'
         : '');
     row.addEventListener('click', function() { row.classList.toggle('selected'); });
     list.appendChild(row);
@@ -502,31 +663,43 @@ function getSelectedItems() {
   document.querySelectorAll('#cs-items-list .item-row.selected').forEach(function(row) {
     const idx = parseInt(row.dataset.idx);
     const item = Object.assign({}, orderData.items[idx]);
-    const qtyInput = row.querySelector('.return-qty-input');
+    const qtyInput = row.querySelector('.cancel-qty-input');
     if (qtyInput) item.quantity = Math.min(item.quantity, Math.max(1, parseInt(qtyInput.value) || 1));
     selected.push(item);
   });
   return selected;
 }
 
+// ── Submit routing ─────────────────────────────────────────────────────────
+function handleSubmit() {
+  if (currentMode === 'return') {
+    csSubmitReturn();
+  } else {
+    csSubmitCancellation();
+  }
+}
+
+// ── Submit: Return ─────────────────────────────────────────────────────────
 async function csSubmitReturn() {
   const btn = document.getElementById('btn-cs-submit');
   const errEl = document.getElementById('msg-submit-error');
   errEl.classList.add('hidden');
   const selectedItems = getSelectedItems();
-  const email = document.getElementById('cs-email').value.trim();
-  const reason = document.getElementById('cs-reason').value;
+  const email  = document.getElementById('cs-email').value.trim();
+  const reason = document.getElementById('cs-reason-return').value;
   let valid = true;
-  if (selectedItems.length === 0) { document.getElementById('msg-no-item').style.display = 'block'; valid = false; }
-  if (!email) { document.getElementById('msg-no-email').style.display = 'block'; valid = false; }
-  if (!reason) { document.getElementById('msg-no-reason').style.display = 'block'; valid = false; }
+  if (selectedItems.length === 0) { document.getElementById('msg-no-item').style.display = 'block';         valid = false; }
+  if (!email)                      { document.getElementById('msg-no-email').style.display = 'block';        valid = false; }
+  if (!reason)                     { document.getElementById('msg-no-reason-return').style.display = 'block'; valid = false; }
   if (!valid) return;
-  document.getElementById('msg-no-item').style.display = 'none';
-  document.getElementById('msg-no-email').style.display = 'none';
-  document.getElementById('msg-no-reason').style.display = 'none';
-  const itemsSummary = selectedItems.map(function(i) { return i.quantity + 'x ' + i.sku + ' — ' + i.name; }).join('\n');
-  const csNotes = document.getElementById('cs-notes').value.trim();
+  document.getElementById('msg-no-item').style.display         = 'none';
+  document.getElementById('msg-no-email').style.display        = 'none';
+  document.getElementById('msg-no-reason-return').style.display = 'none';
+
+  const itemsSummary = selectedItems.map(i => i.quantity + 'x ' + i.sku + ' — ' + i.name).join('\n');
+  const csNotes  = document.getElementById('cs-notes').value.trim();
   const orderNum = document.getElementById('cs-order-number').value.trim();
+
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Submitting…';
   try {
@@ -555,6 +728,7 @@ async function csSubmitReturn() {
       document.getElementById('screen-main').classList.add('hidden');
       document.getElementById('screen-success').classList.remove('hidden');
       document.getElementById('cs-success-msg').textContent = 'The return label has been emailed to ' + email + '.';
+      showSuccessState('return-success-pending');
       pollStatus(data.recordId);
     } else {
       throw new Error(data.error || 'Unknown error');
@@ -566,38 +740,93 @@ async function csSubmitReturn() {
   btn.innerHTML = 'Submit &amp; Send Label';
 }
 
+// ── Submit: Cancellation ───────────────────────────────────────────────────
+async function csSubmitCancellation() {
+  const btn = document.getElementById('btn-cs-submit');
+  const errEl = document.getElementById('msg-submit-error');
+  errEl.classList.add('hidden');
+  const selectedItems = getSelectedItems();
+  const reason = document.getElementById('cs-reason-cancel').value;
+  let valid = true;
+  if (selectedItems.length === 0) { document.getElementById('msg-no-item').style.display = 'block';         valid = false; }
+  if (!reason)                     { document.getElementById('msg-no-reason-cancel').style.display = 'block'; valid = false; }
+  if (!valid) return;
+  document.getElementById('msg-no-item').style.display          = 'none';
+  document.getElementById('msg-no-reason-cancel').style.display = 'none';
+
+  const csNotes  = document.getElementById('cs-notes').value.trim();
+  const orderNum = document.getElementById('cs-order-number').value.trim();
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Submitting…';
+  try {
+    const res = await fetch(API_BASE + '/api/submit-cancellation', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        orderNumber:  orderNum,
+        orderId:      orderData.orderId,
+        customerName: orderData.customerName,
+        items:        selectedItems,
+        reason:       reason,
+        csNotes:      csNotes,
+        csPassword:   csPassword,
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById('screen-main').classList.add('hidden');
+      document.getElementById('screen-success').classList.remove('hidden');
+      const itemCount = selectedItems.length;
+      const allItems  = orderData.items && selectedItems.length >= orderData.items.length;
+      document.getElementById('cancel-success-msg').textContent =
+        (allItems ? 'The full order' : itemCount + ' item(s)') +
+        ' will be cancelled in ShipStation. The manager will see this on the refund queue.';
+      showSuccessState('cancel-success');
+    } else {
+      throw new Error(data.error || 'Unknown error');
+    }
+  } catch (e) {
+    errEl.classList.remove('hidden');
+  }
+  btn.disabled = false;
+  btn.innerHTML = 'Submit Cancellation Request';
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function showSuccessState(id) {
+  ['return-success-pending','return-success-sent','return-success-review','cancel-success']
+    .forEach(s => document.getElementById(s).classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
 async function pollStatus(recordId, attempts) {
   attempts = attempts || 0;
   try {
     const res = await fetch(API_BASE + '/api/return-status/' + recordId);
     const data = await res.json();
-    if (data.status === 'Label Sent') { showCsSuccessState('sent'); }
-    else if (data.status === 'Needs Review') { showCsSuccessState('review'); }
-    else if (attempts < 12) { setTimeout(function() { pollStatus(recordId, attempts + 1); }, 5000); }
-    else { showCsSuccessState('sent'); }
+    if (data.status === 'Label Sent')   { showSuccessState('return-success-sent'); }
+    else if (data.status === 'Needs Review') { showSuccessState('return-success-review'); }
+    else if (attempts < 12) { setTimeout(() => pollStatus(recordId, attempts + 1), 5000); }
+    else { showSuccessState('return-success-sent'); }
   } catch (e) {
-    if (attempts < 12) setTimeout(function() { pollStatus(recordId, attempts + 1); }, 5000);
-    else showCsSuccessState('sent');
+    if (attempts < 12) setTimeout(() => pollStatus(recordId, attempts + 1), 5000);
+    else showSuccessState('return-success-sent');
   }
-}
-
-function showCsSuccessState(state) {
-  document.getElementById('cs-success-pending').classList.add('hidden');
-  document.getElementById('cs-success-sent').classList.add('hidden');
-  document.getElementById('cs-success-review').classList.add('hidden');
-  document.getElementById('cs-success-' + state).classList.remove('hidden');
 }
 
 function resetForm() {
   orderData = null;
-  document.getElementById('cs-order-number').value = '';
-  document.getElementById('order-info-block').classList.add('hidden');
+  document.getElementById('cs-order-number').value  = '';
   document.getElementById('cs-items-list').innerHTML = '';
-  document.getElementById('cs-email').value = '';
-  document.getElementById('cs-reason').value = '';
-  document.getElementById('cs-notes').value = '';
+  document.getElementById('cs-email').value          = '';
+  document.getElementById('cs-reason-return').value  = '';
+  document.getElementById('cs-reason-cancel').value  = '';
+  document.getElementById('cs-notes').value          = '';
+  document.getElementById('order-info-block').classList.add('hidden');
   document.getElementById('screen-success').classList.add('hidden');
   document.getElementById('screen-main').classList.remove('hidden');
+  // Stay in current mode
 }
 </script>
 </body>
