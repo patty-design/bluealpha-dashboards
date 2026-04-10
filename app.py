@@ -549,6 +549,27 @@ def submit_cancellation():
     reason        = data.get("reason", "")
     cs_notes      = data.get("csNotes", "").strip()
 
+    # Verify order has not yet shipped before allowing cancellation
+    CANCELLABLE_STATUSES = {"awaiting_shipment", "awaiting_payment", "on_hold"}
+    try:
+        ss_r = req_lib.get(
+            f"https://ssapi.shipstation.com/orders/{order_id}",
+            headers=ss_headers(), timeout=10,
+        )
+        if ss_r.status_code == 200:
+            ss_status = ss_r.json().get("orderStatus", "")
+            if ss_status and ss_status not in CANCELLABLE_STATUSES:
+                return Response(
+                    json.dumps({
+                        "success": False,
+                        "error": f"Order cannot be cancelled — it has already shipped (status: {ss_status}).",
+                    }),
+                    status=400, headers=c, mimetype="application/json",
+                )
+    except Exception as e:
+        print(f"[submit_cancellation] Status check failed: {e}")
+        # Don't block if the check itself errors — proceed and let ShipStation handle it
+
     items_text = "\n".join(
         f"{i.get('quantity', 1)}x {i.get('sku', '')} — {i.get('name', '')}"
         for i in items

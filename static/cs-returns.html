@@ -379,9 +379,10 @@
 
       <div id="order-info-block" class="hidden">
 
-        <!-- Already shipped warning (cancellation mode only) -->
+        <!-- Already shipped — BLOCKS cancellation -->
         <div id="already-shipped-warning" class="already-shipped-banner hidden">
-          ⚠️ <strong>This order may have already shipped.</strong> Confirm with the warehouse before proceeding with a cancellation.
+          🚫 <strong>This order has already shipped and cannot be cancelled here.</strong>
+          If the customer wants to return items once received, switch to the <strong>Return</strong> tab instead.
         </div>
 
         <div class="order-info" id="order-info-text"></div>
@@ -506,9 +507,12 @@
 
 <script>
 const API_BASE = '';
-let csPassword = '';
-let orderData  = null;
+let csPassword  = '';
+let orderData   = null;
 let currentMode = 'return'; // 'return' | 'cancel'
+let orderBlocked = false;   // true when cancel mode + order already shipped
+
+const CANCELLABLE_STATUSES = ['awaiting_shipment', 'awaiting_payment', 'on_hold'];
 
 // ── Login ──────────────────────────────────────────────────────────────────
 async function csLogin() {
@@ -573,12 +577,15 @@ function setMode(mode) {
   // Submit button
   document.getElementById('btn-cs-submit').innerHTML = isReturn ? 'Submit &amp; Send Label' : 'Submit Cancellation Request';
 
-  // Reset order info if mode changes mid-lookup
+  // Reset order info when mode changes — require a fresh lookup
+  orderData = null;
+  orderBlocked = false;
   document.getElementById('order-info-block').classList.add('hidden');
   document.getElementById('msg-order-not-found').classList.remove('show');
   document.getElementById('msg-lookup-error').classList.remove('show');
   document.getElementById('cs-order-number').value = '';
-  orderData = null;
+  // Re-show submit button (may have been hidden by block state)
+  document.getElementById('btn-cs-submit').classList.remove('hidden');
 }
 
 // ── Order lookup ───────────────────────────────────────────────────────────
@@ -628,9 +635,10 @@ function populateOrderInfo(data) {
   const addrLines = [a.name, a.street1, a.street2, a.city && (a.city + ', ' + a.state + ' ' + a.postalCode)].filter(Boolean);
   document.getElementById('cs-address-display').innerHTML = addrLines.join('<br>');
 
-  // Show "already shipped" warning in cancellation mode if order isn't awaiting shipment
-  const shipped = data.orderStatus && data.orderStatus !== 'awaiting_shipment' && data.orderStatus !== 'on_hold';
-  document.getElementById('already-shipped-warning').classList.toggle('hidden', currentMode !== 'cancel' || !shipped);
+  // In cancellation mode, block if order has already shipped
+  const canCancel = !data.orderStatus || CANCELLABLE_STATUSES.indexOf(data.orderStatus) !== -1;
+  orderBlocked = (currentMode === 'cancel' && !canCancel);
+  _applyBlockState();
 
   document.getElementById('order-info-block').classList.remove('hidden');
 }
@@ -668,6 +676,17 @@ function getSelectedItems() {
     selected.push(item);
   });
   return selected;
+}
+
+// ── Block state helper ─────────────────────────────────────────────────────
+function _applyBlockState() {
+  const blocked = orderBlocked && currentMode === 'cancel';
+  document.getElementById('already-shipped-warning').classList.toggle('hidden', !blocked);
+  // Hide actionable fields when blocked so CS can't proceed
+  const itemsField = document.getElementById('cs-items-list').closest('.field');
+  if (itemsField) itemsField.classList.toggle('hidden', blocked);
+  document.getElementById('field-reason-cancel').classList.toggle('hidden', currentMode !== 'cancel' || blocked);
+  document.getElementById('btn-cs-submit').classList.toggle('hidden', blocked);
 }
 
 // ── Submit routing ─────────────────────────────────────────────────────────
@@ -742,6 +761,7 @@ async function csSubmitReturn() {
 
 // ── Submit: Cancellation ───────────────────────────────────────────────────
 async function csSubmitCancellation() {
+  if (orderBlocked) return; // order already shipped — should not reach here, but guard anyway
   const btn = document.getElementById('btn-cs-submit');
   const errEl = document.getElementById('msg-submit-error');
   errEl.classList.add('hidden');
