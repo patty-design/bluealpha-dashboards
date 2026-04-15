@@ -761,16 +761,18 @@ async function csSubmitReturn() {
 
 // ── Submit: Cancellation ───────────────────────────────────────────────────
 async function csSubmitCancellation() {
-  if (orderBlocked) return; // order already shipped — should not reach here, but guard anyway
+  console.log('[cancel] submit clicked, orderBlocked=', orderBlocked, 'orderData=', orderData);
+  if (orderBlocked) { console.log('[cancel] blocked — returning'); return; }
   const btn = document.getElementById('btn-cs-submit');
   const errEl = document.getElementById('msg-submit-error');
   errEl.classList.remove('show');
   const selectedItems = getSelectedItems();
   const reason = document.getElementById('cs-reason-cancel').value;
+  console.log('[cancel] selectedItems=', selectedItems.length, 'reason=', reason);
   let valid = true;
   if (selectedItems.length === 0) { document.getElementById('msg-no-item').style.display = 'block';         valid = false; }
   if (!reason)                     { document.getElementById('msg-no-reason-cancel').style.display = 'block'; valid = false; }
-  if (!valid) return;
+  if (!valid) { console.log('[cancel] validation failed'); return; }
   document.getElementById('msg-no-item').style.display          = 'none';
   document.getElementById('msg-no-reason-cancel').style.display = 'none';
 
@@ -794,6 +796,7 @@ async function csSubmitCancellation() {
       })
     });
     const data = await res.json();
+    console.log('[cancel] API response:', data);
     if (data.success) {
       document.getElementById('screen-main').classList.add('hidden');
       document.getElementById('screen-success').classList.remove('hidden');
