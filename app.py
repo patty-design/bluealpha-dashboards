@@ -24,6 +24,7 @@ SHIPSTATION_KEY      = os.environ.get("SHIPSTATION_KEY", "")
 SHIPSTATION_SECRET   = os.environ.get("SHIPSTATION_SECRET", "")
 SENDGRID_API_KEY     = os.environ.get("SENDGRID_API_KEY", "")
 SENDGRID_FROM_EMAIL  = os.environ.get("SENDGRID_FROM_EMAIL", "info@bluealpha.us")
+TEST_EMAIL_OVERRIDE  = os.environ.get("TEST_EMAIL_OVERRIDE", "")
 CS_ADMIN_PASSWORD    = os.environ.get("CS_ADMIN_PASSWORD", "")
 
 app = Flask(__name__, static_folder="static")
@@ -1509,7 +1510,7 @@ def submit_exchange():
                     "https://api.sendgrid.com/v3/mail/send",
                     headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
                     json={
-                        "personalizations": [{"to": [{"email": customer_email}]}],
+                        "personalizations": [{"to": [{"email": TEST_EMAIL_OVERRIDE or customer_email}]}],
                         "from":    {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
                         "subject": f"Your Blue Alpha Size Exchange — Order #{original_order_number}",
                         "content": [{"type": "text/plain", "value": email_body}],
