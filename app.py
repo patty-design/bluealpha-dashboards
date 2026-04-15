@@ -484,14 +484,33 @@ def cancel_in_shipstation(order_id, items_to_cancel):
                 remaining.append(item)
 
         if not remaining:
-            # All items cancelled — delete the entire order
-            void_r = req_lib.delete(
-                f"https://ssapi.shipstation.com/orders/{order_id}",
-                headers=ss_headers(), timeout=10,
+            # All items cancelled — mark order as cancelled in ShipStation
+            internal_note = (order.get("internalNotes") or "").strip()
+            internal_note += (" | " if internal_note else "") + "Cancelled via CS portal"
+            cancel_payload = {
+                "orderId":         order.get("orderId"),
+                "orderNumber":     order.get("orderNumber"),
+                "orderKey":        order.get("orderKey"),
+                "orderDate":       order.get("orderDate"),
+                "orderStatus":     "cancelled",
+                "customerEmail":   order.get("customerEmail", ""),
+                "billTo":          order.get("billTo", {}),
+                "shipTo":          order.get("shipTo", {}),
+                "items":           current_items,
+                "amountPaid":      order.get("amountPaid", 0),
+                "taxAmount":       order.get("taxAmount", 0),
+                "shippingAmount":  order.get("shippingAmount", 0),
+                "internalNotes":   internal_note,
+                "advancedOptions": order.get("advancedOptions", {}),
+            }
+            cancel_r = req_lib.post(
+                "https://ssapi.shipstation.com/orders/createorder",
+                headers={**ss_headers(), "Content-Type": "application/json"},
+                json=cancel_payload, timeout=20,
             )
-            if void_r.status_code in (200, 204):
-                return True, "Order deleted in ShipStation"
-            return False, f"Void failed (HTTP {void_r.status_code})"
+            if cancel_r.status_code in (200, 201):
+                return True, "Order cancelled in ShipStation"
+            return False, f"Cancel failed (HTTP {cancel_r.status_code}): {cancel_r.text[:200]}"
         else:
             # Partial: update order with only the remaining items
             internal_note = (order.get("internalNotes") or "").strip()
