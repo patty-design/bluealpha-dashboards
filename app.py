@@ -1289,18 +1289,18 @@ def verify_exchange():
                 if not ex_orders:
                     next_suffix = suffix
                     break
-                ex_order = ex_orders[0]
-                orig_sku = (ex_order.get("advancedOptions") or {}).get("customField3", "").strip()
-                if not orig_sku:
-                    # Fallback: parse "Original SKUs: ..." from internalNotes (for older orders)
-                    notes_text = ex_order.get("internalNotes") or ""
-                    m = re.search(r'Original SKUs?:\s*([^\.\n]+)', notes_text)
-                    if m:
-                        orig_sku = m.group(1).strip()
-                for s in orig_sku.split(","):
-                    s = s.strip()
-                    if s:
-                        already_exchanged_skus.add(s)
+                for ex_order in ex_orders:
+                    orig_sku = (ex_order.get("advancedOptions") or {}).get("customField3", "").strip()
+                    if not orig_sku:
+                        # Fallback: parse "Original SKUs: ..." from internalNotes (for older orders)
+                        notes_text = ex_order.get("internalNotes") or ""
+                        m = re.search(r'Original SKUs?:\s*([^\.\n]+)', notes_text)
+                        if m:
+                            orig_sku = m.group(1).strip()
+                    for s in orig_sku.split(","):
+                        s = s.strip()
+                        if s:
+                            already_exchanged_skus.add(s)
         except Exception as ex_check_err:
             print(f"[verify-exchange] exchange-order check failed (non-fatal): {ex_check_err}")
 
