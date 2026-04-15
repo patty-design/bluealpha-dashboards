@@ -761,10 +761,9 @@ async function csSubmitReturn() {
 
 // ── Submit: Cancellation ───────────────────────────────────────────────────
 async function csSubmitCancellation() {
+  if (orderBlocked) return;
   const selectedItems = getSelectedItems();
   const reason = document.getElementById('cs-reason-cancel').value;
-  alert('DEBUG:\norderBlocked=' + orderBlocked + '\norderData=' + (orderData ? 'set (id=' + orderData.orderId + ')' : 'NULL') + '\nselectedItems=' + selectedItems.length + '\nreason="' + reason + '"');
-  if (orderBlocked) { return; }
   const btn = document.getElementById('btn-cs-submit');
   const errEl = document.getElementById('msg-submit-error');
   errEl.classList.remove('show');
@@ -795,7 +794,6 @@ async function csSubmitCancellation() {
       })
     });
     const data = await res.json();
-    alert('API response: ' + JSON.stringify(data));
     if (data.success) {
       document.getElementById('screen-main').classList.add('hidden');
       document.getElementById('screen-success').classList.remove('hidden');
@@ -809,7 +807,6 @@ async function csSubmitCancellation() {
       throw new Error(data.error || 'Unknown error');
     }
   } catch (e) {
-    alert('ERROR: ' + e.message);
     errEl.classList.add('show');
   }
   btn.disabled = false;

@@ -587,7 +587,7 @@ def submit_cancellation():
         "Items to Return":                items_text,
         "Reason for Return":              reason_str,
         "Submission Date":                datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        "Status":                         "Needs Refund",
+        "Status":                         "Cancelation Needs Refund",
         "Type":                           "Cancellation",
         "WooCommerce Order Link":         wc_link,
     }
