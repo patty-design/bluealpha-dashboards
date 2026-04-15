@@ -1543,6 +1543,16 @@ def submit_exchange():
             "amountPaid":     0.00,
             "taxAmount":      0.00,
             "shippingAmount": 0.00,
+            "carrierCode":    "stamps_com",
+            "serviceCode":    "usps_ground_advantage",
+            "packageCode":    "package",
+            "confirmation":   "delivery",
+            "dimensions": {
+                "units":  "inches",
+                "length": 8,
+                "width":  8,
+                "height": 2,
+            },
             "internalNotes":  f"Exchange for original order #{original_order_number}. Original SKUs: {original_skus_csv}. Include return label. Customer note: {notes}",
             "advancedOptions": {
                 "storeId":      SIZING_EXCHANGE_STORE_ID,
