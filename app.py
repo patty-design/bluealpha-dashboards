@@ -484,13 +484,13 @@ def cancel_in_shipstation(order_id, items_to_cancel):
                 remaining.append(item)
 
         if not remaining:
-            # All items cancelled — void the entire order
-            void_r = req_lib.post(
-                f"https://ssapi.shipstation.com/orders/{order_id}/void",
+            # All items cancelled — delete the entire order
+            void_r = req_lib.delete(
+                f"https://ssapi.shipstation.com/orders/{order_id}",
                 headers=ss_headers(), timeout=10,
             )
-            if void_r.status_code in (200, 201):
-                return True, "Order voided in ShipStation"
+            if void_r.status_code in (200, 204):
+                return True, "Order deleted in ShipStation"
             return False, f"Void failed (HTTP {void_r.status_code})"
         else:
             # Partial: update order with only the remaining items
