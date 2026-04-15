@@ -1275,11 +1275,27 @@ def verify_exchange():
         if not eligible_items:
             return Response(json.dumps({"status": "no_eligible_items"}), headers=c, mimetype="application/json")
 
-        # Check for existing exchange order (orderNumber-E already exists in ShipStation)
-        ex_r = req_lib.get("https://ssapi.shipstation.com/orders",
-                            params={"orderNumber": f"{order_number}-E"},
-                            headers=ss_headers(), timeout=10)
-        if ex_r.json().get("orders"):
+        # Check for existing exchange orders (-E, -E2, -E3, ...) and collect already-exchanged SKUs
+        already_exchanged_skus = set()
+        next_suffix = "-E"
+        for n in range(1, 10):
+            suffix = "-E" if n == 1 else f"-E{n}"
+            ex_r = req_lib.get("https://ssapi.shipstation.com/orders",
+                                params={"orderNumber": f"{order_number}{suffix}"},
+                                headers=ss_headers(), timeout=10)
+            ex_orders = ex_r.json().get("orders", [])
+            if not ex_orders:
+                next_suffix = suffix
+                break
+            for ex_item in ex_orders[0].get("items", []):
+                ex_sku = (ex_item.get("sku") or "").strip()
+                if ex_sku:
+                    already_exchanged_skus.add(ex_sku)
+
+        # Filter out already-exchanged items
+        eligible_items = [i for i in eligible_items if i["sku"] not in already_exchanged_skus]
+
+        if not eligible_items:
             return Response(json.dumps({"status": "already_exchanged"}), headers=c, mimetype="application/json")
 
         ship_to = order.get("shipTo", {})
@@ -1299,6 +1315,7 @@ def verify_exchange():
                 "country":    ship_to.get("country", "US"),
             },
             "eligibleItems": eligible_items,
+            "nextSuffix":    next_suffix,
         }), headers=c, mimetype="application/json")
 
     except Exception as e:
@@ -1364,6 +1381,7 @@ def submit_exchange():
     notes                 = data.get("notes", "")
     original_sku          = data.get("originalSku", "")
     original_airtable_id  = data.get("originalAirtableId", "")
+    next_suffix           = data.get("nextSuffix", "-E")
 
     # Determine routing from selected belt name
     name_lower = selected_name.lower()
@@ -1376,7 +1394,7 @@ def submit_exchange():
 
     today = datetime.now(timezone.utc)
     today_iso             = today.isoformat()
-    exchange_order_number = f"{original_order_number}-E"
+    exchange_order_number = f"{original_order_number}{next_suffix}"
 
     try:
         # ── LP Inner lookup for combo belts ───────────────────────────────────

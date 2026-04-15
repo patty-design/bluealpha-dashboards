@@ -718,6 +718,7 @@ async function submitExchange() {
         selectedName:        parsed.name,
         quantity:            quantity,
         notes:               notes,
+        nextSuffix:          verifyData.nextSuffix || '-E',
       })
     });
     const data = await res.json();
