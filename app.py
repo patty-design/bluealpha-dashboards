@@ -1289,9 +1289,18 @@ def verify_exchange():
                 if not ex_orders:
                     next_suffix = suffix
                     break
-                orig_sku = (ex_orders[0].get("advancedOptions") or {}).get("customField3", "").strip()
-                if orig_sku:
-                    already_exchanged_skus.add(orig_sku)
+                ex_order = ex_orders[0]
+                orig_sku = (ex_order.get("advancedOptions") or {}).get("customField3", "").strip()
+                if not orig_sku:
+                    # Fallback: parse "Original SKUs: ..." from internalNotes (for older orders)
+                    notes_text = ex_order.get("internalNotes") or ""
+                    m = re.search(r'Original SKUs?:\s*([^\.\n]+)', notes_text)
+                    if m:
+                        orig_sku = m.group(1).strip()
+                for s in orig_sku.split(","):
+                    s = s.strip()
+                    if s:
+                        already_exchanged_skus.add(s)
         except Exception as ex_check_err:
             print(f"[verify-exchange] exchange-order check failed (non-fatal): {ex_check_err}")
 
@@ -1480,7 +1489,7 @@ def submit_exchange():
             "amountPaid":     0.00,
             "taxAmount":      0.00,
             "shippingAmount": 0.00,
-            "internalNotes":  f"Exchange for original order #{original_order_number}. Include return label. Customer note: {notes}",
+            "internalNotes":  f"Exchange for original order #{original_order_number}. Original SKUs: {original_skus_csv}. Include return label. Customer note: {notes}",
             "advancedOptions": {
                 "storeId":      SIZING_EXCHANGE_STORE_ID,
                 "customField1": f"Exchange for order #{original_order_number}",
