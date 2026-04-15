@@ -1279,18 +1279,21 @@ def verify_exchange():
         # Original SKU is stored in customField3 of each exchange order
         already_exchanged_skus = set()
         next_suffix = "-E"
-        for n in range(1, 10):
-            suffix = "-E" if n == 1 else f"-E{n}"
-            ex_r = req_lib.get("https://ssapi.shipstation.com/orders",
-                                params={"orderNumber": f"{order_number}{suffix}"},
-                                headers=ss_headers(), timeout=10)
-            ex_orders = ex_r.json().get("orders", [])
-            if not ex_orders:
-                next_suffix = suffix
-                break
-            orig_sku = (ex_orders[0].get("advancedOptions") or {}).get("customField3", "").strip()
-            if orig_sku:
-                already_exchanged_skus.add(orig_sku)
+        try:
+            for n in range(1, 10):
+                suffix = "-E" if n == 1 else f"-E{n}"
+                ex_r = req_lib.get("https://ssapi.shipstation.com/orders",
+                                    params={"orderNumber": f"{order_number}{suffix}"},
+                                    headers=ss_headers(), timeout=10)
+                ex_orders = ex_r.json().get("orders", [])
+                if not ex_orders:
+                    next_suffix = suffix
+                    break
+                orig_sku = (ex_orders[0].get("advancedOptions") or {}).get("customField3", "").strip()
+                if orig_sku:
+                    already_exchanged_skus.add(orig_sku)
+        except Exception as ex_check_err:
+            print(f"[verify-exchange] exchange-order check failed (non-fatal): {ex_check_err}")
 
         # Filter out already-exchanged items
         eligible_items = [i for i in eligible_items if i["sku"] not in already_exchanged_skus]
@@ -1319,6 +1322,8 @@ def verify_exchange():
         }), headers=c, mimetype="application/json")
 
     except Exception as e:
+        import traceback
+        print(f"[verify-exchange] ERROR: {e}\n{traceback.format_exc()}")
         return Response(json.dumps({"status": "error", "error": str(e)}),
                         status=500, headers=c, mimetype="application/json")
 
