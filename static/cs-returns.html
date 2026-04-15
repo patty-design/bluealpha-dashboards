@@ -761,18 +761,17 @@ async function csSubmitReturn() {
 
 // ── Submit: Cancellation ───────────────────────────────────────────────────
 async function csSubmitCancellation() {
-  console.log('[cancel] submit clicked, orderBlocked=', orderBlocked, 'orderData=', orderData);
-  if (orderBlocked) { console.log('[cancel] blocked — returning'); return; }
+  const selectedItems = getSelectedItems();
+  const reason = document.getElementById('cs-reason-cancel').value;
+  alert('DEBUG:\norderBlocked=' + orderBlocked + '\norderData=' + (orderData ? 'set (id=' + orderData.orderId + ')' : 'NULL') + '\nselectedItems=' + selectedItems.length + '\nreason="' + reason + '"');
+  if (orderBlocked) { return; }
   const btn = document.getElementById('btn-cs-submit');
   const errEl = document.getElementById('msg-submit-error');
   errEl.classList.remove('show');
-  const selectedItems = getSelectedItems();
-  const reason = document.getElementById('cs-reason-cancel').value;
-  console.log('[cancel] selectedItems=', selectedItems.length, 'reason=', reason);
   let valid = true;
   if (selectedItems.length === 0) { document.getElementById('msg-no-item').style.display = 'block';         valid = false; }
   if (!reason)                     { document.getElementById('msg-no-reason-cancel').style.display = 'block'; valid = false; }
-  if (!valid) { console.log('[cancel] validation failed'); return; }
+  if (!valid) { return; }
   document.getElementById('msg-no-item').style.display          = 'none';
   document.getElementById('msg-no-reason-cancel').style.display = 'none';
 
