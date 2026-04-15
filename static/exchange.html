@@ -349,6 +349,10 @@
       <strong>Order not found</strong>
       We couldn't find that order. Please check your order number and email, or contact us at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">678-961-3304</a>.
     </div>
+    <div class="message message-warning" id="msg-already-exchanged">
+      <strong>Exchange Already Submitted</strong>
+      An exchange request has already been submitted for this order. If you need help, please contact us at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">(678) 961-3304</a>.
+    </div>
     <div class="message message-warning" id="msg-outside-window">
       <strong>Outside Exchange Window</strong>
       This order is outside the 37-day exchange window. If you have questions, please reach out at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">(678) 961-3304</a>.
@@ -516,6 +520,8 @@ async function verifyExchange() {
       showStep(2);
     } else if (data.status === 'not_found') {
       showMsg('msg-not-found');
+    } else if (data.status === 'already_exchanged') {
+      showMsg('msg-already-exchanged');
     } else if (data.status === 'outside_window') {
       showMsg('msg-outside-window');
     } else if (data.status === 'no_eligible_items') {

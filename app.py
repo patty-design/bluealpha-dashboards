@@ -1275,6 +1275,13 @@ def verify_exchange():
         if not eligible_items:
             return Response(json.dumps({"status": "no_eligible_items"}), headers=c, mimetype="application/json")
 
+        # Check for existing exchange order (orderNumber-E already exists in ShipStation)
+        ex_r = req_lib.get("https://ssapi.shipstation.com/orders",
+                            params={"orderNumber": f"{order_number}-E"},
+                            headers=ss_headers(), timeout=10)
+        if ex_r.json().get("orders"):
+            return Response(json.dumps({"status": "already_exchanged"}), headers=c, mimetype="application/json")
+
         ship_to = order.get("shipTo", {})
         return Response(json.dumps({
             "status":        "eligible",
