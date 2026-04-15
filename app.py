@@ -1564,7 +1564,7 @@ def submit_exchange():
         new_order    = r.json()
         new_order_id = new_order.get("orderId")
 
-        # Add tag
+        # Add routing tag (EDC or Manual Label)
         try:
             req_lib.post(
                 "https://ssapi.shipstation.com/orders/addtag",
@@ -1573,7 +1573,18 @@ def submit_exchange():
                 timeout=10,
             )
         except Exception as tag_err:
-            print(f"[submit-exchange] Tag failed: {tag_err}")
+            print(f"[submit-exchange] Routing tag failed: {tag_err}")
+
+        # Add Expedite (2 Days) tag to all exchange orders
+        try:
+            req_lib.post(
+                "https://ssapi.shipstation.com/orders/addtag",
+                headers={**ss_headers(), "Content-Type": "application/json"},
+                json={"orderId": new_order_id, "tagId": 49845},
+                timeout=10,
+            )
+        except Exception as tag_err:
+            print(f"[submit-exchange] Expedite tag failed: {tag_err}")
 
         # Assign user
         try:
