@@ -702,7 +702,7 @@ function handleSubmit() {
 async function csSubmitReturn() {
   const btn = document.getElementById('btn-cs-submit');
   const errEl = document.getElementById('msg-submit-error');
-  errEl.classList.add('hidden');
+  errEl.classList.remove('show');
   const selectedItems = getSelectedItems();
   const email  = document.getElementById('cs-email').value.trim();
   const reason = document.getElementById('cs-reason-return').value;
@@ -753,7 +753,7 @@ async function csSubmitReturn() {
       throw new Error(data.error || 'Unknown error');
     }
   } catch (e) {
-    errEl.classList.remove('hidden');
+    errEl.classList.add('show');
   }
   btn.disabled = false;
   btn.innerHTML = 'Submit &amp; Send Label';
@@ -764,7 +764,7 @@ async function csSubmitCancellation() {
   if (orderBlocked) return; // order already shipped — should not reach here, but guard anyway
   const btn = document.getElementById('btn-cs-submit');
   const errEl = document.getElementById('msg-submit-error');
-  errEl.classList.add('hidden');
+  errEl.classList.remove('show');
   const selectedItems = getSelectedItems();
   const reason = document.getElementById('cs-reason-cancel').value;
   let valid = true;
@@ -807,7 +807,7 @@ async function csSubmitCancellation() {
       throw new Error(data.error || 'Unknown error');
     }
   } catch (e) {
-    errEl.classList.remove('hidden');
+    errEl.classList.add('show');
   }
   btn.disabled = false;
   btn.innerHTML = 'Submit Cancellation Request';
