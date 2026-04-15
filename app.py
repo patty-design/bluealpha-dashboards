@@ -1381,91 +1381,91 @@ def submit_exchange():
     customer_email        = data.get("customerEmail", "").strip()
     customer_name         = data.get("customerName", "")
     ship_to               = data.get("shipTo", {})
-    selected_sku          = data.get("selectedSku", "")
-    selected_name         = data.get("selectedName", "")
-    quantity              = int(data.get("quantity", 1))
     notes                 = data.get("notes", "")
-    original_sku          = data.get("originalSku", "")
-    original_airtable_id  = data.get("originalAirtableId", "")
     next_suffix           = data.get("nextSuffix", "-E")
+    items_payload         = data.get("items", [])
 
-    # Determine routing from selected belt name
-    name_lower = selected_name.lower()
-    if any(k in name_lower for k in ["edc", "low profile", "inner only", "1.5"]):
+    if not items_payload:
+        return Response(json.dumps({"success": False, "error": "No items provided"}),
+                        status=400, headers=c, mimetype="application/json")
+
+    exchange_order_number = f"{original_order_number}{next_suffix}"
+
+    # Routing: if ANY selected belt is EDC/Low Profile → EDC shipper; otherwise battle/duty
+    all_names_lower = " ".join(i.get("selectedName", "") for i in items_payload).lower()
+    if any(k in all_names_lower for k in ["edc", "low profile", "inner only", "1.5"]):
         tag_id  = 105813
         user_id = "c2fc99de-a9ec-4dfb-8b74-1d263eab34b8"  # Lisa Barnes
     else:
         tag_id  = 102014
         user_id = "62230ab9-eefe-4dd9-8175-949f097fa363"  # Janna Frei
 
-    today = datetime.now(timezone.utc)
-    today_iso             = today.isoformat()
-    exchange_order_number = f"{original_order_number}{next_suffix}"
+    today     = datetime.now(timezone.utc)
+    today_iso = today.isoformat()
 
     try:
-        # ── LP Inner lookup for combo belts ───────────────────────────────────
-        # Outer-only original SKUs (-O or -ONB suffix) → no LP inner
-        # All others → find the full-combo version of the SELECTED new belt,
-        #   look up its Component(s) for the LP inner, and add to order.
         airtable_read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-        is_outer_only = bool(re.search(r'(-ONB|-O)$', original_sku, re.IGNORECASE))
-        lp_inner_items = []
+        order_items = []
 
-        if not is_outer_only and selected_sku:
-            try:
-                # Derive the full-combo SKU from the selected new belt:
-                # "RAN-30-ONB" → "RAN-30"  |  "GTB-MCA-34-O" → "GTB-MCA-34"
-                combo_sku = re.sub(r'(-ONB|-O)$', '', selected_sku, flags=re.IGNORECASE).strip()
+        for item_idx, item_data in enumerate(items_payload):
+            original_sku = item_data.get("originalSku", "")
+            selected_sku = item_data.get("selectedSku", "")
+            selected_name = item_data.get("selectedName", "")
+            quantity      = int(item_data.get("quantity", 1))
 
-                combo_recs = req_lib.get(
-                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}",
-                    params={"filterByFormula": f'{{SKU ID}}="{combo_sku}"', "maxRecords": 1,
-                            "fields[]": ["Component(s)"]},
-                    headers=at_headers(airtable_read_token), timeout=10
-                ).json().get("records", [])
+            order_items.append({
+                "lineItemKey":    f"exchange-{item_idx + 1}",
+                "name":          selected_name,
+                "sku":           selected_sku,
+                "quantity":      quantity,
+                "unitPrice":     0.00,
+                "taxAmount":     0.00,
+                "shippingAmount": 0.00,
+            })
 
-                component_ids = combo_recs[0]["fields"].get("Component(s)", []) if combo_recs else []
-
-                for comp_id in component_ids:
-                    comp_rec = req_lib.get(
-                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}/{comp_id}",
+            # ── LP Inner lookup for combo belts ──────────────────────────────
+            is_outer_only = bool(re.search(r'(-ONB|-O)$', original_sku, re.IGNORECASE))
+            if not is_outer_only and selected_sku:
+                try:
+                    combo_sku = re.sub(r'(-ONB|-O)$', '', selected_sku, flags=re.IGNORECASE).strip()
+                    combo_recs = req_lib.get(
+                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}",
+                        params={"filterByFormula": f'{{SKU ID}}="{combo_sku}"', "maxRecords": 1,
+                                "fields[]": ["Component(s)"]},
                         headers=at_headers(airtable_read_token), timeout=10
-                    ).json()
-                    comp_fields = comp_rec.get("fields", {})
-                    comp_name   = comp_fields.get("Name + Variations", "")
-                    comp_sku    = comp_fields.get("SKU ID", "")
-                    if "inner" not in comp_name.lower():
-                        continue
-                    # Found the LP inner for the selected new belt — add it
-                    lp_inner_items.append({
-                        "lineItemKey":    "exchange-inner",
-                        "name":          comp_name,
-                        "sku":           comp_sku,
-                        "quantity":      quantity,
-                        "unitPrice":     0.00,
-                        "taxAmount":     0.00,
-                        "shippingAmount": 0.00,
-                    })
-                    break  # only one LP inner per order
-            except Exception as lp_err:
-                print(f"[submit-exchange] LP inner lookup failed: {lp_err}")
-                # Non-fatal — proceed with outer belt only
+                    ).json().get("records", [])
+                    component_ids = combo_recs[0]["fields"].get("Component(s)", []) if combo_recs else []
+                    for comp_id in component_ids:
+                        comp_rec    = req_lib.get(
+                            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}/{comp_id}",
+                            headers=at_headers(airtable_read_token), timeout=10
+                        ).json()
+                        comp_fields = comp_rec.get("fields", {})
+                        comp_name   = comp_fields.get("Name + Variations", "")
+                        comp_sku    = comp_fields.get("SKU ID", "")
+                        if "inner" not in comp_name.lower():
+                            continue
+                        order_items.append({
+                            "lineItemKey":    f"exchange-{item_idx + 1}-inner",
+                            "name":          comp_name,
+                            "sku":           comp_sku,
+                            "quantity":      quantity,
+                            "unitPrice":     0.00,
+                            "taxAmount":     0.00,
+                            "shippingAmount": 0.00,
+                        })
+                        break
+                except Exception as lp_err:
+                    print(f"[submit-exchange] LP inner lookup failed for {selected_sku}: {lp_err}")
 
-        order_items = [{
-            "lineItemKey":    "exchange-1",
-            "name":          selected_name,
-            "sku":           selected_sku,
-            "quantity":      quantity,
-            "unitPrice":     0.00,
-            "taxAmount":     0.00,
-            "shippingAmount": 0.00,
-        }] + lp_inner_items
+        original_skus_csv = ",".join(i.get("originalSku", "") for i in items_payload)
+        selected_names    = ", ".join(i.get("selectedName", "") for i in items_payload)
 
         # Create ShipStation exchange order
         order_payload = {
-            "orderNumber":  exchange_order_number,
-            "orderDate":    today_iso,
-            "orderStatus":  "awaiting_shipment",
+            "orderNumber":   exchange_order_number,
+            "orderDate":     today_iso,
+            "orderStatus":   "awaiting_shipment",
             "customerEmail": customer_email,
             "billTo": {
                 "name":       ship_to.get("name", ""),
@@ -1485,7 +1485,7 @@ def submit_exchange():
                 "storeId":      SIZING_EXCHANGE_STORE_ID,
                 "customField1": f"Exchange for order #{original_order_number}",
                 "customField2": notes,
-                "customField3": original_sku,
+                "customField3": original_skus_csv,
             },
         }
 
@@ -1526,14 +1526,15 @@ def submit_exchange():
         # Send confirmation email via SendGrid
         if SENDGRID_API_KEY and customer_email:
             first_name = customer_name.split()[0] if customer_name else "there"
+            belt_lines = "\n".join(f"  • {i['selectedName']}" for i in items_payload)
             email_body = (
                 f"Hi {first_name},\n\n"
                 f"Your size exchange request has been received!\n\n"
                 f"Original Order: #{original_order_number}\n"
-                f"New Belt: {selected_name}\n\n"
-                f"We'll ship your new belt to the address on your original order. "
+                f"New Belt(s):\n{belt_lines}\n\n"
+                f"We'll ship your new belt(s) to the address on your original order. "
                 f"Your package will include a prepaid return label — please use it to send back "
-                f"your original belt within 30 days.\n\n"
+                f"your original belt(s) within 30 days.\n\n"
                 f"Questions? Reply to this email and our team will help you out.\n\n"
                 f"— Blue Alpha"
             )

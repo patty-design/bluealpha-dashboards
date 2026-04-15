@@ -168,43 +168,41 @@
       margin-top: 2px;
     }
 
-    /* ── Eligible-item selector (Step 1b — if multiple items) ── */
-    .eligible-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
-    .eligible-row {
+    /* ── Multi-select exchange item rows ── */
+    .exchange-items-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+    .exchange-item-row {
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .exchange-item-row.checked { border-color: var(--navy); }
+    .item-check-label {
       display: flex;
       align-items: center;
       gap: 14px;
-      border: 1.5px solid var(--border);
-      border-radius: 6px;
       padding: 12px 14px;
       cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
+      background: #fff;
+      transition: background 0.15s;
     }
-    .eligible-row:hover { border-color: var(--navy); background: #f0f5fb; }
-    .eligible-row.selected { border-color: var(--navy); background: #e8f0f9; }
-    .eligible-radio {
-      width: 20px; height: 20px;
-      border: 2px solid var(--border);
-      border-radius: 50%;
+    .exchange-item-row.checked .item-check-label { background: #e8f0f9; }
+    .item-check-label input[type="checkbox"] {
+      width: 18px; height: 18px;
+      accent-color: var(--navy);
       flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      transition: all 0.15s;
+      cursor: pointer;
     }
-    .eligible-row.selected .eligible-radio {
-      border-color: var(--navy);
-    }
-    .eligible-radio::after {
-      content: '';
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      background: var(--navy);
-      opacity: 0;
-      transition: opacity 0.15s;
-    }
-    .eligible-row.selected .eligible-radio::after { opacity: 1; }
-    .eligible-info { flex: 1; }
+    .item-check-info { flex: 1; }
     .eligible-name { font-weight: 700; font-size: 0.95rem; color: var(--text); }
     .eligible-sku  { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+    .item-options-wrap {
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+      background: #f7f9fc;
+    }
+    .item-options-wrap.hidden { display: none; }
+    .item-loading { font-size: 0.88rem; color: var(--muted); padding: 4px 0; }
 
     /* ── Buttons ── */
     .btn {
@@ -367,66 +365,31 @@
     </div>
   </div>
 
-  <!-- ── STEP 2: Select New Belt ── -->
+  <!-- ── STEP 2: Select New Belt(s) ── -->
   <div id="step-2" class="card hidden">
-    <div class="card-title">Step 2 — Select Your New Belt</div>
+    <div class="card-title">Step 2 — Select Your New Belt(s)</div>
     <p class="card-subtitle" id="step2-subheading"></p>
 
-    <!-- If multiple eligible items, show picker -->
-    <div id="item-picker-wrap" class="hidden">
-      <div class="field">
-        <label>Which belt are you exchanging? <span class="req">*</span></label>
-        <div class="eligible-list" id="eligible-list"></div>
-        <div class="message message-error hidden" id="msg-no-item-selected" style="margin-top:0;">Please select the belt you want to exchange.</div>
-      </div>
-    </div>
+    <div class="exchange-items-list" id="exchange-items-list"></div>
 
-    <!-- Current belt display (shown once item is known) -->
-    <div id="exchanging-block" class="exchanging-block hidden">
-      <div class="exchanging-label">Exchanging:</div>
-      <div class="exchanging-name" id="exchanging-name"></div>
-      <div class="exchanging-sku" id="exchanging-sku"></div>
-    </div>
-
-    <div id="options-wrap" class="hidden">
-      <div class="field">
-        <label>Select your new size/color <span class="req">*</span></label>
-        <select id="new-belt-select">
-          <option value="">Loading options…</option>
-        </select>
-      </div>
-
-      <div class="field" id="qty-field" class="hidden" style="display:none;">
-        <label>Quantity <span class="req">*</span></label>
-        <select id="qty-select"></select>
-      </div>
-
+    <div id="step2-form-bottom">
       <div class="field">
         <label>Confirmation Email <span class="req">*</span></label>
         <input type="email" id="confirm-email" placeholder="Email address for confirmation" autocomplete="off">
       </div>
-
       <div class="field">
         <label>Notes <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></label>
         <textarea id="notes" placeholder="Any additional notes for our team…"></textarea>
       </div>
-
-      <div class="message message-error hidden" id="msg-no-option">Please select a new belt size/color.</div>
+      <div class="message message-error hidden" id="msg-no-selection">Please check at least one belt and choose a new size/color for each selected belt.</div>
       <div class="message message-error hidden" id="msg-submit-error">
         <strong>Submission failed</strong>
         Something went wrong. Please try again or contact us at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a>.
       </div>
-
       <div class="btn-row">
         <button class="btn btn-secondary" onclick="goBack(1)">Back</button>
         <button class="btn btn-primary" id="btn-submit" onclick="submitExchange()">Submit Exchange Request</button>
       </div>
-    </div>
-
-    <!-- Continue button shown when multiple items are listed -->
-    <div id="item-picker-btn-row" class="btn-row hidden">
-      <button class="btn btn-secondary" onclick="goBack(1)">Back</button>
-      <button class="btn btn-primary" onclick="confirmItemSelection()">Continue</button>
     </div>
   </div>
 
@@ -555,92 +518,64 @@ document.getElementById('email-input').addEventListener('keydown',     e => { if
 
 // ── Step 2: Build ─────────────────────────────────────────────────────────────
 async function buildStep2(data) {
-  // Set subheading
   document.getElementById('step2-subheading').textContent =
     `Order #${data.orderNumber} — ${data.customerName}`;
+  document.getElementById('confirm-email').value = data.customerEmail || '';
 
   const items = data.eligibleItems || [];
-
-  if (items.length === 1) {
-    // Only one eligible item — skip the picker, go straight to options
-    selectedItem = items[0];
-    showExchangingBlock(selectedItem);
-    await loadOptions(selectedItem);
-    document.getElementById('item-picker-wrap').classList.add('hidden');
-    document.getElementById('item-picker-btn-row').classList.add('hidden');
-  } else {
-    // Multiple items — show radio picker
-    selectedItem = null;
-    document.getElementById('exchanging-block').classList.add('hidden');
-    document.getElementById('options-wrap').classList.add('hidden');
-    buildEligibleList(items);
-    document.getElementById('item-picker-wrap').classList.remove('hidden');
-    document.getElementById('item-picker-btn-row').classList.remove('hidden');
-  }
-}
-
-function buildEligibleList(items) {
-  const list = document.getElementById('eligible-list');
+  const list  = document.getElementById('exchange-items-list');
   list.innerHTML = '';
+
   items.forEach((item, idx) => {
+    const autoCheck = items.length === 1;
     const row = document.createElement('div');
-    row.className = 'eligible-row';
-    row.dataset.idx = idx;
+    row.className = 'exchange-item-row' + (autoCheck ? ' checked' : '');
+    row.id = `item-row-${idx}`;
     row.innerHTML = `
-      <div class="eligible-radio"></div>
-      <div class="eligible-info">
-        <div class="eligible-name">${item.name}</div>
-        <div class="eligible-sku">${item.sku}</div>
+      <label class="item-check-label" for="item-check-${idx}">
+        <input type="checkbox" id="item-check-${idx}" ${autoCheck ? 'checked' : ''}>
+        <div class="item-check-info">
+          <div class="eligible-name">${item.name}</div>
+          <div class="eligible-sku">${item.sku}</div>
+        </div>
+      </label>
+      <div class="item-options-wrap ${autoCheck ? '' : 'hidden'}" id="item-options-${idx}">
+        <div class="item-loading" id="item-loading-${idx}">⏳ Loading size options…</div>
+        <select id="item-select-${idx}" style="display:none"></select>
+        <select id="item-qty-${idx}" style="display:none"></select>
       </div>`;
-    row.addEventListener('click', () => {
-      list.querySelectorAll('.eligible-row').forEach(r => r.classList.remove('selected'));
-      row.classList.add('selected');
-    });
+    row.querySelector(`#item-check-${idx}`).addEventListener('change', () => onItemChecked(idx));
     list.appendChild(row);
+
+    if (autoCheck) loadItemOptions(idx, item);
   });
 }
 
-async function confirmItemSelection() {
-  const selected = document.querySelector('#eligible-list .eligible-row.selected');
-  const errEl = document.getElementById('msg-no-item-selected');
-  if (!selected) {
-    errEl.classList.remove('hidden');
-    errEl.classList.add('show');
-    return;
+function onItemChecked(idx) {
+  const cb      = document.getElementById(`item-check-${idx}`);
+  const row     = document.getElementById(`item-row-${idx}`);
+  const optWrap = document.getElementById(`item-options-${idx}`);
+  if (cb.checked) {
+    row.classList.add('checked');
+    optWrap.classList.remove('hidden');
+    const sel = document.getElementById(`item-select-${idx}`);
+    if (!sel.dataset.loaded) loadItemOptions(idx, verifyData.eligibleItems[idx]);
+  } else {
+    row.classList.remove('checked');
+    optWrap.classList.add('hidden');
   }
-  errEl.classList.add('hidden');
-  errEl.classList.remove('show');
-
-  const idx = parseInt(selected.dataset.idx);
-  selectedItem = verifyData.eligibleItems[idx];
-
-  document.getElementById('item-picker-wrap').classList.add('hidden');
-  document.getElementById('item-picker-btn-row').classList.add('hidden');
-
-  showExchangingBlock(selectedItem);
-  await loadOptions(selectedItem);
 }
 
-function showExchangingBlock(item) {
-  document.getElementById('exchanging-name').textContent = item.name;
-  document.getElementById('exchanging-sku').textContent  = item.sku;
-  document.getElementById('exchanging-block').classList.remove('hidden');
-}
+async function loadItemOptions(idx, item) {
+  const loading = document.getElementById(`item-loading-${idx}`);
+  const sel     = document.getElementById(`item-select-${idx}`);
+  const qtySel  = document.getElementById(`item-qty-${idx}`);
 
-async function loadOptions(item) {
-  const wrap   = document.getElementById('options-wrap');
-  const sel    = document.getElementById('new-belt-select');
-  sel.innerHTML = '<option value="">Loading options…</option>';
-  wrap.classList.remove('hidden');
+  loading.style.display = '';
+  sel.style.display = 'none';
 
-  // Pre-populate email
-  const emailEl = document.getElementById('confirm-email');
-  if (emailEl) emailEl.value = verifyData.customerEmail || '';
-
-  // Show quantity selector if item qty > 1
-  const qtyField = document.getElementById('qty-field');
-  const qtySel   = document.getElementById('qty-select');
-  const itemQty  = item.quantity || 1;
+  // Quantity selector
+  const itemQty = item.quantity || 1;
   if (itemQty > 1) {
     qtySel.innerHTML = '';
     for (let i = 1; i <= itemQty; i++) {
@@ -648,10 +583,10 @@ async function loadOptions(item) {
       o.value = i; o.textContent = i;
       qtySel.appendChild(o);
     }
-    qtyField.style.display = '';
+    qtySel.style.display = '';
   } else {
-    qtyField.style.display = 'none';
     qtySel.innerHTML = '<option value="1">1</option>';
+    qtySel.style.display = 'none';
   }
 
   try {
@@ -670,38 +605,57 @@ async function loadOptions(item) {
       o.textContent = displayName(opt.name);
       sel.appendChild(o);
     });
-
     if (opts.length === 0) {
       sel.innerHTML = '<option value="">No other sizes available — contact us</option>';
     }
+    sel.dataset.loaded = '1';
   } catch (e) {
     sel.innerHTML = '<option value="">Error loading options — please refresh</option>';
   }
+
+  loading.style.display = 'none';
+  sel.style.display = '';
 }
 
 // ── Submit Exchange ───────────────────────────────────────────────────────────
 async function submitExchange() {
   const btn      = document.getElementById('btn-submit');
-  const selVal   = document.getElementById('new-belt-select').value;
   const notes    = document.getElementById('notes').value.trim();
   const emailVal = document.getElementById('confirm-email').value.trim();
-  const quantity = parseInt(document.getElementById('qty-select').value) || 1;
-  const noOptEl  = document.getElementById('msg-no-option');
+  const noSelEl  = document.getElementById('msg-no-selection');
   const errEl    = document.getElementById('msg-submit-error');
 
-  noOptEl.classList.add('hidden');
-  noOptEl.classList.remove('show');
-  errEl.classList.add('hidden');
-  errEl.classList.remove('show');
+  noSelEl.classList.add('hidden'); noSelEl.classList.remove('show');
+  errEl.classList.add('hidden');   errEl.classList.remove('show');
 
-  if (!selVal) {
-    noOptEl.classList.remove('hidden');
-    noOptEl.classList.add('show');
-    return;
+  // Collect all checked items
+  const items = verifyData.eligibleItems || [];
+  const selections = [];
+  for (let idx = 0; idx < items.length; idx++) {
+    const cb  = document.getElementById(`item-check-${idx}`);
+    if (!cb || !cb.checked) continue;
+    const sel = document.getElementById(`item-select-${idx}`);
+    const qty = parseInt(document.getElementById(`item-qty-${idx}`).value) || 1;
+    const val = sel ? sel.value : '';
+    let parsed;
+    try { parsed = JSON.parse(val); } catch(e) { parsed = null; }
+    if (!parsed) {
+      noSelEl.classList.remove('hidden'); noSelEl.classList.add('show');
+      return;
+    }
+    selections.push({
+      originalSku:        items[idx].sku,
+      originalAirtableId: items[idx].airtableId,
+      selectedSku:        parsed.sku,
+      selectedName:       parsed.name,
+      quantity:           qty,
+    });
   }
 
-  let parsed;
-  try { parsed = JSON.parse(selVal); } catch(e) { return; }
+  if (selections.length === 0) {
+    noSelEl.classList.remove('hidden'); noSelEl.classList.add('show');
+    return;
+  }
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Submitting…';
@@ -716,20 +670,17 @@ async function submitExchange() {
         customerEmail:       emailVal || verifyData.customerEmail,
         customerName:        verifyData.customerName,
         shipTo:              verifyData.shipTo,
-        originalSku:         selectedItem.sku,
-        originalAirtableId:  selectedItem.airtableId,
-        selectedSku:         parsed.sku,
-        selectedName:        parsed.name,
-        quantity:            quantity,
         notes:               notes,
         nextSuffix:          verifyData.nextSuffix || '-E',
+        items:               selections,
       })
     });
     const data = await res.json();
 
     if (data.success) {
+      const names = selections.map(s => s.selectedName).join(', ');
       document.getElementById('success-body').textContent =
-        `We'll ship ${parsed.name} to you.`;
+        `We'll ship ${names} to you.`;
       document.getElementById('success-order-number').textContent =
         `Exchange Order: ${data.exchangeOrderNumber}`;
       showStep('success');
@@ -737,8 +688,7 @@ async function submitExchange() {
       throw new Error(data.error || 'Unknown error');
     }
   } catch (e) {
-    errEl.classList.remove('hidden');
-    errEl.classList.add('show');
+    errEl.classList.remove('hidden'); errEl.classList.add('show');
   }
 
   btn.disabled = false;
