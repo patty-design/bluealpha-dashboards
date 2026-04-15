@@ -414,6 +414,7 @@
 const API_BASE = '';
 let verifyData = null;         // full response from /api/verify-exchange
 let selectedItem = null;       // { name, sku, airtableId, parentProductId }
+let optionsCache = {};         // parentProductId → filtered options array
 
 function displayName(name) {
   return name.replace(/^DBL No Buckle Outer\b/i, 'Duty Belt Lite');
@@ -523,7 +524,25 @@ async function buildStep2(data) {
   document.getElementById('confirm-email').value = data.customerEmail || '';
 
   const items = data.eligibleItems || [];
-  const list  = document.getElementById('exchange-items-list');
+  optionsCache = {};
+
+  // Pre-fetch options for all unique parent products in parallel
+  const uniqueParents = [...new Set(items.map(i => i.parentProductId).filter(Boolean))];
+  await Promise.all(uniqueParents.map(async pid => {
+    try {
+      const res  = await fetch(API_BASE + '/api/exchange-options', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ parentProductId: pid })
+      });
+      const data = await res.json();
+      optionsCache[pid] = data.options || [];
+    } catch(e) {
+      optionsCache[pid] = [];
+    }
+  }));
+
+  const list = document.getElementById('exchange-items-list');
   list.innerHTML = '';
 
   items.forEach((item, idx) => {
@@ -540,14 +559,13 @@ async function buildStep2(data) {
         </div>
       </label>
       <div class="item-options-wrap ${autoCheck ? '' : 'hidden'}" id="item-options-${idx}">
-        <div class="item-loading" id="item-loading-${idx}">⏳ Loading size options…</div>
-        <select id="item-select-${idx}" style="display:none"></select>
+        <select id="item-select-${idx}"></select>
         <select id="item-qty-${idx}" style="display:none"></select>
       </div>`;
     row.querySelector(`#item-check-${idx}`).addEventListener('change', () => onItemChecked(idx));
     list.appendChild(row);
 
-    if (autoCheck) loadItemOptions(idx, item);
+    populateItemSelect(idx, item);
   });
 }
 
@@ -558,21 +576,15 @@ function onItemChecked(idx) {
   if (cb.checked) {
     row.classList.add('checked');
     optWrap.classList.remove('hidden');
-    const sel = document.getElementById(`item-select-${idx}`);
-    if (!sel.dataset.loaded) loadItemOptions(idx, verifyData.eligibleItems[idx]);
   } else {
     row.classList.remove('checked');
     optWrap.classList.add('hidden');
   }
 }
 
-async function loadItemOptions(idx, item) {
-  const loading = document.getElementById(`item-loading-${idx}`);
-  const sel     = document.getElementById(`item-select-${idx}`);
-  const qtySel  = document.getElementById(`item-qty-${idx}`);
-
-  loading.style.display = '';
-  sel.style.display = 'none';
+function populateItemSelect(idx, item) {
+  const sel    = document.getElementById(`item-select-${idx}`);
+  const qtySel = document.getElementById(`item-qty-${idx}`);
 
   // Quantity selector
   const itemQty = item.quantity || 1;
@@ -589,32 +601,19 @@ async function loadItemOptions(idx, item) {
     qtySel.style.display = 'none';
   }
 
-  try {
-    const res  = await fetch(API_BASE + '/api/exchange-options', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ parentProductId: item.parentProductId })
-    });
-    const data = await res.json();
-    const opts = (data.options || []).filter(o => o.sku !== item.sku);
+  const allOpts = optionsCache[item.parentProductId] || [];
+  const opts    = allOpts.filter(o => o.sku !== item.sku);
 
-    sel.innerHTML = '<option value="">Select a size/color…</option>';
-    opts.forEach(opt => {
-      const o = document.createElement('option');
-      o.value = JSON.stringify({ sku: opt.sku, name: opt.name });
-      o.textContent = displayName(opt.name);
-      sel.appendChild(o);
-    });
-    if (opts.length === 0) {
-      sel.innerHTML = '<option value="">No other sizes available — contact us</option>';
-    }
-    sel.dataset.loaded = '1';
-  } catch (e) {
-    sel.innerHTML = '<option value="">Error loading options — please refresh</option>';
+  sel.innerHTML = '<option value="">Select a size/color…</option>';
+  opts.forEach(opt => {
+    const o = document.createElement('option');
+    o.value = JSON.stringify({ sku: opt.sku, name: opt.name });
+    o.textContent = displayName(opt.name);
+    sel.appendChild(o);
+  });
+  if (opts.length === 0) {
+    sel.innerHTML = '<option value="">No other sizes available — contact us</option>';
   }
-
-  loading.style.display = 'none';
-  sel.style.display = '';
 }
 
 // ── Submit Exchange ───────────────────────────────────────────────────────────
