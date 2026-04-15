@@ -1336,23 +1336,23 @@ def exchange_options():
 
     try:
         airtable_read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        formula = f'AND({{Can Exchange}}=TRUE(),FIND("{parent_product_id}",ARRAYJOIN({{Parent Product}})))'
         records = at_get_all(
             PRODUCT_SKUS_TABLE_ID,
             airtable_read_token,
             fields=["Name + Variations", "SKU ID", "Parent Product"],
-            formula="{Can Exchange}=TRUE()",
+            formula=formula,
         )
         options = []
         for rec in records:
             fields = rec.get("fields", {})
-            if parent_product_id in fields.get("Parent Product", []):
-                raw_name = fields.get("Name + Variations", "")
-                clean_name = raw_name.replace(" - Base Only (-ONB)", "").replace(" - Base Only", "").replace(" (-ONB)", "").strip()
-                options.append({
-                    "id":   rec["id"],
-                    "name": clean_name,
-                    "sku":  fields.get("SKU ID", ""),
-                })
+            raw_name = fields.get("Name + Variations", "")
+            clean_name = raw_name.replace(" - Base Only (-ONB)", "").replace(" - Base Only", "").replace(" (-ONB)", "").strip()
+            options.append({
+                "id":   rec["id"],
+                "name": clean_name,
+                "sku":  fields.get("SKU ID", ""),
+            })
         options.sort(key=lambda x: x["name"])
         return Response(json.dumps({"options": options}), headers=c, mimetype="application/json")
 
