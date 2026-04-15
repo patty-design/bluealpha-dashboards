@@ -1279,13 +1279,16 @@ def verify_exchange():
         # Original SKU is stored in customField3 of each exchange order
         already_exchanged_skus = set()
         next_suffix = "-E"
+        _debug_ex = []
         try:
             for n in range(1, 10):
                 suffix = "-E" if n == 1 else f"-E{n}"
                 ex_r = req_lib.get("https://ssapi.shipstation.com/orders",
                                     params={"orderNumber": f"{order_number}{suffix}"},
                                     headers=ss_headers(), timeout=10)
-                ex_orders = ex_r.json().get("orders", [])
+                ex_raw = ex_r.json()
+                ex_orders = ex_raw.get("orders", [])
+                _debug_ex.append({"suffix": suffix, "found": len(ex_orders), "status": ex_r.status_code})
                 if not ex_orders:
                     next_suffix = suffix
                     break
@@ -1302,6 +1305,7 @@ def verify_exchange():
                         if s:
                             already_exchanged_skus.add(s)
         except Exception as ex_check_err:
+            _debug_ex.append({"error": str(ex_check_err)})
             print(f"[verify-exchange] exchange-order check failed (non-fatal): {ex_check_err}")
 
         # Filter out already-exchanged items
@@ -1328,6 +1332,8 @@ def verify_exchange():
             },
             "eligibleItems": eligible_items,
             "nextSuffix":    next_suffix,
+            "_debug_ex":     _debug_ex,
+            "_blocked_skus": list(already_exchanged_skus),
         }), headers=c, mimetype="application/json")
 
     except Exception as e:
