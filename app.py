@@ -1432,9 +1432,63 @@ def submit_exchange():
                 "shippingAmount": 0.00,
             })
 
-            # ── LP Inner lookup for combo belts ──────────────────────────────
-            is_outer_only = bool(re.search(r'(-ONB|-O)$', original_sku, re.IGNORECASE))
-            if not is_outer_only and selected_sku:
+            # ── LP Inner lookup ───────────────────────────────────────────────
+            selected_is_onb = bool(re.search(r'-ONB$', selected_sku, re.IGNORECASE))
+
+            if selected_is_onb:
+                # ONB selection → find LP inner by color + size from selected belt name
+                try:
+                    # Extract size from SKU (e.g. MOL-RAN-36-ONB → 36)
+                    size_m = re.search(r'-(\d+)-ONB$', selected_sku, re.IGNORECASE)
+                    inner_size = size_m.group(1) if size_m else None
+
+                    # Map belt color → LP inner color
+                    COLOR_MAP = [
+                        (["mc black", "mc tropic", "woodland", "black"], "Black"),
+                        (["coyote brown", "mc australian", "mc arid"],   "Coyote Brown"),
+                        (["mc classic", "multicam"],                      "Multicam"),
+                        (["ranger green", "ranger", "od green"],          "OD Green"),
+                        (["wolf gray"],                                    "Wolf Gray"),
+                    ]
+                    name_lower = selected_name.lower()
+                    inner_color = None
+                    for keywords, color in COLOR_MAP:
+                        for kw in keywords:
+                            if kw in name_lower:
+                                inner_color = color
+                                break
+                        if inner_color:
+                            break
+
+                    if inner_color and inner_size:
+                        search_str = f"LP INNER ONLY Belt {inner_color} {inner_size}"
+                        inner_formula = (
+                            f'AND(NOT(SEARCH("WPS",{{Name + Variations}})),'
+                            f'SEARCH("{search_str}",{{Name + Variations}}))'
+                        )
+                        inner_recs = at_get_all(
+                            PRODUCT_SKUS_TABLE_ID, airtable_read_token,
+                            fields=["Name + Variations", "SKU ID"],
+                            formula=inner_formula,
+                        )
+                        if inner_recs:
+                            ir = inner_recs[0]["fields"]
+                            order_items.append({
+                                "lineItemKey":    f"exchange-{item_idx + 1}-inner",
+                                "name":          ir.get("Name + Variations", ""),
+                                "sku":           ir.get("SKU ID", ""),
+                                "quantity":      quantity,
+                                "unitPrice":     0.00,
+                                "taxAmount":     0.00,
+                                "shippingAmount": 0.00,
+                            })
+                        else:
+                            print(f"[submit-exchange] No LP inner found for {inner_color} size {inner_size}")
+                except Exception as lp_err:
+                    print(f"[submit-exchange] ONB LP inner lookup failed for {selected_sku}: {lp_err}")
+
+            elif not re.search(r'(-O)$', original_sku, re.IGNORECASE):
+                # Full-combo selected belt → find inner via Component(s) in Airtable
                 try:
                     combo_sku = re.sub(r'(-ONB|-O)$', '', selected_sku, flags=re.IGNORECASE).strip()
                     combo_recs = req_lib.get(
@@ -1465,7 +1519,7 @@ def submit_exchange():
                         })
                         break
                 except Exception as lp_err:
-                    print(f"[submit-exchange] LP inner lookup failed for {selected_sku}: {lp_err}")
+                    print(f"[submit-exchange] Component LP inner lookup failed for {selected_sku}: {lp_err}")
 
         original_skus_csv = ",".join(i.get("originalSku", "") for i in items_payload)
         selected_names    = ", ".join(i.get("selectedName", "") for i in items_payload)
