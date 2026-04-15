@@ -341,6 +341,9 @@
     <button class="btn btn-primary" id="btn-verify" onclick="verifyExchange()" style="margin-top:24px;">
       Continue
     </button>
+    <div id="msg-checking-note" class="message hidden" style="margin-top:14px; background:#f0f5fb; border-color:#5B7FA0; color:#1a2633;">
+      ⏳ This may take 10–15 seconds while we look up your order — hang tight!
+    </div>
 
     <div class="message message-error" id="msg-not-found">
       <strong>Order not found</strong>
@@ -496,6 +499,9 @@ async function verifyExchange() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Checking eligibility…';
 
+  const note = document.getElementById('msg-checking-note');
+  if (note) { note.classList.remove('hidden'); note.classList.add('show'); }
+
   try {
     const res  = await fetch(API_BASE + '/api/verify-exchange', {
       method: 'POST',
@@ -523,6 +529,7 @@ async function verifyExchange() {
 
   btn.disabled = false;
   btn.innerHTML = 'Check Eligibility';
+  if (note) { note.classList.add('hidden'); note.classList.remove('show'); }
 }
 
 function showMsg(id) {
