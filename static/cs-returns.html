@@ -795,7 +795,7 @@ async function csSubmitCancellation() {
       })
     });
     const data = await res.json();
-    console.log('[cancel] API response:', data);
+    alert('API response: ' + JSON.stringify(data));
     if (data.success) {
       document.getElementById('screen-main').classList.add('hidden');
       document.getElementById('screen-success').classList.remove('hidden');
@@ -809,6 +809,7 @@ async function csSubmitCancellation() {
       throw new Error(data.error || 'Unknown error');
     }
   } catch (e) {
+    alert('ERROR: ' + e.message);
     errEl.classList.add('show');
   }
   btn.disabled = false;
