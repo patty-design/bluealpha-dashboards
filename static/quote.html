@@ -147,18 +147,52 @@
     }
     textarea { resize: vertical; min-height: 90px; }
 
-    /* ── Selector row ── */
-    .selector-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr 90px auto;
-      gap: 10px;
-      align-items: end;
-      margin-bottom: 24px;
+    /* ── Category accordion ── */
+    .cat-section { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; overflow: hidden; }
+    .cat-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; cursor: pointer; background: var(--light);
+      font-weight: 700; font-size: 0.9rem; color: var(--text);
+      user-select: none; transition: background 0.15s;
     }
-    @media (max-width: 600px) {
-      .selector-grid { grid-template-columns: 1fr 1fr; }
-      .selector-grid .btn-add { grid-column: 1 / -1; }
+    .cat-header:hover { background: #eaecf0; }
+    .cat-header .cat-arrow { font-size: 0.75rem; color: var(--muted); transition: transform 0.2s; }
+    .cat-header.open .cat-arrow { transform: rotate(90deg); }
+    .cat-count { font-size: 0.8rem; color: var(--muted); font-weight: 400; margin-left: 6px; }
+    .cat-body { display: none; border-top: 1px solid var(--border); }
+    .cat-body.open { display: block; }
+
+    .product-item { border-bottom: 1px solid var(--border); }
+    .product-item:last-child { border-bottom: none; }
+    .product-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 11px 16px; cursor: pointer; transition: background 0.15s;
+      font-size: 0.9rem; color: var(--text);
     }
+    .product-row:hover { background: #f0f4f8; }
+    .product-row.active { background: #e8f0f9; color: var(--navy); font-weight: 700; }
+    .product-row .p-arrow { font-size: 0.75rem; color: var(--muted); transition: transform 0.2s; }
+    .product-row.active .p-arrow { transform: rotate(90deg); color: var(--navy); }
+
+    .product-selector {
+      display: none; padding: 14px 16px 16px; background: #f7f9fc;
+      border-top: 1px solid var(--border);
+    }
+    .product-selector.open { display: block; }
+    .sel-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+    .sel-field { flex: 1; min-width: 120px; }
+    .sel-field label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); display: block; margin-bottom: 5px; }
+    .sel-qty { flex: 0 0 70px; }
+    .btn-add-inline {
+      flex: 0 0 auto; padding: 10px 18px; background: var(--navy); color: #fff;
+      border: none; border-radius: 6px; font-family: 'Montserrat', sans-serif;
+      font-size: 0.85rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+      transition: opacity 0.15s;
+    }
+    .btn-add-inline:hover { opacity: 0.85; }
+    .btn-add-inline:disabled { opacity: 0.4; cursor: not-allowed; }
+    .catalog-loading { padding: 20px; text-align: center; color: var(--muted); font-size: 0.9rem; }
+    .catalog-section-wrap { margin-bottom: 24px; }
 
     /* ── Items list ── */
     .items-empty {
@@ -386,34 +420,9 @@
       <div class="card-title">Step 1 — Select Your Items</div>
       <div class="card-subtitle">Choose a product, color, and size to add each item to your quote.</div>
 
-      <!-- Tiered selector -->
-      <div class="selector-grid">
-        <div class="field" style="margin:0">
-          <label style="margin-bottom:5px">Product</label>
-          <select id="selProduct">
-            <option value="">Select a product…</option>
-          </select>
-        </div>
-        <div class="field" style="margin:0">
-          <label style="margin-bottom:5px">Color</label>
-          <select id="selColor" disabled>
-            <option value="">Select a color…</option>
-          </select>
-        </div>
-        <div class="field" style="margin:0">
-          <label style="margin-bottom:5px">Size</label>
-          <select id="selSize" disabled>
-            <option value="">Select a size…</option>
-          </select>
-        </div>
-        <div class="field" style="margin:0">
-          <label style="margin-bottom:5px">Qty</label>
-          <input type="number" id="selQty" min="1" value="1">
-        </div>
-        <div class="field" style="margin:0">
-          <label style="margin-bottom:5px; visibility:hidden">Add</label>
-          <button class="btn btn-add" id="btnAdd" disabled onclick="addItem()">Add</button>
-        </div>
+      <!-- Category accordion -->
+      <div class="catalog-section-wrap" id="catalogWrap">
+        <div class="catalog-loading">Loading products…</div>
       </div>
 
       <!-- Items list -->
@@ -543,9 +552,10 @@
 
 <script>
 // ─── State ───────────────────────────────────────────────────────────────────
-let catalog = null;       // { parents, skus }
-let items   = [];         // { skuRecordId, name, qty, unitPrice }
-let isIntl  = false;
+let catalog      = null;   // { parents, skus }
+let items        = [];     // { skuRecordId, name, qty, unitPrice }
+let isIntl       = false;
+let activeParent = null;   // currently-expanded parent product id
 
 // ─── Init ────────────────────────────────────────────────────────────────────
 (async function init() {
@@ -553,75 +563,142 @@ let isIntl  = false;
     const r = await fetch('/api/quote-catalog');
     if (!r.ok) throw new Error('Failed to load catalog');
     catalog = await r.json();
-    populateProducts();
+    buildCatalogUI();
   } catch (e) {
-    document.getElementById('step1').insertAdjacentHTML('afterbegin',
-      `<div class="message message-error show" style="margin-bottom:16px">
-        <strong>Catalog unavailable.</strong> Please try refreshing the page. If the issue persists, contact us at info@bluealpha.us
-       </div>`
-    );
+    document.getElementById('catalogWrap').innerHTML =
+      `<div class="message message-error show">
+        <strong>Catalog unavailable.</strong> Please try refreshing. If the issue persists, contact us at info@bluealpha.us
+       </div>`;
   }
 })();
 
-// ─── Catalog selectors ───────────────────────────────────────────────────────
-function populateProducts() {
-  const sel = document.getElementById('selProduct');
-  sel.innerHTML = '<option value="">Select a product…</option>';
+// ─── Build accordion UI ───────────────────────────────────────────────────────
+function buildCatalogUI() {
+  // Group parents by category
+  const catOrder = ['EDC Belts','Battle Belts','Duty Belts','Accessories','Apparel','Merch'];
+  const catMap   = {};
   for (const p of catalog.parents) {
-    const opt = document.createElement('option');
-    opt.value = p.id;
-    opt.textContent = p.name;
-    sel.appendChild(opt);
+    const cat = p.category || 'Other';
+    if (!catMap[cat]) catMap[cat] = [];
+    catMap[cat].push(p);
+  }
+
+  // Sort categories: known order first, then alpha
+  const cats = Object.keys(catMap).sort((a, b) => {
+    const ia = catOrder.indexOf(a), ib = catOrder.indexOf(b);
+    if (ia !== -1 && ib !== -1) return ia - ib;
+    if (ia !== -1) return -1;
+    if (ib !== -1) return 1;
+    return a.localeCompare(b);
+  });
+
+  const wrap = document.getElementById('catalogWrap');
+  wrap.innerHTML = '';
+
+  for (const cat of cats) {
+    const parents = catMap[cat];
+    const section = document.createElement('div');
+    section.className = 'cat-section';
+    section.innerHTML = `
+      <div class="cat-header" onclick="toggleCat(this)">
+        <span>${escHtml(cat)}<span class="cat-count">(${parents.length})</span></span>
+        <span class="cat-arrow">▶</span>
+      </div>
+      <div class="cat-body">
+        ${parents.map(p => `
+          <div class="product-item" id="pi_${p.id}">
+            <div class="product-row" onclick="toggleProduct('${p.id}', this)">
+              <span>${escHtml(p.name)}</span>
+              <span class="p-arrow">▶</span>
+            </div>
+            <div class="product-selector" id="ps_${p.id}">
+              <div class="sel-row">
+                <div class="sel-field">
+                  <label>Color</label>
+                  <select id="sc_${p.id}" onchange="onSelColor('${p.id}')">
+                    <option value="">Select a color…</option>
+                  </select>
+                </div>
+                <div class="sel-field">
+                  <label>Size</label>
+                  <select id="ss_${p.id}" disabled onchange="onSelSize('${p.id}')">
+                    <option value="">Select a size…</option>
+                  </select>
+                </div>
+                <div class="sel-field sel-qty">
+                  <label>Qty</label>
+                  <input type="number" id="sq_${p.id}" min="1" value="1" style="text-align:center">
+                </div>
+                <button class="btn-add-inline" id="sb_${p.id}" disabled
+                        onclick="addCatalogItem('${p.id}')">Add to Quote</button>
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    wrap.appendChild(section);
   }
 }
 
-document.getElementById('selProduct').addEventListener('change', function() {
-  const parentId = this.value;
-  const colorSel = document.getElementById('selColor');
-  const sizeSel  = document.getElementById('selSize');
+function toggleCat(header) {
+  header.classList.toggle('open');
+  header.nextElementSibling.classList.toggle('open');
+}
 
-  colorSel.innerHTML = '<option value="">Select a color…</option>';
-  sizeSel.innerHTML  = '<option value="">Select a size…</option>';
-  colorSel.disabled  = true;
-  sizeSel.disabled   = true;
-  document.getElementById('btnAdd').disabled = true;
+function toggleProduct(parentId, rowEl) {
+  // Close previously open product if different
+  if (activeParent && activeParent !== parentId) {
+    const prev = document.getElementById('ps_' + activeParent);
+    const prevRow = prev && prev.previousElementSibling;
+    if (prev) prev.classList.remove('open');
+    if (prevRow) prevRow.classList.remove('active');
+  }
 
-  if (!parentId) return;
+  const selector = document.getElementById('ps_' + parentId);
+  const isOpen   = selector.classList.contains('open');
 
-  // Collect unique colors for this parent
-  const colorMap = {};
-  for (const sku of catalog.skus) {
-    if (sku.parentId === parentId && sku.colorId && sku.colorName) {
-      colorMap[sku.colorId] = sku.colorName;
+  selector.classList.toggle('open', !isOpen);
+  rowEl.classList.toggle('active', !isOpen);
+  activeParent = isOpen ? null : parentId;
+
+  // Populate colors when opening
+  if (!isOpen) {
+    const colorSel = document.getElementById('sc_' + parentId);
+    if (colorSel.options.length <= 1) {
+      const colorMap = {};
+      for (const sku of catalog.skus) {
+        if (sku.parentId === parentId && sku.colorId && sku.colorName)
+          colorMap[sku.colorId] = sku.colorName;
+      }
+      const colors = Object.entries(colorMap).sort((a,b) => a[1].localeCompare(b[1]));
+      for (const [id, name] of colors) {
+        const opt = document.createElement('option');
+        opt.value = id; opt.textContent = name;
+        colorSel.appendChild(opt);
+      }
+      // Auto-select if only one option
+      if (colors.length === 1) {
+        colorSel.value = colors[0][0];
+        onSelColor(parentId);
+      }
     }
   }
-  const colors = Object.entries(colorMap).sort((a,b) => a[1].localeCompare(b[1]));
-  for (const [id, name] of colors) {
-    const opt = document.createElement('option');
-    opt.value = id;
-    opt.textContent = name;
-    colorSel.appendChild(opt);
-  }
-  colorSel.disabled = false;
-});
+}
 
-document.getElementById('selColor').addEventListener('change', function() {
-  const parentId = document.getElementById('selProduct').value;
-  const colorId  = this.value;
-  const sizeSel  = document.getElementById('selSize');
-
+function onSelColor(parentId) {
+  const colorId = document.getElementById('sc_' + parentId).value;
+  const sizeSel = document.getElementById('ss_' + parentId);
   sizeSel.innerHTML = '<option value="">Select a size…</option>';
-  sizeSel.disabled  = true;
-  document.getElementById('btnAdd').disabled = true;
+  sizeSel.disabled = true;
+  document.getElementById('sb_' + parentId).disabled = true;
 
   if (!colorId) return;
 
-  // Collect unique sizes for this parent+color, sort numerically then alpha
   const sizeMap = {};
   for (const sku of catalog.skus) {
-    if (sku.parentId === parentId && sku.colorId === colorId && sku.sizeId && sku.sizeName) {
+    if (sku.parentId === parentId && sku.colorId === colorId && sku.sizeId && sku.sizeName)
       sizeMap[sku.sizeId] = sku.sizeName;
-    }
   }
   const sizes = Object.entries(sizeMap).sort((a,b) => {
     const na = parseFloat(a[1]), nb = parseFloat(b[1]);
@@ -630,48 +707,50 @@ document.getElementById('selColor').addEventListener('change', function() {
   });
   for (const [id, name] of sizes) {
     const opt = document.createElement('option');
-    opt.value = id;
-    opt.textContent = name;
+    opt.value = id; opt.textContent = name;
     sizeSel.appendChild(opt);
   }
   sizeSel.disabled = false;
-});
-
-document.getElementById('selSize').addEventListener('change', function() {
-  document.getElementById('btnAdd').disabled = !this.value;
-});
-
-// ─── Add item ────────────────────────────────────────────────────────────────
-function addItem() {
-  const parentId = document.getElementById('selProduct').value;
-  const colorId  = document.getElementById('selColor').value;
-  const sizeId   = document.getElementById('selSize').value;
-  const qty      = Math.max(1, parseInt(document.getElementById('selQty').value) || 1);
-
-  if (!parentId || !colorId || !sizeId) return;
-
-  const sku = catalog.skus.find(s => s.parentId === parentId && s.colorId === colorId && s.sizeId === sizeId);
-  if (!sku) return;
-
-  items.push({
-    skuRecordId: sku.recordId,
-    name:        sku.name,
-    qty:         qty,
-    unitPrice:   sku.price,
-  });
-
-  renderItems();
-  resetSelector();
+  // Auto-select if only one size
+  if (sizes.length === 1) {
+    sizeSel.value = sizes[0][0];
+    onSelSize(parentId);
+  }
 }
 
-function resetSelector() {
-  document.getElementById('selProduct').value = '';
-  document.getElementById('selColor').innerHTML = '<option value="">Select a color…</option>';
-  document.getElementById('selColor').disabled = true;
-  document.getElementById('selSize').innerHTML = '<option value="">Select a size…</option>';
-  document.getElementById('selSize').disabled = true;
-  document.getElementById('selQty').value = 1;
-  document.getElementById('btnAdd').disabled = true;
+function onSelSize(parentId) {
+  const sizeId = document.getElementById('ss_' + parentId).value;
+  document.getElementById('sb_' + parentId).disabled = !sizeId;
+}
+
+// ─── Add item ────────────────────────────────────────────────────────────────
+function addCatalogItem(parentId) {
+  const colorId = document.getElementById('sc_' + parentId).value;
+  const sizeId  = document.getElementById('ss_' + parentId).value;
+  const qty     = Math.max(1, parseInt(document.getElementById('sq_' + parentId).value) || 1);
+
+  if (!colorId || !sizeId) return;
+
+  const sku = catalog.skus.find(s =>
+    s.parentId === parentId && s.colorId === colorId && s.sizeId === sizeId
+  );
+  if (!sku) return;
+
+  items.push({ skuRecordId: sku.recordId, name: sku.name, qty, unitPrice: sku.price });
+  renderItems();
+
+  // Reset this selector and close it
+  document.getElementById('sc_' + parentId).value = '';
+  document.getElementById('ss_' + parentId).innerHTML = '<option value="">Select a size…</option>';
+  document.getElementById('ss_' + parentId).disabled = true;
+  document.getElementById('sq_' + parentId).value = 1;
+  document.getElementById('sb_' + parentId).disabled = true;
+  // Close the panel
+  const selector = document.getElementById('ps_' + parentId);
+  const row = selector.previousElementSibling;
+  selector.classList.remove('open');
+  row.classList.remove('active');
+  activeParent = null;
 }
 
 // ─── Render ──────────────────────────────────────────────────────────────────

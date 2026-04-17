@@ -2087,6 +2087,7 @@ def quote_catalog():
             raw_name = f.get("Name + Variations", "")
             clean_name = _clean_product_name(raw_name)
 
+            category = f.get("Category", "") or ""
             skus.append({
                 "recordId":   r["id"],
                 "sku":        f.get("SKU ID", ""),
@@ -2098,12 +2099,13 @@ def quote_catalog():
                 "colorName":  color_name,
                 "sizeId":     size_id,
                 "sizeName":   size_name,
+                "category":   category,
             })
             if parent_id not in seen_parents:
-                seen_parents[parent_id] = parent_name
+                seen_parents[parent_id] = {"name": parent_name, "category": category}
 
         parents = sorted(
-            [{"id": k, "name": v} for k, v in seen_parents.items()],
+            [{"id": k, "name": v["name"], "category": v["category"]} for k, v in seen_parents.items()],
             key=lambda x: x["name"],
         )
         return Response(json.dumps({"parents": parents, "skus": skus}),
