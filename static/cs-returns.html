@@ -512,7 +512,7 @@ let orderData   = null;
 let currentMode = 'return'; // 'return' | 'cancel'
 let orderBlocked = false;   // true when cancel mode + order already shipped
 
-const CANCELLABLE_STATUSES = ['awaiting_shipment', 'awaiting_payment', 'on_hold'];
+const CANCELLABLE_STATUSES = ['awaiting_shipment', 'awaiting_payment', 'on_hold', 'cancelled'];
 
 // ── Login ──────────────────────────────────────────────────────────────────
 async function csLogin() {
