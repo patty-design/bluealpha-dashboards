@@ -8,6 +8,7 @@ import threading
 import requests as req_lib
 
 AIRTABLE_OPS_TOKEN      = os.environ.get("AIRTABLE_OPS_TOKEN", "")
+AIRTABLE_BASE_TOKEN     = os.environ.get("AIRTABLE_BASE_TOKEN", "")
 AIRTABLE_WRITE_TOKEN    = os.environ.get("AIRTABLE_WRITE_TOKEN", "")
 RETURNS_WRITE_TOKEN     = os.environ.get("AIRTABLE_WRITE_TOKEN_2", AIRTABLE_WRITE_TOKEN)
 FLASK_BASE_URL          = os.environ.get("FLASK_BASE_URL", "https://bluealpha-dashboards-production.up.railway.app")
@@ -2049,8 +2050,8 @@ def quote_catalog():
     if request.method == "OPTIONS":
         return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "GET"})
     c = cors()
-    # Use OPS token for reads (same pattern as verify-order/exchange); write token may be restricted
-    token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    # Use full-access token for catalog reads; write token is scoped only to Returns table
+    token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
     try:
         # Fetch all four tables in parallel-ish (sequential is fine for catalog)
         sku_records_raw = at_get_all(
