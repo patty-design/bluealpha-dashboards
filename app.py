@@ -1220,6 +1220,13 @@ def verify_exchange():
         if not name_match and not email_match:
             return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
 
+        # Block international and military overseas orders
+        MILITARY_STATES = {"AA", "AE", "AP"}
+        country = order.get("shipTo", {}).get("country", "US")
+        state   = order.get("shipTo", {}).get("state", "").upper()
+        if country not in ("US", "USA") or state in MILITARY_STATES:
+            return Response(json.dumps({"status": "international"}), headers=c, mimetype="application/json")
+
         # Check ship date within 37 days
         sr = req_lib.get("https://ssapi.shipstation.com/shipments",
                           params={"orderNumber": order_number},
