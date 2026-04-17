@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blue Alpha — View Quote</title>
+  <link rel="icon" href="https://www.bluealphabelts.com/wp-content/uploads/2019/05/cropped-BAG-FAV-32x32.png">
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:    #003a6c;
+      --red:     #ae0000;
+      --light:   #f5f7fa;
+      --border:  #dde3ea;
+      --text:    #1a2633;
+      --muted:   #6b7a8d;
+      --white:   #ffffff;
+      --success: #1a7a3c;
+      --warning: #b45309;
+    }
+
+    body {
+      font-family: 'Lato', sans-serif;
+      background: var(--light);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--navy);
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    header img { height: 44px; width: auto; filter: brightness(0) invert(1); }
+    .header-divider { width: 2px; height: 36px; background: var(--red); border-radius: 2px; }
+    .header-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.75);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+
+    /* ── Container ── */
+    .container {
+      max-width: 760px;
+      margin: 40px auto;
+      padding: 0 20px 80px;
+    }
+
+    /* ── Spinner ── */
+    .loading-state {
+      text-align: center;
+      padding: 80px 0;
+      color: var(--muted);
+    }
+    .spin-lg {
+      display: inline-block;
+      width: 40px; height: 40px;
+      border: 4px solid var(--border);
+      border-top-color: var(--navy);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Error state ── */
+    .error-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 48px 32px;
+      text-align: center;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+    .error-card h2 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.3rem;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+    .error-card p { color: var(--muted); line-height: 1.6; }
+
+    /* ── Banners ── */
+    .banner {
+      border-radius: 8px;
+      padding: 14px 20px;
+      font-size: 0.93rem;
+      line-height: 1.55;
+      margin-bottom: 20px;
+    }
+    .banner-success { background: #edf7f1; border: 1px solid #a3d9b8; color: #145228; }
+    .banner-error   { background: #fff0f0; border: 1px solid #f5c2c2; color: #7a1515; }
+    .banner-warning { background: #fff8ed; border: 1px solid #f5dca0; color: #7a4e00; }
+
+    /* ── Card ── */
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 28px 32px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      margin-bottom: 20px;
+    }
+
+    /* ── Info card ── */
+    .quote-number {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 4px;
+    }
+    .quote-org {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 20px;
+      margin-bottom: 14px;
+    }
+    .meta-item {
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+    .meta-item strong { color: var(--text); }
+    .meta-item.warn  { color: var(--warning); font-weight: 700; }
+    .meta-item.exp   { color: var(--red); font-weight: 700; }
+
+    .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .badge {
+      display: inline-block;
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .badge-navy    { background: var(--navy); color: white; }
+    .badge-success { background: #edf7f1; border: 1px solid #a3d9b8; color: #145228; }
+
+    /* ── Section title ── */
+    .section-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-count {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--muted);
+      background: var(--light);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2px 10px;
+    }
+
+    /* ── Items table ── */
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    .items-table th {
+      text-align: left;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .items-table th.right { text-align: right; }
+    .items-table td {
+      padding: 10px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    .items-table td.right { text-align: right; color: var(--text); }
+    .items-table td.muted { color: var(--muted); }
+    .items-table tr:last-child td { border-bottom: none; }
+
+    .qty-input {
+      width: 70px;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      font-family: 'Lato', sans-serif;
+      font-size: 0.9rem;
+      text-align: center;
+      outline: none;
+    }
+    .qty-input:focus {
+      border-color: var(--navy);
+      box-shadow: 0 0 0 2px rgba(0,58,108,0.08);
+    }
+
+    .btn-remove {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 4px 6px;
+      border-radius: 4px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .btn-remove:hover { color: var(--red); background: #fff0f0; }
+
+    /* ── Add item expander ── */
+    .add-item-toggle {
+      margin-top: 16px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--navy);
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+    }
+    .add-item-toggle:hover { text-decoration: underline; }
+
+    .add-item-panel {
+      margin-top: 16px;
+      padding: 16px;
+      background: var(--light);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    .add-item-panel .selector-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 80px auto;
+      gap: 10px;
+      align-items: end;
+    }
+    @media (max-width: 600px) {
+      .add-item-panel .selector-grid { grid-template-columns: 1fr 1fr; }
+      .add-item-panel .selector-grid .btn-add { grid-column: 1 / -1; }
+    }
+    .add-item-panel label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text);
+      margin-bottom: 5px;
+    }
+    .add-item-panel select,
+    .add-item-panel input[type="number"] {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 9px 12px;
+      font-family: 'Lato', sans-serif;
+      font-size: 0.9rem;
+      color: var(--text);
+      background: var(--white);
+      outline: none;
+    }
+    .add-item-panel select:focus,
+    .add-item-panel input:focus {
+      border-color: var(--navy);
+      box-shadow: 0 0 0 2px rgba(0,58,108,0.08);
+    }
+    .add-item-panel select:disabled { background: #f0f2f5; color: var(--muted); }
+
+    /* ── Totals ── */
+    .totals-block { margin-top: 16px; }
+    .totals-row {
+      display: flex;
+      justify-content: flex-end;
+      gap: 24px;
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .totals-row.total-final {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+      margin-top: 4px;
+    }
+    .totals-row .val { min-width: 90px; text-align: right; }
+
+    /* ── Save button ── */
+    .save-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .save-confirm {
+      font-size: 0.88rem;
+      color: var(--success);
+      font-weight: 700;
+      display: none;
+    }
+
+    /* ── Notes card ── */
+    .notes-text {
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 0.93rem;
+      white-space: pre-wrap;
+    }
+
+    /* ── Action buttons ── */
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-block;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.2s, transform 0.1s;
+      text-decoration: none;
+    }
+    .btn:hover { opacity: 0.88; }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+    .btn-primary { background: var(--navy); color: var(--white); }
+    .btn-danger  { background: var(--red);  color: var(--white); }
+    .btn-secondary {
+      background: transparent;
+      color: var(--navy);
+      border: 1.5px solid var(--navy);
+    }
+    .btn-add { background: var(--navy); color: var(--white); padding: 9px 16px; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+    }
+    .modal {
+      background: var(--white);
+      border-radius: 10px;
+      padding: 36px 32px;
+      max-width: 460px;
+      width: 90%;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    }
+    .modal h2 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 12px;
+    }
+    .modal p {
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+    .modal-btns { display: flex; gap: 12px; }
+    .modal-btns .btn { flex: 1; text-align: center; }
+
+    .spinner-sm {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 480px) {
+      .card { padding: 20px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <img src="https://www.bluealphabelts.com/wp-content/uploads/2019/05/Blue-Alpha-Logo-White.png"
+       alt="Blue Alpha"
+       onerror="this.onerror=null;this.src='/static/ba-logo.jpg'">
+  <div class="header-divider"></div>
+  <div class="header-title">Quote Portal</div>
+</header>
+
+<div class="container">
+
+  <!-- Loading -->
+  <div id="stateLoading" class="loading-state">
+    <div class="spin-lg"></div>
+    <div>Loading your quote…</div>
+  </div>
+
+  <!-- Error -->
+  <div id="stateError" class="hidden">
+    <div class="error-card">
+      <h2>Quote Not Found</h2>
+      <p>We couldn't find this quote. The link may be invalid or expired.<br>
+         Please contact us at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or 678-961-3304.</p>
+    </div>
+  </div>
+
+  <!-- Loaded -->
+  <div id="stateLoaded" class="hidden">
+
+    <!-- Top banners -->
+    <div id="bannerAccepted" class="banner banner-success hidden"></div>
+    <div id="bannerExpired"  class="banner banner-error   hidden">
+      This quote has expired. Please contact us for a new quote —
+      <a href="mailto:info@bluealpha.us" style="color:inherit;font-weight:700;">info@bluealpha.us</a> or 678-961-3304.
+    </div>
+    <div id="bannerSuccess"  class="banner banner-success hidden"></div>
+
+    <!-- Info card -->
+    <div class="card">
+      <div class="quote-number" id="quoteNumber"></div>
+      <div class="quote-org"    id="quoteOrg"></div>
+
+      <div class="meta-row" id="metaRow">
+        <!-- populated by JS -->
+      </div>
+
+      <div class="badges" id="badges">
+        <span class="badge badge-navy">Net 30 Terms</span>
+        <!-- accepted badge injected here -->
+      </div>
+    </div>
+
+    <!-- Items card -->
+    <div class="card">
+      <div class="section-title">
+        Items <span class="section-count" id="itemCount">0</span>
+      </div>
+
+      <table class="items-table" id="itemsTable">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th class="right">Qty</th>
+            <th class="right">Unit Price</th>
+            <th class="right">Line Total</th>
+            <th id="thRemove"></th>
+          </tr>
+        </thead>
+        <tbody id="itemsTbody"></tbody>
+      </table>
+
+      <!-- Add item expander -->
+      <div id="addItemSection">
+        <button class="add-item-toggle" onclick="toggleAddItem()">+ Add another item</button>
+        <div id="addItemPanel" class="add-item-panel hidden">
+          <div class="selector-grid">
+            <div>
+              <label>Product</label>
+              <select id="vSelProduct"><option value="">Select a product…</option></select>
+            </div>
+            <div>
+              <label>Color</label>
+              <select id="vSelColor" disabled><option value="">Select a color…</option></select>
+            </div>
+            <div>
+              <label>Size</label>
+              <select id="vSelSize" disabled><option value="">Select a size…</option></select>
+            </div>
+            <div>
+              <label>Qty</label>
+              <input type="number" id="vSelQty" min="1" value="1">
+            </div>
+            <div>
+              <label style="visibility:hidden">Add</label>
+              <button class="btn btn-add" id="vBtnAdd" disabled onclick="addViewItem()">Add</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Totals -->
+      <div class="totals-block">
+        <div class="totals-row">
+          <span>Subtotal</span>
+          <span class="val" id="vSubtotal">$0.00</span>
+        </div>
+        <div class="totals-row hidden" id="vRowShipping">
+          <span>Shipping</span>
+          <span class="val" id="vShipping">$0.00</span>
+        </div>
+        <div class="totals-row total-final">
+          <span>Total</span>
+          <span class="val" id="vTotal">$0.00</span>
+        </div>
+      </div>
+
+      <!-- Save button (editable mode only) -->
+      <div class="save-row" id="saveRow">
+        <button class="btn btn-primary" id="btnSave" onclick="saveChanges()">Save Changes</button>
+        <span class="save-confirm" id="saveConfirm">✓ Changes saved</span>
+      </div>
+    </div>
+
+    <!-- Notes card -->
+    <div class="card hidden" id="notesCard">
+      <div class="section-title">Notes</div>
+      <div class="notes-text" id="notesText"></div>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions" id="actionsBar">
+      <!-- populated by JS -->
+    </div>
+
+  </div><!-- /stateLoaded -->
+
+</div>
+
+<!-- Accept modal -->
+<div class="modal-overlay hidden" id="acceptModal">
+  <div class="modal">
+    <h2>Place Your Order</h2>
+    <p>By accepting this quote, you're confirming an order under Net 30 payment terms. We'll create your sales order and be in touch about shipping.</p>
+    <div class="modal-btns">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger" id="btnConfirmOrder" onclick="confirmOrder()">Confirm Order</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+const recordId  = window.location.pathname.split('/').pop();
+let   quoteData = null;
+let   catalog   = null;
+let   catalogLoaded = false;
+let   editItems = [];  // working copy of line items when in edit mode
+
+// ─── Load ────────────────────────────────────────────────────────────────────
+(async function load() {
+  try {
+    const r = await fetch(`/api/get-quote/${recordId}`);
+    if (!r.ok) throw new Error('not found');
+    quoteData = await r.json();
+    editItems = quoteData.lineItems.map(i => ({ ...i }));
+    render();
+  } catch(e) {
+    document.getElementById('stateLoading').classList.add('hidden');
+    document.getElementById('stateError').classList.remove('hidden');
+  }
+})();
+
+// ─── Render ──────────────────────────────────────────────────────────────────
+function render() {
+  const q = quoteData;
+
+  document.getElementById('stateLoading').classList.add('hidden');
+  document.getElementById('stateLoaded').classList.remove('hidden');
+
+  // Quote number & org
+  document.getElementById('quoteNumber').textContent = q.quoteNumber;
+  document.getElementById('quoteOrg').textContent    = q.customer?.orgName || '';
+
+  // Meta row
+  const metaRow = document.getElementById('metaRow');
+  metaRow.innerHTML = '';
+
+  const dateEl = makeMetaItem(`Date: <strong>${q.date || '—'}</strong>`);
+  metaRow.appendChild(dateEl);
+
+  if (q.expiryDate) {
+    const daysLeft = daysBetween(new Date(), new Date(q.expiryDate));
+    let expEl;
+    if (q.isExpired) {
+      expEl = makeMetaItem(`Expires: <strong>EXPIRED</strong>`);
+      expEl.classList.add('exp');
+    } else if (daysLeft < 30) {
+      expEl = makeMetaItem(`Expires: <strong>${q.expiryDate}</strong> (${daysLeft}d left)`);
+      expEl.classList.add('warn');
+    } else {
+      expEl = makeMetaItem(`Expires: <strong>${q.expiryDate}</strong>`);
+    }
+    metaRow.appendChild(expEl);
+  }
+
+  if (q.poNumber) {
+    metaRow.appendChild(makeMetaItem(`PO #: <strong>${escHtml(q.poNumber)}</strong>`));
+  }
+
+  // Badges
+  const badges = document.getElementById('badges');
+  badges.innerHTML = '<span class="badge badge-navy">Net 30 Terms</span>';
+  if (q.isAccepted) {
+    const soNumber = q.soNumber || '';
+    const label = soNumber ? `✓ Order Accepted — ${soNumber}` : '✓ Order Accepted';
+    badges.insertAdjacentHTML('beforeend',
+      `<span class="badge badge-success">${escHtml(label)}</span>`);
+  }
+
+  // Status banners
+  if (q.isAccepted) {
+    const soLabel = q.soNumber ? `Order ${q.soNumber} is in progress.` : 'Your order is in progress.';
+    document.getElementById('bannerAccepted').textContent =
+      `This quote has been accepted. ${soLabel}`;
+    document.getElementById('bannerAccepted').classList.remove('hidden');
+  } else if (q.isExpired) {
+    document.getElementById('bannerExpired').classList.remove('hidden');
+  }
+
+  // Notes
+  if (q.notes) {
+    document.getElementById('notesCard').classList.remove('hidden');
+    document.getElementById('notesText').textContent = q.notes;
+  }
+
+  // Render table
+  renderItemsTable();
+
+  // Edit controls visibility
+  const editable = !q.isAccepted && !q.isExpired;
+  document.getElementById('addItemSection').classList.toggle('hidden', !editable);
+  document.getElementById('saveRow').classList.toggle('hidden', !editable);
+  document.getElementById('thRemove').textContent = editable ? '' : '';
+
+  // Actions bar
+  buildActions(editable);
+}
+
+function renderItemsTable() {
+  const q = quoteData;
+  const editable = !q.isAccepted && !q.isExpired;
+
+  document.getElementById('itemCount').textContent = editItems.length;
+
+  const tbody = document.getElementById('itemsTbody');
+  tbody.innerHTML = '';
+
+  for (let i = 0; i < editItems.length; i++) {
+    const item = editItems[i];
+    const lineTotal = (item.qty * item.unitPrice).toFixed(2);
+    const tr = document.createElement('tr');
+
+    if (editable) {
+      tr.innerHTML = `
+        <td>${escHtml(item.name)}</td>
+        <td class="right">
+          <input type="number" class="qty-input" min="1" value="${item.qty}"
+                 data-idx="${i}" onchange="onQtyChange(this)">
+        </td>
+        <td class="right muted">$${item.unitPrice.toFixed(2)}</td>
+        <td class="right" id="vLineTotal_${i}">$${lineTotal}</td>
+        <td><button class="btn-remove" onclick="removeViewItem(${i})" title="Remove">✕</button></td>
+      `;
+    } else {
+      tr.innerHTML = `
+        <td>${escHtml(item.name)}</td>
+        <td class="right">${item.qty}</td>
+        <td class="right muted">$${item.unitPrice.toFixed(2)}</td>
+        <td class="right">$${lineTotal}</td>
+        <td></td>
+      `;
+    }
+    tbody.appendChild(tr);
+  }
+
+  updateTotals();
+}
+
+function updateTotals() {
+  const subtotal = editItems.reduce((s, i) => s + i.qty * i.unitPrice, 0);
+  const shipping = quoteData.shipping || 0;
+  const total    = subtotal + shipping;
+
+  document.getElementById('vSubtotal').textContent = '$' + subtotal.toFixed(2);
+  document.getElementById('vTotal').textContent    = '$' + total.toFixed(2);
+
+  if (shipping > 0) {
+    document.getElementById('vShipping').textContent = '$' + shipping.toFixed(2);
+    document.getElementById('vRowShipping').classList.remove('hidden');
+  }
+}
+
+function buildActions(editable) {
+  const bar = document.getElementById('actionsBar');
+  bar.innerHTML = '';
+
+  // PDF always
+  const pdfBtn = document.createElement('button');
+  pdfBtn.className = 'btn btn-secondary';
+  pdfBtn.textContent = 'Download PDF';
+  pdfBtn.onclick = () => window.open(`/quote-pdf/${recordId}`);
+  bar.appendChild(pdfBtn);
+
+  if (editable) {
+    const acceptBtn = document.createElement('button');
+    acceptBtn.className = 'btn btn-danger';
+    acceptBtn.id = 'btnAccept';
+    acceptBtn.textContent = 'Accept This Quote';
+    acceptBtn.onclick = openModal;
+    bar.appendChild(acceptBtn);
+  }
+}
+
+// ─── Qty change & remove ─────────────────────────────────────────────────────
+function onQtyChange(el) {
+  const idx = parseInt(el.dataset.idx);
+  const qty = Math.max(1, parseInt(el.value) || 1);
+  el.value = qty;
+  editItems[idx].qty = qty;
+  const lt = document.getElementById(`vLineTotal_${idx}`);
+  if (lt) lt.textContent = '$' + (editItems[idx].qty * editItems[idx].unitPrice).toFixed(2);
+  updateTotals();
+}
+
+function removeViewItem(idx) {
+  editItems.splice(idx, 1);
+  renderItemsTable();
+}
+
+// ─── Add item via catalog ────────────────────────────────────────────────────
+let addItemOpen = false;
+
+async function toggleAddItem() {
+  addItemOpen = !addItemOpen;
+  document.getElementById('addItemPanel').classList.toggle('hidden', !addItemOpen);
+  if (addItemOpen && !catalogLoaded) {
+    await loadCatalog();
+  }
+}
+
+async function loadCatalog() {
+  try {
+    const r = await fetch('/api/quote-catalog');
+    if (!r.ok) throw new Error();
+    catalog = await r.json();
+    catalogLoaded = true;
+    populateVProducts();
+  } catch(e) {
+    document.getElementById('addItemPanel').innerHTML =
+      '<p style="color:var(--red);font-size:0.9rem;">Failed to load catalog. Please refresh.</p>';
+  }
+}
+
+function populateVProducts() {
+  const sel = document.getElementById('vSelProduct');
+  sel.innerHTML = '<option value="">Select a product…</option>';
+  for (const p of catalog.parents) {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.name;
+    sel.appendChild(opt);
+  }
+  sel.addEventListener('change', onVProductChange);
+  document.getElementById('vSelColor').addEventListener('change', onVColorChange);
+  document.getElementById('vSelSize').addEventListener('change', () => {
+    document.getElementById('vBtnAdd').disabled = !document.getElementById('vSelSize').value;
+  });
+}
+
+function onVProductChange() {
+  const parentId = this.value || document.getElementById('vSelProduct').value;
+  const colorSel = document.getElementById('vSelColor');
+  const sizeSel  = document.getElementById('vSelSize');
+  colorSel.innerHTML = '<option value="">Select a color…</option>';
+  sizeSel.innerHTML  = '<option value="">Select a size…</option>';
+  colorSel.disabled  = true;
+  sizeSel.disabled   = true;
+  document.getElementById('vBtnAdd').disabled = true;
+  if (!parentId) return;
+  const colorMap = {};
+  for (const sku of catalog.skus) {
+    if (sku.parentId === parentId && sku.colorId && sku.colorName)
+      colorMap[sku.colorId] = sku.colorName;
+  }
+  Object.entries(colorMap).sort((a,b) => a[1].localeCompare(b[1])).forEach(([id,name]) => {
+    const o = document.createElement('option'); o.value = id; o.textContent = name;
+    colorSel.appendChild(o);
+  });
+  colorSel.disabled = false;
+}
+
+function onVColorChange() {
+  const parentId = document.getElementById('vSelProduct').value;
+  const colorId  = document.getElementById('vSelColor').value;
+  const sizeSel  = document.getElementById('vSelSize');
+  sizeSel.innerHTML = '<option value="">Select a size…</option>';
+  sizeSel.disabled  = true;
+  document.getElementById('vBtnAdd').disabled = true;
+  if (!colorId) return;
+  const sizeMap = {};
+  for (const sku of catalog.skus) {
+    if (sku.parentId === parentId && sku.colorId === colorId && sku.sizeId && sku.sizeName)
+      sizeMap[sku.sizeId] = sku.sizeName;
+  }
+  Object.entries(sizeMap).sort((a,b) => {
+    const na = parseFloat(a[1]), nb = parseFloat(b[1]);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return a[1].localeCompare(b[1]);
+  }).forEach(([id,name]) => {
+    const o = document.createElement('option'); o.value = id; o.textContent = name;
+    sizeSel.appendChild(o);
+  });
+  sizeSel.disabled = false;
+}
+
+function addViewItem() {
+  const parentId = document.getElementById('vSelProduct').value;
+  const colorId  = document.getElementById('vSelColor').value;
+  const sizeId   = document.getElementById('vSelSize').value;
+  const qty      = Math.max(1, parseInt(document.getElementById('vSelQty').value) || 1);
+  if (!parentId || !colorId || !sizeId) return;
+  const sku = catalog.skus.find(s => s.parentId === parentId && s.colorId === colorId && s.sizeId === sizeId);
+  if (!sku) return;
+  editItems.push({ skuRecordId: sku.recordId, name: sku.name, qty, unitPrice: sku.price });
+  renderItemsTable();
+  // Reset panel
+  document.getElementById('vSelProduct').value = '';
+  document.getElementById('vSelColor').innerHTML = '<option value="">Select a color…</option>';
+  document.getElementById('vSelColor').disabled = true;
+  document.getElementById('vSelSize').innerHTML  = '<option value="">Select a size…</option>';
+  document.getElementById('vSelSize').disabled  = true;
+  document.getElementById('vSelQty').value = 1;
+  document.getElementById('vBtnAdd').disabled = true;
+}
+
+// Wire up separate listeners for the view-quote selectors
+document.getElementById('vSelProduct').addEventListener('change', onVProductChange);
+document.getElementById('vSelColor').addEventListener('change', onVColorChange);
+document.getElementById('vSelSize').addEventListener('change', function() {
+  document.getElementById('vBtnAdd').disabled = !this.value;
+});
+
+// ─── Save changes ─────────────────────────────────────────────────────────────
+async function saveChanges() {
+  const btn      = document.getElementById('btnSave');
+  const confirm  = document.getElementById('saveConfirm');
+  btn.disabled   = true;
+  btn.innerHTML  = '<span class="spinner-sm"></span>Saving…';
+  confirm.style.display = 'none';
+
+  try {
+    const payload = {
+      items: editItems.map(i => ({
+        skuRecordId: i.skuRecordId,
+        qty:         i.qty,
+        unitPrice:   i.unitPrice,
+      })),
+    };
+    const r = await fetch(`/api/update-quote/${recordId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await r.json();
+    if (!r.ok || !data.success) throw new Error(data.error || 'Save failed');
+    confirm.style.display = 'inline';
+    setTimeout(() => { confirm.style.display = 'none'; }, 3000);
+  } catch(e) {
+    alert('Save failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Changes';
+  }
+}
+
+// ─── Accept modal ─────────────────────────────────────────────────────────────
+function openModal()  { document.getElementById('acceptModal').classList.remove('hidden'); }
+function closeModal() { document.getElementById('acceptModal').classList.add('hidden'); }
+
+async function confirmOrder() {
+  const btn = document.getElementById('btnConfirmOrder');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-sm"></span>Placing Order…';
+
+  try {
+    const r = await fetch(`/api/accept-quote/${recordId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await r.json();
+    if (!r.ok || !data.success) throw new Error(data.error || 'Failed to accept');
+
+    closeModal();
+
+    const soNumber = data.soNumber || '';
+    const successBanner = document.getElementById('bannerSuccess');
+    successBanner.textContent = `Order ${soNumber} created! Our team will be in touch about shipping and invoicing.`;
+    successBanner.classList.remove('hidden');
+
+    // Update quote state
+    quoteData.isAccepted = true;
+    quoteData.soNumber   = soNumber;
+
+    // Hide edit/accept controls
+    document.getElementById('addItemSection').classList.add('hidden');
+    document.getElementById('saveRow').classList.add('hidden');
+
+    // Re-render badges and actions
+    const badges = document.getElementById('badges');
+    badges.innerHTML = '<span class="badge badge-navy">Net 30 Terms</span>';
+    const label = soNumber ? `✓ Order Accepted — ${soNumber}` : '✓ Order Accepted';
+    badges.insertAdjacentHTML('beforeend',
+      `<span class="badge badge-success">${escHtml(label)}</span>`);
+
+    buildActions(false);
+    renderItemsTable();
+  } catch(e) {
+    closeModal();
+    alert('Error: ' + e.message);
+  }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function makeMetaItem(html) {
+  const el = document.createElement('div');
+  el.className = 'meta-item';
+  el.innerHTML = html;
+  return el;
+}
+
+function daysBetween(d1, d2) {
+  return Math.ceil((d2 - d1) / (1000*60*60*24));
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>

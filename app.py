@@ -27,6 +27,14 @@ SENDGRID_FROM_EMAIL  = os.environ.get("SENDGRID_FROM_EMAIL", "info@bluealpha.us"
 TEST_EMAIL_OVERRIDE  = os.environ.get("TEST_EMAIL_OVERRIDE", "")
 CS_ADMIN_PASSWORD    = os.environ.get("CS_ADMIN_PASSWORD", "")
 
+MANUAL_ORDERS_TABLE_ID   = "tblOOZ2wVzIsR1DyL"
+MO_LINE_ITEMS_TABLE_ID   = "tblNjwm5SRsfE38Xu"
+CUSTOMERS_TABLE_ID       = "tblO4AdJE84kFDfEe"
+PARENT_PRODUCTS_TABLE_ID = "tbl40th76YvjdQExS"
+COLORS_TABLE_ID          = "tblN08IV26TpRYSMf"
+SIZES_TABLE_ID           = "tblUGwl1YLaVGCeIJ"
+QUOTE_BASE_URL           = os.environ.get("QUOTE_BASE_URL", "https://quote.bluealphabelts.com")
+
 app = Flask(__name__, static_folder="static")
 
 # In-memory status cache for return submissions (cleared on restart, only needed during ~60s poll window)
@@ -1673,6 +1681,883 @@ def submit_exchange():
             json.dumps({"success": False, "error": str(e)}),
             status=500, headers=c, mimetype="application/json",
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Quote Portal
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/quote")
+def quote_page():
+    return send_from_directory("static", "quote.html")
+
+@app.route("/view-quote/<record_id>")
+def view_quote_page(record_id):
+    return send_from_directory("static", "view-quote.html")
+
+
+def _clean_product_name(name):
+    """Strip marketing suffixes from product names."""
+    for suffix in [" - Base Only (-ONB)", " - Base Only", " (-ONB)"]:
+        if name.endswith(suffix):
+            name = name[: -len(suffix)]
+    return name.strip()
+
+
+def send_quote_email(to_email, to_name, company, quote_number, record_id, expiry_date):
+    """Send quote notification email via SendGrid."""
+    if not SENDGRID_API_KEY:
+        return
+    actual_to = TEST_EMAIL_OVERRIDE or to_email
+    quote_link = f"{QUOTE_BASE_URL}/view-quote/{record_id}"
+    first_name = to_name.split()[0] if to_name else "there"
+    subject = f"Your Blue Alpha Quote \u2013 {quote_number}"
+    html_body = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7fa;padding:32px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background:#1B2438;padding:28px 40px;text-align:left;">
+          <span style="font-family:Arial,Helvetica,sans-serif;font-size:22px;font-weight:800;color:#ffffff;letter-spacing:2px;">BLUE ALPHA</span>
+        </td></tr>
+        <tr><td style="padding:36px 40px;">
+          <p style="color:#1a2633;font-size:16px;margin:0 0 8px;">Hi {first_name},</p>
+          <p style="color:#6b7a8d;font-size:15px;line-height:1.6;margin:0 0 28px;">
+            Your quote from Blue Alpha is ready. Click the button below to view your items, make changes, or accept your order.
+          </p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7fa;border:1px solid #dde3ea;border-radius:8px;margin-bottom:28px;">
+            <tr><td style="padding:20px 24px;">
+              <table cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding:4px 0;color:#6b7a8d;font-size:13px;width:110px;">Quote Number</td>
+                  <td style="padding:4px 0;color:#1a2633;font-size:13px;font-weight:700;">{quote_number}</td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Company</td>
+                  <td style="padding:4px 0;color:#1a2633;font-size:13px;">{company}</td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Expires</td>
+                  <td style="padding:4px 0;color:#1a2633;font-size:13px;">{expiry_date}</td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Terms</td>
+                  <td style="padding:4px 0;color:#1a2633;font-size:13px;">Net 30</td>
+                </tr>
+              </table>
+            </td></tr>
+          </table>
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr><td align="center">
+              <a href="{quote_link}" style="display:inline-block;background:#1B2438;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;text-decoration:none;padding:14px 36px;border-radius:6px;letter-spacing:0.5px;">View Your Quote &rarr;</a>
+            </td></tr>
+          </table>
+          <p style="color:#6b7a8d;font-size:13px;margin:28px 0 0;line-height:1.6;">
+            This link is unique to your quote. Bookmark it or save this email — you can return anytime to edit or accept before the expiry date.<br><br>
+            Questions? Contact us at <a href="mailto:info@bluealpha.us" style="color:#1B2438;">info@bluealpha.us</a> or 678-961-3304.
+          </p>
+        </td></tr>
+        <tr><td style="background:#f5f7fa;border-top:1px solid #dde3ea;padding:20px 40px;text-align:center;">
+          <p style="color:#6b7a8d;font-size:12px;margin:0;">Blue Alpha &bull; bluealphabelts.com &bull; info@bluealpha.us &bull; 678-961-3304</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+    try:
+        req_lib.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "personalizations": [{"to": [{"email": actual_to, "name": to_name}]}],
+                "from": {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
+                "subject": subject,
+                "content": [{"type": "text/html", "value": html_body}],
+            },
+            timeout=15,
+        )
+    except Exception as e:
+        print(f"[send_quote_email] failed: {e}")
+
+
+def send_quote_accepted_email(to_email, to_name, org_name, qu_number, so_number):
+    """Send order confirmation email after quote acceptance."""
+    if not SENDGRID_API_KEY:
+        return
+    actual_to = TEST_EMAIL_OVERRIDE or to_email
+    first_name = to_name.split()[0] if to_name else "there"
+    subject = f"Blue Alpha Quote {qu_number} \u2013 Order Confirmed"
+    html_body = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7fa;padding:32px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background:#1B2438;padding:28px 40px;">
+          <span style="font-family:Arial,Helvetica,sans-serif;font-size:22px;font-weight:800;color:#ffffff;letter-spacing:2px;">BLUE ALPHA</span>
+        </td></tr>
+        <tr><td style="padding:36px 40px;">
+          <p style="color:#1a2633;font-size:16px;margin:0 0 8px;">Hi {first_name},</p>
+          <p style="color:#6b7a8d;font-size:15px;line-height:1.6;margin:0 0 20px;">
+            Great news \u2014 your Blue Alpha order has been confirmed! We've created your sales order and our team will be in touch about shipping and invoicing shortly.
+          </p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7fa;border:1px solid #dde3ea;border-radius:8px;margin-bottom:28px;">
+            <tr><td style="padding:20px 24px;">
+              <table cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding:4px 0;color:#6b7a8d;font-size:13px;width:110px;">Organization</td>
+                  <td style="padding:4px 0;color:#1a2633;font-size:13px;">{org_name}</td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Quote</td>
+                  <td style="padding:4px 0;color:#1a2633;font-size:13px;">{qu_number}</td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Sales Order</td>
+                  <td style="padding:4px 0;color:#1a2633;font-size:13px;font-weight:700;">{so_number}</td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Terms</td>
+                  <td style="padding:4px 0;color:#1a2633;font-size:13px;">Net 30</td>
+                </tr>
+              </table>
+            </td></tr>
+          </table>
+          <p style="color:#6b7a8d;font-size:13px;margin:0 0 0;line-height:1.6;">
+            Questions? Contact us at <a href="mailto:info@bluealpha.us" style="color:#1B2438;">info@bluealpha.us</a> or 678-961-3304.
+          </p>
+        </td></tr>
+        <tr><td style="background:#f5f7fa;border-top:1px solid #dde3ea;padding:20px 40px;text-align:center;">
+          <p style="color:#6b7a8d;font-size:12px;margin:0;">Blue Alpha &bull; bluealphabelts.com &bull; info@bluealpha.us &bull; 678-961-3304</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+    try:
+        req_lib.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "personalizations": [{"to": [{"email": actual_to, "name": to_name}]}],
+                "from": {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
+                "subject": subject,
+                "content": [{"type": "text/html", "value": html_body}],
+            },
+            timeout=15,
+        )
+    except Exception as e:
+        print(f"[send_quote_accepted_email] failed: {e}")
+
+
+def _fetch_quote_data(record_id):
+    """Shared logic: fetch full quote data dict from Airtable. Returns dict or raises."""
+    from datetime import date as dt_date
+    token = RETURNS_WRITE_TOKEN
+
+    # Fetch MO record
+    r = req_lib.get(
+        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+        headers=at_headers(token),
+        timeout=15,
+    )
+    if r.status_code != 200:
+        return None
+    mo = r.json()
+    fields = mo.get("fields", {})
+    if fields.get("Order Type") != "Quote":
+        return None
+
+    order_id     = fields.get("Order ID", "")
+    quote_number = fields.get("Document ID", f"QU-{order_id}")
+    date_str     = fields.get("Date", "")
+    expiry_str   = fields.get("Expiry Date", "")
+    is_accepted  = bool(fields.get("MO Is Approved", False))
+    po_number    = fields.get("Purchase Order #", "")
+    notes        = fields.get("Notes", "")
+
+    today = dt_date.today()
+    is_expired = False
+    if expiry_str:
+        try:
+            exp_d = dt_date.fromisoformat(expiry_str)
+            is_expired = exp_d < today
+        except Exception:
+            pass
+
+    # Fetch customer
+    customer_ids = fields.get("Customer", [])
+    customer = {}
+    if customer_ids:
+        cr = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_ids[0]}",
+            headers=at_headers(token),
+            timeout=15,
+        )
+        if cr.status_code == 200:
+            cf = cr.json().get("fields", {})
+            customer = {
+                "orgName":      cf.get("Organization Name", ""),
+                "contactName":  cf.get("Main Contact Name", ""),
+                "email":        cf.get("Main Contact Email", ""),
+                "phone":        cf.get("Main Contact Phone #", ""),
+                "address1":     cf.get("Customer Address (Line 1)", ""),
+                "address2":     cf.get("Customer Address (Line 2)", ""),
+                "city":         cf.get("Customer City", ""),
+                "state":        cf.get("Customer State", ""),
+                "zip":          cf.get("Customer Zip Code", ""),
+                "billToName":   cf.get("Bill-To Contact Name", "") or cf.get("Main Contact Name", ""),
+                "billToEmail":  cf.get("Bill-To Contact Email", "") or cf.get("Main Contact Email", ""),
+                "billToOrg":    cf.get("Bill-To Org Name", "") or cf.get("Organization Name", ""),
+            }
+
+    # Fetch line items
+    li_formula = f'FIND("{record_id}", ARRAYJOIN({{Manual Order}}))'
+    li_records = at_get_all(
+        MO_LINE_ITEMS_TABLE_ID, token,
+        fields=["Manual Order", "Product SKU", "Qty.", "Adj. Unit Price",
+                "Name + Variations (from Product SKU)", "SKU ID (from Product SKU)"],
+        formula=li_formula,
+    )
+    line_items = []
+    for li in li_records:
+        lf = li.get("fields", {})
+        sku_ids   = lf.get("Product SKU", [])
+        sku_names = lf.get("Name + Variations (from Product SKU)", [])
+        sku_ids_f = lf.get("SKU ID (from Product SKU)", [])
+        line_items.append({
+            "lineItemId":  li["id"],
+            "skuRecordId": sku_ids[0] if sku_ids else "",
+            "skuId":       sku_ids_f[0] if sku_ids_f else "",
+            "name":        sku_names[0] if sku_names else "",
+            "qty":         lf.get("Qty.", 0),
+            "unitPrice":   lf.get("Adj. Unit Price", 0),
+        })
+
+    subtotal = sum(i["qty"] * i["unitPrice"] for i in line_items)
+
+    return {
+        "recordId":    record_id,
+        "orderId":     order_id,
+        "quoteNumber": quote_number,
+        "date":        date_str,
+        "expiryDate":  expiry_str,
+        "isExpired":   is_expired,
+        "isAccepted":  is_accepted,
+        "poNumber":    po_number,
+        "notes":       notes,
+        "customer":    customer,
+        "lineItems":   line_items,
+        "subtotal":    round(subtotal, 2),
+        "shipping":    0,
+        "total":       round(subtotal, 2),
+    }
+
+
+@app.route("/api/quote-catalog", methods=["GET", "OPTIONS"])
+def quote_catalog():
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "GET"})
+    c = cors()
+    token = RETURNS_WRITE_TOKEN
+    try:
+        # Fetch all four tables in parallel-ish (sequential is fine for catalog)
+        sku_records = at_get_all(
+            "tbljngm75r4Km2XIN", token,
+            fields=["SKU ID", "Name + Variations", "Sale Price", "Parent Product", "Color", "Size"],
+            formula="NOT({Sale Price}=BLANK())",
+        )
+        parent_records = at_get_all(PARENT_PRODUCTS_TABLE_ID, token, fields=["Name"])
+        color_records  = at_get_all(COLORS_TABLE_ID, token, fields=["Name"])
+        size_records   = at_get_all(SIZES_TABLE_ID, token, fields=["Name"])
+
+        parent_map = {r["id"]: r["fields"].get("Name", "") for r in parent_records}
+        color_map  = {r["id"]: r["fields"].get("Name", "") for r in color_records}
+        size_map   = {r["id"]: r["fields"].get("Name", "") for r in size_records}
+
+        skus = []
+        seen_parents = {}
+        for r in sku_records:
+            f = r["fields"]
+            parent_ids = f.get("Parent Product", [])
+            if not parent_ids:
+                continue
+            parent_id   = parent_ids[0]
+            parent_name = _clean_product_name(parent_map.get(parent_id, ""))
+            if not parent_name:
+                continue
+
+            color_ids  = f.get("Color", [])
+            size_ids   = f.get("Size", [])
+            color_id   = color_ids[0] if color_ids else ""
+            size_id    = size_ids[0]  if size_ids  else ""
+            color_name = color_map.get(color_id, "")
+            size_name  = size_map.get(size_id, "")
+
+            raw_name = f.get("Name + Variations", "")
+            clean_name = _clean_product_name(raw_name)
+
+            skus.append({
+                "recordId":   r["id"],
+                "sku":        f.get("SKU ID", ""),
+                "name":       clean_name,
+                "price":      f.get("Sale Price", 0),
+                "parentId":   parent_id,
+                "parentName": parent_name,
+                "colorId":    color_id,
+                "colorName":  color_name,
+                "sizeId":     size_id,
+                "sizeName":   size_name,
+            })
+            if parent_id not in seen_parents:
+                seen_parents[parent_id] = parent_name
+
+        parents = sorted(
+            [{"id": k, "name": v} for k, v in seen_parents.items()],
+            key=lambda x: x["name"],
+        )
+        return Response(json.dumps({"parents": parents, "skus": skus}),
+                        headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/create-quote", methods=["POST", "OPTIONS"])
+def create_quote():
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    from datetime import date as dt_date, timedelta
+    data = request.get_json() or {}
+    token = RETURNS_WRITE_TOKEN
+
+    org_name = (data.get("orgName") or "").strip()
+    email    = (data.get("email") or "").strip()
+    items    = data.get("items", [])
+
+    if not org_name or not email or not items:
+        return Response(json.dumps({"error": "orgName, email, and items are required"}),
+                        status=400, headers=c, mimetype="application/json")
+
+    contact_name = (data.get("contactName") or "").strip()
+    phone        = (data.get("phone") or "").strip()
+    address1     = (data.get("address1") or "").strip()
+    address2     = (data.get("address2") or "").strip()
+    city         = (data.get("city") or "").strip()
+    state        = (data.get("state") or "").strip()
+    zip_code     = (data.get("zip") or "").strip()
+    country      = (data.get("country") or "US").strip()
+    po_number    = (data.get("poNumber") or "").strip()
+    notes        = (data.get("notes") or "").strip()
+
+    try:
+        # 1. Find or create customer by email
+        existing = at_get_all(
+            CUSTOMERS_TABLE_ID, token,
+            fields=["Main Contact Email", "Organization Name"],
+            formula=f"{{Main Contact Email}}='{email}'",
+        )
+        if existing:
+            cust_id = existing[0]["id"]
+        else:
+            cr = req_lib.post(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}",
+                headers={**at_headers(token), "Content-Type": "application/json"},
+                json={"fields": {
+                    "Organization Name":      org_name,
+                    "Main Contact Name":      contact_name,
+                    "Main Contact Email":     email,
+                    "Main Contact Phone #":   phone,
+                    "Customer Address (Line 1)": address1,
+                    "Customer Address (Line 2)": address2,
+                    "Customer City":          city,
+                    "Customer State":         state,
+                    "Customer Zip Code":      zip_code,
+                }},
+                timeout=15,
+            )
+            cr.raise_for_status()
+            cust_id = cr.json()["id"]
+
+        # 2. Get next order ID
+        all_mos = at_get_all(MANUAL_ORDERS_TABLE_ID, token, fields=["Order ID"])
+        max_id = 0
+        for mo in all_mos:
+            oid_str = mo["fields"].get("Order ID", "")
+            try:
+                val = int(oid_str)
+                if val > max_id:
+                    max_id = val
+            except (ValueError, TypeError):
+                pass
+        next_id = max_id + 1
+        order_id_str = str(next_id).zfill(4)
+        quote_number = f"QU-{order_id_str}"
+
+        today       = dt_date.today()
+        expiry_date = today + timedelta(days=90)
+        today_str   = today.isoformat()
+        expiry_str  = expiry_date.isoformat()
+
+        # 3. Create Manual Order
+        mo_body = {
+            "fields": {
+                "Order Type":    "Quote",
+                "Document ID":   quote_number,
+                "Order ID":      order_id_str,
+                "Date":          today_str,
+                "Expiry Date":   expiry_str,
+                "Customer":      [cust_id],
+            }
+        }
+        if po_number:
+            mo_body["fields"]["Purchase Order #"] = po_number
+        if notes:
+            mo_body["fields"]["Notes"] = notes
+
+        mo_r = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}",
+            headers={**at_headers(token), "Content-Type": "application/json"},
+            json=mo_body,
+            timeout=15,
+        )
+        mo_r.raise_for_status()
+        mo_record_id = mo_r.json()["id"]
+
+        # 4. Create line items
+        for item in items:
+            li_r = req_lib.post(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}",
+                headers={**at_headers(token), "Content-Type": "application/json"},
+                json={"fields": {
+                    "Manual Order": [mo_record_id],
+                    "Product SKU":  [item["skuRecordId"]],
+                    "Qty.":         int(item["qty"]),
+                    "Adj. Unit Price": float(item["unitPrice"]),
+                }},
+                timeout=15,
+            )
+            li_r.raise_for_status()
+
+        # 5. Send email
+        try:
+            send_quote_email(email, contact_name or org_name, org_name,
+                             quote_number, mo_record_id, expiry_str)
+        except Exception as email_err:
+            print(f"[create_quote] email failed: {email_err}")
+
+        return Response(
+            json.dumps({"success": True, "quoteNumber": quote_number, "recordId": mo_record_id}),
+            headers=c, mimetype="application/json",
+        )
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/get-quote/<record_id>", methods=["GET", "OPTIONS"])
+def get_quote(record_id):
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "GET"})
+    c = cors()
+    try:
+        data = _fetch_quote_data(record_id)
+        if not data:
+            return Response(json.dumps({"error": "Quote not found"}), status=404, headers=c, mimetype="application/json")
+        return Response(json.dumps(data), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/update-quote/<record_id>", methods=["POST", "OPTIONS"])
+def update_quote(record_id):
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    token = RETURNS_WRITE_TOKEN
+    data = request.get_json() or {}
+    items = data.get("items", [])
+
+    try:
+        # Verify it's a quote and not accepted
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+            headers=at_headers(token), timeout=15,
+        )
+        if r.status_code != 200:
+            return Response(json.dumps({"error": "Quote not found"}), status=404, headers=c, mimetype="application/json")
+        mo_fields = r.json().get("fields", {})
+        if mo_fields.get("Order Type") != "Quote":
+            return Response(json.dumps({"error": "Not a quote"}), status=400, headers=c, mimetype="application/json")
+        if mo_fields.get("MO Is Approved"):
+            return Response(json.dumps({"error": "Quote already accepted"}), status=400, headers=c, mimetype="application/json")
+
+        # Delete existing line items
+        li_formula = f'FIND("{record_id}", ARRAYJOIN({{Manual Order}}))'
+        existing_lis = at_get_all(MO_LINE_ITEMS_TABLE_ID, token, fields=["Manual Order"], formula=li_formula)
+        for li in existing_lis:
+            req_lib.delete(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li['id']}",
+                headers=at_headers(token), timeout=10,
+            )
+
+        # Create new line items
+        for item in items:
+            li_r = req_lib.post(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}",
+                headers={**at_headers(token), "Content-Type": "application/json"},
+                json={"fields": {
+                    "Manual Order": [record_id],
+                    "Product SKU":  [item["skuRecordId"]],
+                    "Qty.":         int(item["qty"]),
+                    "Adj. Unit Price": float(item["unitPrice"]),
+                }},
+                timeout=15,
+            )
+            li_r.raise_for_status()
+
+        return Response(json.dumps({"success": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/accept-quote/<record_id>", methods=["POST", "OPTIONS"])
+def accept_quote(record_id):
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    from datetime import date as dt_date
+    token = RETURNS_WRITE_TOKEN
+
+    try:
+        # Fetch MO record
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+            headers=at_headers(token), timeout=15,
+        )
+        if r.status_code != 200:
+            return Response(json.dumps({"error": "Quote not found"}), status=404, headers=c, mimetype="application/json")
+        mo_fields = r.json().get("fields", {})
+
+        if mo_fields.get("Order Type") != "Quote":
+            return Response(json.dumps({"error": "Not a quote"}), status=400, headers=c, mimetype="application/json")
+        if mo_fields.get("MO Is Approved"):
+            return Response(json.dumps({"error": "Already accepted"}), status=400, headers=c, mimetype="application/json")
+
+        expiry_str = mo_fields.get("Expiry Date", "")
+        if expiry_str:
+            try:
+                if dt_date.fromisoformat(expiry_str) < dt_date.today():
+                    return Response(json.dumps({"error": "Quote has expired"}), status=400, headers=c, mimetype="application/json")
+            except Exception:
+                pass
+
+        order_id_str = mo_fields.get("Order ID", "")
+        quote_number = mo_fields.get("Document ID", f"QU-{order_id_str}")
+        so_number    = f"SO-{order_id_str}"
+        customer_ids = mo_fields.get("Customer", [])
+        po_number    = mo_fields.get("Purchase Order #", "")
+        notes        = mo_fields.get("Notes", "")
+        date_str     = mo_fields.get("Date", dt_date.today().isoformat())
+
+        # Create SO record
+        so_body = {
+            "fields": {
+                "Order Type":                "Sales Order",
+                "Document ID":               so_number,
+                "Order ID":                  order_id_str,
+                "Date":                      date_str,
+                "MO Is Approved":            True,
+                "Ready for ShipStation (SOs)": True,
+                "Origin Quote":              quote_number,
+            }
+        }
+        if customer_ids:
+            so_body["fields"]["Customer"] = customer_ids
+        if po_number:
+            so_body["fields"]["Purchase Order #"] = po_number
+        if notes:
+            so_body["fields"]["Notes"] = notes
+
+        so_r = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}",
+            headers={**at_headers(token), "Content-Type": "application/json"},
+            json=so_body,
+            timeout=15,
+        )
+        so_r.raise_for_status()
+        so_record_id = so_r.json()["id"]
+
+        # Copy line items from QU to SO
+        li_formula = f'FIND("{record_id}", ARRAYJOIN({{Manual Order}}))'
+        li_records = at_get_all(
+            MO_LINE_ITEMS_TABLE_ID, token,
+            fields=["Product SKU", "Qty.", "Adj. Unit Price"],
+            formula=li_formula,
+        )
+        for li in li_records:
+            lf = li["fields"]
+            req_lib.post(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}",
+                headers={**at_headers(token), "Content-Type": "application/json"},
+                json={"fields": {
+                    "Manual Order": [so_record_id],
+                    "Product SKU":  lf.get("Product SKU", []),
+                    "Qty.":         lf.get("Qty.", 0),
+                    "Adj. Unit Price": lf.get("Adj. Unit Price", 0),
+                }},
+                timeout=15,
+            )
+
+        # PATCH QU: set MO Is Approved = true
+        req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+            headers={**at_headers(token), "Content-Type": "application/json"},
+            json={"fields": {"MO Is Approved": True}},
+            timeout=15,
+        )
+
+        # Send confirmation email
+        to_email = ""
+        to_name  = ""
+        org_name = ""
+        if customer_ids:
+            try:
+                cr = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_ids[0]}",
+                    headers=at_headers(token), timeout=10,
+                )
+                if cr.status_code == 200:
+                    cf = cr.json().get("fields", {})
+                    to_email = cf.get("Main Contact Email", "")
+                    to_name  = cf.get("Main Contact Name", "")
+                    org_name = cf.get("Organization Name", "")
+            except Exception:
+                pass
+        if to_email:
+            try:
+                send_quote_accepted_email(to_email, to_name, org_name, quote_number, so_number)
+            except Exception as email_err:
+                print(f"[accept_quote] email failed: {email_err}")
+
+        return Response(json.dumps({"success": True, "soNumber": so_number}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/quote-pdf/<record_id>", methods=["GET"])
+def quote_pdf(record_id):
+    c = cors()
+    try:
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib import colors
+        from reportlab.lib.units import inch
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER
+        import io
+
+        quote = _fetch_quote_data(record_id)
+        if not quote:
+            return Response(json.dumps({"error": "Quote not found"}), status=404,
+                            headers=c, mimetype="application/json")
+
+        NAVY       = colors.HexColor("#1B2438")
+        RED        = colors.HexColor("#BD3333")
+        LIGHT_GRAY = colors.HexColor("#f5f7fa")
+        BORDER     = colors.HexColor("#dde3ea")
+        TEXT       = colors.HexColor("#1a2633")
+        MUTED      = colors.HexColor("#6b7a8d")
+
+        buf = io.BytesIO()
+        margin = 0.75 * inch
+        doc = SimpleDocTemplate(
+            buf, pagesize=letter,
+            leftMargin=margin, rightMargin=margin,
+            topMargin=margin, bottomMargin=margin,
+        )
+
+        styles = getSampleStyleSheet()
+        story  = []
+
+        # ── Header row ──────────────────────────────────────────────────────
+        header_data = [[
+            Paragraph('<font name="Helvetica-Bold" size="22" color="#1B2438">BLUE ALPHA</font>', styles["Normal"]),
+            Paragraph('<font name="Helvetica-Bold" size="28" color="#BD3333">QUOTE</font>',
+                      ParagraphStyle("qr", alignment=TA_RIGHT)),
+        ]]
+        header_table = Table(header_data, colWidths=[3.5*inch, 3.5*inch])
+        header_table.setStyle(TableStyle([
+            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+        ]))
+        story.append(header_table)
+
+        story.append(Paragraph(
+            '<font name="Helvetica" size="9" color="#6b7a8d">bluealphabelts.com &nbsp;&bull;&nbsp; info@bluealpha.us &nbsp;&bull;&nbsp; 678-961-3304</font>',
+            ParagraphStyle("sub", spaceBefore=4, spaceAfter=8),
+        ))
+        story.append(HRFlowable(width="100%", thickness=2, color=NAVY, spaceAfter=14))
+
+        # ── Meta two-column ─────────────────────────────────────────────────
+        cust = quote.get("customer", {})
+        bill_lines = []
+        bill_org  = cust.get("billToOrg") or cust.get("orgName", "")
+        bill_name = cust.get("billToName") or cust.get("contactName", "")
+        if bill_org:  bill_lines.append(f"<b>{bill_org}</b>")
+        if bill_name: bill_lines.append(bill_name)
+        addr1 = cust.get("address1", "")
+        city  = cust.get("city", "")
+        state = cust.get("state", "")
+        zip_c = cust.get("zip", "")
+        if addr1:                      bill_lines.append(addr1)
+        if city or state or zip_c:     bill_lines.append(f"{city}, {state} {zip_c}".strip(" ,"))
+
+        def meta_cell(label, value):
+            return Paragraph(f'<font name="Helvetica-Bold" size="9" color="#6b7a8d">{label}&nbsp;&nbsp;</font>'
+                             f'<font name="Helvetica" size="9" color="#1a2633">{value}</font>',
+                             ParagraphStyle("mc", spaceAfter=3))
+
+        left_col = []
+        left_col.append(meta_cell("Quote Number:", quote.get("quoteNumber", "")))
+        left_col.append(meta_cell("Date:",         quote.get("date", "")))
+        left_col.append(meta_cell("Expires:",      quote.get("expiryDate", "")))
+        left_col.append(meta_cell("Terms:",        "Net 30"))
+        if quote.get("poNumber"):
+            left_col.append(meta_cell("PO #:", quote["poNumber"]))
+
+        right_cell = Paragraph(
+            '<font name="Helvetica-Bold" size="9" color="#6b7a8d">Bill To</font><br/>' +
+            "<br/>".join(f'<font name="Helvetica" size="9" color="#1a2633">{ln}</font>' for ln in bill_lines),
+            ParagraphStyle("bt", spaceAfter=3),
+        )
+
+        meta_data = [[left_col, right_cell]]
+        meta_table = Table(meta_data, colWidths=[3.5*inch, 3.5*inch])
+        meta_table.setStyle(TableStyle([
+            ("VALIGN", (0,0), (-1,-1), "TOP"),
+        ]))
+        story.append(meta_table)
+        story.append(Spacer(1, 16))
+
+        # ── Line items table ─────────────────────────────────────────────────
+        li_header = [
+            Paragraph('<font name="Helvetica-Bold" size="9" color="#ffffff">PRODUCT</font>', styles["Normal"]),
+            Paragraph('<font name="Helvetica-Bold" size="9" color="#ffffff">QTY</font>',
+                      ParagraphStyle("th", alignment=TA_RIGHT)),
+            Paragraph('<font name="Helvetica-Bold" size="9" color="#ffffff">UNIT PRICE</font>',
+                      ParagraphStyle("th2", alignment=TA_RIGHT)),
+            Paragraph('<font name="Helvetica-Bold" size="9" color="#ffffff">TOTAL</font>',
+                      ParagraphStyle("th3", alignment=TA_RIGHT)),
+        ]
+        li_rows = [li_header]
+        for idx, item in enumerate(quote.get("lineItems", [])):
+            line_total = item["qty"] * item["unitPrice"]
+            row_style  = LIGHT_GRAY if idx % 2 == 0 else colors.white
+            li_rows.append([
+                Paragraph(f'<font name="Helvetica" size="9" color="#1a2633">{item["name"]}</font>', styles["Normal"]),
+                Paragraph(f'<font name="Helvetica" size="9" color="#1a2633">{item["qty"]}</font>',
+                          ParagraphStyle("rv", alignment=TA_RIGHT)),
+                Paragraph(f'<font name="Helvetica" size="9" color="#1a2633">${item["unitPrice"]:.2f}</font>',
+                          ParagraphStyle("rv2", alignment=TA_RIGHT)),
+                Paragraph(f'<font name="Helvetica" size="9" color="#1a2633">${line_total:.2f}</font>',
+                          ParagraphStyle("rv3", alignment=TA_RIGHT)),
+            ])
+
+        li_table = Table(li_rows, colWidths=[4.0*inch, 0.6*inch, 1.1*inch, 1.3*inch])
+        li_style = [
+            ("BACKGROUND", (0,0), (-1,0), NAVY),
+            ("ROWBACKGROUNDS", (0,1), (-1,-1), [LIGHT_GRAY, colors.white]),
+            ("GRID", (0,0), (-1,-1), 0.5, BORDER),
+            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+            ("TOPPADDING",    (0,0), (-1,-1), 6),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+            ("LEFTPADDING",   (0,0), (-1,-1), 8),
+            ("RIGHTPADDING",  (0,0), (-1,-1), 8),
+        ]
+        li_table.setStyle(TableStyle(li_style))
+        story.append(li_table)
+        story.append(Spacer(1, 10))
+
+        # ── Totals block ─────────────────────────────────────────────────────
+        subtotal = quote.get("subtotal", 0)
+        shipping = quote.get("shipping", 0)
+        total    = quote.get("total", 0)
+
+        totals_rows = []
+        totals_rows.append([
+            "",
+            Paragraph('<font name="Helvetica" size="9" color="#6b7a8d">Subtotal</font>',
+                      ParagraphStyle("tr", alignment=TA_RIGHT)),
+            Paragraph(f'<font name="Helvetica" size="9" color="#1a2633">${subtotal:.2f}</font>',
+                      ParagraphStyle("tv", alignment=TA_RIGHT)),
+        ])
+        if shipping > 0:
+            totals_rows.append([
+                "",
+                Paragraph('<font name="Helvetica" size="9" color="#6b7a8d">Shipping</font>',
+                          ParagraphStyle("tr2", alignment=TA_RIGHT)),
+                Paragraph(f'<font name="Helvetica" size="9" color="#1a2633">${shipping:.2f}</font>',
+                          ParagraphStyle("tv2", alignment=TA_RIGHT)),
+            ])
+        totals_rows.append([
+            "",
+            Paragraph('<font name="Helvetica-Bold" size="10" color="#1a2633">Total</font>',
+                      ParagraphStyle("trb", alignment=TA_RIGHT)),
+            Paragraph(f'<font name="Helvetica-Bold" size="10" color="#1a2633">${total:.2f}</font>',
+                      ParagraphStyle("tvb", alignment=TA_RIGHT)),
+        ])
+
+        totals_table = Table(totals_rows, colWidths=[3.6*inch, 1.4*inch, 2.0*inch])
+        totals_tbl_style = [
+            ("TOPPADDING",    (0,0), (-1,-1), 4),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+            ("LINEABOVE", (1, len(totals_rows)-1), (-1, len(totals_rows)-1), 1, NAVY),
+        ]
+        totals_table.setStyle(TableStyle(totals_tbl_style))
+        story.append(totals_table)
+
+        story.append(HRFlowable(width="100%", thickness=0.5, color=BORDER, spaceBefore=12, spaceAfter=12))
+
+        # ── Notes ────────────────────────────────────────────────────────────
+        if quote.get("notes"):
+            story.append(Paragraph(
+                '<font name="Helvetica-Bold" size="9" color="#6b7a8d">NOTES</font>',
+                ParagraphStyle("noteslbl", spaceAfter=4),
+            ))
+            story.append(Paragraph(
+                f'<font name="Helvetica" size="9" color="#1a2633">{quote["notes"]}</font>',
+                ParagraphStyle("notestxt", spaceAfter=12),
+            ))
+
+        # ── Footer ───────────────────────────────────────────────────────────
+        story.append(Paragraph(
+            '<font name="Helvetica" size="8" color="#6b7a8d">'
+            'This quote is valid for 90 days from the date of issue. Payment terms are Net 30 upon acceptance. '
+            'To accept this quote, visit the link provided in your email. '
+            'Questions? Contact us at info@bluealpha.us or 678-961-3304.'
+            '</font>',
+            ParagraphStyle("footer", spaceAfter=0),
+        ))
+
+        doc.build(story)
+        pdf_bytes = buf.getvalue()
+        filename  = f"{quote.get('quoteNumber', record_id)}.pdf"
+
+        return Response(
+            pdf_bytes,
+            headers={
+                **cors(),
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Type": "application/pdf",
+            },
+        )
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=cors(), mimetype="application/json")
 
 
 if __name__ == "__main__":

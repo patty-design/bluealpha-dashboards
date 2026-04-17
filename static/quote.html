@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blue Alpha — Quote Request</title>
+  <link rel="icon" href="https://www.bluealphabelts.com/wp-content/uploads/2019/05/cropped-BAG-FAV-32x32.png">
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:    #003a6c;
+      --red:     #ae0000;
+      --light:   #f5f7fa;
+      --border:  #dde3ea;
+      --text:    #1a2633;
+      --muted:   #6b7a8d;
+      --white:   #ffffff;
+      --success: #1a7a3c;
+      --error:   #ae0000;
+    }
+
+    body {
+      font-family: 'Lato', sans-serif;
+      background: var(--light);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--navy);
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    header img { height: 44px; width: auto; filter: brightness(0) invert(1); }
+    .header-divider { width: 2px; height: 36px; background: var(--red); border-radius: 2px; }
+    .header-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.75);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+
+    /* ── Container ── */
+    .container {
+      max-width: 680px;
+      margin: 48px auto;
+      padding: 0 20px 80px;
+    }
+
+    .page-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+    .page-subtitle {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 32px;
+      line-height: 1.5;
+    }
+
+    /* ── Progress ── */
+    .progress {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 36px;
+      align-items: center;
+    }
+    .progress-step {
+      flex: 1;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      transition: background 0.3s;
+    }
+    .progress-step.active { background: var(--navy); }
+    .progress-step.done   { background: var(--navy); opacity: 0.4; }
+
+    /* ── Card ── */
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 32px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+
+    .card-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+    .card-subtitle {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 24px;
+    }
+
+    /* ── Form ── */
+    .field { margin-bottom: 20px; }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 7px;
+    }
+    label .req { color: var(--red); margin-left: 3px; }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="number"],
+    textarea,
+    select {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 11px 14px;
+      font-family: 'Lato', sans-serif;
+      font-size: 0.95rem;
+      color: var(--text);
+      background: var(--white);
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--navy);
+      box-shadow: 0 0 0 3px rgba(0,58,108,0.08);
+    }
+    input:disabled, select:disabled {
+      background: #f0f2f5;
+      color: var(--muted);
+      cursor: not-allowed;
+    }
+    textarea { resize: vertical; min-height: 90px; }
+
+    /* ── Selector row ── */
+    .selector-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 90px auto;
+      gap: 10px;
+      align-items: end;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 600px) {
+      .selector-grid { grid-template-columns: 1fr 1fr; }
+      .selector-grid .btn-add { grid-column: 1 / -1; }
+    }
+
+    /* ── Items list ── */
+    .items-empty {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+      padding: 24px 0;
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+    .items-list { margin-bottom: 16px; }
+    .item-row {
+      display: grid;
+      grid-template-columns: 1fr 80px 100px 100px 36px;
+      gap: 8px;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 8px;
+      background: var(--white);
+    }
+    .item-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.3;
+    }
+    .item-price {
+      font-size: 0.9rem;
+      color: var(--muted);
+      text-align: right;
+    }
+    .item-total {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text);
+      text-align: right;
+    }
+    .item-qty-input {
+      width: 100%;
+      padding: 7px 8px;
+      font-size: 0.9rem;
+      text-align: center;
+    }
+    .btn-remove {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1.1rem;
+      padding: 4px;
+      border-radius: 4px;
+      transition: color 0.15s, background 0.15s;
+      text-align: center;
+    }
+    .btn-remove:hover { color: var(--red); background: #fff0f0; }
+
+    .totals-block {
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+      margin-bottom: 24px;
+    }
+    .totals-row {
+      display: flex;
+      justify-content: flex-end;
+      gap: 24px;
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .totals-row.total-row {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+      margin-top: 4px;
+    }
+    .totals-row .val { min-width: 90px; text-align: right; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-block;
+      padding: 12px 28px;
+      border-radius: 6px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn:hover { opacity: 0.88; }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+    .btn-primary { background: var(--navy); color: var(--white); width: 100%; text-align: center; }
+    .btn-secondary { background: transparent; color: var(--navy); border: 1.5px solid var(--navy); }
+    .btn-add { background: var(--navy); color: var(--white); padding: 11px 18px; white-space: nowrap; }
+    .btn-row { display: flex; gap: 12px; margin-top: 24px; }
+    .btn-row .btn-primary { flex: 1; }
+
+    /* ── Divider ── */
+    .form-divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+    /* ── Note ── */
+    .field-note {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 5px;
+    }
+
+    /* ── Messages ── */
+    .message {
+      border-radius: 6px;
+      padding: 14px 18px;
+      margin-top: 16px;
+      font-size: 0.92rem;
+      line-height: 1.55;
+      display: none;
+    }
+    .message.show { display: block; }
+    .message-error   { background: #fff0f0; border: 1px solid #f5c2c2; color: #7a1515; }
+
+    /* ── Success screen ── */
+    .success-screen {
+      text-align: center;
+      padding: 12px 0 8px;
+    }
+    .success-icon {
+      width: 72px; height: 72px;
+      background: var(--success);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 2rem;
+      color: white;
+    }
+    .success-screen h2 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 10px;
+    }
+    .success-screen p {
+      color: var(--muted);
+      line-height: 1.6;
+      max-width: 440px;
+      margin: 0 auto 8px;
+    }
+    .quote-number-pill {
+      display: inline-block;
+      margin-top: 18px;
+      background: var(--light);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 8px 20px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--navy);
+      letter-spacing: 0.3px;
+    }
+    .success-screen a {
+      display: inline-block;
+      margin-top: 28px;
+      color: var(--navy);
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-decoration: none;
+      border-bottom: 2px solid var(--navy);
+      padding-bottom: 2px;
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 480px) {
+      .card { padding: 24px 18px; }
+      .item-row { grid-template-columns: 1fr 70px 80px 32px; }
+      .item-price { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <img src="https://www.bluealphabelts.com/wp-content/uploads/2019/05/Blue-Alpha-Logo-White.png"
+       alt="Blue Alpha"
+       onerror="this.onerror=null;this.src='/static/ba-logo.jpg'">
+  <div class="header-divider"></div>
+  <div class="header-title">Quote Request</div>
+</header>
+
+<div class="container">
+
+  <!-- Progress bar -->
+  <div class="progress" id="progressBar">
+    <div class="progress-step active" id="pStep1"></div>
+    <div class="progress-step" id="pStep2"></div>
+  </div>
+
+  <!-- ────────────────────────────────────────────────────────────────────── -->
+  <!-- Step 1: Build Your Quote                                              -->
+  <!-- ────────────────────────────────────────────────────────────────────── -->
+  <div id="step1">
+    <div class="page-title">Build Your Quote</div>
+    <div class="page-subtitle">Select the products you want and we'll send you a formal quote with Net 30 payment terms.</div>
+
+    <div class="card">
+      <div class="card-title">Step 1 — Select Your Items</div>
+      <div class="card-subtitle">Choose a product, color, and size to add each item to your quote.</div>
+
+      <!-- Tiered selector -->
+      <div class="selector-grid">
+        <div class="field" style="margin:0">
+          <label style="margin-bottom:5px">Product</label>
+          <select id="selProduct">
+            <option value="">Select a product…</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0">
+          <label style="margin-bottom:5px">Color</label>
+          <select id="selColor" disabled>
+            <option value="">Select a color…</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0">
+          <label style="margin-bottom:5px">Size</label>
+          <select id="selSize" disabled>
+            <option value="">Select a size…</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0">
+          <label style="margin-bottom:5px">Qty</label>
+          <input type="number" id="selQty" min="1" value="1">
+        </div>
+        <div class="field" style="margin:0">
+          <label style="margin-bottom:5px; visibility:hidden">Add</label>
+          <button class="btn btn-add" id="btnAdd" disabled onclick="addItem()">Add</button>
+        </div>
+      </div>
+
+      <!-- Items list -->
+      <div id="itemsEmpty" class="items-empty">No items added yet.</div>
+      <div id="itemsList" class="items-list hidden"></div>
+
+      <div id="totalsBlock" class="totals-block hidden">
+        <div class="totals-row" id="rowSubtotal">
+          <span>Subtotal</span>
+          <span class="val" id="valSubtotal">$0.00</span>
+        </div>
+        <div class="totals-row hidden" id="rowShipping">
+          <span>Shipping</span>
+          <span class="val">$25.00</span>
+        </div>
+        <div class="totals-row total-row">
+          <span>Total</span>
+          <span class="val" id="valTotal">$0.00</span>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="btnContinue" disabled onclick="goStep2()">
+        Continue to Your Information →
+      </button>
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────────────────────────────── -->
+  <!-- Step 2: Your Information                                              -->
+  <!-- ────────────────────────────────────────────────────────────────────── -->
+  <div id="step2" class="hidden">
+    <div class="page-title">Your Information</div>
+    <div class="page-subtitle">We'll use this to create your quote and send it to your email.</div>
+
+    <div class="card">
+      <div class="card-title">Step 2 — Your Information</div>
+
+      <div class="field">
+        <label>Organization Name <span class="req">*</span></label>
+        <input type="text" id="f_org" placeholder="Acme Corp" autocomplete="organization">
+      </div>
+      <div class="field">
+        <label>Contact Name <span class="req">*</span></label>
+        <input type="text" id="f_name" placeholder="Jane Smith" autocomplete="name">
+      </div>
+      <div class="field">
+        <label>Email Address <span class="req">*</span></label>
+        <input type="email" id="f_email" placeholder="jane@example.com" autocomplete="email">
+      </div>
+      <div class="field">
+        <label>Phone</label>
+        <input type="text" id="f_phone" placeholder="(555) 000-0000" autocomplete="tel">
+      </div>
+
+      <hr class="form-divider">
+
+      <div class="field">
+        <label>Address Line 1</label>
+        <input type="text" id="f_addr1" placeholder="123 Main St" autocomplete="address-line1">
+      </div>
+      <div class="field">
+        <label>Address Line 2</label>
+        <input type="text" id="f_addr2" placeholder="Suite 400" autocomplete="address-line2">
+      </div>
+      <div class="field">
+        <label>City</label>
+        <input type="text" id="f_city" placeholder="Atlanta" autocomplete="address-level2">
+      </div>
+      <div class="field">
+        <label>State / Province</label>
+        <input type="text" id="f_state" placeholder="GA" autocomplete="address-level1">
+      </div>
+      <div class="field">
+        <label>Zip / Postal Code</label>
+        <input type="text" id="f_zip" placeholder="30301" autocomplete="postal-code">
+      </div>
+      <div class="field">
+        <label>Country</label>
+        <select id="f_country" onchange="onCountryChange()">
+          <option value="US">United States</option>
+          <option value="CA">Canada</option>
+          <option value="GB">United Kingdom</option>
+          <option value="AU">Australia</option>
+          <option value="DE">Germany</option>
+          <option value="OTHER">Other</option>
+        </select>
+        <div class="field-note" id="shippingNote" style="display:none;">⚠️ International orders include a $25.00 shipping charge.</div>
+      </div>
+
+      <hr class="form-divider">
+
+      <div class="field">
+        <label>Purchase Order # <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+        <input type="text" id="f_po" placeholder="PO-12345">
+      </div>
+      <div class="field">
+        <label>Notes <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+        <textarea id="f_notes" placeholder="Any special instructions or notes…"></textarea>
+      </div>
+
+      <div class="message message-error" id="submitError"></div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="goStep1()">← Back</button>
+        <button class="btn btn-primary" id="btnSubmit" onclick="submitQuote()">Submit Quote Request</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────────────────────────────── -->
+  <!-- Step 3: Success                                                       -->
+  <!-- ────────────────────────────────────────────────────────────────────── -->
+  <div id="step3" class="hidden">
+    <div class="card">
+      <div class="success-screen">
+        <div class="success-icon">✓</div>
+        <h2>Quote Request Submitted!</h2>
+        <p>We've sent a link to <strong id="successEmail"></strong>. Use it to view, edit, or accept your quote anytime before it expires.</p>
+        <div class="quote-number-pill" id="successQuoteNumber"></div>
+        <br>
+        <a href="https://www.bluealphabelts.com">← Back to bluealphabelts.com</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+let catalog = null;       // { parents, skus }
+let items   = [];         // { skuRecordId, name, qty, unitPrice }
+let isIntl  = false;
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+(async function init() {
+  try {
+    const r = await fetch('/api/quote-catalog');
+    if (!r.ok) throw new Error('Failed to load catalog');
+    catalog = await r.json();
+    populateProducts();
+  } catch (e) {
+    document.getElementById('step1').insertAdjacentHTML('afterbegin',
+      `<div class="message message-error show" style="margin-bottom:16px">
+        <strong>Catalog unavailable.</strong> Please try refreshing the page. If the issue persists, contact us at info@bluealpha.us
+       </div>`
+    );
+  }
+})();
+
+// ─── Catalog selectors ───────────────────────────────────────────────────────
+function populateProducts() {
+  const sel = document.getElementById('selProduct');
+  sel.innerHTML = '<option value="">Select a product…</option>';
+  for (const p of catalog.parents) {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.name;
+    sel.appendChild(opt);
+  }
+}
+
+document.getElementById('selProduct').addEventListener('change', function() {
+  const parentId = this.value;
+  const colorSel = document.getElementById('selColor');
+  const sizeSel  = document.getElementById('selSize');
+
+  colorSel.innerHTML = '<option value="">Select a color…</option>';
+  sizeSel.innerHTML  = '<option value="">Select a size…</option>';
+  colorSel.disabled  = true;
+  sizeSel.disabled   = true;
+  document.getElementById('btnAdd').disabled = true;
+
+  if (!parentId) return;
+
+  // Collect unique colors for this parent
+  const colorMap = {};
+  for (const sku of catalog.skus) {
+    if (sku.parentId === parentId && sku.colorId && sku.colorName) {
+      colorMap[sku.colorId] = sku.colorName;
+    }
+  }
+  const colors = Object.entries(colorMap).sort((a,b) => a[1].localeCompare(b[1]));
+  for (const [id, name] of colors) {
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = name;
+    colorSel.appendChild(opt);
+  }
+  colorSel.disabled = false;
+});
+
+document.getElementById('selColor').addEventListener('change', function() {
+  const parentId = document.getElementById('selProduct').value;
+  const colorId  = this.value;
+  const sizeSel  = document.getElementById('selSize');
+
+  sizeSel.innerHTML = '<option value="">Select a size…</option>';
+  sizeSel.disabled  = true;
+  document.getElementById('btnAdd').disabled = true;
+
+  if (!colorId) return;
+
+  // Collect unique sizes for this parent+color, sort numerically then alpha
+  const sizeMap = {};
+  for (const sku of catalog.skus) {
+    if (sku.parentId === parentId && sku.colorId === colorId && sku.sizeId && sku.sizeName) {
+      sizeMap[sku.sizeId] = sku.sizeName;
+    }
+  }
+  const sizes = Object.entries(sizeMap).sort((a,b) => {
+    const na = parseFloat(a[1]), nb = parseFloat(b[1]);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return a[1].localeCompare(b[1]);
+  });
+  for (const [id, name] of sizes) {
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = name;
+    sizeSel.appendChild(opt);
+  }
+  sizeSel.disabled = false;
+});
+
+document.getElementById('selSize').addEventListener('change', function() {
+  document.getElementById('btnAdd').disabled = !this.value;
+});
+
+// ─── Add item ────────────────────────────────────────────────────────────────
+function addItem() {
+  const parentId = document.getElementById('selProduct').value;
+  const colorId  = document.getElementById('selColor').value;
+  const sizeId   = document.getElementById('selSize').value;
+  const qty      = Math.max(1, parseInt(document.getElementById('selQty').value) || 1);
+
+  if (!parentId || !colorId || !sizeId) return;
+
+  const sku = catalog.skus.find(s => s.parentId === parentId && s.colorId === colorId && s.sizeId === sizeId);
+  if (!sku) return;
+
+  items.push({
+    skuRecordId: sku.recordId,
+    name:        sku.name,
+    qty:         qty,
+    unitPrice:   sku.price,
+  });
+
+  renderItems();
+  resetSelector();
+}
+
+function resetSelector() {
+  document.getElementById('selProduct').value = '';
+  document.getElementById('selColor').innerHTML = '<option value="">Select a color…</option>';
+  document.getElementById('selColor').disabled = true;
+  document.getElementById('selSize').innerHTML = '<option value="">Select a size…</option>';
+  document.getElementById('selSize').disabled = true;
+  document.getElementById('selQty').value = 1;
+  document.getElementById('btnAdd').disabled = true;
+}
+
+// ─── Render ──────────────────────────────────────────────────────────────────
+function renderItems() {
+  const empty = document.getElementById('itemsEmpty');
+  const list  = document.getElementById('itemsList');
+  const totals = document.getElementById('totalsBlock');
+
+  if (items.length === 0) {
+    empty.classList.remove('hidden');
+    list.classList.add('hidden');
+    totals.classList.add('hidden');
+    document.getElementById('btnContinue').disabled = true;
+    return;
+  }
+
+  empty.classList.add('hidden');
+  list.classList.remove('hidden');
+  totals.classList.remove('hidden');
+  document.getElementById('btnContinue').disabled = false;
+
+  list.innerHTML = '';
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const lineTotal = (item.qty * item.unitPrice).toFixed(2);
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.innerHTML = `
+      <div class="item-name">${escHtml(item.name)}</div>
+      <input type="number" class="item-qty-input" min="1" value="${item.qty}"
+             data-idx="${i}" onchange="updateQty(this)">
+      <div class="item-price">$${item.unitPrice.toFixed(2)}</div>
+      <div class="item-total" id="lineTotal_${i}">$${lineTotal}</div>
+      <button class="btn-remove" onclick="removeItem(${i})" title="Remove">✕</button>
+    `;
+    list.appendChild(row);
+  }
+
+  updateTotals();
+}
+
+function updateQty(el) {
+  const idx = parseInt(el.dataset.idx);
+  const qty = Math.max(1, parseInt(el.value) || 1);
+  el.value = qty;
+  items[idx].qty = qty;
+  const lt = document.getElementById(`lineTotal_${idx}`);
+  if (lt) lt.textContent = '$' + (items[idx].qty * items[idx].unitPrice).toFixed(2);
+  updateTotals();
+}
+
+function removeItem(idx) {
+  items.splice(idx, 1);
+  renderItems();
+}
+
+function updateTotals() {
+  const subtotal = items.reduce((s, it) => s + it.qty * it.unitPrice, 0);
+  const shipping = isIntl ? 25 : 0;
+  const total    = subtotal + shipping;
+
+  document.getElementById('valSubtotal').textContent = '$' + subtotal.toFixed(2);
+  document.getElementById('valTotal').textContent    = '$' + total.toFixed(2);
+  document.getElementById('rowShipping').classList.toggle('hidden', !isIntl);
+}
+
+// ─── Country ─────────────────────────────────────────────────────────────────
+function onCountryChange() {
+  const country = document.getElementById('f_country').value;
+  isIntl = country !== 'US';
+  document.getElementById('shippingNote').style.display = isIntl ? 'block' : 'none';
+  updateTotals();
+}
+
+// ─── Navigation ──────────────────────────────────────────────────────────────
+function goStep2() {
+  document.getElementById('step1').classList.add('hidden');
+  document.getElementById('step2').classList.remove('hidden');
+  document.getElementById('pStep1').classList.remove('active');
+  document.getElementById('pStep1').classList.add('done');
+  document.getElementById('pStep2').classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function goStep1() {
+  document.getElementById('step2').classList.add('hidden');
+  document.getElementById('step1').classList.remove('hidden');
+  document.getElementById('pStep1').classList.add('active');
+  document.getElementById('pStep1').classList.remove('done');
+  document.getElementById('pStep2').classList.remove('active');
+  window.scrollTo(0,0);
+}
+
+// ─── Submit ───────────────────────────────────────────────────────────────────
+async function submitQuote() {
+  const errEl  = document.getElementById('submitError');
+  const btnEl  = document.getElementById('btnSubmit');
+
+  errEl.className = 'message';
+  errEl.textContent = '';
+
+  const org   = document.getElementById('f_org').value.trim();
+  const name  = document.getElementById('f_name').value.trim();
+  const email = document.getElementById('f_email').value.trim();
+
+  if (!org)   { showError('Organization Name is required.'); return; }
+  if (!name)  { showError('Contact Name is required.'); return; }
+  if (!email) { showError('Email Address is required.'); return; }
+  if (items.length === 0) { showError('Please add at least one item.'); return; }
+
+  btnEl.disabled = true;
+  btnEl.innerHTML = '<span class="spinner"></span>Submitting…';
+
+  const country = document.getElementById('f_country').value;
+
+  const payload = {
+    orgName:     org,
+    contactName: name,
+    email:       email,
+    phone:       document.getElementById('f_phone').value.trim(),
+    address1:    document.getElementById('f_addr1').value.trim(),
+    address2:    document.getElementById('f_addr2').value.trim(),
+    city:        document.getElementById('f_city').value.trim(),
+    state:       document.getElementById('f_state').value.trim(),
+    zip:         document.getElementById('f_zip').value.trim(),
+    country:     country,
+    poNumber:    document.getElementById('f_po').value.trim(),
+    notes:       document.getElementById('f_notes').value.trim(),
+    items:       items.map(it => ({
+      skuRecordId: it.skuRecordId,
+      qty:         it.qty,
+      unitPrice:   it.unitPrice,
+    })),
+  };
+
+  try {
+    const r = await fetch('/api/create-quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await r.json();
+    if (!r.ok || !data.success) throw new Error(data.error || 'Submission failed');
+
+    document.getElementById('successEmail').textContent = email;
+    document.getElementById('successQuoteNumber').textContent = data.quoteNumber;
+
+    document.getElementById('step2').classList.add('hidden');
+    document.getElementById('progressBar').classList.add('hidden');
+    document.getElementById('step3').classList.remove('hidden');
+    window.scrollTo(0, 0);
+  } catch (e) {
+    showError(e.message || 'An error occurred. Please try again.');
+    btnEl.disabled = false;
+    btnEl.textContent = 'Submit Quote Request';
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('submitError');
+  el.textContent = msg;
+  el.className = 'message message-error show';
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>
