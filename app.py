@@ -2053,6 +2053,18 @@ def quote_catalog():
     # Use full-access token for catalog reads; write token is scoped only to Returns table
     token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
     try:
+        # Quick auth probe — returns fast error if token is wrong/missing
+        _probe = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/tbljngm75r4Km2XIN",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"maxRecords": 1, "fields[0]": "SKU ID"},
+            timeout=10,
+        ).json()
+        if "error" in _probe:
+            tok_hint = (token[:8] + "…") if token else "(empty)"
+            return Response(json.dumps({"error": f"Airtable auth failed [{tok_hint}]: {_probe['error']}"}),
+                            status=500, headers=c, mimetype="application/json")
+
         # Fetch all four tables in parallel-ish (sequential is fine for catalog)
         sku_records_raw = at_get_all(
             "tbljngm75r4Km2XIN", token,
