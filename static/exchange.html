@@ -310,7 +310,7 @@
 
 <div class="container">
   <h1 class="page-title">Belt Size Exchange</h1>
-  <p class="page-subtitle">Enter your order details to check eligibility. Exchanges are accepted within 30 days of delivery.</p>
+  <p class="page-subtitle">Enter your order details to check eligibility. Exchanges are accepted within 30 days of delivery.<br><strong>International orders:</strong> Please contact us by phone or email to request an exchange — <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">678-961-3304</a>.</p>
 
   <div class="progress" id="progress">
     <div class="progress-step active" id="prog-1"></div>
@@ -353,7 +353,11 @@
     </div>
     <div class="message message-warning" id="msg-outside-window">
       <strong>Outside Exchange Window</strong>
-      This order is outside the 37-day exchange window. If you have questions, please reach out at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">(678) 961-3304</a>.
+      This order is outside the 30-day exchange window. If you have questions, please reach out at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">(678) 961-3304</a>.
+    </div>
+    <div class="message message-warning" id="msg-international">
+      <strong>International Order</strong>
+      Unfortunately, we're unable to process exchanges online for international orders. Please contact us directly and we'll be happy to help — <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">(678) 961-3304</a>.
     </div>
     <div class="message message-warning" id="msg-no-eligible-items">
       <strong>No Eligible Items</strong>
@@ -492,6 +496,8 @@ async function verifyExchange() {
       showMsg('msg-already-exchanged');
     } else if (data.status === 'outside_window') {
       showMsg('msg-outside-window');
+    } else if (data.status === 'international') {
+      showMsg('msg-international');
     } else if (data.status === 'no_eligible_items') {
       showMsg('msg-no-eligible-items');
     } else {
