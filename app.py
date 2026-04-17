@@ -2049,18 +2049,9 @@ def quote_catalog():
     if request.method == "OPTIONS":
         return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "GET"})
     c = cors()
-    token = RETURNS_WRITE_TOKEN
+    # Use OPS token for reads (same pattern as verify-order/exchange); write token may be restricted
+    token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
     try:
-        # Debug: check first Airtable response for auth errors
-        _dbg = req_lib.get(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/tbljngm75r4Km2XIN",
-            headers={"Authorization": f"Bearer {token}"},
-            params={"maxRecords": 1, "fields[0]": "SKU ID"},
-            timeout=15,
-        ).json()
-        if "error" in _dbg:
-            return Response(json.dumps({"error": f"Airtable: {_dbg['error']}"}), status=500, headers=c, mimetype="application/json")
-
         # Fetch all four tables in parallel-ish (sequential is fine for catalog)
         sku_records_raw = at_get_all(
             "tbljngm75r4Km2XIN", token,
