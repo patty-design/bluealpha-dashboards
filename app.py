@@ -7,6 +7,8 @@ import base64
 import threading
 import requests as req_lib
 
+_BUILD_VERSION = "05d478f-plus1"  # bump to verify Railway deployment
+
 AIRTABLE_OPS_TOKEN      = os.environ.get("AIRTABLE_OPS_TOKEN", "")
 AIRTABLE_BASE_TOKEN     = os.environ.get("AIRTABLE_BASE_TOKEN", "")
 AIRTABLE_WRITE_TOKEN    = os.environ.get("AIRTABLE_WRITE_TOKEN", "")
@@ -73,6 +75,11 @@ def require_auth(f):
             )
         return f(*args, **kwargs)
     return decorated
+
+@app.route("/_version")
+def version():
+    return Response(json.dumps({"v": _BUILD_VERSION, "base_token_set": bool(AIRTABLE_BASE_TOKEN)}),
+                    mimetype="application/json")
 
 @app.route("/static/<path:filename>")
 def serve_static(filename):
