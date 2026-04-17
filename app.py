@@ -421,6 +421,33 @@ def cs_lookup_order():
         items = [{"sku": i.get("sku", "").strip(), "name": i.get("name", ""), "quantity": i.get("quantity", 1)}
                  for i in order.get("items", []) if is_returnable_item(i)]
 
+        # Remove already-cancelled items/quantities from this form's previous submissions
+        try:
+            formula = f"AND({{Order Number}}='{order_number}',{{Type}}='Cancellation')"
+            ac_r = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
+                params={"filterByFormula": formula, "fields[]": ["Items to Return"]},
+                headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
+                timeout=10,
+            )
+            already_cancelled = {}
+            for rec in ac_r.json().get("records", []):
+                items_text = rec.get("fields", {}).get("Items to Return", "")
+                for line in items_text.split("\n"):
+                    m = re.match(r'(\d+)x\s+(\S+)\s+[—\-]', line.strip())
+                    if m:
+                        already_cancelled[m.group(2).strip()] = \
+                            already_cancelled.get(m.group(2).strip(), 0) + int(m.group(1))
+            if already_cancelled:
+                adjusted = []
+                for item in items:
+                    remaining = item["quantity"] - already_cancelled.get(item["sku"], 0)
+                    if remaining > 0:
+                        adjusted.append({**item, "quantity": remaining})
+                items = adjusted
+        except Exception:
+            pass  # Don't block lookup if this check fails
+
         # Get ship date from shipments
         sr = req_lib.get("https://ssapi.shipstation.com/shipments",
                          params={"orderNumber": order_number},
@@ -616,6 +643,42 @@ def submit_cancellation():
     except Exception as e:
         print(f"[submit_cancellation] Status check failed: {e}")
         # Don't block if the check itself errors — proceed and let ShipStation handle it
+
+    # Validate no items have already been cancelled via this form
+    try:
+        formula = f"AND({{Order Number}}='{order_number}',{{Type}}='Cancellation')"
+        ac_r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
+            params={"filterByFormula": formula, "fields[]": ["Items to Return"]},
+            headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
+            timeout=10,
+        )
+        already_cancelled = {}
+        for rec in ac_r.json().get("records", []):
+            items_text_existing = rec.get("fields", {}).get("Items to Return", "")
+            for line in items_text_existing.split("\n"):
+                m = re.match(r'(\d+)x\s+(\S+)\s+[—\-]', line.strip())
+                if m:
+                    already_cancelled[m.group(2).strip()] = \
+                        already_cancelled.get(m.group(2).strip(), 0) + int(m.group(1))
+        if already_cancelled:
+            dupes = []
+            for item in items:
+                sku = item.get("sku", "")
+                qty = int(item.get("quantity", 1))
+                already = already_cancelled.get(sku, 0)
+                if already >= qty:
+                    dupes.append(item.get("name") or sku)
+            if dupes:
+                return Response(
+                    json.dumps({
+                        "success": False,
+                        "error": f"Cancellation already submitted for: {', '.join(dupes)}.",
+                    }),
+                    status=400, headers=c, mimetype="application/json",
+                )
+    except Exception as e:
+        print(f"[submit_cancellation] Duplicate check failed (non-fatal): {e}")
 
     items_text = "\n".join(
         f"{i.get('quantity', 1)}x {i.get('sku', '')} — {i.get('name', '')}"
