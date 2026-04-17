@@ -2056,11 +2056,22 @@ def _fetch_quote_data(record_id):
     }
 
 
+_CATALOG_CACHE = {"data": None, "ts": 0}
+_CATALOG_TTL   = 600  # 10 minutes
+_EXCLUDED_PARENTS = {
+    "wps lp inner", "wps low profile", "wps 1.75\" cobra", "wps 1.75\" d-ring",
+    "dog collar", "dog leash", "gps pouch", "belt resize service",
+    "service", "stock sock", "test parent", "test3",
+}
+
 @app.route("/api/quote-catalog", methods=["GET", "OPTIONS"])
 def quote_catalog():
     if request.method == "OPTIONS":
         return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "GET"})
     c = cors()
+    import time as _time
+    if _CATALOG_CACHE["data"] and (_time.time() - _CATALOG_CACHE["ts"]) < _CATALOG_TTL:
+        return Response(json.dumps(_CATALOG_CACHE["data"]), headers=c, mimetype="application/json")
     # Use full-access token for catalog reads; write token is scoped only to Returns table
     token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
     try:
@@ -2095,6 +2106,8 @@ def quote_catalog():
             parent_name = _clean_product_name(parent_map.get(parent_id, ""))
             if not parent_name:
                 continue
+            if parent_name.lower() in _EXCLUDED_PARENTS:
+                continue
 
             color_ids  = f.get("Color", [])
             size_ids   = f.get("Size", [])
@@ -2127,8 +2140,10 @@ def quote_catalog():
             [{"id": k, "name": v["name"], "category": v["category"]} for k, v in seen_parents.items()],
             key=lambda x: x["name"],
         )
-        return Response(json.dumps({"parents": parents, "skus": skus}),
-                        headers=c, mimetype="application/json")
+        result = {"parents": parents, "skus": skus}
+        _CATALOG_CACHE["data"] = result
+        _CATALOG_CACHE["ts"]   = _time.time()
+        return Response(json.dumps(result), headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
