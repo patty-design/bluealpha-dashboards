@@ -2055,7 +2055,7 @@ def quote_catalog():
         sku_records = at_get_all(
             "tbljngm75r4Km2XIN", token,
             fields=["SKU ID", "Name + Variations", "Sale Price", "Parent Product", "Color", "Size", "Category"],
-            formula="AND(NOT({Sale Price}=BLANK()),{Category}!=\"Contract\")",
+            formula='AND(NOT({Sale Price}=BLANK()),NOT({Category}="Contract"))',
         )
         parent_records = at_get_all(PARENT_PRODUCTS_TABLE_ID, token, fields=["Name"])
         color_records  = at_get_all(COLORS_TABLE_ID, token, fields=["Name"])
