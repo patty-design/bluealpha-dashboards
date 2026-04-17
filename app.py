@@ -605,41 +605,44 @@ def submit_cancellation():
     cs_notes      = data.get("csNotes", "").strip()
 
     # Block cancellation only if order has shipped OR has a tracking number.
-    # Cancelled orders in ShipStation are allowed through (they just need an Airtable record).
+    # If the order is already cancelled in ShipStation, always allow through.
     try:
         ss_r = req_lib.get(
             f"https://ssapi.shipstation.com/orders/{order_id}",
             headers=ss_headers(), timeout=10,
         )
+        ss_status = ""
         if ss_r.status_code == 200:
             ss_status = ss_r.json().get("orderStatus", "")
-            if ss_status == "shipped":
-                return Response(
-                    json.dumps({
-                        "success": False,
-                        "error": "Order cannot be cancelled — it has already shipped.",
-                    }),
-                    status=400, headers=c, mimetype="application/json",
-                )
-        # Also check for tracking numbers on any shipment
-        ship_r = req_lib.get(
-            "https://ssapi.shipstation.com/shipments",
-            params={"orderId": order_id},
-            headers=ss_headers(), timeout=10,
-        )
-        if ship_r.status_code == 200:
-            shipments = ship_r.json().get("shipments", [])
-            for s in shipments:
-                tracking = (s.get("trackingNumber") or "").strip()
-                voided   = s.get("voided", False)
-                if tracking and not voided:
-                    return Response(
-                        json.dumps({
-                            "success": False,
-                            "error": "Order cannot be cancelled — a tracking number has already been assigned.",
-                        }),
-                        status=400, headers=c, mimetype="application/json",
-                    )
+
+        if ss_status == "cancelled":
+            pass  # Always allow — already cancelled in ShipStation, just need Airtable record
+        elif ss_status == "shipped":
+            return Response(
+                json.dumps({
+                    "success": False,
+                    "error": "Order cannot be cancelled — it has already shipped.",
+                }),
+                status=400, headers=c, mimetype="application/json",
+            )
+        else:
+            # Check for tracking numbers on any non-voided shipment
+            ship_r = req_lib.get(
+                "https://ssapi.shipstation.com/shipments",
+                params={"orderId": order_id},
+                headers=ss_headers(), timeout=10,
+            )
+            if ship_r.status_code == 200:
+                for s in ship_r.json().get("shipments", []):
+                    tracking = (s.get("trackingNumber") or "").strip()
+                    if tracking and not s.get("voided", False):
+                        return Response(
+                            json.dumps({
+                                "success": False,
+                                "error": "Order cannot be cancelled — a tracking number has already been assigned.",
+                            }),
+                            status=400, headers=c, mimetype="application/json",
+                        )
     except Exception as e:
         print(f"[submit_cancellation] Status check failed: {e}")
         # Don't block if the check itself errors — proceed and let ShipStation handle it
