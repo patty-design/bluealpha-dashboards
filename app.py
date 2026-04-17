@@ -2060,9 +2060,13 @@ def quote_catalog():
             params={"maxRecords": 1, "fields[0]": "SKU ID"},
             timeout=10,
         ).json()
+        tok_hint = (token[:8] + "…") if token else "(empty)"
         if "error" in _probe:
-            tok_hint = (token[:8] + "…") if token else "(empty)"
             return Response(json.dumps({"error": f"Airtable auth failed [{tok_hint}]: {_probe['error']}"}),
+                            status=500, headers=c, mimetype="application/json")
+        probe_count = len(_probe.get("records", []))
+        if probe_count == 0:
+            return Response(json.dumps({"error": f"Airtable probe returned 0 records (token={tok_hint}, base={AIRTABLE_BASE_ID})"}),
                             status=500, headers=c, mimetype="application/json")
 
         # Fetch all four tables in parallel-ish (sequential is fine for catalog)
