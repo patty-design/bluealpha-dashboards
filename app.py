@@ -7,7 +7,7 @@ import base64
 import threading
 import requests as req_lib
 
-_BUILD_VERSION = "05d478f-plus1"  # bump to verify Railway deployment
+_BUILD_VERSION = "no-formula-v1"  # bump to verify Railway deployment
 
 AIRTABLE_OPS_TOKEN      = os.environ.get("AIRTABLE_OPS_TOKEN", "")
 AIRTABLE_BASE_TOKEN     = os.environ.get("AIRTABLE_BASE_TOKEN", "")
@@ -2060,30 +2060,21 @@ def quote_catalog():
     # Use full-access token for catalog reads; write token is scoped only to Returns table
     token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
     try:
-        # Quick auth probe — returns fast error if token is wrong/missing
-        _probe = req_lib.get(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/tbljngm75r4Km2XIN",
-            headers={"Authorization": f"Bearer {token}"},
-            params={"maxRecords": 1, "fields[0]": "SKU ID"},
-            timeout=10,
-        ).json()
-        tok_hint = (token[:8] + "…") if token else "(empty)"
-        if "error" in _probe:
-            return Response(json.dumps({"error": f"Airtable auth failed [{tok_hint}]: {_probe['error']}"}),
-                            status=500, headers=c, mimetype="application/json")
-        probe_count = len(_probe.get("records", []))
-        if probe_count == 0:
-            return Response(json.dumps({"error": f"Airtable probe returned 0 records (token={tok_hint}, base={AIRTABLE_BASE_ID})"}),
-                            status=500, headers=c, mimetype="application/json")
-
-        # Fetch all four tables in parallel-ish (sequential is fine for catalog)
-        sku_records_raw = at_get_all(
+        # Fetch all SKUs (no formula — filter in Python to avoid encoding issues)
+        sku_records_all = at_get_all(
             "tbljngm75r4Km2XIN", token,
             fields=["SKU ID", "Name + Variations", "Sale Price", "Parent Product", "Color", "Size", "Category"],
-            formula="NOT({Sale Price}=BLANK())",
         )
-        # Filter Contract category in Python to avoid Airtable formula escaping issues
-        sku_records = [r for r in sku_records_raw if r.get("fields", {}).get("Category", "") != "Contract"]
+        if not sku_records_all:
+            tok_hint = (token[:8] + "…") if token else "(empty)"
+            return Response(json.dumps({"error": f"No SKU records returned (token={tok_hint})"}),
+                            status=500, headers=c, mimetype="application/json")
+        # Keep only SKUs with a Sale Price and not in Contract category
+        sku_records = [
+            r for r in sku_records_all
+            if r.get("fields", {}).get("Sale Price")
+            and r.get("fields", {}).get("Category", "") != "Contract"
+        ]
         parent_records = at_get_all(PARENT_PRODUCTS_TABLE_ID, token, fields=["Name"])
         color_records  = at_get_all(COLORS_TABLE_ID, token, fields=["Name"])
         size_records   = at_get_all(SIZES_TABLE_ID, token, fields=["Name"])
