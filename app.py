@@ -2442,12 +2442,7 @@ def accept_quote(record_id):
 def quote_pdf(record_id):
     c = cors()
     try:
-        from reportlab.lib.pagesizes import letter
-        from reportlab.lib import colors
-        from reportlab.lib.units import inch
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER
+        from fpdf import FPDF
         import io
 
         quote = _fetch_quote_data(record_id)
@@ -2455,187 +2450,176 @@ def quote_pdf(record_id):
             return Response(json.dumps({"error": "Quote not found"}), status=404,
                             headers=c, mimetype="application/json")
 
-        NAVY       = colors.HexColor("#1B2438")
-        RED        = colors.HexColor("#BD3333")
-        LIGHT_GRAY = colors.HexColor("#f5f7fa")
-        BORDER     = colors.HexColor("#dde3ea")
-        TEXT       = colors.HexColor("#1a2633")
-        MUTED      = colors.HexColor("#6b7a8d")
+        # ── Build PDF with fpdf2 ────────────────────────────────────────────
+        cust       = quote.get("customer", {})
+        line_items = quote.get("lineItems", [])
+        subtotal   = quote.get("subtotal", 0.0)
+        shipping   = quote.get("shipping", 0.0)
+        total      = quote.get("total",    0.0)
+        q_number   = quote.get("quoteNumber", "")
+        q_date     = quote.get("date", "")
+        q_expiry   = quote.get("expiryDate", "")
+        q_po       = quote.get("poNumber", "")
+        q_notes    = quote.get("notes", "")
 
-        buf = io.BytesIO()
-        margin = 0.75 * inch
-        doc = SimpleDocTemplate(
-            buf, pagesize=letter,
-            leftMargin=margin, rightMargin=margin,
-            topMargin=margin, bottomMargin=margin,
-        )
-
-        styles = getSampleStyleSheet()
-        story  = []
-
-        # ── Header row ──────────────────────────────────────────────────────
-        header_data = [[
-            Paragraph('<font name="Helvetica-Bold" size="22" color="#1B2438">BLUE ALPHA</font>', styles["Normal"]),
-            Paragraph('<font name="Helvetica-Bold" size="28" color="#BD3333">QUOTE</font>',
-                      ParagraphStyle("qr", alignment=TA_RIGHT)),
-        ]]
-        header_table = Table(header_data, colWidths=[3.5*inch, 3.5*inch])
-        header_table.setStyle(TableStyle([
-            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
-            ("BOTTOMPADDING", (0,0), (-1,-1), 4),
-        ]))
-        story.append(header_table)
-
-        story.append(Paragraph(
-            '<font name="Helvetica" size="9" color="#6b7a8d">bluealphabelts.com &nbsp;&bull;&nbsp; info@bluealpha.us &nbsp;&bull;&nbsp; 678-961-3304</font>',
-            ParagraphStyle("sub", spaceBefore=4, spaceAfter=8),
-        ))
-        story.append(HRFlowable(width="100%", thickness=2, color=NAVY, spaceAfter=14))
-
-        # ── Meta two-column ─────────────────────────────────────────────────
-        cust = quote.get("customer", {})
-        bill_lines = []
-        bill_org  = cust.get("billToOrg") or cust.get("orgName", "")
+        bill_org  = cust.get("billToOrg")  or cust.get("orgName", "")
         bill_name = cust.get("billToName") or cust.get("contactName", "")
-        if bill_org:  bill_lines.append(f"<b>{bill_org}</b>")
-        if bill_name: bill_lines.append(bill_name)
-        addr1 = cust.get("address1", "")
-        city  = cust.get("city", "")
-        state = cust.get("state", "")
-        zip_c = cust.get("zip", "")
-        if addr1:                      bill_lines.append(addr1)
-        if city or state or zip_c:     bill_lines.append(f"{city}, {state} {zip_c}".strip(" ,"))
+        addr1     = cust.get("address1", "")
+        city      = cust.get("city", "")
+        state_v   = cust.get("state", "")
+        zip_v     = cust.get("zip", "")
 
-        def meta_cell(label, value):
-            return Paragraph(f'<font name="Helvetica-Bold" size="9" color="#6b7a8d">{label}&nbsp;&nbsp;</font>'
-                             f'<font name="Helvetica" size="9" color="#1a2633">{value}</font>',
-                             ParagraphStyle("mc", spaceAfter=3))
+        pdf = FPDF(orientation="P", unit="mm", format="letter")
+        pdf.set_margins(19, 19, 19)
+        pdf.set_auto_page_break(auto=True, margin=19)
+        pdf.add_page()
 
-        left_col = []
-        left_col.append(meta_cell("Quote Number:", quote.get("quoteNumber", "")))
-        left_col.append(meta_cell("Date:",         quote.get("date", "")))
-        left_col.append(meta_cell("Expires:",      quote.get("expiryDate", "")))
-        left_col.append(meta_cell("Terms:",        "Net 30"))
-        if quote.get("poNumber"):
-            left_col.append(meta_cell("PO #:", quote["poNumber"]))
+        W = 177.0  # usable width (letter 215.9 - 2×19mm margins)
 
-        right_cell = Paragraph(
-            '<font name="Helvetica-Bold" size="9" color="#6b7a8d">Bill To</font><br/>' +
-            "<br/>".join(f'<font name="Helvetica" size="9" color="#1a2633">{ln}</font>' for ln in bill_lines),
-            ParagraphStyle("bt", spaceAfter=3),
-        )
+        # Navy / Red colours
+        NAVY = (27,  36,  56)
+        RED  = (189, 51,  51)
+        MUTED = (107, 122, 141)
+        TEXT  = (26,  38,  51)
+        LG    = (245, 247, 250)
+        BD    = (221, 227, 234)
 
-        meta_data = [[left_col, right_cell]]
-        meta_table = Table(meta_data, colWidths=[3.5*inch, 3.5*inch])
-        meta_table.setStyle(TableStyle([
-            ("VALIGN", (0,0), (-1,-1), "TOP"),
-        ]))
-        story.append(meta_table)
-        story.append(Spacer(1, 16))
+        # ── Header ────────────────────────────────────────────────────────
+        pdf.set_font("Helvetica", "B", 20)
+        pdf.set_text_color(*NAVY)
+        pdf.cell(W * 0.6, 10, "BLUE ALPHA", border=0, align="L")
+        pdf.set_font("Helvetica", "B", 26)
+        pdf.set_text_color(*RED)
+        pdf.cell(W * 0.4, 10, "QUOTE", border=0, align="R", new_x="LMARGIN", new_y="NEXT")
 
-        # ── Line items table ─────────────────────────────────────────────────
-        li_header = [
-            Paragraph('<font name="Helvetica-Bold" size="9" color="#ffffff">PRODUCT</font>', styles["Normal"]),
-            Paragraph('<font name="Helvetica-Bold" size="9" color="#ffffff">QTY</font>',
-                      ParagraphStyle("th", alignment=TA_RIGHT)),
-            Paragraph('<font name="Helvetica-Bold" size="9" color="#ffffff">UNIT PRICE</font>',
-                      ParagraphStyle("th2", alignment=TA_RIGHT)),
-            Paragraph('<font name="Helvetica-Bold" size="9" color="#ffffff">TOTAL</font>',
-                      ParagraphStyle("th3", alignment=TA_RIGHT)),
-        ]
-        li_rows = [li_header]
-        for idx, item in enumerate(quote.get("lineItems", [])):
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*MUTED)
+        pdf.cell(W, 6, "bluealphabelts.com  |  info@bluealpha.us  |  678-961-3304",
+                 border=0, align="L", new_x="LMARGIN", new_y="NEXT")
+
+        # Navy rule
+        pdf.set_draw_color(*NAVY)
+        pdf.set_line_width(0.7)
+        pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
+        pdf.ln(5)
+
+        # ── Meta two-column ───────────────────────────────────────────────
+        y_meta = pdf.get_y()
+        col_w  = W / 2
+
+        def meta_row(label, value):
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.set_text_color(*MUTED)
+            pdf.cell(28, 5.5, label, border=0)
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_text_color(*TEXT)
+            pdf.cell(col_w - 28, 5.5, str(value), border=0, new_x="LMARGIN", new_y="NEXT")
+
+        meta_rows = [("Quote Number:", q_number), ("Date:", q_date),
+                     ("Expires:", q_expiry), ("Terms:", "Net 30")]
+        if q_po:
+            meta_rows.append(("PO #:", q_po))
+
+        for label, value in meta_rows:
+            meta_row(label, value)
+
+        # Bill To (right column)
+        pdf.set_xy(19 + col_w, y_meta)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.set_text_color(*MUTED)
+        pdf.cell(col_w, 5.5, "Bill To", border=0, new_x="LEFT", new_y="NEXT")
+        pdf.set_x(19 + col_w)
+
+        for line in [bill_org, bill_name, addr1,
+                     f"{city}, {state_v} {zip_v}".strip(", ")]:
+            if line:
+                pdf.set_font("Helvetica", "B" if line == bill_org else "", 9)
+                pdf.set_text_color(*TEXT)
+                pdf.set_x(19 + col_w)
+                pdf.cell(col_w, 5.5, line, border=0, new_x="LEFT", new_y="NEXT")
+
+        pdf.ln(6)
+
+        # ── Line items table ──────────────────────────────────────────────
+        col_widths = [W - 60, 14, 23, 23]  # Product, Qty, Unit Price, Total
+        headers    = ["PRODUCT", "QTY", "UNIT PRICE", "TOTAL"]
+        aligns     = ["L", "R", "R", "R"]
+        row_h      = 7
+
+        # Header row
+        pdf.set_fill_color(*NAVY)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 8)
+        for w, h, a in zip(col_widths, headers, aligns):
+            pdf.cell(w, row_h, h, border=0, align=a, fill=True)
+        pdf.ln()
+
+        # Data rows
+        pdf.set_font("Helvetica", "", 8)
+        for idx, item in enumerate(line_items):
+            fill = idx % 2 == 0
+            pdf.set_fill_color(*LG)
+            pdf.set_text_color(*TEXT)
             line_total = item["qty"] * item["unitPrice"]
-            row_style  = LIGHT_GRAY if idx % 2 == 0 else colors.white
-            li_rows.append([
-                Paragraph(f'<font name="Helvetica" size="9" color="#1a2633">{item["name"]}</font>', styles["Normal"]),
-                Paragraph(f'<font name="Helvetica" size="9" color="#1a2633">{item["qty"]}</font>',
-                          ParagraphStyle("rv", alignment=TA_RIGHT)),
-                Paragraph(f'<font name="Helvetica" size="9" color="#1a2633">${item["unitPrice"]:.2f}</font>',
-                          ParagraphStyle("rv2", alignment=TA_RIGHT)),
-                Paragraph(f'<font name="Helvetica" size="9" color="#1a2633">${line_total:.2f}</font>',
-                          ParagraphStyle("rv3", alignment=TA_RIGHT)),
-            ])
+            row_data = [item["name"], str(item["qty"]),
+                        f"${item['unitPrice']:.2f}", f"${line_total:.2f}"]
+            for w, cell, a in zip(col_widths, row_data, aligns):
+                pdf.cell(w, row_h, cell, border=0, align=a, fill=fill)
+            pdf.ln()
 
-        li_table = Table(li_rows, colWidths=[4.0*inch, 0.6*inch, 1.1*inch, 1.3*inch])
-        li_style = [
-            ("BACKGROUND", (0,0), (-1,0), NAVY),
-            ("ROWBACKGROUNDS", (0,1), (-1,-1), [LIGHT_GRAY, colors.white]),
-            ("GRID", (0,0), (-1,-1), 0.5, BORDER),
-            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
-            ("TOPPADDING",    (0,0), (-1,-1), 6),
-            ("BOTTOMPADDING", (0,0), (-1,-1), 6),
-            ("LEFTPADDING",   (0,0), (-1,-1), 8),
-            ("RIGHTPADDING",  (0,0), (-1,-1), 8),
-        ]
-        li_table.setStyle(TableStyle(li_style))
-        story.append(li_table)
-        story.append(Spacer(1, 10))
+        pdf.ln(3)
 
-        # ── Totals block ─────────────────────────────────────────────────────
-        subtotal = quote.get("subtotal", 0)
-        shipping = quote.get("shipping", 0)
-        total    = quote.get("total", 0)
+        # ── Totals ────────────────────────────────────────────────────────
+        def totals_row(label, value, bold=False):
+            pdf.set_font("Helvetica", "B" if bold else "", 9)
+            pdf.set_text_color(*TEXT if bold else MUTED)
+            pdf.cell(W - 46, 6, "", border=0)
+            pdf.set_text_color(*TEXT if bold else MUTED)
+            pdf.cell(23, 6, label, border=0, align="R")
+            pdf.set_text_color(*TEXT)
+            pdf.cell(23, 6, value, border=0, align="R", new_x="LMARGIN", new_y="NEXT")
 
-        totals_rows = []
-        totals_rows.append([
-            "",
-            Paragraph('<font name="Helvetica" size="9" color="#6b7a8d">Subtotal</font>',
-                      ParagraphStyle("tr", alignment=TA_RIGHT)),
-            Paragraph(f'<font name="Helvetica" size="9" color="#1a2633">${subtotal:.2f}</font>',
-                      ParagraphStyle("tv", alignment=TA_RIGHT)),
-        ])
+        totals_row("Subtotal", f"${subtotal:.2f}")
         if shipping > 0:
-            totals_rows.append([
-                "",
-                Paragraph('<font name="Helvetica" size="9" color="#6b7a8d">Shipping</font>',
-                          ParagraphStyle("tr2", alignment=TA_RIGHT)),
-                Paragraph(f'<font name="Helvetica" size="9" color="#1a2633">${shipping:.2f}</font>',
-                          ParagraphStyle("tv2", alignment=TA_RIGHT)),
-            ])
-        totals_rows.append([
-            "",
-            Paragraph('<font name="Helvetica-Bold" size="10" color="#1a2633">Total</font>',
-                      ParagraphStyle("trb", alignment=TA_RIGHT)),
-            Paragraph(f'<font name="Helvetica-Bold" size="10" color="#1a2633">${total:.2f}</font>',
-                      ParagraphStyle("tvb", alignment=TA_RIGHT)),
-        ])
+            totals_row("Shipping", f"${shipping:.2f}")
+        # Rule above total
+        y_rule = pdf.get_y()
+        pdf.set_draw_color(*NAVY)
+        pdf.set_line_width(0.4)
+        pdf.line(19 + W - 46, y_rule, 19 + W, y_rule)
+        pdf.ln(1)
+        totals_row("Total", f"${total:.2f}", bold=True)
+        pdf.ln(5)
 
-        totals_table = Table(totals_rows, colWidths=[3.6*inch, 1.4*inch, 2.0*inch])
-        totals_tbl_style = [
-            ("TOPPADDING",    (0,0), (-1,-1), 4),
-            ("BOTTOMPADDING", (0,0), (-1,-1), 4),
-            ("LINEABOVE", (1, len(totals_rows)-1), (-1, len(totals_rows)-1), 1, NAVY),
-        ]
-        totals_table.setStyle(TableStyle(totals_tbl_style))
-        story.append(totals_table)
+        # ── Notes ─────────────────────────────────────────────────────────
+        if q_notes:
+            pdf.set_draw_color(*BD)
+            pdf.set_line_width(0.3)
+            pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
+            pdf.ln(4)
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.set_text_color(*MUTED)
+            pdf.cell(W, 5, "NOTES", border=0, new_x="LMARGIN", new_y="NEXT")
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_text_color(*TEXT)
+            pdf.multi_cell(W, 5, q_notes, border=0)
+            pdf.ln(3)
 
-        story.append(HRFlowable(width="100%", thickness=0.5, color=BORDER, spaceBefore=12, spaceAfter=12))
+        # ── Footer ────────────────────────────────────────────────────────
+        pdf.set_draw_color(*BD)
+        pdf.set_line_width(0.3)
+        pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
+        pdf.ln(4)
+        pdf.set_font("Helvetica", "", 7.5)
+        pdf.set_text_color(*MUTED)
+        pdf.multi_cell(W, 4.5,
+            "This quote is valid for 90 days from the date of issue. Payment terms are Net 30 upon acceptance. "
+            "To accept this quote, visit the link provided in your email. "
+            "Questions? Contact us at info@bluealpha.us or 678-961-3304.",
+            border=0)
 
-        # ── Notes ────────────────────────────────────────────────────────────
-        if quote.get("notes"):
-            story.append(Paragraph(
-                '<font name="Helvetica-Bold" size="9" color="#6b7a8d">NOTES</font>',
-                ParagraphStyle("noteslbl", spaceAfter=4),
-            ))
-            story.append(Paragraph(
-                f'<font name="Helvetica" size="9" color="#1a2633">{quote["notes"]}</font>',
-                ParagraphStyle("notestxt", spaceAfter=12),
-            ))
-
-        # ── Footer ───────────────────────────────────────────────────────────
-        story.append(Paragraph(
-            '<font name="Helvetica" size="8" color="#6b7a8d">'
-            'This quote is valid for 90 days from the date of issue. Payment terms are Net 30 upon acceptance. '
-            'To accept this quote, visit the link provided in your email. '
-            'Questions? Contact us at info@bluealpha.us or 678-961-3304.'
-            '</font>',
-            ParagraphStyle("footer", spaceAfter=0),
-        ))
-
-        doc.build(story)
-        pdf_bytes = buf.getvalue()
-        filename  = f"{quote.get('quoteNumber', record_id)}.pdf"
+        pdf_bytes = bytes(pdf.output())
+        filename  = f"{q_number or record_id}.pdf"
 
         return Response(
             pdf_bytes,
@@ -2646,6 +2630,7 @@ def quote_pdf(record_id):
             },
         )
     except Exception as e:
+        import traceback; traceback.print_exc()
         return Response(json.dumps({"error": str(e)}), status=500, headers=cors(), mimetype="application/json")
 
 
