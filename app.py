@@ -7,7 +7,7 @@ import base64
 import threading
 import requests as req_lib
 
-_BUILD_VERSION = "diag-v3"  # bump to verify Railway deployment
+_BUILD_VERSION = "catalog-live"
 
 AIRTABLE_OPS_TOKEN      = os.environ.get("AIRTABLE_OPS_TOKEN", "")
 AIRTABLE_BASE_TOKEN     = os.environ.get("AIRTABLE_BASE_TOKEN", "")
@@ -2070,18 +2070,6 @@ def quote_catalog():
             fields=["SKU ID", "Name + Variations", "Sale Price", "Parent Product", "Color", "Size", "Category"],
             formula="{Sale Price}",
         )
-        tok_hint = (token[:8] + "…") if token else "(empty)"
-        if not sku_records_all:
-            return Response(json.dumps({"error": f"No SKU records returned (token={tok_hint})"}),
-                            status=500, headers=c, mimetype="application/json")
-        # Sample first record fields for diagnostics
-        _sample_fields = list(sku_records_all[0].get("fields", {}).keys()) if sku_records_all else []
-        _with_price = sum(1 for r in sku_records_all if r.get("fields", {}).get("Sale Price"))
-        if _with_price == 0:
-            return Response(json.dumps({
-                "error": f"0/{len(sku_records_all)} SKUs have Sale Price (token={tok_hint})",
-                "sample_fields": _sample_fields,
-            }), status=500, headers=c, mimetype="application/json")
         # Keep only SKUs with a Sale Price and not in Contract category
         sku_records = [
             r for r in sku_records_all
