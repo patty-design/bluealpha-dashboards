@@ -7,7 +7,7 @@ import base64
 import threading
 import requests as req_lib
 
-_BUILD_VERSION = "diag-v2"  # bump to verify Railway deployment
+_BUILD_VERSION = "diag-v3"  # bump to verify Railway deployment
 
 AIRTABLE_OPS_TOKEN      = os.environ.get("AIRTABLE_OPS_TOKEN", "")
 AIRTABLE_BASE_TOKEN     = os.environ.get("AIRTABLE_BASE_TOKEN", "")
@@ -78,8 +78,12 @@ def require_auth(f):
 
 @app.route("/_version")
 def version():
-    return Response(json.dumps({"v": _BUILD_VERSION, "base_token_set": bool(AIRTABLE_BASE_TOKEN)}),
-                    mimetype="application/json")
+    tok = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    return Response(json.dumps({
+        "v": _BUILD_VERSION,
+        "base_token_set": bool(AIRTABLE_BASE_TOKEN),
+        "token_prefix": tok[:12] if tok else "(empty)",
+    }), mimetype="application/json")
 
 @app.route("/static/<path:filename>")
 def serve_static(filename):
@@ -2060,10 +2064,11 @@ def quote_catalog():
     # Use full-access token for catalog reads; write token is scoped only to Returns table
     token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
     try:
-        # Fetch all SKUs (no formula — filter in Python to avoid encoding issues)
+        # Fetch SKUs with a sale price ({Sale Price} = truthy check, no BLANK() syntax)
         sku_records_all = at_get_all(
             "tbljngm75r4Km2XIN", token,
             fields=["SKU ID", "Name + Variations", "Sale Price", "Parent Product", "Color", "Size", "Category"],
+            formula="{Sale Price}",
         )
         tok_hint = (token[:8] + "…") if token else "(empty)"
         if not sku_records_all:
