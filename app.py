@@ -2176,6 +2176,22 @@ _EXCLUDED_PARENTS = {
     "1.75\" standard belt - both buckles",
 }
 
+@app.route("/api/admin/refresh-catalog", methods=["POST"])
+def admin_refresh_catalog():
+    """Force an immediate synchronous catalog rebuild (internal use)."""
+    global _CATALOG_REFRESHING
+    try:
+        result = _build_catalog()
+        import time as _time
+        _CATALOG_CACHE["data"] = result
+        _CATALOG_CACHE["ts"]   = _time.time()
+        _CATALOG_REFRESHING = False
+        return Response(json.dumps({"ok": True, "parents": len(result["parents"]), "skus": len(result["skus"])}),
+                        mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"ok": False, "error": str(e)}), status=500, mimetype="application/json")
+
+
 @app.route("/api/quote-catalog", methods=["GET", "OPTIONS"])
 def quote_catalog():
     if request.method == "OPTIONS":
