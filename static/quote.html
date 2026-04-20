@@ -205,6 +205,19 @@
       border-radius: 6px;
       background: #f0f2f5;
     }
+    .sku-price-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .sku-price-row .sku-price-val {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--navy);
+    }
 
     /* ── Items list ── */
     .items-empty {
@@ -589,7 +602,7 @@ function _productHtml(p) {
   const addonHtml = `<div class="sel-row hidden" id="sarow_${p.id}">
       <div class="sel-field" style="flex:1 1 100%">
         <label>Add-on <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0;">(optional)</span></label>
-        <select id="sadon_${p.id}">
+        <select id="sadon_${p.id}" onchange="_updatePrice('${p.id}')">
           <option value="">None</option>
         </select>
       </div>
@@ -626,6 +639,9 @@ function _productHtml(p) {
           </div>
         </div>
         ${addonHtml}
+        <div class="sku-price-row hidden" id="spricerow_${p.id}">
+          Unit price: <span class="sku-price-val" id="sprice_${p.id}"></span>
+        </div>
         <div class="sel-row hidden" id="sqrow_${p.id}" style="margin-top:8px">
           <div class="sel-field sel-qty">
             <label>Qty</label>
@@ -739,6 +755,7 @@ function onSelColor(parentId) {
   szField.classList.add('hidden');
   _resetFeature(parentId);
   document.getElementById('sqrow_' + parentId).classList.add('hidden');
+  document.getElementById('spricerow_' + parentId).classList.add('hidden');
   document.getElementById('sb_' + parentId).disabled = true;
 
   if (!colorId) return;
@@ -785,6 +802,7 @@ function onSelSize(parentId) {
 
   _resetFeature(parentId);
   document.getElementById('sqrow_' + parentId).classList.add('hidden');
+  document.getElementById('spricerow_' + parentId).classList.add('hidden');
   document.getElementById('sb_' + parentId).disabled = true;
   if (sizeId) populateFeatures(parentId);
 }
@@ -822,6 +840,7 @@ function populateFeatures(parentId) {
     populateAddons(parentId, colorId, sizeId);
     document.getElementById('sqrow_' + parentId).classList.remove('hidden');
     document.getElementById('sb_' + parentId).disabled = false;
+    _updatePrice(parentId);
     return;
   }
 
@@ -841,6 +860,32 @@ function populateFeatures(parentId) {
 function onSelFeature(parentId) {
   const featId = document.getElementById('sfeat_' + parentId)?.value || '';
   document.getElementById('sb_' + parentId).disabled = !featId;
+  _updatePrice(parentId);
+}
+
+function _updatePrice(parentId) {
+  const colorId      = document.getElementById('sc_' + parentId).value;
+  const sizeId       = document.getElementById('ss_' + parentId).value;
+  const featureVarId = document.getElementById('sfeat_' + parentId)?.value || '';
+  const addonId      = document.getElementById('sadon_' + parentId)?.value || '';
+
+  const sku = catalog.skus.find(s =>
+    s.parentId === parentId && s.colorId === colorId && s.sizeId === sizeId &&
+    (featureVarId ? s.featureVarId === featureVarId : true) &&
+    s.addonId === addonId
+  ) || catalog.skus.find(s =>
+    s.parentId === parentId && s.colorId === colorId && s.sizeId === sizeId &&
+    (featureVarId ? s.featureVarId === featureVarId : true)
+  ) || catalog.skus.find(s =>
+    s.parentId === parentId && s.colorId === colorId && s.sizeId === sizeId
+  );
+
+  const priceEl    = document.getElementById('sprice_' + parentId);
+  const priceRow   = document.getElementById('spricerow_' + parentId);
+  if (priceEl && priceRow && sku) {
+    priceEl.textContent = '$' + sku.price.toFixed(2);
+    priceRow.classList.remove('hidden');
+  }
 }
 
 function populateAddons(parentId, colorId, sizeId) {
@@ -915,6 +960,7 @@ function addCatalogItem(parentId) {
   document.getElementById('szfield_' + parentId).classList.add('hidden');
   document.getElementById('sq_' + parentId).value = 1;
   document.getElementById('sqrow_' + parentId).classList.add('hidden');
+  document.getElementById('spricerow_' + parentId).classList.add('hidden');
   document.getElementById('sb_' + parentId).disabled = true;
   document.getElementById('snote_' + parentId).value = '';
   document.getElementById('sn_' + parentId).classList.add('hidden');
