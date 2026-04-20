@@ -754,16 +754,15 @@ function onSelColor(parentId) {
     return a[1].localeCompare(b[1]);
   });
 
-  szField.classList.remove('hidden');
-
-  // One size (0 or 1 options) — show "One Size" label and move on
+  // One size (0 or 1 options) — skip size entirely, move on
   if (sizes.length <= 1) {
-    sizeSel.classList.add('hidden');
-    sizeLabel.classList.remove('hidden');
+    szField.classList.add('hidden');
     if (sizes.length === 1) sizeSel.value = sizes[0][0];
     populateFeatures(parentId);
     return;
   }
+
+  szField.classList.remove('hidden');
 
   // Multiple sizes — show dropdown, wait for selection
   for (const [id, name] of sizes) {
