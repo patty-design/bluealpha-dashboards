@@ -609,9 +609,9 @@ function _productHtml(p) {
               <option value="">Select a color…</option>
             </select>
           </div>
-          <div class="sel-field">
+          <div class="sel-field hidden" id="szfield_${p.id}">
             <label>Size</label>
-            <select id="ss_${p.id}" disabled onchange="onSelSize('${p.id}')">
+            <select id="ss_${p.id}" onchange="onSelSize('${p.id}')">
               <option value="">Select a size…</option>
             </select>
             <div id="sl_${p.id}" class="one-size-label hidden">One Size</div>
@@ -626,7 +626,7 @@ function _productHtml(p) {
           </div>
         </div>
         ${addonHtml}
-        <div class="sel-row" style="margin-top:8px">
+        <div class="sel-row hidden" id="sqrow_${p.id}" style="margin-top:8px">
           <div class="sel-field sel-qty">
             <label>Qty</label>
             <input type="number" id="sq_${p.id}" min="1" value="1" style="text-align:center">
@@ -730,11 +730,15 @@ function onSelColor(parentId) {
   const colorId   = document.getElementById('sc_' + parentId).value;
   const sizeSel   = document.getElementById('ss_' + parentId);
   const sizeLabel = document.getElementById('sl_' + parentId);
+  const szField   = document.getElementById('szfield_' + parentId);
+
+  // Reset everything below color
   sizeSel.innerHTML = '<option value="">Select a size…</option>';
-  sizeSel.disabled = true;
   sizeSel.classList.remove('hidden');
   sizeLabel.classList.add('hidden');
+  szField.classList.add('hidden');
   _resetFeature(parentId);
+  document.getElementById('sqrow_' + parentId).classList.add('hidden');
   document.getElementById('sb_' + parentId).disabled = true;
 
   if (!colorId) return;
@@ -750,7 +754,9 @@ function onSelColor(parentId) {
     return a[1].localeCompare(b[1]);
   });
 
-  // One size (0 or 1 options) — show label, skip dropdown, then check features
+  szField.classList.remove('hidden');
+
+  // One size (0 or 1 options) — show "One Size" label and move on
   if (sizes.length <= 1) {
     sizeSel.classList.add('hidden');
     sizeLabel.classList.remove('hidden');
@@ -759,13 +765,12 @@ function onSelColor(parentId) {
     return;
   }
 
-  // Multiple sizes — normal dropdown
+  // Multiple sizes — show dropdown, wait for selection
   for (const [id, name] of sizes) {
     const opt = document.createElement('option');
     opt.value = id; opt.textContent = name;
     sizeSel.appendChild(opt);
   }
-  sizeSel.disabled = false;
 }
 
 function onSelSize(parentId) {
@@ -780,6 +785,7 @@ function onSelSize(parentId) {
   if (!isOther) document.getElementById('snote_' + parentId).value = '';
 
   _resetFeature(parentId);
+  document.getElementById('sqrow_' + parentId).classList.add('hidden');
   document.getElementById('sb_' + parentId).disabled = true;
   if (sizeId) populateFeatures(parentId);
 }
@@ -815,6 +821,7 @@ function populateFeatures(parentId) {
     if (featRow) featRow.classList.add('hidden');
     if (featSel && fvars.length === 1) featSel.value = fvars[0][0];
     populateAddons(parentId, colorId, sizeId);
+    document.getElementById('sqrow_' + parentId).classList.remove('hidden');
     document.getElementById('sb_' + parentId).disabled = false;
     return;
   }
@@ -828,6 +835,7 @@ function populateFeatures(parentId) {
   }
   featRow.classList.remove('hidden');
   populateAddons(parentId, colorId, sizeId);
+  document.getElementById('sqrow_' + parentId).classList.remove('hidden');
   document.getElementById('sb_' + parentId).disabled = true;
 }
 
@@ -903,10 +911,11 @@ function addCatalogItem(parentId) {
   // Reset selector state
   document.getElementById('sc_' + parentId).value = '';
   document.getElementById('ss_' + parentId).innerHTML = '<option value="">Select a size…</option>';
-  document.getElementById('ss_' + parentId).disabled = true;
   document.getElementById('ss_' + parentId).classList.remove('hidden');
   document.getElementById('sl_' + parentId).classList.add('hidden');
+  document.getElementById('szfield_' + parentId).classList.add('hidden');
   document.getElementById('sq_' + parentId).value = 1;
+  document.getElementById('sqrow_' + parentId).classList.add('hidden');
   document.getElementById('sb_' + parentId).disabled = true;
   document.getElementById('snote_' + parentId).value = '';
   document.getElementById('sn_' + parentId).classList.add('hidden');
