@@ -2111,6 +2111,11 @@ def _build_catalog():
         color_name = color_map.get(color_id, "")
         size_name  = size_map.get(size_id, "")
 
+        # Skip excluded colors for specific parents
+        excluded_colors = _EXCLUDED_COLORS_BY_PARENT.get(parent_name.lower(), set())
+        if color_name.lower() in excluded_colors:
+            continue
+
         raw_name   = f.get("Name + Variations", "")
         clean_name = _clean_product_name(raw_name)
         category   = f.get("Category", "") or ""
@@ -2178,6 +2183,11 @@ _EXCLUDED_PARENTS = {
     "hat", "hoodie", "t-shirt",
     "sentry strap - ba",
     "fanny pack",
+}
+
+# Colors to exclude per parent (lowercase parent name → set of lowercase color names)
+_EXCLUDED_COLORS_BY_PARENT = {
+    "radio pouch": {"wolf gray"},
 }
 
 @app.route("/api/admin/refresh-catalog", methods=["POST"])
