@@ -193,6 +193,9 @@
     .btn-add-inline:disabled { opacity: 0.4; cursor: not-allowed; }
     .catalog-loading { padding: 20px; text-align: center; color: var(--muted); font-size: 0.9rem; }
     .catalog-section-wrap { margin-bottom: 24px; }
+    .size-note-row { margin-top: 10px; }
+    .size-note-row input { font-size: 0.92rem; }
+    .item-note { font-size: 0.82rem; color: var(--muted); margin-top: 3px; font-style: italic; }
 
     /* ── Items list ── */
     .items-empty {
@@ -632,6 +635,12 @@ function buildCatalogUI() {
                 <button class="btn-add-inline" id="sb_${p.id}" disabled
                         onclick="addCatalogItem('${p.id}')">Add to Quote</button>
               </div>
+              <div class="size-note-row hidden" id="sn_${p.id}">
+                <div class="sel-field">
+                  <label>Pant Size / Inseam <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">(e.g. 32×34)</span></label>
+                  <input type="text" id="snote_${p.id}" placeholder="e.g. 32×34" maxlength="80">
+                </div>
+              </div>
             </div>
           </div>
         `).join('')}
@@ -719,8 +728,16 @@ function onSelColor(parentId) {
 }
 
 function onSelSize(parentId) {
-  const sizeId = document.getElementById('ss_' + parentId).value;
+  const sizeSel = document.getElementById('ss_' + parentId);
+  const sizeId  = sizeSel.value;
   document.getElementById('sb_' + parentId).disabled = !sizeId;
+
+  // Show size note field when "other" is selected
+  const noteRow  = document.getElementById('sn_' + parentId);
+  const sizeName = sizeId ? sizeSel.options[sizeSel.selectedIndex].text : '';
+  const isOther  = sizeName.toLowerCase().includes('other');
+  noteRow.classList.toggle('hidden', !isOther);
+  if (!isOther) document.getElementById('snote_' + parentId).value = '';
 }
 
 // ─── Add item ────────────────────────────────────────────────────────────────
@@ -736,7 +753,8 @@ function addCatalogItem(parentId) {
   );
   if (!sku) return;
 
-  items.push({ skuRecordId: sku.recordId, name: sku.name, qty, unitPrice: sku.price });
+  const sizeNote = (document.getElementById('snote_' + parentId)?.value || '').trim();
+  items.push({ skuRecordId: sku.recordId, name: sku.name, qty, unitPrice: sku.price, sizeNote });
   renderItems();
 
   // Reset this selector and close it
@@ -745,6 +763,8 @@ function addCatalogItem(parentId) {
   document.getElementById('ss_' + parentId).disabled = true;
   document.getElementById('sq_' + parentId).value = 1;
   document.getElementById('sb_' + parentId).disabled = true;
+  document.getElementById('snote_' + parentId).value = '';
+  document.getElementById('sn_' + parentId).classList.add('hidden');
   // Close the panel
   const selector = document.getElementById('ps_' + parentId);
   const row = selector.previousElementSibling;
@@ -779,7 +799,7 @@ function renderItems() {
     const row = document.createElement('div');
     row.className = 'item-row';
     row.innerHTML = `
-      <div class="item-name">${escHtml(item.name)}</div>
+      <div class="item-name">${escHtml(item.name)}${item.sizeNote ? `<div class="item-note">📏 ${escHtml(item.sizeNote)}</div>` : ''}</div>
       <input type="number" class="item-qty-input" min="1" value="${item.qty}"
              data-idx="${i}" onchange="updateQty(this)">
       <div class="item-price">$${item.unitPrice.toFixed(2)}</div>
@@ -881,8 +901,10 @@ async function submitQuote() {
     notes:       document.getElementById('f_notes').value.trim(),
     items:       items.map(it => ({
       skuRecordId: it.skuRecordId,
+      name:        it.name,
       qty:         it.qty,
       unitPrice:   it.unitPrice,
+      sizeNote:    it.sizeNote || '',
     })),
   };
 

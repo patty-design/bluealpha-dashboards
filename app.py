@@ -2226,6 +2226,17 @@ def create_quote():
         expiry_str  = expiry_date.isoformat()
 
         # 3. Create Manual Order
+        # Collect per-item size notes and append to order notes
+        item_size_notes = []
+        for it in items:
+            sn = (it.get("sizeNote") or "").strip()
+            if sn:
+                item_name = (it.get("name") or f"Item {items.index(it)+1}").strip()
+                item_size_notes.append(f"  - {item_name}: {sn}")
+        if item_size_notes:
+            size_note_block = "Size/fit specs:\n" + "\n".join(item_size_notes)
+            notes = (notes + "\n\n" + size_note_block).strip() if notes else size_note_block
+
         mo_body = {
             "fields": {
                 "Order Type":    "Quote",
