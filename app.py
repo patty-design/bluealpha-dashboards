@@ -2056,8 +2056,105 @@ def _fetch_quote_data(record_id):
     }
 
 
-_CATALOG_CACHE = {"data": None, "ts": 0}
-_CATALOG_TTL   = 600  # 10 minutes
+_CATALOG_CACHE      = {"data": None, "ts": 0}
+_CATALOG_TTL        = 1800  # 30 minutes
+_CATALOG_REFRESHING = False  # prevent duplicate background refreshes
+
+
+def _build_catalog():
+    """Fetch and assemble the quote catalog. Fetches all 4 tables in parallel."""
+    import concurrent.futures
+    token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+        fut_skus    = ex.submit(at_get_all, "tbljngm75r4Km2XIN", token,
+                                fields=["SKU ID", "Name + Variations", "Sale Price",
+                                        "Parent Product", "Color", "Size", "Category"],
+                                formula="{Sale Price}")
+        fut_parents = ex.submit(at_get_all, PARENT_PRODUCTS_TABLE_ID, token, fields=["Name"])
+        fut_colors  = ex.submit(at_get_all, COLORS_TABLE_ID,           token, fields=["Name"])
+        fut_sizes   = ex.submit(at_get_all, SIZES_TABLE_ID,            token, fields=["Name"])
+
+        sku_records_all = fut_skus.result()
+        parent_records  = fut_parents.result()
+        color_records   = fut_colors.result()
+        size_records    = fut_sizes.result()
+
+    sku_records = [
+        r for r in sku_records_all
+        if r.get("fields", {}).get("Sale Price")
+        and r.get("fields", {}).get("Category", "") != "Contract"
+    ]
+
+    parent_map = {r["id"]: r["fields"].get("Name", "") for r in parent_records}
+    color_map  = {r["id"]: r["fields"].get("Name", "") for r in color_records}
+    size_map   = {r["id"]: r["fields"].get("Name", "") for r in size_records}
+
+    skus = []
+    seen_parents = {}
+    for r in sku_records:
+        f = r["fields"]
+        parent_ids = f.get("Parent Product", [])
+        if not parent_ids:
+            continue
+        parent_id   = parent_ids[0]
+        parent_name = _clean_product_name(parent_map.get(parent_id, ""))
+        if not parent_name:
+            continue
+        if parent_name.lower() in _EXCLUDED_PARENTS:
+            continue
+
+        color_ids  = f.get("Color", [])
+        size_ids   = f.get("Size", [])
+        color_id   = color_ids[0] if color_ids else ""
+        size_id    = size_ids[0]  if size_ids  else ""
+        color_name = color_map.get(color_id, "")
+        size_name  = size_map.get(size_id, "")
+
+        raw_name   = f.get("Name + Variations", "")
+        clean_name = _clean_product_name(raw_name)
+        category   = f.get("Category", "") or ""
+
+        skus.append({
+            "recordId":   r["id"],
+            "sku":        f.get("SKU ID", ""),
+            "name":       clean_name,
+            "price":      f.get("Sale Price", 0),
+            "parentId":   parent_id,
+            "parentName": parent_name,
+            "colorId":    color_id,
+            "colorName":  color_name,
+            "sizeId":     size_id,
+            "sizeName":   size_name,
+            "category":   category,
+        })
+        if parent_id not in seen_parents:
+            seen_parents[parent_id] = {"name": parent_name, "category": category}
+
+    parents = sorted(
+        [{"id": k, "name": v["name"], "category": v["category"]} for k, v in seen_parents.items()],
+        key=lambda x: x["name"],
+    )
+    return {"parents": parents, "skus": skus}
+
+
+def _refresh_catalog_bg():
+    """Build catalog in background and update cache. Clears refreshing flag when done."""
+    global _CATALOG_REFRESHING
+    import time as _time
+    try:
+        result = _build_catalog()
+        _CATALOG_CACHE["data"] = result
+        _CATALOG_CACHE["ts"]   = _time.time()
+        print("[catalog] background refresh complete")
+    except Exception as e:
+        print(f"[catalog] background refresh failed: {e}")
+    finally:
+        _CATALOG_REFRESHING = False
+
+
+# Warm cache on startup so the first visitor never waits
+threading.Thread(target=_refresh_catalog_bg, daemon=True).start()
 _EXCLUDED_PARENTS = {
     # WPS / NeoMag products
     "wps lp inner", "wps low profile", "wps 1.75\" cobra", "wps 1.75\" d-ring",
@@ -2084,78 +2181,24 @@ def quote_catalog():
     if request.method == "OPTIONS":
         return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "GET"})
     c = cors()
+    global _CATALOG_REFRESHING
     import time as _time
-    if _CATALOG_CACHE["data"] and (_time.time() - _CATALOG_CACHE["ts"]) < _CATALOG_TTL:
+    now = _time.time()
+
+    # Fresh cache — serve immediately
+    if _CATALOG_CACHE["data"] and (now - _CATALOG_CACHE["ts"]) < _CATALOG_TTL:
         return Response(json.dumps(_CATALOG_CACHE["data"]), headers=c, mimetype="application/json")
-    # Use full-access token for catalog reads; write token is scoped only to Returns table
-    token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+
+    # Stale cache — serve instantly and kick off a background refresh
+    if _CATALOG_CACHE["data"]:
+        if not _CATALOG_REFRESHING:
+            _CATALOG_REFRESHING = True
+            threading.Thread(target=_refresh_catalog_bg, daemon=True).start()
+        return Response(json.dumps(_CATALOG_CACHE["data"]), headers=c, mimetype="application/json")
+
+    # No cache at all (startup warming should cover this, but handle it gracefully)
     try:
-        # Fetch SKUs with a sale price ({Sale Price} = truthy check, no BLANK() syntax)
-        sku_records_all = at_get_all(
-            "tbljngm75r4Km2XIN", token,
-            fields=["SKU ID", "Name + Variations", "Sale Price", "Parent Product", "Color", "Size", "Category"],
-            formula="{Sale Price}",
-        )
-        # Keep only SKUs with a Sale Price and not in Contract category
-        sku_records = [
-            r for r in sku_records_all
-            if r.get("fields", {}).get("Sale Price")
-            and r.get("fields", {}).get("Category", "") != "Contract"
-        ]
-        parent_records = at_get_all(PARENT_PRODUCTS_TABLE_ID, token, fields=["Name"])
-        color_records  = at_get_all(COLORS_TABLE_ID, token, fields=["Name"])
-        size_records   = at_get_all(SIZES_TABLE_ID, token, fields=["Name"])
-
-        parent_map = {r["id"]: r["fields"].get("Name", "") for r in parent_records}
-        color_map  = {r["id"]: r["fields"].get("Name", "") for r in color_records}
-        size_map   = {r["id"]: r["fields"].get("Name", "") for r in size_records}
-
-        skus = []
-        seen_parents = {}
-        for r in sku_records:
-            f = r["fields"]
-            parent_ids = f.get("Parent Product", [])
-            if not parent_ids:
-                continue
-            parent_id   = parent_ids[0]
-            parent_name = _clean_product_name(parent_map.get(parent_id, ""))
-            if not parent_name:
-                continue
-            if parent_name.lower() in _EXCLUDED_PARENTS:
-                continue
-
-            color_ids  = f.get("Color", [])
-            size_ids   = f.get("Size", [])
-            color_id   = color_ids[0] if color_ids else ""
-            size_id    = size_ids[0]  if size_ids  else ""
-            color_name = color_map.get(color_id, "")
-            size_name  = size_map.get(size_id, "")
-
-            raw_name = f.get("Name + Variations", "")
-            clean_name = _clean_product_name(raw_name)
-
-            category = f.get("Category", "") or ""
-            skus.append({
-                "recordId":   r["id"],
-                "sku":        f.get("SKU ID", ""),
-                "name":       clean_name,
-                "price":      f.get("Sale Price", 0),
-                "parentId":   parent_id,
-                "parentName": parent_name,
-                "colorId":    color_id,
-                "colorName":  color_name,
-                "sizeId":     size_id,
-                "sizeName":   size_name,
-                "category":   category,
-            })
-            if parent_id not in seen_parents:
-                seen_parents[parent_id] = {"name": parent_name, "category": category}
-
-        parents = sorted(
-            [{"id": k, "name": v["name"], "category": v["category"]} for k, v in seen_parents.items()],
-            key=lambda x: x["name"],
-        )
-        result = {"parents": parents, "skus": skus}
+        result = _build_catalog()
         _CATALOG_CACHE["data"] = result
         _CATALOG_CACHE["ts"]   = _time.time()
         return Response(json.dumps(result), headers=c, mimetype="application/json")
