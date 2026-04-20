@@ -2075,6 +2075,8 @@ _EXCLUDED_PARENTS = {
     # Test / placeholder
     "test parent", "test3", "new parent", "second test parent",
     "see manager", "anklemdkt",
+    # Specific exclusions
+    "1.75\" standard belt - both buckles",
 }
 
 @app.route("/api/quote-catalog", methods=["GET", "OPTIONS"])
