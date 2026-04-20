@@ -2177,6 +2177,7 @@ _EXCLUDED_PARENTS = {
     "misc.",
     "hat", "hoodie", "t-shirt",
     "sentry strap - ba",
+    "fanny pack",
 }
 
 @app.route("/api/admin/refresh-catalog", methods=["POST"])
