@@ -2059,9 +2059,22 @@ def _fetch_quote_data(record_id):
 _CATALOG_CACHE = {"data": None, "ts": 0}
 _CATALOG_TTL   = 600  # 10 minutes
 _EXCLUDED_PARENTS = {
+    # WPS / NeoMag products
     "wps lp inner", "wps low profile", "wps 1.75\" cobra", "wps 1.75\" d-ring",
+    "belt lanyardwps", "sentry strapwps",
+    "sentry strapneomag", "sentry strapneomag ",
+    "sentry strap extensionneomag",
+    "beltless backer pad - neomag", "beltless backer tegris - neomag",
+    "tray insert - neomag",
+    # Internal / components
     "dog collar", "dog leash", "gps pouch", "belt resize service",
-    "service", "stock sock", "test parent", "test3",
+    "service", "stock sock",
+    "buckle", "shock cord", "scrim", "fife loop", "overlap inner",
+    "med components", "med pouch handles", "packy sack parts",
+    "combo packets", "sandwich bags",
+    # Test / placeholder
+    "test parent", "test3", "new parent", "second test parent",
+    "see manager", "anklemdkt",
 }
 
 @app.route("/api/quote-catalog", methods=["GET", "OPTIONS"])
