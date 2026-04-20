@@ -2174,6 +2174,7 @@ _EXCLUDED_PARENTS = {
     "see manager", "anklemdkt",
     # Specific exclusions
     "1.75\" standard belt - both buckles",
+    "misc.",
 }
 
 @app.route("/api/admin/refresh-catalog", methods=["POST"])
