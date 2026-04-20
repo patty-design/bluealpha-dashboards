@@ -2176,6 +2176,7 @@ _EXCLUDED_PARENTS = {
     "1.75\" standard belt - both buckles",
     "misc.",
     "hat", "hoodie", "t-shirt",
+    "sentry strap - ba",
 }
 
 @app.route("/api/admin/refresh-catalog", methods=["POST"])
