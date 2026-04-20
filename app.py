@@ -2169,6 +2169,10 @@ def _build_catalog():
         if fvar_name.lower() in ("none", ""):
             fvar_id = ""; fvar_name = ""
 
+        addon_ids_sku = f.get("Add-ons", [])
+        addon_id_sku  = addon_ids_sku[0] if addon_ids_sku else ""
+        addon_name_sku = addon_name_map.get(addon_id_sku, "") if addon_id_sku else ""
+
         raw_name   = f.get("Name + Variations", "")
         clean_name = _clean_product_name(raw_name)
         category   = f.get("Category", "") or ""
@@ -2186,6 +2190,8 @@ def _build_catalog():
             "sizeName":       size_name,
             "featureVarId":   fvar_id,
             "featureVarName": fvar_name,
+            "addonId":        addon_id_sku,
+            "addonName":      addon_name_sku,
             "category":       category,
         })
         if parent_id not in seen_parents:

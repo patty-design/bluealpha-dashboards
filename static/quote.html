@@ -586,17 +586,14 @@ let activeParent = null;   // currently-expanded parent product id
 
 // ─── Build accordion UI ───────────────────────────────────────────────────────
 function _productHtml(p) {
-  const addonHtml = (p.addons && p.addons.length > 0)
-    ? `<div class="sel-row" id="sarow_${p.id}">
-        <div class="sel-field" style="flex:1 1 100%">
-          <label>Add-on <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0;">(optional)</span></label>
-          <select id="sadon_${p.id}">
-            <option value="">None</option>
-            ${p.addons.map(a => `<option value="${a.id}">${escHtml(a.name)}</option>`).join('')}
-          </select>
-        </div>
-      </div>`
-    : '';
+  const addonHtml = `<div class="sel-row hidden" id="sarow_${p.id}">
+      <div class="sel-field" style="flex:1 1 100%">
+        <label>Add-on <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0;">(optional)</span></label>
+        <select id="sadon_${p.id}">
+          <option value="">None</option>
+        </select>
+      </div>
+    </div>`;
 
   return `
     <div class="product-item" id="pi_${p.id}">
@@ -789,10 +786,14 @@ function onSelSize(parentId) {
 
 // ─── Feature variation helpers ────────────────────────────────────────────────
 function _resetFeature(parentId) {
-  const featRow = document.getElementById('sfrow_' + parentId);
-  const featSel = document.getElementById('sfeat_' + parentId);
-  if (featRow) featRow.classList.add('hidden');
-  if (featSel) { featSel.innerHTML = '<option value="">Select a style…</option>'; featSel.value = ''; }
+  const featRow  = document.getElementById('sfrow_' + parentId);
+  const featSel  = document.getElementById('sfeat_' + parentId);
+  const addonRow = document.getElementById('sarow_' + parentId);
+  const addonSel = document.getElementById('sadon_' + parentId);
+  if (featRow)  featRow.classList.add('hidden');
+  if (featSel)  { featSel.innerHTML = '<option value="">Select a style…</option>'; featSel.value = ''; }
+  if (addonRow) addonRow.classList.add('hidden');
+  if (addonSel) { addonSel.innerHTML = '<option value="">None</option>'; addonSel.value = ''; }
 }
 
 function populateFeatures(parentId) {
@@ -811,9 +812,9 @@ function populateFeatures(parentId) {
   const fvars = Object.entries(fvarMap).sort((a,b) => a[1].localeCompare(b[1]));
 
   if (!featRow || fvars.length <= 1) {
-    // Hide selector — auto-select the one variant if it exists
     if (featRow) featRow.classList.add('hidden');
     if (featSel && fvars.length === 1) featSel.value = fvars[0][0];
+    populateAddons(parentId, colorId, sizeId);
     document.getElementById('sb_' + parentId).disabled = false;
     return;
   }
@@ -826,12 +827,45 @@ function populateFeatures(parentId) {
     featSel.appendChild(opt);
   }
   featRow.classList.remove('hidden');
+  populateAddons(parentId, colorId, sizeId);
   document.getElementById('sb_' + parentId).disabled = true;
 }
 
 function onSelFeature(parentId) {
   const featId = document.getElementById('sfeat_' + parentId)?.value || '';
   document.getElementById('sb_' + parentId).disabled = !featId;
+}
+
+function populateAddons(parentId, colorId, sizeId) {
+  const addonRow = document.getElementById('sarow_' + parentId);
+  const addonSel = document.getElementById('sadon_' + parentId);
+  if (!addonRow || !addonSel) return;
+
+  const addonMap = {};
+  let hasBase = false;
+  for (const sku of catalog.skus) {
+    if (sku.parentId === parentId && sku.colorId === colorId && sku.sizeId === sizeId) {
+      if (sku.addonId && sku.addonName) addonMap[sku.addonId] = sku.addonName;
+      else hasBase = true;
+    }
+  }
+
+  const addons = Object.entries(addonMap).sort((a,b) => a[1].localeCompare(b[1]));
+  if (addons.length === 0) { addonRow.classList.add('hidden'); return; }
+
+  addonSel.innerHTML = '';
+  if (hasBase) {
+    const opt = document.createElement('option');
+    opt.value = ''; opt.textContent = 'None';
+    addonSel.appendChild(opt);
+  }
+  for (const [id, name] of addons) {
+    const opt = document.createElement('option');
+    opt.value = id; opt.textContent = name;
+    addonSel.appendChild(opt);
+  }
+  if (!hasBase) addonSel.value = addons[0][0]; // default to first if no base SKU
+  addonRow.classList.remove('hidden');
 }
 
 // ─── Add item ────────────────────────────────────────────────────────────────
@@ -843,8 +877,15 @@ function addCatalogItem(parentId) {
 
   if (!colorId) return;
 
-  // Find SKU: match parent + color + size + feature (with fallbacks)
+  const addonSel = document.getElementById('sadon_' + parentId);
+  const addonId  = addonSel ? addonSel.value : '';
+
+  // Find SKU: match parent + color + size + feature variation + add-on (with fallbacks)
   const sku = catalog.skus.find(s =>
+    s.parentId === parentId && s.colorId === colorId && s.sizeId === sizeId &&
+    (featureVarId ? s.featureVarId === featureVarId : true) &&
+    s.addonId === addonId
+  ) || catalog.skus.find(s =>
     s.parentId === parentId && s.colorId === colorId && s.sizeId === sizeId &&
     (featureVarId ? s.featureVarId === featureVarId : true)
   ) || catalog.skus.find(s =>
@@ -856,23 +897,6 @@ function addCatalogItem(parentId) {
 
   const sizeNote = (document.getElementById('snote_' + parentId)?.value || '').trim();
   items.push({ skuRecordId: sku.recordId, name: sku.name, qty, unitPrice: sku.price, sizeNote });
-
-  // Add-on: find matching SKU by color, fallback to first available
-  const addonSel = document.getElementById('sadon_' + parentId);
-  const addonId  = addonSel ? addonSel.value : '';
-  if (addonId && catalog.addonSkus && catalog.addonSkus[addonId]) {
-    const byColor    = catalog.addonSkus[addonId];
-    const addonEntry = byColor[colorId] || Object.values(byColor)[0];
-    if (addonEntry) {
-      items.push({
-        skuRecordId: addonEntry.recordId,
-        name:        addonEntry.name,
-        qty,
-        unitPrice:   addonEntry.price,
-        sizeNote:    '',
-      });
-    }
-  }
 
   renderItems();
 
@@ -886,8 +910,7 @@ function addCatalogItem(parentId) {
   document.getElementById('sb_' + parentId).disabled = true;
   document.getElementById('snote_' + parentId).value = '';
   document.getElementById('sn_' + parentId).classList.add('hidden');
-  _resetFeature(parentId);
-  if (addonSel) addonSel.value = '';
+  _resetFeature(parentId); // handles feature row + addon row reset
 
   // Close the panel
   const selector = document.getElementById('ps_' + parentId);
