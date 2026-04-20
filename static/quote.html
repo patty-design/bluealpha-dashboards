@@ -196,6 +196,15 @@
     .size-note-row { margin-top: 10px; }
     .size-note-row input { font-size: 0.92rem; }
     .item-note { font-size: 0.82rem; color: var(--muted); margin-top: 3px; font-style: italic; }
+    .one-size-label {
+      padding: 11px 14px;
+      font-size: 0.92rem;
+      color: var(--muted);
+      font-style: italic;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #f0f2f5;
+    }
 
     /* ── Items list ── */
     .items-empty {
@@ -627,6 +636,7 @@ function buildCatalogUI() {
                   <select id="ss_${p.id}" disabled onchange="onSelSize('${p.id}')">
                     <option value="">Select a size…</option>
                   </select>
+                  <div id="sl_${p.id}" class="one-size-label hidden">One Size</div>
                 </div>
                 <div class="sel-field sel-qty">
                   <label>Qty</label>
@@ -696,10 +706,13 @@ function toggleProduct(parentId, rowEl) {
 }
 
 function onSelColor(parentId) {
-  const colorId = document.getElementById('sc_' + parentId).value;
-  const sizeSel = document.getElementById('ss_' + parentId);
+  const colorId   = document.getElementById('sc_' + parentId).value;
+  const sizeSel   = document.getElementById('ss_' + parentId);
+  const sizeLabel = document.getElementById('sl_' + parentId);
   sizeSel.innerHTML = '<option value="">Select a size…</option>';
   sizeSel.disabled = true;
+  sizeSel.classList.remove('hidden');
+  sizeLabel.classList.add('hidden');
   document.getElementById('sb_' + parentId).disabled = true;
 
   if (!colorId) return;
@@ -714,17 +727,23 @@ function onSelColor(parentId) {
     if (!isNaN(na) && !isNaN(nb)) return na - nb;
     return a[1].localeCompare(b[1]);
   });
+
+  // One size (0 options or exactly 1) — show label, skip dropdown
+  if (sizes.length <= 1) {
+    sizeSel.classList.add('hidden');
+    sizeLabel.classList.remove('hidden');
+    if (sizes.length === 1) sizeSel.value = sizes[0][0]; // keep value for SKU lookup
+    document.getElementById('sb_' + parentId).disabled = false;
+    return;
+  }
+
+  // Multiple sizes — normal dropdown
   for (const [id, name] of sizes) {
     const opt = document.createElement('option');
     opt.value = id; opt.textContent = name;
     sizeSel.appendChild(opt);
   }
   sizeSel.disabled = false;
-  // Auto-select if only one size
-  if (sizes.length === 1) {
-    sizeSel.value = sizes[0][0];
-    onSelSize(parentId);
-  }
 }
 
 function onSelSize(parentId) {
@@ -750,6 +769,8 @@ function addCatalogItem(parentId) {
 
   const sku = catalog.skus.find(s =>
     s.parentId === parentId && s.colorId === colorId && s.sizeId === sizeId
+  ) || catalog.skus.find(s =>
+    s.parentId === parentId && s.colorId === colorId
   );
   if (!sku) return;
 
@@ -765,6 +786,8 @@ function addCatalogItem(parentId) {
   document.getElementById('sb_' + parentId).disabled = true;
   document.getElementById('snote_' + parentId).value = '';
   document.getElementById('sn_' + parentId).classList.add('hidden');
+  document.getElementById('sl_' + parentId).classList.add('hidden');
+  document.getElementById('ss_' + parentId).classList.remove('hidden');
   // Close the panel
   const selector = document.getElementById('ps_' + parentId);
   const row = selector.previousElementSibling;
