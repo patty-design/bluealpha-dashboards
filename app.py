@@ -33,9 +33,11 @@ CS_ADMIN_PASSWORD    = os.environ.get("CS_ADMIN_PASSWORD", "")
 MANUAL_ORDERS_TABLE_ID   = "tblOOZ2wVzIsR1DyL"
 MO_LINE_ITEMS_TABLE_ID   = "tblNjwm5SRsfE38Xu"
 CUSTOMERS_TABLE_ID       = "tblO4AdJE84kFDfEe"
-PARENT_PRODUCTS_TABLE_ID = "tbl40th76YvjdQExS"
-COLORS_TABLE_ID          = "tblN08IV26TpRYSMf"
-SIZES_TABLE_ID           = "tblUGwl1YLaVGCeIJ"
+PARENT_PRODUCTS_TABLE_ID    = "tbl40th76YvjdQExS"
+COLORS_TABLE_ID             = "tblN08IV26TpRYSMf"
+SIZES_TABLE_ID              = "tblUGwl1YLaVGCeIJ"
+FEATURE_VARIATIONS_TABLE_ID = "tblwbWDNFSjJSV9hh"
+ADDONS_TABLE_ID             = "tblW8N35cbaXQDuQv"
 QUOTE_BASE_URL           = os.environ.get("QUOTE_BASE_URL", "https://quote.bluealphabelts.com")
 
 app = Flask(__name__, static_folder="static")
@@ -2062,23 +2064,29 @@ _CATALOG_REFRESHING = False  # prevent duplicate background refreshes
 
 
 def _build_catalog():
-    """Fetch and assemble the quote catalog. Fetches all 4 tables in parallel."""
+    """Fetch and assemble the quote catalog. Fetches all tables in parallel."""
     import concurrent.futures
     token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
-        fut_skus    = ex.submit(at_get_all, "tbljngm75r4Km2XIN", token,
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
+        fut_skus    = ex.submit(at_get_all, PRODUCT_SKUS_TABLE_ID, token,
                                 fields=["SKU ID", "Name + Variations", "Sale Price",
-                                        "Parent Product", "Color", "Size", "Category"],
+                                        "Parent Product", "Color", "Size", "Category",
+                                        "Feature Variation", "Add-ons"],
                                 formula="{Sale Price}")
-        fut_parents = ex.submit(at_get_all, PARENT_PRODUCTS_TABLE_ID, token, fields=["Name"])
-        fut_colors  = ex.submit(at_get_all, COLORS_TABLE_ID,           token, fields=["Name"])
-        fut_sizes   = ex.submit(at_get_all, SIZES_TABLE_ID,            token, fields=["Name"])
+        fut_parents = ex.submit(at_get_all, PARENT_PRODUCTS_TABLE_ID,    token, fields=["Name"])
+        fut_colors  = ex.submit(at_get_all, COLORS_TABLE_ID,             token, fields=["Name"])
+        fut_sizes   = ex.submit(at_get_all, SIZES_TABLE_ID,              token, fields=["Name"])
+        fut_fvars   = ex.submit(at_get_all, FEATURE_VARIATIONS_TABLE_ID, token, fields=["Name"])
+        fut_addons  = ex.submit(at_get_all, ADDONS_TABLE_ID,             token,
+                                fields=["Name", "Parent Products"])
 
         sku_records_all = fut_skus.result()
         parent_records  = fut_parents.result()
         color_records   = fut_colors.result()
         size_records    = fut_sizes.result()
+        fvar_records    = fut_fvars.result()
+        addon_records   = fut_addons.result()
 
     sku_records = [
         r for r in sku_records_all
@@ -2089,6 +2097,46 @@ def _build_catalog():
     parent_map = {r["id"]: r["fields"].get("Name", "") for r in parent_records}
     color_map  = {r["id"]: r["fields"].get("Name", "") for r in color_records}
     size_map   = {r["id"]: r["fields"].get("Name", "") for r in size_records}
+    fvar_map   = {r["id"]: r["fields"].get("Name", "").strip() for r in fvar_records}
+
+    # Build add-on name map and parent → addons list
+    addon_name_map   = {}  # addonId → name
+    addon_parent_map = {}  # parentId → [{id, name}]
+    for r in addon_records:
+        name = r["fields"].get("Name", "").strip()
+        if not name or name.lower() == "none":
+            continue
+        addon_name_map[r["id"]] = name
+        for pid in r["fields"].get("Parent Products", []):
+            addon_parent_map.setdefault(pid, []).append({"id": r["id"], "name": name})
+
+    # Build add-on SKU map: addonId → colorId → {recordId, price, name, sizeId}
+    # Uses pre-filter SKU list so add-on SKUs are found even if their parent is excluded
+    addon_sku_map = {}
+    for r in sku_records_all:
+        f = r["fields"]
+        if not f.get("Sale Price"):
+            continue
+        addon_ids = f.get("Add-ons", [])
+        if not addon_ids:
+            continue
+        color_ids = f.get("Color", [])
+        color_id  = color_ids[0] if color_ids else ""
+        size_ids  = f.get("Size", [])
+        size_id   = size_ids[0] if size_ids else ""
+        price     = f.get("Sale Price", 0)
+        name      = _clean_product_name(f.get("Name + Variations", ""))
+        for aid in addon_ids:
+            if aid not in addon_name_map:
+                continue  # skip "None" and unlisted add-ons
+            addon_sku_map.setdefault(aid, {})
+            if color_id not in addon_sku_map[aid]:  # keep first match per color
+                addon_sku_map[aid][color_id] = {
+                    "recordId": r["id"],
+                    "price":    price,
+                    "name":     name,
+                    "sizeId":   size_id,
+                }
 
     skus = []
     seen_parents = {}
@@ -2111,36 +2159,45 @@ def _build_catalog():
         color_name = color_map.get(color_id, "")
         size_name  = size_map.get(size_id, "")
 
-        # Skip excluded colors for specific parents
         excluded_colors = _EXCLUDED_COLORS_BY_PARENT.get(parent_name.lower(), set())
         if color_name.lower() in excluded_colors:
             continue
+
+        fvar_ids  = f.get("Feature Variation", [])
+        fvar_id   = fvar_ids[0] if fvar_ids else ""
+        fvar_name = fvar_map.get(fvar_id, "").strip() if fvar_id else ""
+        if fvar_name.lower() in ("none", ""):
+            fvar_id = ""; fvar_name = ""
 
         raw_name   = f.get("Name + Variations", "")
         clean_name = _clean_product_name(raw_name)
         category   = f.get("Category", "") or ""
 
         skus.append({
-            "recordId":   r["id"],
-            "sku":        f.get("SKU ID", ""),
-            "name":       clean_name,
-            "price":      f.get("Sale Price", 0),
-            "parentId":   parent_id,
-            "parentName": parent_name,
-            "colorId":    color_id,
-            "colorName":  color_name,
-            "sizeId":     size_id,
-            "sizeName":   size_name,
-            "category":   category,
+            "recordId":       r["id"],
+            "sku":            f.get("SKU ID", ""),
+            "name":           clean_name,
+            "price":          f.get("Sale Price", 0),
+            "parentId":       parent_id,
+            "parentName":     parent_name,
+            "colorId":        color_id,
+            "colorName":      color_name,
+            "sizeId":         size_id,
+            "sizeName":       size_name,
+            "featureVarId":   fvar_id,
+            "featureVarName": fvar_name,
+            "category":       category,
         })
         if parent_id not in seen_parents:
             seen_parents[parent_id] = {"name": parent_name, "category": category}
 
     parents = sorted(
-        [{"id": k, "name": v["name"], "category": v["category"]} for k, v in seen_parents.items()],
+        [{"id": k, "name": v["name"], "category": v["category"],
+          "addons": addon_parent_map.get(k, [])}
+         for k, v in seen_parents.items()],
         key=lambda x: x["name"],
     )
-    return {"parents": parents, "skus": skus}
+    return {"parents": parents, "skus": skus, "addonSkus": addon_sku_map}
 
 
 def _refresh_catalog_bg():

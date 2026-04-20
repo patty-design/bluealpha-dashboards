@@ -585,8 +585,69 @@ let activeParent = null;   // currently-expanded parent product id
 })();
 
 // ─── Build accordion UI ───────────────────────────────────────────────────────
+function _productHtml(p) {
+  const addonHtml = (p.addons && p.addons.length > 0)
+    ? `<div class="sel-row" id="sarow_${p.id}">
+        <div class="sel-field" style="flex:1 1 100%">
+          <label>Add-on <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0;">(optional)</span></label>
+          <select id="sadon_${p.id}">
+            <option value="">None</option>
+            ${p.addons.map(a => `<option value="${a.id}">${escHtml(a.name)}</option>`).join('')}
+          </select>
+        </div>
+      </div>`
+    : '';
+
+  return `
+    <div class="product-item" id="pi_${p.id}">
+      <div class="product-row" onclick="toggleProduct('${p.id}', this)">
+        <span>${escHtml(p.name)}</span>
+        <span class="p-arrow">▶</span>
+      </div>
+      <div class="product-selector" id="ps_${p.id}">
+        <div class="sel-row">
+          <div class="sel-field">
+            <label>Color</label>
+            <select id="sc_${p.id}" onchange="onSelColor('${p.id}')">
+              <option value="">Select a color…</option>
+            </select>
+          </div>
+          <div class="sel-field">
+            <label>Size</label>
+            <select id="ss_${p.id}" disabled onchange="onSelSize('${p.id}')">
+              <option value="">Select a size…</option>
+            </select>
+            <div id="sl_${p.id}" class="one-size-label hidden">One Size</div>
+          </div>
+        </div>
+        <div class="sel-row hidden" id="sfrow_${p.id}">
+          <div class="sel-field" style="flex:1 1 100%">
+            <label>Style / Version</label>
+            <select id="sfeat_${p.id}" onchange="onSelFeature('${p.id}')">
+              <option value="">Select a style…</option>
+            </select>
+          </div>
+        </div>
+        ${addonHtml}
+        <div class="sel-row" style="margin-top:8px">
+          <div class="sel-field sel-qty">
+            <label>Qty</label>
+            <input type="number" id="sq_${p.id}" min="1" value="1" style="text-align:center">
+          </div>
+          <button class="btn-add-inline" id="sb_${p.id}" disabled
+                  onclick="addCatalogItem('${p.id}')">Add to Quote</button>
+        </div>
+        <div class="size-note-row hidden" id="sn_${p.id}">
+          <div class="sel-field">
+            <label>Pant Size / Inseam <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">(e.g. 32×34)</span></label>
+            <input type="text" id="snote_${p.id}" placeholder="e.g. 32×34" maxlength="80">
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
 function buildCatalogUI() {
-  // Group parents by category
   const catOrder = ['EDC Belts','Battle Belts','Duty Belts','Accessories','Apparel','Merch'];
   const catMap   = {};
   for (const p of catalog.parents) {
@@ -595,7 +656,6 @@ function buildCatalogUI() {
     catMap[cat].push(p);
   }
 
-  // Sort categories: known order first, then alpha
   const cats = Object.keys(catMap).sort((a, b) => {
     const ia = catOrder.indexOf(a), ib = catOrder.indexOf(b);
     if (ia !== -1 && ib !== -1) return ia - ib;
@@ -617,43 +677,7 @@ function buildCatalogUI() {
         <span class="cat-arrow">▶</span>
       </div>
       <div class="cat-body">
-        ${parents.map(p => `
-          <div class="product-item" id="pi_${p.id}">
-            <div class="product-row" onclick="toggleProduct('${p.id}', this)">
-              <span>${escHtml(p.name)}</span>
-              <span class="p-arrow">▶</span>
-            </div>
-            <div class="product-selector" id="ps_${p.id}">
-              <div class="sel-row">
-                <div class="sel-field">
-                  <label>Color</label>
-                  <select id="sc_${p.id}" onchange="onSelColor('${p.id}')">
-                    <option value="">Select a color…</option>
-                  </select>
-                </div>
-                <div class="sel-field">
-                  <label>Size</label>
-                  <select id="ss_${p.id}" disabled onchange="onSelSize('${p.id}')">
-                    <option value="">Select a size…</option>
-                  </select>
-                  <div id="sl_${p.id}" class="one-size-label hidden">One Size</div>
-                </div>
-                <div class="sel-field sel-qty">
-                  <label>Qty</label>
-                  <input type="number" id="sq_${p.id}" min="1" value="1" style="text-align:center">
-                </div>
-                <button class="btn-add-inline" id="sb_${p.id}" disabled
-                        onclick="addCatalogItem('${p.id}')">Add to Quote</button>
-              </div>
-              <div class="size-note-row hidden" id="sn_${p.id}">
-                <div class="sel-field">
-                  <label>Pant Size / Inseam <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">(e.g. 32×34)</span></label>
-                  <input type="text" id="snote_${p.id}" placeholder="e.g. 32×34" maxlength="80">
-                </div>
-              </div>
-            </div>
-          </div>
-        `).join('')}
+        ${parents.map(p => _productHtml(p)).join('')}
       </div>
     `;
     wrap.appendChild(section);
@@ -713,6 +737,7 @@ function onSelColor(parentId) {
   sizeSel.disabled = true;
   sizeSel.classList.remove('hidden');
   sizeLabel.classList.add('hidden');
+  _resetFeature(parentId);
   document.getElementById('sb_' + parentId).disabled = true;
 
   if (!colorId) return;
@@ -728,12 +753,12 @@ function onSelColor(parentId) {
     return a[1].localeCompare(b[1]);
   });
 
-  // One size (0 options or exactly 1) — show label, skip dropdown
+  // One size (0 or 1 options) — show label, skip dropdown, then check features
   if (sizes.length <= 1) {
     sizeSel.classList.add('hidden');
     sizeLabel.classList.remove('hidden');
-    if (sizes.length === 1) sizeSel.value = sizes[0][0]; // keep value for SKU lookup
-    document.getElementById('sb_' + parentId).disabled = false;
+    if (sizes.length === 1) sizeSel.value = sizes[0][0];
+    populateFeatures(parentId);
     return;
   }
 
@@ -747,27 +772,82 @@ function onSelColor(parentId) {
 }
 
 function onSelSize(parentId) {
-  const sizeSel = document.getElementById('ss_' + parentId);
-  const sizeId  = sizeSel.value;
-  document.getElementById('sb_' + parentId).disabled = !sizeId;
+  const sizeSel  = document.getElementById('ss_' + parentId);
+  const sizeId   = sizeSel.value;
 
-  // Show size note field when "other" is selected
+  // Show/hide pant-size note for "Other" sizes
   const noteRow  = document.getElementById('sn_' + parentId);
   const sizeName = sizeId ? sizeSel.options[sizeSel.selectedIndex].text : '';
   const isOther  = sizeName.toLowerCase().includes('other');
   noteRow.classList.toggle('hidden', !isOther);
   if (!isOther) document.getElementById('snote_' + parentId).value = '';
+
+  _resetFeature(parentId);
+  document.getElementById('sb_' + parentId).disabled = true;
+  if (sizeId) populateFeatures(parentId);
+}
+
+// ─── Feature variation helpers ────────────────────────────────────────────────
+function _resetFeature(parentId) {
+  const featRow = document.getElementById('sfrow_' + parentId);
+  const featSel = document.getElementById('sfeat_' + parentId);
+  if (featRow) featRow.classList.add('hidden');
+  if (featSel) { featSel.innerHTML = '<option value="">Select a style…</option>'; featSel.value = ''; }
+}
+
+function populateFeatures(parentId) {
+  const colorId = document.getElementById('sc_' + parentId).value;
+  const sizeId  = document.getElementById('ss_' + parentId).value;
+  const featRow = document.getElementById('sfrow_' + parentId);
+  const featSel = document.getElementById('sfeat_' + parentId);
+
+  // Collect unique feature variations for this parent + color + size
+  const fvarMap = {};
+  for (const sku of catalog.skus) {
+    if (sku.parentId === parentId && sku.colorId === colorId && sku.sizeId === sizeId
+        && sku.featureVarId && sku.featureVarName)
+      fvarMap[sku.featureVarId] = sku.featureVarName;
+  }
+  const fvars = Object.entries(fvarMap).sort((a,b) => a[1].localeCompare(b[1]));
+
+  if (!featRow || fvars.length <= 1) {
+    // Hide selector — auto-select the one variant if it exists
+    if (featRow) featRow.classList.add('hidden');
+    if (featSel && fvars.length === 1) featSel.value = fvars[0][0];
+    document.getElementById('sb_' + parentId).disabled = false;
+    return;
+  }
+
+  // Multiple variants — show selector, wait for user choice
+  featSel.innerHTML = '<option value="">Select a style…</option>';
+  for (const [id, name] of fvars) {
+    const opt = document.createElement('option');
+    opt.value = id; opt.textContent = name;
+    featSel.appendChild(opt);
+  }
+  featRow.classList.remove('hidden');
+  document.getElementById('sb_' + parentId).disabled = true;
+}
+
+function onSelFeature(parentId) {
+  const featId = document.getElementById('sfeat_' + parentId)?.value || '';
+  document.getElementById('sb_' + parentId).disabled = !featId;
 }
 
 // ─── Add item ────────────────────────────────────────────────────────────────
 function addCatalogItem(parentId) {
-  const colorId = document.getElementById('sc_' + parentId).value;
-  const sizeId  = document.getElementById('ss_' + parentId).value;
-  const qty     = Math.max(1, parseInt(document.getElementById('sq_' + parentId).value) || 1);
+  const colorId      = document.getElementById('sc_' + parentId).value;
+  const sizeId       = document.getElementById('ss_' + parentId).value;
+  const qty          = Math.max(1, parseInt(document.getElementById('sq_' + parentId).value) || 1);
+  const featureVarId = document.getElementById('sfeat_' + parentId)?.value || '';
 
-  if (!colorId || !sizeId) return;
+  if (!colorId) return;
 
+  // Find SKU: match parent + color + size + feature (with fallbacks)
   const sku = catalog.skus.find(s =>
+    s.parentId === parentId && s.colorId === colorId && s.sizeId === sizeId &&
+    (featureVarId ? s.featureVarId === featureVarId : true)
+  ) || catalog.skus.find(s =>
     s.parentId === parentId && s.colorId === colorId && s.sizeId === sizeId
   ) || catalog.skus.find(s =>
     s.parentId === parentId && s.colorId === colorId
@@ -776,18 +856,39 @@ function addCatalogItem(parentId) {
 
   const sizeNote = (document.getElementById('snote_' + parentId)?.value || '').trim();
   items.push({ skuRecordId: sku.recordId, name: sku.name, qty, unitPrice: sku.price, sizeNote });
+
+  // Add-on: find matching SKU by color, fallback to first available
+  const addonSel = document.getElementById('sadon_' + parentId);
+  const addonId  = addonSel ? addonSel.value : '';
+  if (addonId && catalog.addonSkus && catalog.addonSkus[addonId]) {
+    const byColor    = catalog.addonSkus[addonId];
+    const addonEntry = byColor[colorId] || Object.values(byColor)[0];
+    if (addonEntry) {
+      items.push({
+        skuRecordId: addonEntry.recordId,
+        name:        addonEntry.name,
+        qty,
+        unitPrice:   addonEntry.price,
+        sizeNote:    '',
+      });
+    }
+  }
+
   renderItems();
 
-  // Reset this selector and close it
+  // Reset selector state
   document.getElementById('sc_' + parentId).value = '';
   document.getElementById('ss_' + parentId).innerHTML = '<option value="">Select a size…</option>';
   document.getElementById('ss_' + parentId).disabled = true;
+  document.getElementById('ss_' + parentId).classList.remove('hidden');
+  document.getElementById('sl_' + parentId).classList.add('hidden');
   document.getElementById('sq_' + parentId).value = 1;
   document.getElementById('sb_' + parentId).disabled = true;
   document.getElementById('snote_' + parentId).value = '';
   document.getElementById('sn_' + parentId).classList.add('hidden');
-  document.getElementById('sl_' + parentId).classList.add('hidden');
-  document.getElementById('ss_' + parentId).classList.remove('hidden');
+  _resetFeature(parentId);
+  if (addonSel) addonSel.value = '';
+
   // Close the panel
   const selector = document.getElementById('ps_' + parentId);
   const row = selector.previousElementSibling;
