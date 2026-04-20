@@ -2175,6 +2175,7 @@ _EXCLUDED_PARENTS = {
     # Specific exclusions
     "1.75\" standard belt - both buckles",
     "misc.",
+    "hat", "hoodie", "t-shirt",
 }
 
 @app.route("/api/admin/refresh-catalog", methods=["POST"])
