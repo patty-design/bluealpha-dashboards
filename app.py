@@ -2035,16 +2035,19 @@ def _fetch_quote_data(record_id):
                 "billToOrg":    cf.get("Bill-To Org Name", "") or cf.get("Organization Name", ""),
             }
 
-    # Fetch line items
-    li_formula = f'FIND("{record_id}", ARRAYJOIN({{Manual Order}}))'
-    li_records = at_get_all(
-        MO_LINE_ITEMS_TABLE_ID, token,
-        fields=["Manual Order", "Product SKU", "Qty.", "Confirmed Unit Price",
-                "Name + Variations (from Product SKU)", "SKU ID (from Product SKU)"],
-        formula=li_formula,
-    )
+    # Fetch line items — use record IDs from MO field directly (ARRAYJOIN formula
+    # returns display names, not IDs, so filter-based lookup doesn't work)
+    li_record_ids = fields.get("MO Line Items", [])
     line_items = []
-    for li in li_records:
+    for li_id in li_record_ids:
+        li_r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+            headers=at_headers(token),
+            timeout=15,
+        )
+        if li_r.status_code != 200:
+            continue
+        li = li_r.json()
         lf = li.get("fields", {})
         sku_ids   = lf.get("Product SKU", [])
         sku_names = lf.get("Name + Variations (from Product SKU)", [])
