@@ -1960,7 +1960,8 @@ def send_quote_accepted_email(to_email, to_name, org_name, qu_number, so_number)
 def _fetch_quote_data(record_id):
     """Shared logic: fetch full quote data dict from Airtable. Returns dict or raises."""
     from datetime import date as dt_date
-    token = RETURNS_WRITE_TOKEN
+    # Use broadest available read token (write token may not have read scope on all tables)
+    token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
 
     # Fetch MO record
     r = req_lib.get(
