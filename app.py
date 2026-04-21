@@ -2446,12 +2446,11 @@ def create_quote():
 
         mo_body = {
             "fields": {
-                "Order Type":    "Quote",
-                "Document ID":   quote_number,
-                "Order ID":      order_id_str,
-                "Date":          today_str,
-                "Expiry Date":   expiry_str,
-                "Customer":      [cust_id],
+                "Order Type":  "Quote",
+                "Order ID":    order_id_str,
+                "Date":        today_str,
+                "Expiry Date": expiry_str,
+                "Customer":    [cust_id],
             }
         }
         if po_number:
