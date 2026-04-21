@@ -1021,10 +1021,9 @@ function addCatalogItem(parentId) {
   document.getElementById('sn_' + parentId).classList.add('hidden');
   clearSizeNoteError(parentId);
   _resetFeature(parentId);
-  onSelColor(parentId);
-  // Force size back to placeholder — use setTimeout to run after any
-  // browser autocomplete/form-cache restoration that may fire post-render
-  setTimeout(() => { document.getElementById('ss_' + parentId).value = ''; }, 0);
+  // Reset size back to placeholder without rebuilding the dropdown —
+  // the options are already populated; just move the selection back to index 0
+  document.getElementById('ss_' + parentId).selectedIndex = 0;
 }
 
 // ─── Render ──────────────────────────────────────────────────────────────────
