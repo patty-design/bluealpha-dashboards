@@ -208,6 +208,10 @@
     .catalog-section-wrap { margin-bottom: 24px; }
     .size-note-row { margin-top: 10px; }
     .size-note-row input { font-size: 0.92rem; }
+    .size-note-error { display:none; margin-top:6px; padding:7px 10px; background:#fff0f0; border:1px solid #f5c2c2; border-radius:5px; color:#7a1515; font-size:0.84rem; font-weight:600; }
+    .size-note-error.show { display:block; }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
+    .shake { animation: shake 0.4s ease; }
     .item-note { font-size: 0.82rem; color: var(--muted); margin-top: 3px; font-style: italic; }
     .one-size-label {
       padding: 11px 14px;
@@ -666,7 +670,8 @@ function _productHtml(p) {
         <div class="size-note-row hidden" id="sn_${p.id}">
           <div class="sel-field">
             <label>Pant Size <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">(even sizes only)</span></label>
-            <input type="number" id="snote_${p.id}" placeholder="e.g. 52" min="20" max="98" step="2" style="max-width:90px" oninput="this.value=this.value.slice(0,2)">
+            <input type="number" id="snote_${p.id}" placeholder="e.g. 52" min="20" max="98" step="2" style="max-width:90px" oninput="this.value=this.value.slice(0,2);clearSizeNoteError('${p.id}')">
+            <div class="size-note-error" id="snerr_${p.id}">⚠️ Please enter a valid even pant size (e.g. 32, 34, 36…)</div>
           </div>
         </div>
       </div>
@@ -810,6 +815,14 @@ function onSelColor(parentId) {
 function onSelSize(parentId) {
   const sizeSel  = document.getElementById('ss_' + parentId);
   const sizeId   = sizeSel.value;
+
+  // Clear pant-size error state
+  function clearSizeNoteError(parentId) {
+    const noteEl = document.getElementById('snote_' + parentId);
+    const errEl  = document.getElementById('snerr_' + parentId);
+    if (noteEl) { noteEl.style.borderColor = ''; noteEl.style.outline = ''; }
+    if (errEl)  errEl.classList.remove('show');
+  }
 
   // Show/hide pant-size note for "Other" sizes
   const noteRow  = document.getElementById('sn_' + parentId);
@@ -981,7 +994,16 @@ function addCatalogItem(parentId) {
     if (!sizeNote || isNaN(sizeNum) || sizeNum % 2 !== 0) {
       noteEl.focus();
       noteEl.style.borderColor = 'var(--red)';
-      setTimeout(() => noteEl.style.borderColor = '', 1500);
+      noteEl.style.outline = '2px solid var(--red)';
+      const errEl = document.getElementById('snerr_' + parentId);
+      if (errEl) errEl.classList.add('show');
+      // Shake both the input and the error message
+      [noteEl, errEl].forEach(el => {
+        if (!el) return;
+        el.classList.remove('shake');
+        void el.offsetWidth; // force reflow to restart animation
+        el.classList.add('shake');
+      });
       return;
     }
   }
@@ -1001,6 +1023,7 @@ function addCatalogItem(parentId) {
   document.getElementById('sb_' + parentId).disabled = true;
   document.getElementById('snote_' + parentId).value = '';
   document.getElementById('sn_' + parentId).classList.add('hidden');
+  clearSizeNoteError(parentId);
   _resetFeature(parentId); // handles feature row + addon row reset
 
   // Close the panel
