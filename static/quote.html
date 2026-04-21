@@ -641,7 +641,7 @@ function _productHtml(p) {
           </div>
           <div class="sel-field hidden" id="szfield_${p.id}">
             <label>Size</label>
-            <select id="ss_${p.id}" onchange="onSelSize('${p.id}')">
+            <select id="ss_${p.id}" onchange="onSelSize('${p.id}')" autocomplete="off">
               <option value="">Select a size…</option>
             </select>
             <div id="sl_${p.id}" class="one-size-label hidden">One Size</div>
@@ -1022,9 +1022,9 @@ function addCatalogItem(parentId) {
   clearSizeNoteError(parentId);
   _resetFeature(parentId);
   onSelColor(parentId);
-  // Force size back to placeholder after onSelColor repopulates it
-  // (browser may restore previous selection from form cache otherwise)
-  document.getElementById('ss_' + parentId).value = '';
+  // Force size back to placeholder — use setTimeout to run after any
+  // browser autocomplete/form-cache restoration that may fire post-render
+  setTimeout(() => { document.getElementById('ss_' + parentId).value = ''; }, 0);
 }
 
 // ─── Render ──────────────────────────────────────────────────────────────────
