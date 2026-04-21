@@ -913,17 +913,18 @@ function onSelSize(parentId) {
   noteRow.classList.toggle('hidden', !isOther);
   if (!isOther) document.getElementById('snote_' + parentId).value = '';
 
-  // For size-only-reset parents, preserve the current feature selection across size changes
+  // For size-only-reset parents, preserve feature + addon selections across size changes
   const _pname = (catalog.parents.find(p => p.id === parentId)?.name || '').toLowerCase();
-  const _preservedFvar = _SIZE_ONLY_RESET_PARENTS.has(_pname)
-    ? (document.getElementById('sfeat_' + parentId)?.value || '')
-    : '';
+  const _preservedFvar  = _SIZE_ONLY_RESET_PARENTS.has(_pname)
+    ? (document.getElementById('sfeat_' + parentId)?.value || '') : '';
+  const _preservedAddon = _SIZE_ONLY_RESET_PARENTS.has(_pname)
+    ? (document.getElementById('sadon_' + parentId)?.value || '') : '';
 
   _resetFeature(parentId);
   document.getElementById('sqrow_' + parentId).classList.add('hidden');
   document.getElementById('spricerow_' + parentId).classList.add('hidden');
   document.getElementById('sb_' + parentId).disabled = true;
-  if (sizeId) populateFeatures(parentId, _preservedFvar);
+  if (sizeId) populateFeatures(parentId, _preservedFvar, _preservedAddon);
 }
 
 // ─── Feature variation helpers ────────────────────────────────────────────────
@@ -938,7 +939,7 @@ function _resetFeature(parentId) {
   if (addonSel) { addonSel.innerHTML = '<option value="">None</option>'; addonSel.value = ''; }
 }
 
-function populateFeatures(parentId, preferredFvarId = '') {
+function populateFeatures(parentId, preferredFvarId = '', preferredAddonId = '') {
   const colorId = document.getElementById('sc_' + parentId).value;
   const sizeId  = document.getElementById('ss_' + parentId).value;
   const featRow = document.getElementById('sfrow_' + parentId);
@@ -957,7 +958,7 @@ function populateFeatures(parentId, preferredFvarId = '') {
     const autoFvarId = fvars.length === 1 ? fvars[0][0] : '';
     if (featRow) featRow.classList.add('hidden');
     if (featSel && fvars.length === 1) featSel.value = fvars[0][0];
-    populateAddons(parentId, colorId, sizeId, autoFvarId);
+    populateAddons(parentId, colorId, sizeId, autoFvarId, preferredAddonId);
     document.getElementById('sqrow_' + parentId).classList.remove('hidden');
     document.getElementById('sb_' + parentId).disabled = false;
     _updatePrice(parentId);
@@ -977,7 +978,7 @@ function populateFeatures(parentId, preferredFvarId = '') {
   // If a preferred feature is still available for this size, auto-select it
   if (preferredFvarId && fvarMap[preferredFvarId]) {
     featSel.value = preferredFvarId;
-    populateAddons(parentId, colorId, sizeId, preferredFvarId);
+    populateAddons(parentId, colorId, sizeId, preferredFvarId, preferredAddonId);
     document.getElementById('sb_' + parentId).disabled = false;
     _updatePrice(parentId);
   } else {
@@ -1019,7 +1020,7 @@ function _updatePrice(parentId) {
   }
 }
 
-function populateAddons(parentId, colorId, sizeId, featureVarId = '') {
+function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredAddonId = '') {
   const addonRow = document.getElementById('sarow_' + parentId);
   const addonSel = document.getElementById('sadon_' + parentId);
   if (!addonRow || !addonSel) return;
@@ -1048,8 +1049,11 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '') {
     opt.value = id; opt.textContent = name;
     addonSel.appendChild(opt);
   }
-  // Always explicitly set value — browser can auto-restore stale selection otherwise
-  addonSel.value = hasBase ? '' : addons[0][0];
+  // Restore preferred addon if available, otherwise default
+  const preferredIsAvailable = preferredAddonId && (preferredAddonId === '' ? hasBase : addonMap[preferredAddonId]);
+  addonSel.value = (preferredAddonId !== '' && addonMap[preferredAddonId])
+    ? preferredAddonId
+    : (hasBase ? '' : addons[0][0]);
   addonRow.classList.remove('hidden');
   // Trigger price update now that add-on value is set
   _updatePrice(parentId);
