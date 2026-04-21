@@ -2195,13 +2195,14 @@ def _build_catalog():
             "category":       category,
         })
         if parent_id not in seen_parents:
-            seen_parents[parent_id] = {"name": parent_name, "category": category}
+            display_name = _PARENT_NAME_OVERRIDES.get(parent_name.lower(), parent_name)
+            seen_parents[parent_id] = {"name": display_name, "category": category}
 
     parents = sorted(
         [{"id": k, "name": v["name"], "category": v["category"],
           "addons": addon_parent_map.get(k, [])}
          for k, v in seen_parents.items()],
-        key=lambda x: x["name"],
+        key=lambda x: (1 if x["name"].lower() in _SORT_LAST_PARENTS else 0, x["name"]),
     )
     return {"parents": parents, "skus": skus, "addonSkus": addon_sku_map}
 
@@ -2251,6 +2252,16 @@ _EXCLUDED_PARENTS = {
 # Colors to exclude per parent (lowercase parent name → set of lowercase color names)
 _EXCLUDED_COLORS_BY_PARENT = {
     "radio pouch": {"wolf gray"},
+}
+
+# Display name overrides (post-clean lowercase → desired display name)
+_PARENT_NAME_OVERRIDES = {
+    "1.5\" lp inner only belt": "1.5\" Low Profile Inner Only Belt",
+}
+
+# Parents that should sort last within their category (post-clean lowercase)
+_SORT_LAST_PARENTS = {
+    "1.5\" low profile inner only belt",
 }
 
 @app.route("/api/admin/refresh-catalog", methods=["POST"])
