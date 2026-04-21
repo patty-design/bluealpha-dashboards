@@ -1045,9 +1045,8 @@ function addCatalogItem(parentId) {
 
   renderItems();
 
-  // Reset only the size field and its dependents — keep color and qty so the
-  // customer can quickly add another size of the same product.
-  // Re-call onSelColor to repopulate the size dropdown for the still-selected color.
+  // Reset size and qty — keep color so the customer can quickly add another size.
+  document.getElementById('sq_' + parentId).value = 1;
   document.getElementById('sqrow_' + parentId).classList.add('hidden');
   document.getElementById('spricerow_' + parentId).classList.add('hidden');
   document.getElementById('sb_' + parentId).disabled = true;
