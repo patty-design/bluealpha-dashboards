@@ -620,6 +620,14 @@ let activeParent = null;   // currently-expanded parent product id
 })();
 
 // ─── Build accordion UI ───────────────────────────────────────────────────────
+// Parents that get a "size-only" reset after add:
+// size → placeholder, qty → 1, but color/feature/addon stay visible & populated
+const _SIZE_ONLY_RESET_PARENTS = new Set([
+  "2\" duty belt lite - molle",
+  "2\" duty belt lite - standard",
+  "1.75\" battle belt lite",
+]);
+
 // Product descriptions keyed by lowercase product name
 const _PRODUCT_DESCRIPTIONS = {
   "2\" duty belt lite - molle": `
@@ -1085,17 +1093,27 @@ function addCatalogItem(parentId) {
 
   renderItems();
 
-  // Reset after add — keep color, reset everything else.
-  // onSelColor handles size/feature/addon reset and re-enables qty+button
-  // automatically for no-size products (so the panel stays ready to add again).
+  // Reset after add
+  const _parentName = (catalog.parents.find(p => p.id === parentId)?.name || '').toLowerCase();
   document.getElementById('sq_' + parentId).value = 1;
-  document.getElementById('sqrow_' + parentId).classList.add('hidden');
-  document.getElementById('spricerow_' + parentId).classList.add('hidden');
-  document.getElementById('sb_' + parentId).disabled = true;
   document.getElementById('snote_' + parentId).value = '';
   document.getElementById('sn_' + parentId).classList.add('hidden');
   clearSizeNoteError(parentId);
-  onSelColor(parentId);
+
+  if (_SIZE_ONLY_RESET_PARENTS.has(_parentName)) {
+    // Size-only reset: keep color, feature, addon, and qty row visible —
+    // just reset size to placeholder and disable add button until new size picked
+    _repopulateSizes(parentId);
+    document.getElementById('spricerow_' + parentId).classList.add('hidden');
+    document.getElementById('sb_' + parentId).disabled = true;
+  } else {
+    // Full reset: keep color, reset everything else via onSelColor
+    // (re-enables qty+button automatically for no-size products)
+    document.getElementById('sqrow_' + parentId).classList.add('hidden');
+    document.getElementById('spricerow_' + parentId).classList.add('hidden');
+    document.getElementById('sb_' + parentId).disabled = true;
+    onSelColor(parentId);
+  }
 }
 
 // ─── Render ──────────────────────────────────────────────────────────────────
