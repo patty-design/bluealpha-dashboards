@@ -939,7 +939,8 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '') {
     opt.value = id; opt.textContent = name;
     addonSel.appendChild(opt);
   }
-  if (!hasBase) addonSel.value = addons[0][0]; // default to first if no base SKU
+  // Always explicitly set value — browser can auto-restore stale selection otherwise
+  addonSel.value = hasBase ? '' : addons[0][0];
   addonRow.classList.remove('hidden');
   // Trigger price update now that add-on value is set
   _updatePrice(parentId);
