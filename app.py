@@ -2180,6 +2180,8 @@ def _build_catalog():
         fvar_name = fvar_map.get(fvar_id, "").strip() if fvar_id else ""
         if fvar_name.lower() in ("none", ""):
             fvar_id = ""; fvar_name = ""
+        if fvar_name.lower() in _EXCLUDED_FEATURE_VARS_GLOBAL:
+            continue
 
         addon_ids_sku  = f.get("Add-ons", [])
         addon_id_sku   = addon_ids_sku[0] if addon_ids_sku else ""
@@ -2262,6 +2264,11 @@ _EXCLUDED_PARENTS = {
     "hat", "hoodie", "t-shirt",
     "sentry strap - ba",
     "fanny pack",
+}
+
+# Feature variations to exclude globally (lowercase)
+_EXCLUDED_FEATURE_VARS_GLOBAL = {
+    "base only (-onb)",
 }
 
 # Colors to exclude globally (lowercase color names)
