@@ -1806,7 +1806,7 @@ def _clean_product_name(name):
     return name.strip()
 
 
-def send_quote_email(to_email, to_name, company, quote_number, record_id, expiry_date):
+def send_quote_email(to_email, to_name, company, quote_number, record_id, expiry_date, quote_data=None):
     """Send quote notification email via SendGrid."""
     if not SENDGRID_API_KEY:
         return
@@ -1870,16 +1870,31 @@ def send_quote_email(to_email, to_name, company, quote_number, record_id, expiry
 </body>
 </html>"""
     try:
+        payload = {
+            "personalizations": [{"to": [{"email": actual_to, "name": to_name}]}],
+            "from": {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
+            "subject": subject,
+            "content": [{"type": "text/html", "value": html_body}],
+        }
+        # Attach PDF if quote data available
+        if quote_data:
+            try:
+                import base64
+                pdf_bytes = _build_quote_pdf_bytes(quote_data)
+                payload["attachments"] = [{
+                    "content":     base64.b64encode(pdf_bytes).decode("utf-8"),
+                    "type":        "application/pdf",
+                    "filename":    f"{quote_number}.pdf",
+                    "disposition": "attachment",
+                }]
+            except Exception as pdf_err:
+                print(f"[send_quote_email] PDF generation failed: {pdf_err}")
+
         sg_r = req_lib.post(
             "https://api.sendgrid.com/v3/mail/send",
             headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
-            json={
-                "personalizations": [{"to": [{"email": actual_to, "name": to_name}]}],
-                "from": {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
-                "subject": subject,
-                "content": [{"type": "text/html", "value": html_body}],
-            },
-            timeout=15,
+            json=payload,
+            timeout=30,
         )
         print(f"[send_quote_email] to={actual_to} status={sg_r.status_code} body={sg_r.text[:200]}")
     except Exception as e:
@@ -2497,10 +2512,11 @@ def create_quote():
             )
             li_r.raise_for_status()
 
-        # 5. Send email
+        # 5. Send email with PDF attachment
         try:
+            quote_data = _fetch_quote_data(mo_record_id)
             send_quote_email(email, contact_name or org_name, org_name,
-                             quote_number, mo_record_id, expiry_str)
+                             quote_number, mo_record_id, expiry_str, quote_data=quote_data)
         except Exception as email_err:
             print(f"[create_quote] email failed: {email_err}")
 
@@ -2702,20 +2718,12 @@ def accept_quote(record_id):
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
 
-@app.route("/quote-pdf/<record_id>", methods=["GET"])
-def quote_pdf(record_id):
-    c = cors()
-    try:
-        from fpdf import FPDF
-        import io
+def _build_quote_pdf_bytes(quote):
+    """Generate PDF bytes for a quote dict. Returns bytes."""
+    from fpdf import FPDF
 
-        quote = _fetch_quote_data(record_id)
-        if not quote:
-            return Response(json.dumps({"error": "Quote not found"}), status=404,
-                            headers=c, mimetype="application/json")
-
-        # ── Build PDF with fpdf2 ────────────────────────────────────────────
-        cust       = quote.get("customer", {})
+    # ── Build PDF with fpdf2 ────────────────────────────────────────────
+    cust       = quote.get("customer", {})
         line_items = quote.get("lineItems", [])
         subtotal   = quote.get("subtotal", 0.0)
         shipping   = quote.get("shipping", 0.0)
@@ -2882,14 +2890,24 @@ def quote_pdf(record_id):
             "Questions? Contact us at info@bluealpha.us or 678-961-3304.",
             border=0)
 
-        pdf_bytes = bytes(pdf.output())
-        filename  = f"{q_number or record_id}.pdf"
+        return bytes(pdf.output())
 
+
+@app.route("/quote-pdf/<record_id>", methods=["GET"])
+def quote_pdf(record_id):
+    c = cors()
+    try:
+        quote = _fetch_quote_data(record_id)
+        if not quote:
+            return Response(json.dumps({"error": "Quote not found"}), status=404,
+                            headers=c, mimetype="application/json")
+        pdf_bytes = _build_quote_pdf_bytes(quote)
+        q_number  = quote.get("quoteNumber", record_id)
         return Response(
             pdf_bytes,
             headers={
                 **cors(),
-                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Disposition": f'attachment; filename="{q_number}.pdf"',
                 "Content-Type": "application/pdf",
             },
         )
