@@ -812,51 +812,51 @@ function onSelColor(parentId) {
   }
 }
 
+// Repopulate size dropdown for the current color and reset to placeholder.
+// Called after add so the color stays selected but size resets cleanly.
+function _repopulateSizes(parentId) {
+  const colorId = document.getElementById('sc_' + parentId).value;
+  const sizeSel = document.getElementById('ss_' + parentId);
+  const szField = document.getElementById('szfield_' + parentId);
+
+  // Wipe and rebuild from scratch — prevents browser from restoring old value
+  sizeSel.innerHTML = '<option value="">Select a size\u2026</option>';
+
+  if (!colorId) { szField.classList.add('hidden'); return; }
+
+  const sizeMap = {};
+  for (const sku of catalog.skus) {
+    if (sku.parentId === parentId && sku.colorId === colorId && sku.sizeId && sku.sizeName)
+      sizeMap[sku.sizeId] = sku.sizeName;
+  }
+  const sizes = Object.entries(sizeMap).sort((a,b) => {
+    const na = parseFloat(a[1]), nb = parseFloat(b[1]);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return a[1].localeCompare(b[1]);
+  });
+
+  if (sizes.length <= 1) { szField.classList.add('hidden'); return; }
+
+  for (const [id, name] of sizes) {
+    const opt = document.createElement('option');
+    opt.value = id; opt.textContent = name;
+    sizeSel.appendChild(opt);
+  }
+  sizeSel.selectedIndex = 0;
+  szField.classList.remove('hidden');
+}
+
+// Clear pant-size error state
+function clearSizeNoteError(parentId) {
+  const noteEl = document.getElementById('snote_' + parentId);
+  const errEl  = document.getElementById('snerr_' + parentId);
+  if (noteEl) { noteEl.style.borderColor = ''; noteEl.style.outline = ''; }
+  if (errEl)  errEl.classList.remove('show');
+}
+
 function onSelSize(parentId) {
   const sizeSel  = document.getElementById('ss_' + parentId);
   const sizeId   = sizeSel.value;
-
-  // Repopulate size dropdown for the current color and reset to placeholder.
-  // Called after add so the color stays selected but size resets cleanly.
-  function _repopulateSizes(parentId) {
-    const colorId = document.getElementById('sc_' + parentId).value;
-    const sizeSel = document.getElementById('ss_' + parentId);
-    const szField = document.getElementById('szfield_' + parentId);
-
-    // Wipe and rebuild from scratch — prevents browser from restoring old value
-    sizeSel.innerHTML = '<option value="">Select a size\u2026</option>';
-
-    if (!colorId) { szField.classList.add('hidden'); return; }
-
-    const sizeMap = {};
-    for (const sku of catalog.skus) {
-      if (sku.parentId === parentId && sku.colorId === colorId && sku.sizeId && sku.sizeName)
-        sizeMap[sku.sizeId] = sku.sizeName;
-    }
-    const sizes = Object.entries(sizeMap).sort((a,b) => {
-      const na = parseFloat(a[1]), nb = parseFloat(b[1]);
-      if (!isNaN(na) && !isNaN(nb)) return na - nb;
-      return a[1].localeCompare(b[1]);
-    });
-
-    if (sizes.length <= 1) { szField.classList.add('hidden'); return; }
-
-    for (const [id, name] of sizes) {
-      const opt = document.createElement('option');
-      opt.value = id; opt.textContent = name;
-      sizeSel.appendChild(opt);
-    }
-    sizeSel.selectedIndex = 0;
-    szField.classList.remove('hidden');
-  }
-
-  // Clear pant-size error state
-  function clearSizeNoteError(parentId) {
-    const noteEl = document.getElementById('snote_' + parentId);
-    const errEl  = document.getElementById('snerr_' + parentId);
-    if (noteEl) { noteEl.style.borderColor = ''; noteEl.style.outline = ''; }
-    if (errEl)  errEl.classList.remove('show');
-  }
 
   // Show/hide pant-size note for "Other" sizes
   const noteRow  = document.getElementById('sn_' + parentId);
