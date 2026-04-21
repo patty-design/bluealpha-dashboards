@@ -206,6 +206,11 @@
     .btn-add-inline:disabled { opacity: 0.4; cursor: not-allowed; }
     .catalog-loading { padding: 20px; text-align: center; color: var(--muted); font-size: 0.9rem; }
     .catalog-section-wrap { margin-bottom: 24px; }
+    .product-desc { margin: 0 0 12px; padding: 10px 13px; background: #f4f7fa; border-left: 3px solid var(--steel); border-radius: 0 5px 5px 0; font-size: 0.85rem; color: #3a4a5c; line-height: 1.6; }
+    .product-desc ul { margin: 4px 0 0 0; padding-left: 18px; }
+    .product-desc li { margin: 1px 0; }
+    .product-desc .desc-section { font-weight: 700; margin-top: 8px; }
+    .product-desc .desc-section:first-child { margin-top: 0; }
     .size-note-row { margin-top: 10px; }
     .size-note-row input { font-size: 0.92rem; }
     .size-note-error { display:none; margin-top:6px; padding:7px 10px; background:#fff0f0; border:1px solid #f5c2c2; border-radius:5px; color:#7a1515; font-size:0.84rem; font-weight:600; }
@@ -615,7 +620,27 @@ let activeParent = null;   // currently-expanded parent product id
 })();
 
 // ─── Build accordion UI ───────────────────────────────────────────────────────
+// Product descriptions keyed by lowercase product name
+const _PRODUCT_DESCRIPTIONS = {
+  "battle belt lite": `
+    <div class="desc-section">Combos include</div>
+    <ul>
+      <li>(2) Rifle Magazine Pouches</li>
+      <li>(2) 3&Prime; Pistol Magazine Pouches</li>
+      <li>Dump Pouch</li>
+      <li>Belt Lanyard</li>
+    </ul>
+    <div class="desc-section">Ultimate Combos additionally include</div>
+    <ul>
+      <li>(6) MOLLE Straps</li>
+      <li>(4) Shock Cord/Pull Tab</li>
+    </ul>`,
+};
+
 function _productHtml(p) {
+  const descHtml = _PRODUCT_DESCRIPTIONS[p.name.toLowerCase()]
+    ? `<div class="product-desc">${_PRODUCT_DESCRIPTIONS[p.name.toLowerCase()]}</div>`
+    : '';
   const addonHtml = `<div class="sel-row hidden" id="sarow_${p.id}">
       <div class="sel-field" style="flex:1 1 100%">
         <label>Add-on <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0;">(optional)</span></label>
@@ -632,6 +657,7 @@ function _productHtml(p) {
         <span class="p-arrow">▶</span>
       </div>
       <div class="product-selector" id="ps_${p.id}">
+        ${descHtml}
         <div class="sel-row">
           <div class="sel-field">
             <label>Color</label>
