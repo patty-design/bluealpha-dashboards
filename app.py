@@ -31,7 +31,7 @@ TEST_EMAIL_OVERRIDE  = os.environ.get("TEST_EMAIL_OVERRIDE", "")
 CS_ADMIN_PASSWORD    = os.environ.get("CS_ADMIN_PASSWORD", "")
 
 MANUAL_ORDERS_TABLE_ID   = "tblOOZ2wVzIsR1DyL"
-MO_LINE_ITEMS_TABLE_ID   = "tblNjwm5SRsfE38Xu"
+MO_LINE_ITEMS_TABLE_ID   = "tblNDxbfgyZDMex7n"
 CUSTOMERS_TABLE_ID       = "tblO4AdJE84kFDfEe"
 PARENT_PRODUCTS_TABLE_ID    = "tbl40th76YvjdQExS"
 COLORS_TABLE_ID             = "tblN08IV26TpRYSMf"
@@ -2473,10 +2473,10 @@ def create_quote():
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}",
                 headers={**at_headers(token), "Content-Type": "application/json"},
                 json={"fields": {
-                    "Manual Order": [mo_record_id],
-                    "Product SKU":  [item["skuRecordId"]],
-                    "Qty.":         int(item["qty"]),
-                    "Adj. Unit Price": float(item["unitPrice"]),
+                    "Manual Order":         [mo_record_id],
+                    "Product SKU":          [item["skuRecordId"]],
+                    "Qty.":                 int(item["qty"]),
+                    "Confirmed Unit Price": float(item["unitPrice"]),
                 }},
                 timeout=15,
             )
