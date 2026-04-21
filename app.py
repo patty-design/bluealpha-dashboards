@@ -2605,6 +2605,10 @@ def accept_quote(record_id):
     from datetime import date as dt_date
     token = RETURNS_WRITE_TOKEN
 
+    data = request.get_json() or {}
+    billing      = data.get("billing") or {}
+    shipping_obj = data.get("shipping")  # may be None (same as billing)
+
     try:
         # Fetch MO record
         r = req_lib.get(
@@ -2632,6 +2636,7 @@ def accept_quote(record_id):
         quote_number = mo_fields.get("Document ID", f"QU-{order_id_str}")
         so_number    = f"SO-{order_id_str}"
         customer_ids = mo_fields.get("Customer", [])
+        customer_id  = customer_ids[0] if customer_ids else None
         po_number    = mo_fields.get("Purchase Order #", "")
         notes        = mo_fields.get("Notes", "")
         date_str     = mo_fields.get("Date", dt_date.today().isoformat())
@@ -2663,6 +2668,54 @@ def accept_quote(record_id):
         )
         so_r.raise_for_status()
         so_record_id = so_r.json()["id"]
+
+        # Update customer billing address if provided
+        if billing and customer_id:
+            bill_line1 = billing.get("addr1", "")
+            if billing.get("addr2"):
+                bill_line1 = f"{bill_line1}, {billing['addr2']}"
+            bill_line2 = ""
+            city_  = billing.get("city", "")
+            state_ = billing.get("state", "")
+            zip_   = billing.get("zip", "")
+            if city_ and state_:
+                bill_line2 = f"{city_}, {state_} {zip_}".strip()
+            cust_update = {}
+            if billing.get("org"):   cust_update["Organization Name"] = billing["org"]
+            if billing.get("name"):  cust_update["Main Contact Name"] = billing["name"]
+            if bill_line1: cust_update["Customer Address (Line 1)"] = bill_line1
+            if bill_line2: cust_update["Customer Address (Line 2)"] = bill_line2
+            if cust_update:
+                try:
+                    req_lib.patch(
+                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
+                        headers={**at_headers(token), "Content-Type": "application/json"},
+                        json={"fields": cust_update},
+                        timeout=15,
+                    )
+                except Exception as cust_err:
+                    print(f"[accept_quote] customer update failed: {cust_err}")
+
+        # Add ship-to to SO notes if different from billing
+        if shipping_obj:
+            ship_note = "Ship To: {org} {name}, {addr1}{addr2}, {city}, {state} {zip}".format(
+                org   = shipping_obj.get("org", ""),
+                name  = shipping_obj.get("name", ""),
+                addr1 = shipping_obj.get("addr1", ""),
+                addr2 = f", {shipping_obj['addr2']}" if shipping_obj.get("addr2") else "",
+                city  = shipping_obj.get("city", ""),
+                state = shipping_obj.get("state", ""),
+                zip   = shipping_obj.get("zip", ""),
+            ).strip()
+            try:
+                req_lib.patch(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{so_record_id}",
+                    headers={**at_headers(token), "Content-Type": "application/json"},
+                    json={"fields": {"Notes": ship_note}},
+                    timeout=15,
+                )
+            except Exception:
+                pass
 
         # Copy line items from QU to SO
         li_formula = f'FIND("{record_id}", ARRAYJOIN({{Manual Order}}))'

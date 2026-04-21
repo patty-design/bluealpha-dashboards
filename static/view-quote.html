@@ -403,6 +403,11 @@
       vertical-align: middle;
     }
 
+    .v-add-wrap { display:flex; flex-direction:column; gap:0; }
+    .v-add-row { display:flex; align-items:center; gap:12px; padding:6px 0; }
+    .v-add-row label { width:130px; font-size:0.82rem; color:var(--muted); flex-shrink:0; font-weight:600; }
+    .v-add-row select { flex:1; max-width:320px; }
+
     .hidden { display: none !important; }
 
     @media (max-width: 480px) {
@@ -463,6 +468,12 @@
       </div>
     </div>
 
+    <!-- Customer card -->
+    <div class="card" id="customerCard">
+      <div class="section-title">Customer</div>
+      <div id="custInfo"></div>
+    </div>
+
     <!-- Items card -->
     <div class="card">
       <div class="section-title">
@@ -486,26 +497,33 @@
       <div id="addItemSection">
         <button class="add-item-toggle" onclick="toggleAddItem()">+ Add another item</button>
         <div id="addItemPanel" class="add-item-panel hidden">
-          <div class="selector-grid">
-            <div>
+          <div class="v-add-wrap">
+            <div class="v-add-row">
               <label>Product</label>
-              <select id="vSelProduct"><option value="">Select a product…</option></select>
+              <select id="vProd" onchange="vOnProduct()"><option value="">Select a product…</option></select>
             </div>
-            <div>
+            <div class="v-add-row hidden" id="vColorRow">
               <label>Color</label>
-              <select id="vSelColor" disabled><option value="">Select a color…</option></select>
+              <select id="vColor" onchange="vOnColor()"><option value="">Select a color…</option></select>
             </div>
-            <div>
+            <div class="v-add-row hidden" id="vSizeRow">
               <label>Size</label>
-              <select id="vSelSize" disabled><option value="">Select a size…</option></select>
+              <select id="vSize" onchange="vOnSize()"><option value="">Select a size…</option></select>
             </div>
-            <div>
+            <div class="v-add-row hidden" id="vFvarRow">
+              <label>Style / Version</label>
+              <select id="vFvar" onchange="vOnFvar()"><option value="">Select a style…</option></select>
+            </div>
+            <div class="v-add-row hidden" id="vAddonRow">
+              <label>Add-on</label>
+              <select id="vAddon"><option value="">No add-on</option></select>
+            </div>
+            <div class="v-add-row hidden" id="vQtyAddRow">
               <label>Qty</label>
-              <input type="number" id="vSelQty" min="1" value="1">
-            </div>
-            <div>
-              <label style="visibility:hidden">Add</label>
-              <button class="btn btn-add" id="vBtnAdd" disabled onclick="addViewItem()">Add</button>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input type="number" id="vQty" min="1" value="1" style="width:70px;">
+                <button class="btn btn-add" onclick="vDoAdd()">Add</button>
+              </div>
             </div>
           </div>
         </div>
@@ -551,12 +569,44 @@
 
 <!-- Accept modal -->
 <div class="modal-overlay hidden" id="acceptModal">
-  <div class="modal">
-    <h2>Place Your Order</h2>
-    <p>By accepting this quote, you're confirming an order under Net 30 payment terms. We'll create your sales order and be in touch about shipping.</p>
+  <div class="modal" style="max-width:520px;width:95%;">
+    <h2>Confirm Your Order</h2>
+    <p style="color:var(--muted);font-size:0.88rem;margin-bottom:16px;">
+      Please confirm your billing address. Payment terms are Net 30.
+    </p>
+
+    <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">
+      Billing Address <span style="color:var(--red)">*</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
+      <div style="grid-column:1/-1;"><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">Company</label><input type="text" id="billOrg" placeholder="Company name" style="width:100%;box-sizing:border-box;"></div>
+      <div style="grid-column:1/-1;"><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">Contact Name</label><input type="text" id="billName" placeholder="Full name" style="width:100%;box-sizing:border-box;"></div>
+      <div style="grid-column:1/-1;"><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">Address</label><input type="text" id="billAddr1" placeholder="Street address" style="width:100%;box-sizing:border-box;"></div>
+      <div style="grid-column:1/-1;"><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">Suite / Apt</label><input type="text" id="billAddr2" placeholder="Optional" style="width:100%;box-sizing:border-box;"></div>
+      <div><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">City</label><input type="text" id="billCity" style="width:100%;box-sizing:border-box;"></div>
+      <div><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">State</label><input type="text" id="billState" maxlength="2" style="width:100%;box-sizing:border-box;text-transform:uppercase;"></div>
+      <div><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">ZIP</label><input type="text" id="billZip" style="width:100%;box-sizing:border-box;"></div>
+    </div>
+
+    <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">
+      Shipping Address
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:0.88rem;color:var(--muted);cursor:pointer;margin-bottom:8px;">
+      <input type="checkbox" id="shipSame" onchange="toggleShipSame()" checked> Same as billing address
+    </label>
+    <div id="shipFields" class="hidden" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
+      <div style="grid-column:1/-1;"><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">Company</label><input type="text" id="shipOrg" style="width:100%;box-sizing:border-box;"></div>
+      <div style="grid-column:1/-1;"><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">Contact Name</label><input type="text" id="shipName" style="width:100%;box-sizing:border-box;"></div>
+      <div style="grid-column:1/-1;"><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">Address</label><input type="text" id="shipAddr1" style="width:100%;box-sizing:border-box;"></div>
+      <div style="grid-column:1/-1;"><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">Suite / Apt</label><input type="text" id="shipAddr2" style="width:100%;box-sizing:border-box;"></div>
+      <div><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">City</label><input type="text" id="shipCity" style="width:100%;box-sizing:border-box;"></div>
+      <div><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">State</label><input type="text" id="shipState" maxlength="2" style="width:100%;box-sizing:border-box;text-transform:uppercase;"></div>
+      <div><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">ZIP</label><input type="text" id="shipZip" style="width:100%;box-sizing:border-box;"></div>
+    </div>
+
     <div class="modal-btns">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-danger" id="btnConfirmOrder" onclick="confirmOrder()">Confirm Order</button>
+      <button class="btn btn-danger" id="btnConfirmOrder" onclick="confirmOrder()">Place Order</button>
     </div>
   </div>
 </div>
@@ -628,6 +678,26 @@ function render() {
     const label = soNumber ? `✓ Order Accepted — ${soNumber}` : '✓ Order Accepted';
     badges.insertAdjacentHTML('beforeend',
       `<span class="badge badge-success">${escHtml(label)}</span>`);
+  }
+
+  // Customer info
+  const c = quoteData.customer || {};
+  const custEl = document.getElementById('custInfo');
+  if (custEl) {
+    let html = '';
+    if (c.orgName)     html += `<div style="font-weight:700;font-size:1rem;margin-bottom:4px;">${escHtml(c.orgName)}</div>`;
+    if (c.contactName) html += `<div style="color:var(--muted);font-size:0.88rem;">${escHtml(c.contactName)}</div>`;
+    if (c.email)       html += `<div style="font-size:0.88rem;margin-top:6px;"><a href="mailto:${escHtml(c.email)}" style="color:var(--navy)">${escHtml(c.email)}</a></div>`;
+    if (c.phone)       html += `<div style="font-size:0.88rem;">${escHtml(c.phone)}</div>`;
+    if (c.address1) {
+      html += `<div style="font-size:0.88rem;margin-top:6px;">${escHtml(c.address1)}</div>`;
+      const parts = [];
+      if (c.city) parts.push(c.city);
+      const stateZip = [c.state ? c.state.toUpperCase() : '', c.zip].filter(Boolean).join(' ');
+      if (stateZip) parts.push(stateZip);
+      if (parts.length) html += `<div style="font-size:0.88rem;">${escHtml(parts.join(', '))}</div>`;
+    }
+    custEl.innerHTML = html;
   }
 
   // Status banners
@@ -767,101 +837,176 @@ async function loadCatalog() {
     if (!r.ok) throw new Error();
     catalog = await r.json();
     catalogLoaded = true;
-    populateVProducts();
+    // Populate product dropdown
+    const prodSel = document.getElementById('vProd');
+    if (prodSel) {
+      prodSel.innerHTML = '<option value="">Select a product\u2026</option>';
+      for (const p of catalog.parents) {
+        const o = document.createElement('option');
+        o.value = p.id;
+        o.textContent = p.name;
+        prodSel.appendChild(o);
+      }
+    }
   } catch(e) {
     document.getElementById('addItemPanel').innerHTML =
       '<p style="color:var(--red);font-size:0.9rem;">Failed to load catalog. Please refresh.</p>';
   }
 }
 
-function populateVProducts() {
-  const sel = document.getElementById('vSelProduct');
-  sel.innerHTML = '<option value="">Select a product…</option>';
-  for (const p of catalog.parents) {
-    const opt = document.createElement('option');
-    opt.value = p.id;
-    opt.textContent = p.name;
-    sel.appendChild(opt);
-  }
-  sel.addEventListener('change', onVProductChange);
-  document.getElementById('vSelColor').addEventListener('change', onVColorChange);
-  document.getElementById('vSelSize').addEventListener('change', () => {
-    document.getElementById('vBtnAdd').disabled = !document.getElementById('vSelSize').value;
-  });
-}
-
-function onVProductChange() {
-  const parentId = this.value || document.getElementById('vSelProduct').value;
-  const colorSel = document.getElementById('vSelColor');
-  const sizeSel  = document.getElementById('vSelSize');
-  colorSel.innerHTML = '<option value="">Select a color…</option>';
-  sizeSel.innerHTML  = '<option value="">Select a size…</option>';
-  colorSel.disabled  = true;
-  sizeSel.disabled   = true;
-  document.getElementById('vBtnAdd').disabled = true;
+function vOnProduct() {
+  const parentId = document.getElementById('vProd').value;
+  vResetFrom('color');
   if (!parentId) return;
   const colorMap = {};
   for (const sku of catalog.skus) {
-    if (sku.parentId === parentId && sku.colorId && sku.colorName)
+    if (sku.parentId === parentId && sku.colorId)
       colorMap[sku.colorId] = sku.colorName;
   }
-  Object.entries(colorMap).sort((a,b) => a[1].localeCompare(b[1])).forEach(([id,name]) => {
-    const o = document.createElement('option'); o.value = id; o.textContent = name;
-    colorSel.appendChild(o);
+  const colorSel = document.getElementById('vColor');
+  colorSel.innerHTML = '<option value="">Select a color\u2026</option>';
+  Object.entries(colorMap).sort((a,b)=>a[1].localeCompare(b[1])).forEach(([id,name])=>{
+    const o=document.createElement('option'); o.value=id; o.textContent=name; colorSel.appendChild(o);
   });
-  colorSel.disabled = false;
+  document.getElementById('vColorRow').classList.remove('hidden');
 }
 
-function onVColorChange() {
-  const parentId = document.getElementById('vSelProduct').value;
-  const colorId  = document.getElementById('vSelColor').value;
-  const sizeSel  = document.getElementById('vSelSize');
-  sizeSel.innerHTML = '<option value="">Select a size…</option>';
-  sizeSel.disabled  = true;
-  document.getElementById('vBtnAdd').disabled = true;
+function vOnColor() {
+  const parentId = document.getElementById('vProd').value;
+  const colorId  = document.getElementById('vColor').value;
+  vResetFrom('size');
   if (!colorId) return;
   const sizeMap = {};
   for (const sku of catalog.skus) {
-    if (sku.parentId === parentId && sku.colorId === colorId && sku.sizeId && sku.sizeName)
+    if (sku.parentId===parentId && sku.colorId===colorId && sku.sizeId)
       sizeMap[sku.sizeId] = sku.sizeName;
   }
-  Object.entries(sizeMap).sort((a,b) => {
-    const na = parseFloat(a[1]), nb = parseFloat(b[1]);
-    if (!isNaN(na) && !isNaN(nb)) return na - nb;
-    return a[1].localeCompare(b[1]);
-  }).forEach(([id,name]) => {
-    const o = document.createElement('option'); o.value = id; o.textContent = name;
-    sizeSel.appendChild(o);
+  const sizes = Object.entries(sizeMap);
+  if (sizes.length > 1) {
+    const sizeSel = document.getElementById('vSize');
+    sizeSel.innerHTML = '<option value="">Select a size\u2026</option>';
+    sizes.sort((a,b)=>{ const na=parseFloat(a[1]),nb=parseFloat(b[1]); return (!isNaN(na)&&!isNaN(nb))?na-nb:a[1].localeCompare(b[1]); })
+         .forEach(([id,name])=>{ const o=document.createElement('option'); o.value=id; o.textContent=name; sizeSel.appendChild(o); });
+    document.getElementById('vSizeRow').classList.remove('hidden');
+  } else if (sizes.length === 1) {
+    document.getElementById('vSize').dataset.autoId   = sizes[0][0];
+    document.getElementById('vSize').dataset.autoName = sizes[0][1];
+    vOnSize(sizes[0][0]);
+  }
+}
+
+function vOnSize(forcedSizeId) {
+  const parentId = document.getElementById('vProd').value;
+  const colorId  = document.getElementById('vColor').value;
+  const sizeId   = forcedSizeId !== undefined ? forcedSizeId : document.getElementById('vSize').value;
+  vResetFrom('fvar');
+  if (!sizeId && forcedSizeId === undefined) return;
+  const fvarMap = {};
+  for (const sku of catalog.skus) {
+    if (sku.parentId===parentId && sku.colorId===colorId &&
+        (!sizeId || sku.sizeId===sizeId) && sku.featureVarId)
+      fvarMap[sku.featureVarId] = sku.featureVarName;
+  }
+  const fvars = Object.entries(fvarMap);
+  if (fvars.length > 1) {
+    const fvarSel = document.getElementById('vFvar');
+    fvarSel.innerHTML = '<option value="">Select a style\u2026</option>';
+    fvars.forEach(([id,name])=>{ const o=document.createElement('option'); o.value=id; o.textContent=name; fvarSel.appendChild(o); });
+    document.getElementById('vFvarRow').classList.remove('hidden');
+  } else {
+    const autoId = fvars[0]?.[0] || '';
+    document.getElementById('vFvar').dataset.autoId = autoId;
+    vOnFvar(autoId);
+  }
+}
+
+function vOnFvar(forcedFvarId) {
+  const parentId = document.getElementById('vProd').value;
+  const colorId  = document.getElementById('vColor').value;
+  const sizeEl   = document.getElementById('vSize');
+  const sizeId   = sizeEl.dataset.autoId || sizeEl.value || '';
+  const fvarId   = forcedFvarId !== undefined ? forcedFvarId : document.getElementById('vFvar').value;
+  vResetFrom('addon');
+  const addonMap = {};
+  let hasBase = false;
+  for (const sku of catalog.skus) {
+    if (sku.parentId===parentId && sku.colorId===colorId &&
+        (!sizeId || sku.sizeId===sizeId) &&
+        (!fvarId || sku.featureVarId===fvarId)) {
+      if (sku.addonId) addonMap[sku.addonId] = sku.addonName;
+      else hasBase = true;
+    }
+  }
+  const addons = Object.entries(addonMap);
+  if (addons.length > 0 && hasBase) {
+    const addonSel = document.getElementById('vAddon');
+    addonSel.innerHTML = '<option value="">No add-on</option>';
+    addons.forEach(([id,name])=>{ const o=document.createElement('option'); o.value=id; o.textContent=name; addonSel.appendChild(o); });
+    document.getElementById('vAddonRow').classList.remove('hidden');
+  }
+  document.getElementById('vQtyAddRow').classList.remove('hidden');
+}
+
+function vResetFrom(level) {
+  const levels = ['color','size','fvar','addon','qty'];
+  const idx = levels.indexOf(level);
+  if (idx <= 0) {
+    document.getElementById('vColorRow').classList.add('hidden');
+    document.getElementById('vColor').innerHTML = '<option value="">Select a color\u2026</option>';
+  }
+  if (idx <= 1) {
+    document.getElementById('vSizeRow').classList.add('hidden');
+    const s = document.getElementById('vSize');
+    s.innerHTML = '<option value="">Select a size\u2026</option>';
+    delete s.dataset.autoId; delete s.dataset.autoName;
+  }
+  if (idx <= 2) {
+    document.getElementById('vFvarRow').classList.add('hidden');
+    const f = document.getElementById('vFvar');
+    f.innerHTML = '<option value="">Select a style\u2026</option>';
+    delete f.dataset.autoId;
+  }
+  if (idx <= 3) {
+    document.getElementById('vAddonRow').classList.add('hidden');
+    document.getElementById('vAddon').innerHTML = '<option value="">No add-on</option>';
+  }
+  if (idx <= 4) {
+    document.getElementById('vQtyAddRow').classList.add('hidden');
+  }
+}
+
+function vDoAdd() {
+  const parentId = document.getElementById('vProd').value;
+  const colorId  = document.getElementById('vColor').value;
+  const sizeEl   = document.getElementById('vSize');
+  const sizeId   = sizeEl.dataset.autoId || sizeEl.value || '';
+  const fvarEl   = document.getElementById('vFvar');
+  const fvarId   = fvarEl.dataset.autoId !== undefined ? fvarEl.dataset.autoId : (fvarEl.value || '');
+  const addonId  = document.getElementById('vAddon').value || '';
+  const qty      = Math.max(1, parseInt(document.getElementById('vQty').value)||1);
+
+  const sku = catalog.skus.find(s =>
+    s.parentId===parentId && s.colorId===colorId &&
+    (!sizeId || s.sizeId===sizeId) &&
+    (!fvarId || s.featureVarId===fvarId) &&
+    (addonId ? s.addonId===addonId : !s.addonId)
+  );
+  if (!sku) { alert('Could not find matching product. Please check your selections.'); return; }
+
+  editItems.push({
+    skuRecordId: sku.recordId,
+    skuId:       sku.skuId || '',
+    name:        sku.name  || '',
+    qty,
+    unitPrice:   sku.price || 0,
   });
-  sizeSel.disabled = false;
-}
-
-function addViewItem() {
-  const parentId = document.getElementById('vSelProduct').value;
-  const colorId  = document.getElementById('vSelColor').value;
-  const sizeId   = document.getElementById('vSelSize').value;
-  const qty      = Math.max(1, parseInt(document.getElementById('vSelQty').value) || 1);
-  if (!parentId || !colorId || !sizeId) return;
-  const sku = catalog.skus.find(s => s.parentId === parentId && s.colorId === colorId && s.sizeId === sizeId);
-  if (!sku) return;
-  editItems.push({ skuRecordId: sku.recordId, name: sku.name, qty, unitPrice: sku.price });
   renderItemsTable();
-  // Reset panel
-  document.getElementById('vSelProduct').value = '';
-  document.getElementById('vSelColor').innerHTML = '<option value="">Select a color…</option>';
-  document.getElementById('vSelColor').disabled = true;
-  document.getElementById('vSelSize').innerHTML  = '<option value="">Select a size…</option>';
-  document.getElementById('vSelSize').disabled  = true;
-  document.getElementById('vSelQty').value = 1;
-  document.getElementById('vBtnAdd').disabled = true;
-}
 
-// Wire up separate listeners for the view-quote selectors
-document.getElementById('vSelProduct').addEventListener('change', onVProductChange);
-document.getElementById('vSelColor').addEventListener('change', onVColorChange);
-document.getElementById('vSelSize').addEventListener('change', function() {
-  document.getElementById('vBtnAdd').disabled = !this.value;
-});
+  // Reset
+  document.getElementById('vProd').value = '';
+  vResetFrom('color');
+  document.getElementById('vQty').value = 1;
+}
 
 // ─── Save changes ─────────────────────────────────────────────────────────────
 async function saveChanges() {
@@ -897,44 +1042,80 @@ async function saveChanges() {
 }
 
 // ─── Accept modal ─────────────────────────────────────────────────────────────
-function openModal()  { document.getElementById('acceptModal').classList.remove('hidden'); }
+function openModal() {
+  const c = quoteData.customer || {};
+  document.getElementById('billOrg').value   = c.billToOrg  || c.orgName     || '';
+  document.getElementById('billName').value  = c.billToName || c.contactName || '';
+  document.getElementById('billAddr1').value = c.address1   || '';
+  document.getElementById('billAddr2').value = c.address2   || '';
+  document.getElementById('billCity').value  = c.city       || '';
+  document.getElementById('billState').value = (c.state     || '').toUpperCase();
+  document.getElementById('billZip').value   = c.zip        || '';
+  document.getElementById('shipSame').checked = true;
+  document.getElementById('shipFields').classList.add('hidden');
+  document.getElementById('acceptModal').classList.remove('hidden');
+}
+
+function toggleShipSame() {
+  document.getElementById('shipFields').classList.toggle('hidden', document.getElementById('shipSame').checked);
+}
+
 function closeModal() { document.getElementById('acceptModal').classList.add('hidden'); }
 
 async function confirmOrder() {
   const btn = document.getElementById('btnConfirmOrder');
+  const billAddr1 = document.getElementById('billAddr1').value.trim();
+  const billCity  = document.getElementById('billCity').value.trim();
+  const billState = document.getElementById('billState').value.trim();
+  const billZip   = document.getElementById('billZip').value.trim();
+  if (!billAddr1 || !billCity || !billState || !billZip) {
+    alert('Please complete the required billing address fields.');
+    return;
+  }
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-sm"></span>Placing Order…';
+  btn.innerHTML = '<span class="spinner-sm"></span>Placing Order\u2026';
+
+  const billing = {
+    org:   document.getElementById('billOrg').value.trim(),
+    name:  document.getElementById('billName').value.trim(),
+    addr1: billAddr1,
+    addr2: document.getElementById('billAddr2').value.trim(),
+    city:  billCity,
+    state: billState.toUpperCase(),
+    zip:   billZip,
+  };
+  const shipSame = document.getElementById('shipSame').checked;
+  const shippingAddr = shipSame ? null : {
+    org:   document.getElementById('shipOrg').value.trim(),
+    name:  document.getElementById('shipName').value.trim(),
+    addr1: document.getElementById('shipAddr1').value.trim(),
+    addr2: document.getElementById('shipAddr2').value.trim(),
+    city:  document.getElementById('shipCity').value.trim(),
+    state: document.getElementById('shipState').value.trim().toUpperCase(),
+    zip:   document.getElementById('shipZip').value.trim(),
+  };
 
   try {
     const r = await fetch(`/api/accept-quote/${recordId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ billing, shipping: shippingAddr }),
     });
     const data = await r.json();
     if (!r.ok || !data.success) throw new Error(data.error || 'Failed to accept');
-
     closeModal();
-
     const soNumber = data.soNumber || '';
     const successBanner = document.getElementById('bannerSuccess');
     successBanner.textContent = `Order ${soNumber} created! Our team will be in touch about shipping and invoicing.`;
     successBanner.classList.remove('hidden');
-
-    // Update quote state
     quoteData.isAccepted = true;
     quoteData.soNumber   = soNumber;
-
-    // Hide edit/accept controls
     document.getElementById('addItemSection').classList.add('hidden');
     document.getElementById('saveRow').classList.add('hidden');
-
-    // Re-render badges and actions
     const badges = document.getElementById('badges');
     badges.innerHTML = '<span class="badge badge-navy">Net 30 Terms</span>';
-    const label = soNumber ? `✓ Order Accepted — ${soNumber}` : '✓ Order Accepted';
-    badges.insertAdjacentHTML('beforeend',
-      `<span class="badge badge-success">${escHtml(label)}</span>`);
-
+    const label = soNumber ? `\u2713 Order Accepted \u2014 ${soNumber}` : '\u2713 Order Accepted';
+    badges.insertAdjacentHTML('beforeend', `<span class="badge badge-success">${escHtml(label)}</span>`);
     buildActions(false);
     renderItemsTable();
   } catch(e) {
