@@ -962,7 +962,15 @@ function addCatalogItem(parentId) {
   );
   if (!sku) return;
 
-  const sizeNote = (document.getElementById('snote_' + parentId)?.value || '').trim();
+  const noteRow  = document.getElementById('sn_' + parentId);
+  const noteEl   = document.getElementById('snote_' + parentId);
+  const sizeNote = (noteEl?.value || '').trim();
+  if (noteRow && !noteRow.classList.contains('hidden') && !sizeNote) {
+    noteEl.focus();
+    noteEl.style.borderColor = 'var(--red)';
+    setTimeout(() => noteEl.style.borderColor = '', 1500);
+    return;
+  }
   items.push({ skuRecordId: sku.recordId, name: sku.name, qty, unitPrice: sku.price, sizeNote });
 
   renderItems();
