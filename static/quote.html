@@ -1045,7 +1045,9 @@ function addCatalogItem(parentId) {
 
   renderItems();
 
-  // Reset size and qty — keep color so the customer can quickly add another size.
+  // Reset after add — keep color, reset everything else.
+  // onSelColor handles size/feature/addon reset and re-enables qty+button
+  // automatically for no-size products (so the panel stays ready to add again).
   document.getElementById('sq_' + parentId).value = 1;
   document.getElementById('sqrow_' + parentId).classList.add('hidden');
   document.getElementById('spricerow_' + parentId).classList.add('hidden');
@@ -1053,8 +1055,7 @@ function addCatalogItem(parentId) {
   document.getElementById('snote_' + parentId).value = '';
   document.getElementById('sn_' + parentId).classList.add('hidden');
   clearSizeNoteError(parentId);
-  _resetFeature(parentId);
-  _repopulateSizes(parentId);
+  onSelColor(parentId);
 }
 
 // ─── Render ──────────────────────────────────────────────────────────────────
