@@ -2183,6 +2183,10 @@ def _build_catalog():
         if fvar_name.lower() in _EXCLUDED_FEATURE_VARS_GLOBAL:
             continue
 
+        sku_id = f.get("SKU ID", "")
+        if "-onb" in sku_id.lower():
+            continue
+
         addon_ids_sku  = f.get("Add-ons", [])
         addon_id_sku   = addon_ids_sku[0] if addon_ids_sku else ""
         addon_name_sku = addon_name_map.get(addon_id_sku, "") if addon_id_sku else ""
