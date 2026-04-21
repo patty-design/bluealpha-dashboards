@@ -2724,173 +2724,173 @@ def _build_quote_pdf_bytes(quote):
 
     # ── Build PDF with fpdf2 ────────────────────────────────────────────
     cust       = quote.get("customer", {})
-        line_items = quote.get("lineItems", [])
-        subtotal   = quote.get("subtotal", 0.0)
-        shipping   = quote.get("shipping", 0.0)
-        total      = quote.get("total",    0.0)
-        q_number   = quote.get("quoteNumber", "")
-        q_date     = quote.get("date", "")
-        q_expiry   = quote.get("expiryDate", "")
-        q_po       = quote.get("poNumber", "")
-        q_notes    = quote.get("notes", "")
+    line_items = quote.get("lineItems", [])
+    subtotal   = quote.get("subtotal", 0.0)
+    shipping   = quote.get("shipping", 0.0)
+    total      = quote.get("total",    0.0)
+    q_number   = quote.get("quoteNumber", "")
+    q_date     = quote.get("date", "")
+    q_expiry   = quote.get("expiryDate", "")
+    q_po       = quote.get("poNumber", "")
+    q_notes    = quote.get("notes", "")
 
-        bill_org  = cust.get("billToOrg")  or cust.get("orgName", "")
-        bill_name = cust.get("billToName") or cust.get("contactName", "")
-        addr1     = cust.get("address1", "")
-        city      = cust.get("city", "")
-        state_v   = cust.get("state", "")
-        zip_v     = cust.get("zip", "")
+    bill_org  = cust.get("billToOrg")  or cust.get("orgName", "")
+    bill_name = cust.get("billToName") or cust.get("contactName", "")
+    addr1     = cust.get("address1", "")
+    city      = cust.get("city", "")
+    state_v   = cust.get("state", "")
+    zip_v     = cust.get("zip", "")
 
-        pdf = FPDF(orientation="P", unit="mm", format="letter")
-        pdf.set_margins(19, 19, 19)
-        pdf.set_auto_page_break(auto=True, margin=19)
-        pdf.add_page()
+    pdf = FPDF(orientation="P", unit="mm", format="letter")
+    pdf.set_margins(19, 19, 19)
+    pdf.set_auto_page_break(auto=True, margin=19)
+    pdf.add_page()
 
-        W = 177.0  # usable width (letter 215.9 - 2×19mm margins)
+    W = 177.0  # usable width (letter 215.9 - 2×19mm margins)
 
-        # Navy / Red colours
-        NAVY = (27,  36,  56)
-        RED  = (189, 51,  51)
-        MUTED = (107, 122, 141)
-        TEXT  = (26,  38,  51)
-        LG    = (245, 247, 250)
-        BD    = (221, 227, 234)
+    # Navy / Red colours
+    NAVY = (27,  36,  56)
+    RED  = (189, 51,  51)
+    MUTED = (107, 122, 141)
+    TEXT  = (26,  38,  51)
+    LG    = (245, 247, 250)
+    BD    = (221, 227, 234)
 
-        # ── Header ────────────────────────────────────────────────────────
-        pdf.set_font("Helvetica", "B", 20)
-        pdf.set_text_color(*NAVY)
-        pdf.cell(W * 0.6, 10, "BLUE ALPHA", border=0, align="L")
-        pdf.set_font("Helvetica", "B", 26)
-        pdf.set_text_color(*RED)
-        pdf.cell(W * 0.4, 10, "QUOTE", border=0, align="R", new_x="LMARGIN", new_y="NEXT")
+    # ── Header ────────────────────────────────────────────────────────
+    pdf.set_font("Helvetica", "B", 20)
+    pdf.set_text_color(*NAVY)
+    pdf.cell(W * 0.6, 10, "BLUE ALPHA", border=0, align="L")
+    pdf.set_font("Helvetica", "B", 26)
+    pdf.set_text_color(*RED)
+    pdf.cell(W * 0.4, 10, "QUOTE", border=0, align="R", new_x="LMARGIN", new_y="NEXT")
 
+    pdf.set_font("Helvetica", "", 8)
+    pdf.set_text_color(*MUTED)
+    pdf.cell(W, 6, "bluealphabelts.com  |  info@bluealpha.us  |  678-961-3304",
+             border=0, align="L", new_x="LMARGIN", new_y="NEXT")
+
+    # Navy rule
+    pdf.set_draw_color(*NAVY)
+    pdf.set_line_width(0.7)
+    pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
+    pdf.ln(5)
+
+    # ── Meta two-column ───────────────────────────────────────────────
+    y_meta = pdf.get_y()
+    col_w  = W / 2
+
+    def meta_row(label, value):
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.set_text_color(*MUTED)
+        pdf.cell(28, 5.5, label, border=0)
         pdf.set_font("Helvetica", "", 8)
-        pdf.set_text_color(*MUTED)
-        pdf.cell(W, 6, "bluealphabelts.com  |  info@bluealpha.us  |  678-961-3304",
-                 border=0, align="L", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_text_color(*TEXT)
+        pdf.cell(col_w - 28, 5.5, str(value), border=0, new_x="LMARGIN", new_y="NEXT")
 
-        # Navy rule
-        pdf.set_draw_color(*NAVY)
-        pdf.set_line_width(0.7)
-        pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
-        pdf.ln(5)
+    meta_rows = [("Quote Number:", q_number), ("Date:", q_date),
+                 ("Expires:", q_expiry), ("Terms:", "Net 30")]
+    if q_po:
+        meta_rows.append(("PO #:", q_po))
 
-        # ── Meta two-column ───────────────────────────────────────────────
-        y_meta = pdf.get_y()
-        col_w  = W / 2
+    for label, value in meta_rows:
+        meta_row(label, value)
 
-        def meta_row(label, value):
-            pdf.set_font("Helvetica", "B", 8)
-            pdf.set_text_color(*MUTED)
-            pdf.cell(28, 5.5, label, border=0)
-            pdf.set_font("Helvetica", "", 8)
+    # Bill To (right column)
+    pdf.set_xy(19 + col_w, y_meta)
+    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_text_color(*MUTED)
+    pdf.cell(col_w, 5.5, "Bill To", border=0, new_x="LEFT", new_y="NEXT")
+    pdf.set_x(19 + col_w)
+
+    for line in [bill_org, bill_name, addr1,
+                 f"{city}, {state_v} {zip_v}".strip(", ")]:
+        if line:
+            pdf.set_font("Helvetica", "B" if line == bill_org else "", 9)
             pdf.set_text_color(*TEXT)
-            pdf.cell(col_w - 28, 5.5, str(value), border=0, new_x="LMARGIN", new_y="NEXT")
+            pdf.set_x(19 + col_w)
+            pdf.cell(col_w, 5.5, line, border=0, new_x="LEFT", new_y="NEXT")
 
-        meta_rows = [("Quote Number:", q_number), ("Date:", q_date),
-                     ("Expires:", q_expiry), ("Terms:", "Net 30")]
-        if q_po:
-            meta_rows.append(("PO #:", q_po))
+    pdf.ln(6)
 
-        for label, value in meta_rows:
-            meta_row(label, value)
+    # ── Line items table ──────────────────────────────────────────────
+    col_widths = [W - 60, 14, 23, 23]  # Product, Qty, Unit Price, Total
+    headers    = ["PRODUCT", "QTY", "UNIT PRICE", "TOTAL"]
+    aligns     = ["L", "R", "R", "R"]
+    row_h      = 7
 
-        # Bill To (right column)
-        pdf.set_xy(19 + col_w, y_meta)
-        pdf.set_font("Helvetica", "B", 8)
-        pdf.set_text_color(*MUTED)
-        pdf.cell(col_w, 5.5, "Bill To", border=0, new_x="LEFT", new_y="NEXT")
-        pdf.set_x(19 + col_w)
+    # Header row
+    pdf.set_fill_color(*NAVY)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 8)
+    for w, h, a in zip(col_widths, headers, aligns):
+        pdf.cell(w, row_h, h, border=0, align=a, fill=True)
+    pdf.ln()
 
-        for line in [bill_org, bill_name, addr1,
-                     f"{city}, {state_v} {zip_v}".strip(", ")]:
-            if line:
-                pdf.set_font("Helvetica", "B" if line == bill_org else "", 9)
-                pdf.set_text_color(*TEXT)
-                pdf.set_x(19 + col_w)
-                pdf.cell(col_w, 5.5, line, border=0, new_x="LEFT", new_y="NEXT")
-
-        pdf.ln(6)
-
-        # ── Line items table ──────────────────────────────────────────────
-        col_widths = [W - 60, 14, 23, 23]  # Product, Qty, Unit Price, Total
-        headers    = ["PRODUCT", "QTY", "UNIT PRICE", "TOTAL"]
-        aligns     = ["L", "R", "R", "R"]
-        row_h      = 7
-
-        # Header row
-        pdf.set_fill_color(*NAVY)
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_font("Helvetica", "B", 8)
-        for w, h, a in zip(col_widths, headers, aligns):
-            pdf.cell(w, row_h, h, border=0, align=a, fill=True)
+    # Data rows
+    pdf.set_font("Helvetica", "", 8)
+    for idx, item in enumerate(line_items):
+        fill = idx % 2 == 0
+        pdf.set_fill_color(*LG)
+        pdf.set_text_color(*TEXT)
+        line_total = item["qty"] * item["unitPrice"]
+        row_data = [item["name"], str(item["qty"]),
+                    f"${item['unitPrice']:.2f}", f"${line_total:.2f}"]
+        for w, cell, a in zip(col_widths, row_data, aligns):
+            pdf.cell(w, row_h, cell, border=0, align=a, fill=fill)
         pdf.ln()
 
-        # Data rows
-        pdf.set_font("Helvetica", "", 8)
-        for idx, item in enumerate(line_items):
-            fill = idx % 2 == 0
-            pdf.set_fill_color(*LG)
-            pdf.set_text_color(*TEXT)
-            line_total = item["qty"] * item["unitPrice"]
-            row_data = [item["name"], str(item["qty"]),
-                        f"${item['unitPrice']:.2f}", f"${line_total:.2f}"]
-            for w, cell, a in zip(col_widths, row_data, aligns):
-                pdf.cell(w, row_h, cell, border=0, align=a, fill=fill)
-            pdf.ln()
+    pdf.ln(3)
 
-        pdf.ln(3)
+    # ── Totals ────────────────────────────────────────────────────────
+    def totals_row(label, value, bold=False):
+        pdf.set_font("Helvetica", "B" if bold else "", 9)
+        pdf.set_text_color(*TEXT if bold else MUTED)
+        pdf.cell(W - 46, 6, "", border=0)
+        pdf.set_text_color(*TEXT if bold else MUTED)
+        pdf.cell(23, 6, label, border=0, align="R")
+        pdf.set_text_color(*TEXT)
+        pdf.cell(23, 6, value, border=0, align="R", new_x="LMARGIN", new_y="NEXT")
 
-        # ── Totals ────────────────────────────────────────────────────────
-        def totals_row(label, value, bold=False):
-            pdf.set_font("Helvetica", "B" if bold else "", 9)
-            pdf.set_text_color(*TEXT if bold else MUTED)
-            pdf.cell(W - 46, 6, "", border=0)
-            pdf.set_text_color(*TEXT if bold else MUTED)
-            pdf.cell(23, 6, label, border=0, align="R")
-            pdf.set_text_color(*TEXT)
-            pdf.cell(23, 6, value, border=0, align="R", new_x="LMARGIN", new_y="NEXT")
+    totals_row("Subtotal", f"${subtotal:.2f}")
+    if shipping > 0:
+        totals_row("Shipping", f"${shipping:.2f}")
+    # Rule above total
+    y_rule = pdf.get_y()
+    pdf.set_draw_color(*NAVY)
+    pdf.set_line_width(0.4)
+    pdf.line(19 + W - 46, y_rule, 19 + W, y_rule)
+    pdf.ln(1)
+    totals_row("Total", f"${total:.2f}", bold=True)
+    pdf.ln(5)
 
-        totals_row("Subtotal", f"${subtotal:.2f}")
-        if shipping > 0:
-            totals_row("Shipping", f"${shipping:.2f}")
-        # Rule above total
-        y_rule = pdf.get_y()
-        pdf.set_draw_color(*NAVY)
-        pdf.set_line_width(0.4)
-        pdf.line(19 + W - 46, y_rule, 19 + W, y_rule)
-        pdf.ln(1)
-        totals_row("Total", f"${total:.2f}", bold=True)
-        pdf.ln(5)
-
-        # ── Notes ─────────────────────────────────────────────────────────
-        if q_notes:
-            pdf.set_draw_color(*BD)
-            pdf.set_line_width(0.3)
-            pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
-            pdf.ln(4)
-            pdf.set_font("Helvetica", "B", 8)
-            pdf.set_text_color(*MUTED)
-            pdf.cell(W, 5, "NOTES", border=0, new_x="LMARGIN", new_y="NEXT")
-            pdf.set_font("Helvetica", "", 8)
-            pdf.set_text_color(*TEXT)
-            pdf.multi_cell(W, 5, q_notes, border=0)
-            pdf.ln(3)
-
-        # ── Footer ────────────────────────────────────────────────────────
+    # ── Notes ─────────────────────────────────────────────────────────
+    if q_notes:
         pdf.set_draw_color(*BD)
         pdf.set_line_width(0.3)
         pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
         pdf.ln(4)
-        pdf.set_font("Helvetica", "", 7.5)
+        pdf.set_font("Helvetica", "B", 8)
         pdf.set_text_color(*MUTED)
-        pdf.multi_cell(W, 4.5,
-            "This quote is valid for 90 days from the date of issue. Payment terms are Net 30 upon acceptance. "
-            "To accept this quote, visit the link provided in your email. "
-            "Questions? Contact us at info@bluealpha.us or 678-961-3304.",
-            border=0)
+        pdf.cell(W, 5, "NOTES", border=0, new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*TEXT)
+        pdf.multi_cell(W, 5, q_notes, border=0)
+        pdf.ln(3)
 
-        return bytes(pdf.output())
+    # ── Footer ────────────────────────────────────────────────────────
+    pdf.set_draw_color(*BD)
+    pdf.set_line_width(0.3)
+    pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
+    pdf.ln(4)
+    pdf.set_font("Helvetica", "", 7.5)
+    pdf.set_text_color(*MUTED)
+    pdf.multi_cell(W, 4.5,
+        "This quote is valid for 90 days from the date of issue. Payment terms are Net 30 upon acceptance. "
+        "To accept this quote, visit the link provided in your email. "
+        "Questions? Contact us at info@bluealpha.us or 678-961-3304.",
+        border=0)
+
+    return bytes(pdf.output())
 
 
 @app.route("/quote-pdf/<record_id>", methods=["GET"])
