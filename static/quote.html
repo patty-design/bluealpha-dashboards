@@ -1011,13 +1011,12 @@ function addCatalogItem(parentId) {
 
   renderItems();
 
-  // Reset selector state
-  document.getElementById('sc_' + parentId).value = '';
+  // Reset only the size field and its dependents — keep color and qty so the
+  // customer can quickly add another size of the same product
   document.getElementById('ss_' + parentId).innerHTML = '<option value="">Select a size…</option>';
   document.getElementById('ss_' + parentId).classList.remove('hidden');
   document.getElementById('sl_' + parentId).classList.add('hidden');
   document.getElementById('szfield_' + parentId).classList.add('hidden');
-  document.getElementById('sq_' + parentId).value = 1;
   document.getElementById('sqrow_' + parentId).classList.add('hidden');
   document.getElementById('spricerow_' + parentId).classList.add('hidden');
   document.getElementById('sb_' + parentId).disabled = true;
@@ -1025,15 +1024,6 @@ function addCatalogItem(parentId) {
   document.getElementById('sn_' + parentId).classList.add('hidden');
   clearSizeNoteError(parentId);
   _resetFeature(parentId); // handles feature row + addon row reset
-
-  // Close the panel
-  const selector = document.getElementById('ps_' + parentId);
-  const row      = selector.previousElementSibling;
-  const item     = document.getElementById('pi_' + parentId);
-  selector.classList.remove('open');
-  row.classList.remove('active');
-  item.classList.remove('active');
-  activeParent = null;
 }
 
 // ─── Render ──────────────────────────────────────────────────────────────────
