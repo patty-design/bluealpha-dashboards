@@ -2382,20 +2382,31 @@ def create_quote():
         if existing:
             cust_id = existing[0]["id"]
         else:
+            # Build address lines in the format the Airtable formulas expect:
+            # Line 1 = street (+ suite/unit if provided)
+            # Line 2 = "City, State ZIP"  ← parsed by Customer City/State/Zip formulas
+            line1 = address1
+            if address2:
+                line1 = f"{address1}, {address2}"
+            line2 = ""
+            if city and state and zip_code:
+                line2 = f"{city}, {state} {zip_code}"
+            elif city or state or zip_code:
+                line2 = " ".join(filter(None, [city, state, zip_code]))
+
+            new_cust = {
+                "Organization Name":      org_name,
+                "Main Contact Name":      contact_name,
+                "Main Contact Email":     email,
+            }
+            if phone:   new_cust["Main Contact Phone #"]        = phone
+            if line1:   new_cust["Customer Address (Line 1)"]   = line1
+            if line2:   new_cust["Customer Address (Line 2)"]   = line2
+
             cr = req_lib.post(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}",
                 headers={**at_headers(token), "Content-Type": "application/json"},
-                json={"fields": {
-                    "Organization Name":      org_name,
-                    "Main Contact Name":      contact_name,
-                    "Main Contact Email":     email,
-                    "Main Contact Phone #":   phone,
-                    "Customer Address (Line 1)": address1,
-                    "Customer Address (Line 2)": address2,
-                    "Customer City":          city,
-                    "Customer State":         state,
-                    "Customer Zip Code":      zip_code,
-                }},
+                json={"fields": new_cust},
                 timeout=15,
             )
             cr.raise_for_status()
