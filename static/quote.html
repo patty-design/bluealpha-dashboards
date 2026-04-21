@@ -663,8 +663,8 @@ function _productHtml(p) {
         </div>
         <div class="size-note-row hidden" id="sn_${p.id}">
           <div class="sel-field">
-            <label>Pant Size <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">(e.g. 52)</span></label>
-            <input type="number" id="snote_${p.id}" placeholder="e.g. 52" min="20" max="99" maxlength="2" style="max-width:90px" oninput="this.value=this.value.slice(0,2)">
+            <label>Pant Size <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">(even sizes only)</span></label>
+            <input type="number" id="snote_${p.id}" placeholder="e.g. 52" min="20" max="98" step="2" style="max-width:90px" oninput="this.value=this.value.slice(0,2)">
           </div>
         </div>
       </div>
@@ -965,11 +965,14 @@ function addCatalogItem(parentId) {
   const noteRow  = document.getElementById('sn_' + parentId);
   const noteEl   = document.getElementById('snote_' + parentId);
   const sizeNote = (noteEl?.value || '').trim();
-  if (noteRow && !noteRow.classList.contains('hidden') && !sizeNote) {
-    noteEl.focus();
-    noteEl.style.borderColor = 'var(--red)';
-    setTimeout(() => noteEl.style.borderColor = '', 1500);
-    return;
+  if (noteRow && !noteRow.classList.contains('hidden')) {
+    const sizeNum = parseInt(sizeNote, 10);
+    if (!sizeNote || isNaN(sizeNum) || sizeNum % 2 !== 0) {
+      noteEl.focus();
+      noteEl.style.borderColor = 'var(--red)';
+      setTimeout(() => noteEl.style.borderColor = '', 1500);
+      return;
+    }
   }
   items.push({ skuRecordId: sku.recordId, name: sku.name, qty, unitPrice: sku.price, sizeNote });
 
