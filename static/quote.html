@@ -1118,14 +1118,25 @@ function addCatalogItem(parentId) {
   document.getElementById('sn_' + parentId).classList.add('hidden');
   clearSizeNoteError(parentId);
 
+  // Detect color-only products (no size, no feature var, no addon on any SKU)
+  const _parentSkus = catalog.skus.filter(s => s.parentId === parentId);
+  const _colorOnly  = _parentSkus.every(s => !s.sizeId && !s.featureVarId && !s.addonId);
+
   if (_SIZE_ONLY_RESET_PARENTS.has(_parentName)) {
     // Size-only reset: keep color, feature, addon, and qty row visible —
     // just reset size to placeholder and disable add button until new size picked
     _repopulateSizes(parentId);
     document.getElementById('spricerow_' + parentId).classList.add('hidden');
     document.getElementById('sb_' + parentId).disabled = true;
+  } else if (_colorOnly) {
+    // Color-only product: reset color to placeholder so customer must re-select
+    document.getElementById('sc_' + parentId).value = '';
+    document.getElementById('sqrow_' + parentId).classList.add('hidden');
+    document.getElementById('spricerow_' + parentId).classList.add('hidden');
+    document.getElementById('sb_' + parentId).disabled = true;
+    onSelColor(parentId);
   } else {
-    // Full reset: keep color, reset everything else via onSelColor
+    // Has size/feature/addon: keep color, reset everything else via onSelColor
     // (re-enables qty+button automatically for no-size products)
     document.getElementById('sqrow_' + parentId).classList.add('hidden');
     document.getElementById('spricerow_' + parentId).classList.add('hidden');
