@@ -2023,7 +2023,7 @@ def _fetch_quote_data(record_id):
     li_formula = f'FIND("{record_id}", ARRAYJOIN({{Manual Order}}))'
     li_records = at_get_all(
         MO_LINE_ITEMS_TABLE_ID, token,
-        fields=["Manual Order", "Product SKU", "Qty.", "Adj. Unit Price",
+        fields=["Manual Order", "Product SKU", "Qty.", "Confirmed Unit Price",
                 "Name + Variations (from Product SKU)", "SKU ID (from Product SKU)"],
         formula=li_formula,
     )
@@ -2039,7 +2039,7 @@ def _fetch_quote_data(record_id):
             "skuId":       sku_ids_f[0] if sku_ids_f else "",
             "name":        sku_names[0] if sku_names else "",
             "qty":         lf.get("Qty.", 0),
-            "unitPrice":   lf.get("Adj. Unit Price", 0),
+            "unitPrice":   lf.get("Confirmed Unit Price", 0),
         })
 
     subtotal = sum(i["qty"] * i["unitPrice"] for i in line_items)
@@ -2385,9 +2385,10 @@ def create_quote():
     notes        = (data.get("notes") or "").strip()
 
     try:
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
         # 1. Find or create customer by email
         existing = at_get_all(
-            CUSTOMERS_TABLE_ID, token,
+            CUSTOMERS_TABLE_ID, read_token,
             fields=["Main Contact Email", "Organization Name"],
             formula=f"{{Main Contact Email}}='{email}'",
         )
@@ -2424,8 +2425,9 @@ def create_quote():
             cr.raise_for_status()
             cust_id = cr.json()["id"]
 
-        # 2. Get next order ID
-        all_mos = at_get_all(MANUAL_ORDERS_TABLE_ID, token, fields=["Order ID"])
+        # 2. Get next order ID — use read token (write token may lack read scope)
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        all_mos = at_get_all(MANUAL_ORDERS_TABLE_ID, read_token, fields=["Order ID"])
         max_id = 0
         for mo in all_mos:
             oid_str = mo["fields"].get("Order ID", "")
