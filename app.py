@@ -2160,6 +2160,7 @@ def _build_catalog():
         color_id   = color_ids[0] if color_ids else ""
         size_id    = size_ids[0]  if size_ids  else ""
         color_name = color_map.get(color_id, "")
+        color_name = _COLOR_NAME_OVERRIDES.get(color_name.lower(), color_name)
         size_name  = size_map.get(size_id, "")
         # Treat placeholder sizes as no-size so frontend handles correctly
         if size_name.strip().lower() in ("none", "n/a", "one size"):
@@ -2271,6 +2272,11 @@ _EXCLUDED_COLORS_BY_PARENT = {
 # Display name overrides (post-clean lowercase → desired display name)
 _PARENT_NAME_OVERRIDES = {
     "1.5\" lp inner only belt": "1.5\" Low Profile Inner Only Belt",
+}
+
+# Color display name overrides (lowercase color name from Airtable → desired display name)
+_COLOR_NAME_OVERRIDES = {
+    "mc classic": "Multicam Classic",
 }
 
 # Parents that should sort last within their category (post-clean lowercase)
