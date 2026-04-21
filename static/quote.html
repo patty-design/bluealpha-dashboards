@@ -187,13 +187,14 @@
     }
 
     .product-selector {
-      display: none; padding: 14px 16px 16px; background: #f7f9fc;
+      display: none; padding: 18px 20px 20px; background: #f7f9fc;
       border-top: 1px solid var(--border);
     }
     .product-selector.open { display: block; }
-    .sel-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+    .sel-row { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
+    .sel-row:last-child { margin-bottom: 0; }
     .sel-field { flex: 1; min-width: 120px; }
-    .sel-field label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); display: block; margin-bottom: 5px; }
+    .sel-field label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); display: block; margin-bottom: 6px; }
     .sel-qty { flex: 0 0 70px; }
     .btn-add-inline {
       flex: 0 0 auto; padding: 10px 18px; background: var(--navy); color: #fff;
@@ -221,7 +222,7 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      margin-top: 10px;
+      margin-bottom: 14px;
       font-size: 0.9rem;
       color: var(--muted);
     }
@@ -654,7 +655,7 @@ function _productHtml(p) {
         <div class="sku-price-row hidden" id="spricerow_${p.id}">
           Unit price: <span class="sku-price-val" id="sprice_${p.id}"></span>
         </div>
-        <div class="sel-row hidden" id="sqrow_${p.id}" style="margin-top:8px">
+        <div class="sel-row hidden" id="sqrow_${p.id}">
           <div class="sel-field sel-qty">
             <label>Qty</label>
             <input type="number" id="sq_${p.id}" min="1" value="1" style="text-align:center">
