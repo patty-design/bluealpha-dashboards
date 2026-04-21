@@ -1788,7 +1788,10 @@ def submit_exchange():
 
 @app.route("/quote")
 def quote_page():
-    return send_from_directory("static", "quote.html")
+    resp = send_from_directory("static", "quote.html")
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
 
 @app.route("/view-quote/<record_id>")
 def view_quote_page(record_id):
