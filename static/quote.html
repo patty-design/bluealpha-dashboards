@@ -941,6 +941,8 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '') {
   }
   if (!hasBase) addonSel.value = addons[0][0]; // default to first if no base SKU
   addonRow.classList.remove('hidden');
+  // Trigger price update now that add-on value is set
+  _updatePrice(parentId);
 }
 
 // ─── Add item ────────────────────────────────────────────────────────────────
