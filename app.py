@@ -2285,6 +2285,7 @@ _EXCLUDED_COLORS_BY_PARENT = {
 # Display name overrides (post-clean lowercase → desired display name)
 _PARENT_NAME_OVERRIDES = {
     "1.5\" lp inner only belt": "1.5\" Low Profile Inner Only Belt",
+    "keepers": "Keepers (set of 4)",
 }
 
 # Color display name overrides (lowercase color name from Airtable → desired display name)
