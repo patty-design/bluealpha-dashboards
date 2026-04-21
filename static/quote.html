@@ -852,16 +852,17 @@ function populateFeatures(parentId) {
   const fvars = Object.entries(fvarMap).sort((a,b) => a[1].localeCompare(b[1]));
 
   if (!featRow || fvars.length <= 1) {
+    const autoFvarId = fvars.length === 1 ? fvars[0][0] : '';
     if (featRow) featRow.classList.add('hidden');
     if (featSel && fvars.length === 1) featSel.value = fvars[0][0];
-    populateAddons(parentId, colorId, sizeId);
+    populateAddons(parentId, colorId, sizeId, autoFvarId);
     document.getElementById('sqrow_' + parentId).classList.remove('hidden');
     document.getElementById('sb_' + parentId).disabled = false;
     _updatePrice(parentId);
     return;
   }
 
-  // Multiple variants — show selector, wait for user choice
+  // Multiple feature variants — show selector; add-ons load after user picks a feature
   featSel.innerHTML = '<option value="">Select a style…</option>';
   for (const [id, name] of fvars) {
     const opt = document.createElement('option');
@@ -869,14 +870,17 @@ function populateFeatures(parentId) {
     featSel.appendChild(opt);
   }
   featRow.classList.remove('hidden');
-  populateAddons(parentId, colorId, sizeId);
+  // Don't populate add-ons yet — onSelFeature will do it after user picks
   document.getElementById('sqrow_' + parentId).classList.remove('hidden');
   document.getElementById('sb_' + parentId).disabled = true;
 }
 
 function onSelFeature(parentId) {
-  const featId = document.getElementById('sfeat_' + parentId)?.value || '';
+  const featId  = document.getElementById('sfeat_' + parentId)?.value || '';
+  const colorId = document.getElementById('sc_' + parentId).value;
+  const sizeId  = document.getElementById('ss_' + parentId).value;
   document.getElementById('sb_' + parentId).disabled = !featId;
+  if (featId) populateAddons(parentId, colorId, sizeId, featId);
   _updatePrice(parentId);
 }
 
@@ -905,7 +909,7 @@ function _updatePrice(parentId) {
   }
 }
 
-function populateAddons(parentId, colorId, sizeId) {
+function populateAddons(parentId, colorId, sizeId, featureVarId = '') {
   const addonRow = document.getElementById('sarow_' + parentId);
   const addonSel = document.getElementById('sadon_' + parentId);
   if (!addonRow || !addonSel) return;
@@ -913,7 +917,8 @@ function populateAddons(parentId, colorId, sizeId) {
   const addonMap = {};
   let hasBase = false;
   for (const sku of catalog.skus) {
-    if (sku.parentId === parentId && sku.colorId === colorId && sku.sizeId === sizeId) {
+    if (sku.parentId === parentId && sku.colorId === colorId && sku.sizeId === sizeId &&
+        (featureVarId ? sku.featureVarId === featureVarId : true)) {
       if (sku.addonId && sku.addonName) addonMap[sku.addonId] = sku.addonName;
       else hasBase = true;
     }
