@@ -2161,6 +2161,9 @@ def _build_catalog():
         size_id    = size_ids[0]  if size_ids  else ""
         color_name = color_map.get(color_id, "")
         size_name  = size_map.get(size_id, "")
+        # Treat placeholder sizes as no-size so frontend handles correctly
+        if size_name.strip().lower() in ("none", "n/a", "one size"):
+            size_id = ""; size_name = ""
 
         excluded_colors = _EXCLUDED_COLORS_BY_PARENT.get(parent_name.lower(), set())
         if color_name.lower() in excluded_colors:
