@@ -1870,7 +1870,7 @@ def send_quote_email(to_email, to_name, company, quote_number, record_id, expiry
 </body>
 </html>"""
     try:
-        req_lib.post(
+        sg_r = req_lib.post(
             "https://api.sendgrid.com/v3/mail/send",
             headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
             json={
@@ -1881,6 +1881,7 @@ def send_quote_email(to_email, to_name, company, quote_number, record_id, expiry
             },
             timeout=15,
         )
+        print(f"[send_quote_email] to={actual_to} status={sg_r.status_code} body={sg_r.text[:200]}")
     except Exception as e:
         print(f"[send_quote_email] failed: {e}")
 
