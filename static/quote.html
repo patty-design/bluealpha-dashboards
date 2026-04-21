@@ -170,9 +170,20 @@
       font-size: 0.9rem; color: var(--text);
     }
     .product-row:hover { background: #f0f4f8; }
-    .product-row.active { background: #e8f0f9; color: var(--navy); font-weight: 700; }
+    .product-row.active {
+      background: #dce8f5;
+      color: var(--navy);
+      font-weight: 700;
+      border-left: 4px solid var(--navy);
+      padding-left: 12px;
+    }
     .product-row .p-arrow { font-size: 0.75rem; color: var(--muted); transition: transform 0.2s; }
     .product-row.active .p-arrow { transform: rotate(90deg); color: var(--navy); }
+    .product-item.active {
+      box-shadow: 0 0 0 2px var(--navy);
+      border-radius: 4px;
+      overflow: hidden;
+    }
 
     .product-selector {
       display: none; padding: 14px 16px 16px; background: #f7f9fc;
@@ -705,17 +716,21 @@ function toggleCat(header) {
 function toggleProduct(parentId, rowEl) {
   // Close previously open product if different
   if (activeParent && activeParent !== parentId) {
-    const prev = document.getElementById('ps_' + activeParent);
-    const prevRow = prev && prev.previousElementSibling;
-    if (prev) prev.classList.remove('open');
-    if (prevRow) prevRow.classList.remove('active');
+    const prev     = document.getElementById('ps_' + activeParent);
+    const prevRow  = prev && prev.previousElementSibling;
+    const prevItem = document.getElementById('pi_' + activeParent);
+    if (prev)     prev.classList.remove('open');
+    if (prevRow)  prevRow.classList.remove('active');
+    if (prevItem) prevItem.classList.remove('active');
   }
 
   const selector = document.getElementById('ps_' + parentId);
+  const item     = document.getElementById('pi_' + parentId);
   const isOpen   = selector.classList.contains('open');
 
   selector.classList.toggle('open', !isOpen);
   rowEl.classList.toggle('active', !isOpen);
+  item.classList.toggle('active', !isOpen);
   activeParent = isOpen ? null : parentId;
 
   // Populate colors when opening
@@ -968,9 +983,11 @@ function addCatalogItem(parentId) {
 
   // Close the panel
   const selector = document.getElementById('ps_' + parentId);
-  const row = selector.previousElementSibling;
+  const row      = selector.previousElementSibling;
+  const item     = document.getElementById('pi_' + parentId);
   selector.classList.remove('open');
   row.classList.remove('active');
+  item.classList.remove('active');
   activeParent = null;
 }
 
