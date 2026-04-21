@@ -2166,7 +2166,7 @@ def _build_catalog():
             size_id = ""; size_name = ""
 
         excluded_colors = _EXCLUDED_COLORS_BY_PARENT.get(parent_name.lower(), set())
-        if color_name.lower() in excluded_colors:
+        if color_name.lower() in excluded_colors or color_name.lower() in _EXCLUDED_COLORS_GLOBAL:
             continue
 
         fvar_ids  = f.get("Feature Variation", [])
@@ -2256,6 +2256,11 @@ _EXCLUDED_PARENTS = {
     "hat", "hoodie", "t-shirt",
     "sentry strap - ba",
     "fanny pack",
+}
+
+# Colors to exclude globally (lowercase color names)
+_EXCLUDED_COLORS_GLOBAL = {
+    "splatter",
 }
 
 # Colors to exclude per parent (lowercase parent name → set of lowercase color names)
