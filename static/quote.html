@@ -1022,6 +1022,9 @@ function addCatalogItem(parentId) {
   clearSizeNoteError(parentId);
   _resetFeature(parentId);
   onSelColor(parentId);
+  // Force size back to placeholder after onSelColor repopulates it
+  // (browser may restore previous selection from form cache otherwise)
+  document.getElementById('ss_' + parentId).value = '';
 }
 
 // ─── Render ──────────────────────────────────────────────────────────────────
