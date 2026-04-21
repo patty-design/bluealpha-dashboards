@@ -913,11 +913,17 @@ function onSelSize(parentId) {
   noteRow.classList.toggle('hidden', !isOther);
   if (!isOther) document.getElementById('snote_' + parentId).value = '';
 
+  // For size-only-reset parents, preserve the current feature selection across size changes
+  const _pname = (catalog.parents.find(p => p.id === parentId)?.name || '').toLowerCase();
+  const _preservedFvar = _SIZE_ONLY_RESET_PARENTS.has(_pname)
+    ? (document.getElementById('sfeat_' + parentId)?.value || '')
+    : '';
+
   _resetFeature(parentId);
   document.getElementById('sqrow_' + parentId).classList.add('hidden');
   document.getElementById('spricerow_' + parentId).classList.add('hidden');
   document.getElementById('sb_' + parentId).disabled = true;
-  if (sizeId) populateFeatures(parentId);
+  if (sizeId) populateFeatures(parentId, _preservedFvar);
 }
 
 // ─── Feature variation helpers ────────────────────────────────────────────────
@@ -932,7 +938,7 @@ function _resetFeature(parentId) {
   if (addonSel) { addonSel.innerHTML = '<option value="">None</option>'; addonSel.value = ''; }
 }
 
-function populateFeatures(parentId) {
+function populateFeatures(parentId, preferredFvarId = '') {
   const colorId = document.getElementById('sc_' + parentId).value;
   const sizeId  = document.getElementById('ss_' + parentId).value;
   const featRow = document.getElementById('sfrow_' + parentId);
@@ -966,9 +972,17 @@ function populateFeatures(parentId) {
     featSel.appendChild(opt);
   }
   featRow.classList.remove('hidden');
-  // Don't populate add-ons yet — onSelFeature will do it after user picks
   document.getElementById('sqrow_' + parentId).classList.remove('hidden');
-  document.getElementById('sb_' + parentId).disabled = true;
+
+  // If a preferred feature is still available for this size, auto-select it
+  if (preferredFvarId && fvarMap[preferredFvarId]) {
+    featSel.value = preferredFvarId;
+    populateAddons(parentId, colorId, sizeId, preferredFvarId);
+    document.getElementById('sb_' + parentId).disabled = false;
+    _updatePrice(parentId);
+  } else {
+    document.getElementById('sb_' + parentId).disabled = true;
+  }
 }
 
 function onSelFeature(parentId) {
