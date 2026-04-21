@@ -663,8 +663,8 @@ function _productHtml(p) {
         </div>
         <div class="size-note-row hidden" id="sn_${p.id}">
           <div class="sel-field">
-            <label>Pant Size / Inseam <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">(e.g. 32×34)</span></label>
-            <input type="text" id="snote_${p.id}" placeholder="e.g. 32×34" maxlength="80">
+            <label>Pant Size <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">(e.g. 52)</span></label>
+            <input type="number" id="snote_${p.id}" placeholder="e.g. 52" min="20" max="99" maxlength="2" style="max-width:90px" oninput="this.value=this.value.slice(0,2)">
           </div>
         </div>
       </div>
