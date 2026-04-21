@@ -1012,18 +1012,16 @@ function addCatalogItem(parentId) {
   renderItems();
 
   // Reset only the size field and its dependents — keep color and qty so the
-  // customer can quickly add another size of the same product
-  document.getElementById('ss_' + parentId).innerHTML = '<option value="">Select a size…</option>';
-  document.getElementById('ss_' + parentId).classList.remove('hidden');
-  document.getElementById('sl_' + parentId).classList.add('hidden');
-  document.getElementById('szfield_' + parentId).classList.add('hidden');
+  // customer can quickly add another size of the same product.
+  // Re-call onSelColor to repopulate the size dropdown for the still-selected color.
   document.getElementById('sqrow_' + parentId).classList.add('hidden');
   document.getElementById('spricerow_' + parentId).classList.add('hidden');
   document.getElementById('sb_' + parentId).disabled = true;
   document.getElementById('snote_' + parentId).value = '';
   document.getElementById('sn_' + parentId).classList.add('hidden');
   clearSizeNoteError(parentId);
-  _resetFeature(parentId); // handles feature row + addon row reset
+  _resetFeature(parentId);
+  onSelColor(parentId);
 }
 
 // ─── Render ──────────────────────────────────────────────────────────────────
