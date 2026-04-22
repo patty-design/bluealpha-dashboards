@@ -2550,7 +2550,9 @@ def update_quote(record_id):
     if request.method == "OPTIONS":
         return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
     c = cors()
-    token = RETURNS_WRITE_TOKEN
+    write_token = RETURNS_WRITE_TOKEN
+    # Use broadest available read token for verification (write token may lack read scope)
+    read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
     data = request.get_json() or {}
     items = data.get("items", [])
 
@@ -2558,7 +2560,7 @@ def update_quote(record_id):
         # Verify it's a quote and not accepted
         r = req_lib.get(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
-            headers=at_headers(token), timeout=15,
+            headers=at_headers(read_token), timeout=15,
         )
         if r.status_code != 200:
             return Response(json.dumps({"error": "Quote not found"}), status=404, headers=c, mimetype="application/json")
@@ -2570,18 +2572,18 @@ def update_quote(record_id):
 
         # Delete existing line items
         li_formula = f'FIND("{record_id}", ARRAYJOIN({{Manual Order}}))'
-        existing_lis = at_get_all(MO_LINE_ITEMS_TABLE_ID, token, fields=["Manual Order"], formula=li_formula)
+        existing_lis = at_get_all(MO_LINE_ITEMS_TABLE_ID, read_token, fields=["Manual Order"], formula=li_formula)
         for li in existing_lis:
             req_lib.delete(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li['id']}",
-                headers=at_headers(token), timeout=10,
+                headers=at_headers(write_token), timeout=10,
             )
 
         # Create new line items
         for item in items:
             li_r = req_lib.post(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}",
-                headers={**at_headers(token), "Content-Type": "application/json"},
+                headers={**at_headers(write_token), "Content-Type": "application/json"},
                 json={"fields": {
                     "Manual Order": [record_id],
                     "Product SKU":  [item["skuRecordId"]],
