@@ -2570,12 +2570,12 @@ def update_quote(record_id):
         if mo_fields.get("MO Is Approved"):
             return Response(json.dumps({"error": "Quote already accepted"}), status=400, headers=c, mimetype="application/json")
 
-        # Delete existing line items
-        li_formula = f'FIND("{record_id}", ARRAYJOIN({{Manual Order}}))'
-        existing_lis = at_get_all(MO_LINE_ITEMS_TABLE_ID, read_token, fields=["Manual Order"], formula=li_formula)
-        for li in existing_lis:
+        # Delete existing line items using IDs stored on the MO record (formula
+        # filter via ARRAYJOIN doesn't return record IDs, so would miss all items)
+        existing_li_ids = mo_fields.get("MO Line Items", [])
+        for li_id in existing_li_ids:
             req_lib.delete(
-                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li['id']}",
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
                 headers=at_headers(write_token), timeout=10,
             )
 
