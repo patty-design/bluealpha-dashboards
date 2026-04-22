@@ -334,6 +334,10 @@
       <strong>International Order</strong>
       For international returns, please contact us at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">(678) 961-3304</a> and we'll take care of you.
     </div>
+    <div class="message message-warning" id="msg-not-shipped">
+      <strong>Order Not Yet Shipped</strong>
+      This order hasn't shipped yet and isn't eligible for a return. If you'd like to cancel, please contact us at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">(678) 961-3304</a>.
+    </div>
     <div class="message message-warning" id="msg-outside-window">
       <strong>Outside Return Window</strong>
       Your order is outside our 30-day return window. If you have questions, please reach out at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">(678) 961-3304</a>.
@@ -496,6 +500,8 @@ async function verifyOrder() {
       document.getElementById('msg-not-found').classList.add('show');
     } else if (data.status === 'international') {
       document.getElementById('msg-international').classList.add('show');
+    } else if (data.status === 'not_shipped') {
+      document.getElementById('msg-not-shipped').classList.add('show');
     } else if (data.status === 'outside_window') {
       document.getElementById('msg-outside-window').classList.add('show');
     } else {

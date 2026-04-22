@@ -538,12 +538,22 @@ def verify_order():
         if country not in ("US", "USA") or state in MILITARY_STATES:
             return Response(json.dumps({"status": "international"}), headers=c, mimetype="application/json")
 
+        # Block returns on unshipped orders
+        order_status = order.get("orderStatus", "")
+        UNSHIPPED_STATUSES = {"awaiting_shipment", "awaiting_payment", "on_hold"}
+        if order_status in UNSHIPPED_STATUSES:
+            return Response(json.dumps({"status": "not_shipped"}), headers=c, mimetype="application/json")
+
         # Get ship date from shipments
         sr = req_lib.get("https://ssapi.shipstation.com/shipments",
                           params={"orderNumber": order_number},
                           headers=ss_headers(), timeout=10)
         shipments = sr.json().get("shipments", [])
         ship_date_str = shipments[0].get("shipDate", "") if shipments else ""
+
+        # Also block if orderStatus isn't clearly shipped and there are no shipments
+        if not ship_date_str and order_status != "shipped":
+            return Response(json.dumps({"status": "not_shipped"}), headers=c, mimetype="application/json")
 
         def parse_dt(s):
             """Parse ISO date/datetime string, always return UTC-aware datetime."""
