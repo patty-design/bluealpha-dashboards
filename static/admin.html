@@ -230,9 +230,11 @@
     <div class="login-card">
       <h2>Admin Access</h2>
       <div id="loginError"></div>
-      <label>Password</label>
-      <input type="password" id="adminPassword" placeholder="Enter admin password" onkeydown="if(event.key==='Enter') doLogin()">
-      <button class="btn btn-primary btn-full" onclick="doLogin()">Sign In</button>
+      <label>Username</label>
+      <input type="text" id="adminUsername" placeholder="patty or kelly" autocomplete="username" onkeydown="if(event.key==='Enter') doLogin()">
+      <label style="margin-top:12px;">Password</label>
+      <input type="password" id="adminPassword" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()">
+      <button class="btn btn-primary btn-full" style="margin-top:16px;" onclick="doLogin()">Sign In</button>
     </div>
   </div>
 
@@ -243,6 +245,7 @@
         <div class="tab active" data-tab="pending">Pending</div>
         <div class="tab" data-tab="approved">Approved</div>
         <div class="tab" data-tab="denied">Denied</div>
+        <div class="tab" data-tab="password" style="margin-left:auto;">🔑 Change Password</div>
       </div>
 
       <div class="tab-panel active" id="tab-pending">
@@ -258,6 +261,19 @@
       <div class="tab-panel" id="tab-denied">
         <div class="card">
           <div id="deniedContent" class="loading">Loading…</div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-password">
+        <div class="card" style="max-width:420px;">
+          <h3 style="margin-top:0;">Change Your Password</h3>
+          <div id="pwChangeMsg"></div>
+          <label>Current Password</label>
+          <input type="password" id="pwCurrent" autocomplete="current-password">
+          <label style="margin-top:12px;">New Password</label>
+          <input type="password" id="pwNew" autocomplete="new-password" placeholder="At least 8 characters">
+          <label style="margin-top:12px;">Confirm New Password</label>
+          <input type="password" id="pwConfirm" autocomplete="new-password">
+          <button class="btn btn-primary" style="margin-top:16px;" onclick="doChangePassword()">Update Password</button>
         </div>
       </div>
     </div>
@@ -291,24 +307,54 @@
     })();
 
     async function doLogin() {
-      const pw = document.getElementById('adminPassword').value;
-      const errEl = document.getElementById('loginError');
+      const username = (document.getElementById('adminUsername').value || '').trim();
+      const pw       = document.getElementById('adminPassword').value;
+      const errEl    = document.getElementById('loginError');
       errEl.innerHTML = '';
+      if (!username) { errEl.innerHTML = '<div class="alert alert-error">Please enter your username.</div>'; return; }
       try {
         const resp = await fetch('/api/admin/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password: pw })
+          body: JSON.stringify({ username, password: pw })
         });
         if (resp.ok) {
           showAdmin();
           const appsResp = await fetch('/api/admin/applications');
           if (appsResp.ok) loadApplications(await appsResp.json());
         } else {
-          errEl.innerHTML = '<div class="alert alert-error">Incorrect password.</div>';
+          errEl.innerHTML = '<div class="alert alert-error">Invalid username or password.</div>';
         }
       } catch (e) {
         errEl.innerHTML = '<div class="alert alert-error">Network error.</div>';
+      }
+    }
+
+    async function doChangePassword() {
+      const current  = document.getElementById('pwCurrent').value;
+      const newPw    = document.getElementById('pwNew').value;
+      const confirm  = document.getElementById('pwConfirm').value;
+      const msgEl    = document.getElementById('pwChangeMsg');
+      msgEl.innerHTML = '';
+      if (newPw !== confirm) { msgEl.innerHTML = '<div class="alert alert-error">New passwords do not match.</div>'; return; }
+      if (newPw.length < 8)  { msgEl.innerHTML = '<div class="alert alert-error">Password must be at least 8 characters.</div>'; return; }
+      try {
+        const resp = await fetch('/api/admin/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentPassword: current, newPassword: newPw })
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          msgEl.innerHTML = '<div class="alert alert-success">Password updated successfully.</div>';
+          document.getElementById('pwCurrent').value = '';
+          document.getElementById('pwNew').value = '';
+          document.getElementById('pwConfirm').value = '';
+        } else {
+          msgEl.innerHTML = `<div class="alert alert-error">${data.error || 'Failed to update password.'}</div>`;
+        }
+      } catch (e) {
+        msgEl.innerHTML = '<div class="alert alert-error">Network error.</div>';
       }
     }
 

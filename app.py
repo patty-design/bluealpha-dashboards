@@ -38,6 +38,7 @@ QUOTE_SECRET_KEY         = os.environ.get("QUOTE_SECRET_KEY", "change-me-ba-port
 MANUAL_ORDERS_TABLE_ID   = "tblOOZ2wVzIsR1DyL"
 MO_LINE_ITEMS_TABLE_ID   = "tblNDxbfgyZDMex7n"
 CUSTOMERS_TABLE_ID       = "tblO4AdJE84kFDfEe"
+EMPLOYEES_TABLE_ID       = "tblUDcItnhNhe2GgO"
 # NOTE: These two tables must be created manually in Airtable and their IDs updated here.
 # Table 1: "Account Applications" — see task description for required fields
 # Table 2: "Portal Users" — see task description for required fields
@@ -206,15 +207,62 @@ def portal_login_required(f):
     return decorated
 
 
+def _hash_password(password, salt=None):
+    import hashlib, secrets as sec
+    if salt is None:
+        salt = sec.token_hex(16)
+    h = hashlib.sha256((salt + password).encode()).hexdigest()
+    return f"sha256${salt}${h}"
+
+def _check_password(password, stored_hash):
+    try:
+        _, salt, _ = stored_hash.split("$")
+        return _hash_password(password, salt) == stored_hash
+    except Exception:
+        return False
+
+def _lookup_admin(username, password):
+    """Check username+password against Employees table. Returns record dict or None."""
+    read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    formula = f"AND({{Portal Username}}='{username}',{{Quote Portal Admin}}=1)"
+    try:
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}",
+            headers=at_headers(read_token),
+            params={"filterByFormula": formula, "fields[]": ["Full Name", "Portal Username", "Password Hash", "Email"]},
+            timeout=10,
+        )
+        records = r.json().get("records", [])
+        if not records:
+            return None
+        rec = records[0]
+        stored = rec.get("fields", {}).get("Password Hash", "")
+        if not stored or not _check_password(password, stored):
+            return None
+        return rec
+    except Exception:
+        return None
+
 def check_admin_session(req):
     token = req.cookies.get("ba_admin_session")
-    if not token or not QUOTE_ADMIN_PASSWORD:
+    if not token:
         return False
     try:
         data = pyjwt.decode(token, QUOTE_SECRET_KEY + "_admin", algorithms=["HS256"])
         return data.get("admin") is True
     except Exception:
         return False
+
+def get_admin_username(req):
+    """Return username from admin session, or None."""
+    token = req.cookies.get("ba_admin_session")
+    if not token:
+        return None
+    try:
+        data = pyjwt.decode(token, QUOTE_SECRET_KEY + "_admin", algorithms=["HS256"])
+        return data.get("username") if data.get("admin") else None
+    except Exception:
+        return None
 
 
 def generate_magic_link(portal_user_record_id, expiry_hours=0.25):
@@ -3776,25 +3824,53 @@ def admin_login():
     from datetime import datetime, timezone, timedelta
     c = cors()
     data = request.get_json() or {}
-    pw = (data.get("password") or "").strip()
-    if not QUOTE_ADMIN_PASSWORD or pw != QUOTE_ADMIN_PASSWORD:
-        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+    username = (data.get("username") or "").strip().lower()
+    pw       = (data.get("password") or "").strip()
+    rec = _lookup_admin(username, pw)
+    if not rec:
+        return Response(json.dumps({"error": "Invalid username or password"}), status=401, headers=c, mimetype="application/json")
 
     payload = {
-        "admin": True,
-        "exp":   datetime.now(timezone.utc) + timedelta(hours=12),
+        "admin":    True,
+        "username": username,
+        "name":     rec.get("fields", {}).get("Full Name", username),
+        "record_id": rec.get("id"),
+        "exp":      datetime.now(timezone.utc) + timedelta(hours=12),
     }
     token = pyjwt.encode(payload, QUOTE_SECRET_KEY + "_admin", algorithm="HS256")
-    resp = make_response(Response(json.dumps({"ok": True}), headers=c, mimetype="application/json"))
-    resp.set_cookie(
-        "ba_admin_session",
-        token,
-        max_age=12 * 3600,
-        httponly=True,
-        samesite="Lax",
-        secure=True,
-    )
+    resp = make_response(Response(json.dumps({"ok": True, "name": payload["name"]}), headers=c, mimetype="application/json"))
+    resp.set_cookie("ba_admin_session", token, max_age=12*3600, httponly=True, samesite="Lax", secure=True)
     return resp
+
+
+@app.route("/api/admin/change-password", methods=["POST"])
+def admin_change_password():
+    from datetime import datetime, timezone, timedelta
+    c = cors()
+    if not check_admin_session(request):
+        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+    username = get_admin_username(request)
+    data = request.get_json() or {}
+    current_pw  = (data.get("currentPassword") or "").strip()
+    new_pw      = (data.get("newPassword") or "").strip()
+    if not current_pw or not new_pw or len(new_pw) < 8:
+        return Response(json.dumps({"error": "New password must be at least 8 characters"}), status=400, headers=c, mimetype="application/json")
+    # Verify current password
+    rec = _lookup_admin(username, current_pw)
+    if not rec:
+        return Response(json.dumps({"error": "Current password is incorrect"}), status=401, headers=c, mimetype="application/json")
+    # Write new hash
+    new_hash = _hash_password(new_pw)
+    write_token = RETURNS_WRITE_TOKEN
+    r = req_lib.patch(
+        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}/{rec['id']}",
+        headers={**at_headers(write_token), "Content-Type": "application/json"},
+        json={"fields": {"Password Hash": new_hash}},
+        timeout=10,
+    )
+    if r.status_code != 200:
+        return Response(json.dumps({"error": "Failed to update password — check write token permissions"}), status=500, headers=c, mimetype="application/json")
+    return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
 
 
 @app.route("/api/admin/applications")
