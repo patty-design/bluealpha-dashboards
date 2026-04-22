@@ -892,6 +892,10 @@ function vOnColor() {
     document.getElementById('vSize').dataset.autoId   = sizes[0][0];
     document.getElementById('vSize').dataset.autoName = sizes[0][1];
     vOnSize(sizes[0][0]);
+  } else {
+    // No sizes for this product — skip straight to fvar/addon/qty
+    document.getElementById('vSize').dataset.autoId = '';
+    vOnSize('');
   }
 }
 
