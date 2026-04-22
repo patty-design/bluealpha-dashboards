@@ -111,6 +111,8 @@ def index():
         return send_from_directory("static", "returns.html")
     if host in DASHBOARDS:
         return dashboard(host)
+    if host == "quote":
+        return redirect("/quote")
     return "Blue Alpha Dashboards", 200
 
 @app.route("/cs")
