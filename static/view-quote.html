@@ -548,6 +548,7 @@
       <!-- Save button (editable mode only) -->
       <div class="save-row" id="saveRow">
         <button class="btn btn-primary" id="btnSave" onclick="saveChanges()">Save Changes</button>
+        <button class="btn btn-secondary" id="btnRevert" onclick="revertChanges()" style="display:none;">Revert</button>
         <span class="save-confirm" id="saveConfirm">✓ Changes saved</span>
       </div>
     </div>
@@ -617,11 +618,27 @@ const recordId  = window.location.pathname.split('/').pop();
 let   quoteData = null;
 let   catalog   = null;
 let   catalogLoaded = false;
-let   editItems = [];  // working copy of line items when in edit mode
-let   dirty     = false;  // true when there are unsaved changes
+let   editItems  = [];  // working copy of line items when in edit mode
+let   savedItems = [];  // snapshot of last-saved state for revert
+let   dirty      = false;  // true when there are unsaved changes
 
-function markDirty() { dirty = true; }
-function markClean() { dirty = false; }
+function markDirty() {
+  dirty = true;
+  const btn = document.getElementById('btnRevert');
+  if (btn) btn.style.display = '';
+}
+function markClean() {
+  dirty = false;
+  const btn = document.getElementById('btnRevert');
+  if (btn) btn.style.display = 'none';
+}
+
+function revertChanges() {
+  if (!confirm('Discard your changes and revert to the last saved version?')) return;
+  editItems = savedItems.map(i => ({ ...i }));
+  markClean();
+  renderItemsTable();
+}
 
 window.addEventListener('beforeunload', e => {
   if (dirty) {
@@ -636,7 +653,8 @@ window.addEventListener('beforeunload', e => {
     const r = await fetch(`/api/get-quote/${recordId}`);
     if (!r.ok) throw new Error('not found');
     quoteData = await r.json();
-    editItems = quoteData.lineItems.map(i => ({ ...i }));
+    editItems  = quoteData.lineItems.map(i => ({ ...i }));
+    savedItems = quoteData.lineItems.map(i => ({ ...i }));
     render();
   } catch(e) {
     document.getElementById('stateLoading').classList.add('hidden');
@@ -1052,6 +1070,7 @@ async function saveChanges() {
     });
     const data = await r.json();
     if (!r.ok || !data.success) throw new Error(data.error || 'Save failed');
+    savedItems = editItems.map(i => ({ ...i }));
     markClean();
     confirm.style.display = 'inline';
     setTimeout(() => { confirm.style.display = 'none'; }, 3000);
