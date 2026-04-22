@@ -2588,7 +2588,7 @@ def update_quote(record_id):
                     "Manual Order": [record_id],
                     "Product SKU":  [item["skuRecordId"]],
                     "Qty.":         int(item["qty"]),
-                    "Adj. Unit Price": float(item["unitPrice"]),
+                    "Confirmed Unit Price": float(item["unitPrice"]),
                 }},
                 timeout=15,
             )
