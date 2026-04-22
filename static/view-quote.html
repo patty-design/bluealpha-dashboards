@@ -816,6 +816,9 @@ function onQtyChange(el) {
 }
 
 function removeViewItem(idx) {
+  const item = editItems[idx];
+  const name = item?.name || 'this item';
+  if (!confirm(`Remove "${name}" from the quote?`)) return;
   editItems.splice(idx, 1);
   renderItemsTable();
 }
