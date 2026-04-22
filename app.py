@@ -3347,8 +3347,7 @@ def apply_page():
     billing_zip            = (data.get("billingZip") or "").strip()
     shipping_same          = bool(data.get("shippingSameAsBilling", True))
     tax_exempt             = bool(data.get("taxExempt", False))
-    resale_cert            = (data.get("resaleCertNumber") or "").strip()
-    resale_state           = (data.get("resaleState") or "").strip()
+    tax_exemption_number   = (data.get("taxExemptionNumber") or "").strip()
 
     required_fields = [company_name, ein, business_phone, billing_contact_name,
                        billing_contact_email, billing_contact_phone,
@@ -3375,8 +3374,7 @@ def apply_page():
     }
     if website:          fields["Website"]                  = website
     if billing_addr2:    fields["Billing Address 2"]        = billing_addr2
-    if resale_cert:      fields["Resale Certificate Number"] = resale_cert
-    if resale_state:     fields["Resale State"]             = resale_state
+    if tax_exemption_number: fields["State Tax Exemption Number"] = tax_exemption_number
 
     if not shipping_same:
         fields["Shipping Contact Name"]  = (data.get("shippingContactName") or "").strip()
@@ -3887,7 +3885,7 @@ def admin_applications():
                     "Billing Contact Name", "Billing Contact Email", "Billing Contact Phone",
                     "Billing Address 1", "Billing Address 2", "Billing City", "Billing State", "Billing Zip",
                     "Shipping Same as Billing", "Shipping Address 1", "Shipping City", "Shipping State",
-                    "Tax Exempt", "Resale Certificate Number", "Resale State",
+                    "Tax Exempt", "State Tax Exemption Number",
                     "Status", "Denial Reason", "Applied Date"],
         )
         apps = []
@@ -3912,8 +3910,7 @@ def admin_applications():
                 "shipping_city":         f.get("Shipping City", ""),
                 "shipping_state":        f.get("Shipping State", ""),
                 "tax_exempt":            bool(f.get("Tax Exempt", False)),
-                "resale_cert":           f.get("Resale Certificate Number", ""),
-                "resale_state":          f.get("Resale State", ""),
+                "tax_exemption_number":  f.get("State Tax Exemption Number", ""),
                 "status":                f.get("Status", "Pending"),
                 "denial_reason":         f.get("Denial Reason", ""),
                 "applied_date":          f.get("Applied Date", ""),
