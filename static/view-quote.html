@@ -618,6 +618,17 @@ let   quoteData = null;
 let   catalog   = null;
 let   catalogLoaded = false;
 let   editItems = [];  // working copy of line items when in edit mode
+let   dirty     = false;  // true when there are unsaved changes
+
+function markDirty() { dirty = true; }
+function markClean() { dirty = false; }
+
+window.addEventListener('beforeunload', e => {
+  if (dirty) {
+    e.preventDefault();
+    e.returnValue = 'You have unsaved changes. Leave without saving?';
+  }
+});
 
 // ─── Load ────────────────────────────────────────────────────────────────────
 (async function load() {
@@ -810,6 +821,7 @@ function onQtyChange(el) {
   const qty = Math.max(1, parseInt(el.value) || 1);
   el.value = qty;
   editItems[idx].qty = qty;
+  markDirty();
   const lt = document.getElementById(`vLineTotal_${idx}`);
   if (lt) lt.textContent = '$' + (editItems[idx].qty * editItems[idx].unitPrice).toFixed(2);
   updateTotals();
@@ -820,6 +832,7 @@ function removeViewItem(idx) {
   const name = item?.name || 'this item';
   if (!confirm(`Remove "${name}" from the quote?`)) return;
   editItems.splice(idx, 1);
+  markDirty();
   renderItemsTable();
 }
 
@@ -1007,6 +1020,7 @@ function vDoAdd() {
     qty,
     unitPrice:   sku.price || 0,
   });
+  markDirty();
   renderItemsTable();
 
   // Reset
@@ -1038,6 +1052,7 @@ async function saveChanges() {
     });
     const data = await r.json();
     if (!r.ok || !data.success) throw new Error(data.error || 'Save failed');
+    markClean();
     confirm.style.display = 'inline';
     setTimeout(() => { confirm.style.display = 'none'; }, 3000);
   } catch(e) {
@@ -1050,6 +1065,10 @@ async function saveChanges() {
 
 // ─── Accept modal ─────────────────────────────────────────────────────────────
 function openModal() {
+  if (dirty) {
+    alert('You have unsaved changes. Please click "Save Changes" before accepting the quote.');
+    return;
+  }
   const c = quoteData.customer || {};
   document.getElementById('billOrg').value   = c.billToOrg  || c.orgName     || '';
   document.getElementById('billName').value  = c.billToName || c.contactName || '';
