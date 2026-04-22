@@ -273,7 +273,7 @@ def generate_magic_link(portal_user_record_id, expiry_hours=0.25):
     write_token = RETURNS_WRITE_TOKEN
     try:
         req_lib.patch(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PORTAL_USERS_TABLE_ID}/{portal_user_record_id}",
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{portal_user_record_id}",
             headers={**at_headers(write_token), "Content-Type": "application/json"},
             json={"fields": {"Magic Token": token, "Token Expiry": expiry_iso}},
             timeout=10,
@@ -3357,38 +3357,29 @@ def apply_page():
                         status=400, headers=c, mimetype="application/json")
 
     fields = {
-        "Company Name":          company_name,
-        "EIN":                   ein,
-        "Business Phone":        business_phone,
-        "Billing Contact Name":  billing_contact_name,
-        "Billing Contact Email": billing_contact_email,
-        "Billing Contact Phone": billing_contact_phone,
-        "Billing Address 1":     billing_addr1,
-        "Billing City":          billing_city,
-        "Billing State":         billing_state,
-        "Billing Zip":           billing_zip,
-        "Shipping Same as Billing": shipping_same,
-        "Tax Exempt":            tax_exempt,
-        "Status":                "Pending",
-        "Applied Date":          datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        "Organization Name":         company_name,
+        "EIN":                       ein,
+        "Main Contact Phone #":      business_phone,
+        "Main Contact Name":         billing_contact_name,
+        "Bill-To Contact Name":      billing_contact_name,
+        "Main Contact Email":        billing_contact_email,
+        "Bill-To Contact Email":     billing_contact_email,
+        "Bill-To Org Name":          company_name,
+        "Customer Address (Line 1)": billing_addr1,
+        "Customer City":             billing_city,
+        "Customer State":            billing_state,
+        "Customer Zip Code":         billing_zip,
+        "Tax Exempt":                tax_exempt,
+        "Application Status":        "Pending",
+        "Applied Date":              datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
     }
-    if website:          fields["Website"]                  = website
-    if billing_addr2:    fields["Billing Address 2"]        = billing_addr2
-    if tax_exemption_number: fields["State Tax Exemption Number"] = tax_exemption_number
-
-    if not shipping_same:
-        fields["Shipping Contact Name"]  = (data.get("shippingContactName") or "").strip()
-        fields["Shipping Contact Email"] = (data.get("shippingContactEmail") or "").strip()
-        fields["Shipping Contact Phone"] = (data.get("shippingContactPhone") or "").strip()
-        fields["Shipping Address 1"]     = (data.get("shippingAddr1") or "").strip()
-        fields["Shipping Address 2"]     = (data.get("shippingAddr2") or "").strip()
-        fields["Shipping City"]          = (data.get("shippingCity") or "").strip()
-        fields["Shipping State"]         = (data.get("shippingState") or "").strip()
-        fields["Shipping Zip"]           = (data.get("shippingZip") or "").strip()
+    if website:              fields["Website"]                    = website
+    if billing_addr2:        fields["Customer Address (Line 2)"]  = billing_addr2
+    if tax_exemption_number: fields["State Tax Exemption #"]      = tax_exemption_number
 
     try:
         r = req_lib.post(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{APP_APPLICATIONS_TABLE_ID}",
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}",
             headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
             json={"fields": fields},
             timeout=15,
@@ -3415,18 +3406,15 @@ def login_page():
         try:
             read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
             records = at_get_all(
-                PORTAL_USERS_TABLE_ID, read_token,
-                fields=["Email", "Active", "Customer ID", "Is Primary"],
-                formula=f"AND(LOWER({{Email}})='{email}',{{Active}}=TRUE())",
+                CUSTOMERS_TABLE_ID, read_token,
+                fields=["Main Contact Email", "Main Contact Name", "Application Status"],
+                formula=f"AND(LOWER({{Main Contact Email}})='{email}',{{Application Status}}='Approved')",
             )
             if not records:
                 return
             user_rec = records[0]
-            user_id  = user_rec["id"]
-            uf = user_rec.get("fields", {})
-            customer_id = uf.get("Customer ID", "")
-            is_primary  = bool(uf.get("Is Primary", False))
-            magic_link  = generate_magic_link(user_id, expiry_hours=0.25)
+            user_id  = user_rec["id"]  # Customer record ID is both user_id and customer_id
+            magic_link = generate_magic_link(user_id, expiry_hours=0.25)
             send_magic_link_email(email, magic_link)
         except Exception as e:
             print(f"[login] magic link error: {e}")
@@ -3442,11 +3430,10 @@ def auth_magic_link(token):
     from datetime import datetime, timezone
     read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
     try:
-        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
         records = at_get_all(
-            PORTAL_USERS_TABLE_ID, read_token,
-            fields=["Magic Token", "Token Expiry", "Customer ID", "Is Primary", "Active"],
-            formula=f"AND({{Magic Token}}='{token}',{{Active}}=TRUE())",
+            CUSTOMERS_TABLE_ID, read_token,
+            fields=["Magic Token", "Token Expiry", "Application Status"],
+            formula=f"{{Magic Token}}='{token}'",
         )
         if not records:
             return send_from_directory("static", "auth-error.html"), 401
@@ -3455,6 +3442,10 @@ def auth_magic_link(token):
         uf = user_rec.get("fields", {})
         expiry_str = uf.get("Token Expiry", "")
         if not expiry_str:
+            return send_from_directory("static", "auth-error.html"), 401
+
+        # Check Application Status
+        if uf.get("Application Status") != "Approved":
             return send_from_directory("static", "auth-error.html"), 401
 
         # Check expiry
@@ -3469,14 +3460,15 @@ def auth_magic_link(token):
         if datetime.now(timezone.utc) > exp_dt:
             return send_from_directory("static", "auth-error.html"), 401
 
+        # Customer record ID is both user_id and customer_id
         user_id     = user_rec["id"]
-        customer_id = uf.get("Customer ID", "")
-        is_primary  = bool(uf.get("Is Primary", False))
+        customer_id = user_rec["id"]
+        is_primary  = True
 
         # Clear magic token + update last login
         try:
             req_lib.patch(
-                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PORTAL_USERS_TABLE_ID}/{user_id}",
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{user_id}",
                 headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
                 json={"fields": {
                     "Magic Token":  "",
@@ -3659,27 +3651,26 @@ def portal_orders(user):
 def portal_users(user):
     c = cors()
     customer_id = user.get("customer_id", "")
-    is_primary  = user.get("is_primary", False)
-    if not is_primary:
-        return Response(json.dumps({"error": "Not authorized"}), status=403, headers=c, mimetype="application/json")
-
+    # One login per agency — return just the current user from the Customer record
     try:
         read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-        records = at_get_all(
-            PORTAL_USERS_TABLE_ID, read_token,
-            fields=["Name", "Email", "Customer ID", "Is Primary", "Active"],
-            formula=f"AND({{Customer ID}}='{customer_id}',{{Active}}=TRUE())",
+        cr = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
+            headers=at_headers(read_token),
+            params={"fields[]": ["Main Contact Name", "Main Contact Email"]},
+            timeout=10,
         )
-        users = []
-        for r in records:
-            f = r.get("fields", {})
-            users.append({
-                "id":         r["id"],
-                "name":       f.get("Name", ""),
-                "email":      f.get("Email", ""),
-                "is_primary": bool(f.get("Is Primary", False)),
-            })
-        return Response(json.dumps({"users": users}), headers=c, mimetype="application/json")
+        if cr.status_code == 200:
+            cf = cr.json().get("fields", {})
+            current_user = {
+                "id":         customer_id,
+                "name":       cf.get("Main Contact Name", ""),
+                "email":      cf.get("Main Contact Email", ""),
+                "is_primary": True,
+            }
+        else:
+            current_user = {"id": customer_id, "name": "", "email": "", "is_primary": True}
+        return Response(json.dumps({"users": [current_user]}), headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
@@ -3688,99 +3679,22 @@ def portal_users(user):
 @portal_login_required
 def portal_users_add(user):
     c = cors()
-    is_primary  = user.get("is_primary", False)
-    customer_id = user.get("customer_id", "")
-    if not is_primary:
-        return Response(json.dumps({"error": "Not authorized"}), status=403, headers=c, mimetype="application/json")
-
-    data  = request.get_json() or {}
-    name  = (data.get("name") or "").strip()
-    email = (data.get("email") or "").strip().lower()
-    if not name or not email:
-        return Response(json.dumps({"error": "Name and email are required."}),
-                        status=400, headers=c, mimetype="application/json")
-
-    try:
-        # Check email isn't already registered
-        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-        existing = at_get_all(
-            PORTAL_USERS_TABLE_ID, read_token,
-            fields=["Email"],
-            formula=f"AND(LOWER({{Email}})='{email}',{{Active}}=TRUE())",
-        )
-        if existing:
-            return Response(json.dumps({"error": "That email is already registered."}),
-                            status=400, headers=c, mimetype="application/json")
-
-        r = req_lib.post(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PORTAL_USERS_TABLE_ID}",
-            headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
-            json={"fields": {
-                "Name":        name,
-                "Email":       email,
-                "Customer ID": customer_id,
-                "Is Primary":  False,
-                "Active":      True,
-            }},
-            timeout=10,
-        )
-        if r.status_code not in (200, 201):
-            return Response(json.dumps({"error": "Failed to create user."}),
-                            status=500, headers=c, mimetype="application/json")
-        new_user_id = r.json()["id"]
-        # Send them a magic link
-        def _send_new_user_link(uid, email):
-            try:
-                link = generate_magic_link(uid, expiry_hours=48)
-                send_magic_link_email(email, link)
-            except Exception as ex:
-                print(f"[portal_users_add] link send failed: {ex}")
-        threading.Thread(target=_send_new_user_link, args=(new_user_id, email), daemon=True).start()
-
-        return Response(json.dumps({"success": True}), headers=c, mimetype="application/json")
-    except Exception as e:
-        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+    # One login per agency — additional users are not supported
+    return Response(
+        json.dumps({"error": "Additional portal users are not supported. Each agency has one login."}),
+        status=400, headers=c, mimetype="application/json",
+    )
 
 
 @app.route("/api/portal/users/remove", methods=["POST"])
 @portal_login_required
 def portal_users_remove(user):
     c = cors()
-    is_primary = user.get("is_primary", False)
-    customer_id = user.get("customer_id", "")
-    if not is_primary:
-        return Response(json.dumps({"error": "Not authorized"}), status=403, headers=c, mimetype="application/json")
-
-    data    = request.get_json() or {}
-    user_id = (data.get("userId") or "").strip()
-    if not user_id:
-        return Response(json.dumps({"error": "userId required"}), status=400, headers=c, mimetype="application/json")
-
-    try:
-        # Verify user belongs to same customer
-        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-        ur = req_lib.get(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PORTAL_USERS_TABLE_ID}/{user_id}",
-            headers=at_headers(read_token), timeout=10,
-        )
-        if ur.status_code != 200:
-            return Response(json.dumps({"error": "User not found."}), status=404, headers=c, mimetype="application/json")
-        uf = ur.json().get("fields", {})
-        if uf.get("Customer ID") != customer_id:
-            return Response(json.dumps({"error": "Not authorized."}), status=403, headers=c, mimetype="application/json")
-        if uf.get("Is Primary"):
-            return Response(json.dumps({"error": "Cannot remove primary user."}), status=400, headers=c, mimetype="application/json")
-
-        # Deactivate (soft delete)
-        req_lib.patch(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PORTAL_USERS_TABLE_ID}/{user_id}",
-            headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
-            json={"fields": {"Active": False}},
-            timeout=10,
-        )
-        return Response(json.dumps({"success": True}), headers=c, mimetype="application/json")
-    except Exception as e:
-        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+    # One login per agency — user removal is not supported
+    return Response(
+        json.dumps({"error": "User removal is not supported. Each agency has one login."}),
+        status=400, headers=c, mimetype="application/json",
+    )
 
 
 @app.route("/api/portal/request-magic-link", methods=["POST"])
@@ -3793,9 +3707,9 @@ def portal_request_magic_link():
         try:
             read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
             records = at_get_all(
-                PORTAL_USERS_TABLE_ID, read_token,
-                fields=["Email", "Active"],
-                formula=f"AND(LOWER({{Email}})='{email}',{{Active}}=TRUE())",
+                CUSTOMERS_TABLE_ID, read_token,
+                fields=["Main Contact Email", "Application Status"],
+                formula=f"AND(LOWER({{Main Contact Email}})='{email}',{{Application Status}}='Approved')",
             )
             if records:
                 link = generate_magic_link(records[0]["id"])
@@ -3880,38 +3794,30 @@ def admin_applications():
     try:
         read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
         records = at_get_all(
-            APP_APPLICATIONS_TABLE_ID, read_token,
-            fields=["Company Name", "EIN", "Business Phone", "Website",
-                    "Billing Contact Name", "Billing Contact Email", "Billing Contact Phone",
-                    "Billing Address 1", "Billing Address 2", "Billing City", "Billing State", "Billing Zip",
-                    "Shipping Same as Billing", "Shipping Address 1", "Shipping City", "Shipping State",
-                    "Tax Exempt", "State Tax Exemption Number",
-                    "Status", "Denial Reason", "Applied Date"],
+            CUSTOMERS_TABLE_ID, read_token,
+            fields=["Organization Name", "EIN", "Main Contact Name", "Main Contact Email",
+                    "Main Contact Phone #", "Website", "Customer Address (Line 1)", "Customer City",
+                    "Customer State", "Customer Zip Code", "State Tax Exemption #", "Tax Exempt",
+                    "Application Status", "Denial Reason", "Applied Date"],
+            formula="NOT({Application Status}='')",
         )
         apps = []
         for r in records:
             f = r.get("fields", {})
             apps.append({
-                "id":                   r["id"],
-                "company_name":         f.get("Company Name", ""),
-                "ein":                  f.get("EIN", ""),
-                "business_phone":       f.get("Business Phone", ""),
-                "website":              f.get("Website", ""),
-                "billing_contact_name":  f.get("Billing Contact Name", ""),
-                "billing_contact_email": f.get("Billing Contact Email", ""),
-                "billing_contact_phone": f.get("Billing Contact Phone", ""),
-                "billing_addr1":         f.get("Billing Address 1", ""),
-                "billing_addr2":         f.get("Billing Address 2", ""),
-                "billing_city":          f.get("Billing City", ""),
-                "billing_state":         f.get("Billing State", ""),
-                "billing_zip":           f.get("Billing Zip", ""),
-                "shipping_same":         bool(f.get("Shipping Same as Billing", True)),
-                "shipping_addr1":        f.get("Shipping Address 1", ""),
-                "shipping_city":         f.get("Shipping City", ""),
-                "shipping_state":        f.get("Shipping State", ""),
+                "id":                    r["id"],
+                "company_name":          f.get("Organization Name", ""),
+                "ein":                   f.get("EIN", ""),
+                "business_phone":        f.get("Main Contact Phone #", ""),
+                "website":               f.get("Website", ""),
+                "billing_contact_name":  f.get("Main Contact Name", ""),
+                "billing_contact_email": f.get("Main Contact Email", ""),
+                "billing_addr1":         f.get("Customer Address (Line 1)", ""),
+                "billing_city":          f.get("Customer City", ""),
+                "billing_state":         f.get("Customer State", ""),
                 "tax_exempt":            bool(f.get("Tax Exempt", False)),
-                "tax_exemption_number":  f.get("State Tax Exemption Number", ""),
-                "status":                f.get("Status", "Pending"),
+                "tax_exemption_number":  f.get("State Tax Exemption #", ""),
+                "status":                f.get("Application Status", "Pending"),
                 "denial_reason":         f.get("Denial Reason", ""),
                 "applied_date":          f.get("Applied Date", ""),
             })
@@ -3933,84 +3839,34 @@ def admin_approve(app_id):
 
     try:
         # Fetch application
+        # Fetch Customer record — app_id IS the Customer record ID
         r = req_lib.get(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{APP_APPLICATIONS_TABLE_ID}/{app_id}",
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{app_id}",
             headers=at_headers(read_token), timeout=10,
         )
         if r.status_code != 200:
             return Response(json.dumps({"error": "Application not found."}), status=404, headers=c, mimetype="application/json")
         f = r.json().get("fields", {})
 
-        company_name  = f.get("Company Name", "")
-        contact_name  = f.get("Billing Contact Name", "")
-        contact_email = f.get("Billing Contact Email", "")
-        contact_phone = f.get("Billing Contact Phone", "")
-        addr1 = f.get("Billing Address 1", "")
-        addr2 = f.get("Billing Address 2", "")
-        city  = f.get("Billing City", "")
-        state = f.get("Billing State", "")
-        zipv  = f.get("Billing Zip", "")
+        company_name  = f.get("Organization Name", "")
+        contact_name  = f.get("Main Contact Name", "")
+        contact_email = f.get("Main Contact Email", "")
 
-        # Create Customer record
-        line1 = addr1
-        if addr2:
-            line1 = f"{addr1}, {addr2}"
-        line2 = f"{city}, {state} {zipv}".strip(", ") if city else ""
-
-        cust_fields = {
-            "Organization Name":      company_name,
-            "Main Contact Name":      contact_name,
-            "Main Contact Email":     contact_email,
-        }
-        if contact_phone: cust_fields["Main Contact Phone #"]        = contact_phone
-        if line1:         cust_fields["Customer Address (Line 1)"]   = line1
-        if line2:         cust_fields["Customer Address (Line 2)"]   = line2
-
-        # Bill-To from application billing contact
-        cust_fields["Bill-To Contact Name"]  = contact_name
-        cust_fields["Bill-To Contact Email"] = contact_email
-        cust_fields["Bill-To Org Name"]      = company_name
-
-        cr = req_lib.post(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}",
-            headers={**at_headers(write_token), "Content-Type": "application/json"},
-            json={"fields": cust_fields},
-            timeout=15,
-        )
-        cr.raise_for_status()
-        customer_record_id = cr.json()["id"]
-
-        # Create Portal User (primary)
-        pu_r = req_lib.post(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PORTAL_USERS_TABLE_ID}",
-            headers={**at_headers(write_token), "Content-Type": "application/json"},
-            json={"fields": {
-                "Name":        contact_name,
-                "Email":       contact_email,
-                "Customer ID": customer_record_id,
-                "Is Primary":  True,
-                "Active":      True,
-            }},
-            timeout=15,
-        )
-        pu_r.raise_for_status()
-        portal_user_id = pu_r.json()["id"]
-
-        # Update application status
+        # Update Application Status to Approved on the same Customer record
         req_lib.patch(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{APP_APPLICATIONS_TABLE_ID}/{app_id}",
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{app_id}",
             headers={**at_headers(write_token), "Content-Type": "application/json"},
-            json={"fields": {"Status": "Approved"}},
+            json={"fields": {"Application Status": "Approved"}},
             timeout=10,
         )
 
-        # Generate magic link (48hr for first login)
-        magic_link = generate_magic_link(portal_user_id, expiry_hours=48)
+        # Generate magic link (48hr for first login) — writes to Customer record
+        magic_link = generate_magic_link(app_id, expiry_hours=48)
 
         # Send approval email
         send_approval_email(contact_email, contact_name, company_name, magic_link)
 
-        return Response(json.dumps({"success": True, "customerId": customer_record_id}),
+        return Response(json.dumps({"success": True, "customerId": app_id}),
                         headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
@@ -4031,24 +3887,24 @@ def admin_deny(app_id):
     read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
 
     try:
-        # Fetch application to get contact info for email
+        # Fetch Customer record — app_id IS the Customer record ID
         r = req_lib.get(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{APP_APPLICATIONS_TABLE_ID}/{app_id}",
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{app_id}",
             headers=at_headers(read_token), timeout=10,
         )
         if r.status_code != 200:
             return Response(json.dumps({"error": "Application not found."}), status=404, headers=c, mimetype="application/json")
         f = r.json().get("fields", {})
 
-        contact_name  = f.get("Billing Contact Name", "")
-        contact_email = f.get("Billing Contact Email", "")
-        company_name  = f.get("Company Name", "")
+        contact_name  = f.get("Main Contact Name", "")
+        contact_email = f.get("Main Contact Email", "")
+        company_name  = f.get("Organization Name", "")
 
-        # Update application status
+        # Update Application Status to Denied on the Customer record
         req_lib.patch(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{APP_APPLICATIONS_TABLE_ID}/{app_id}",
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{app_id}",
             headers={**at_headers(write_token), "Content-Type": "application/json"},
-            json={"fields": {"Status": "Denied", "Denial Reason": reason}},
+            json={"fields": {"Application Status": "Denied", "Denial Reason": reason}},
             timeout=10,
         )
 
