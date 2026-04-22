@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blue Alpha — Invalid Login Link</title>
+  <link rel="icon" href="https://www.bluealphabelts.com/wp-content/uploads/2019/05/cropped-BAG-FAV-32x32.png">
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:   #1B2438;
+      --red:    #7B2318;
+      --light:  #f5f7fa;
+      --border: #dde3ea;
+      --text:   #1a2633;
+      --muted:  #6b7a8d;
+      --white:  #ffffff;
+    }
+    body {
+      font-family: 'Lato', sans-serif;
+      background: var(--light);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: var(--navy);
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    header img { height: 44px; width: auto; filter: brightness(0) invert(1); }
+    .header-divider { width: 2px; height: 36px; background: var(--red); border-radius: 2px; }
+    .header-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.75);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+    .main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+    }
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      max-width: 420px;
+      width: 100%;
+      padding: 52px 40px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+      text-align: center;
+    }
+    .icon {
+      width: 56px;
+      height: 56px;
+      background: #fdf0ef;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+    }
+    .icon svg { width: 28px; height: 28px; fill: var(--red); }
+    h1 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 12px;
+    }
+    p {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+    .btn {
+      display: inline-block;
+      background: var(--navy);
+      color: var(--white);
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      border-radius: 8px;
+      padding: 13px 32px;
+      text-decoration: none;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn:hover { background: #222d47; transform: translateY(-1px); }
+    .divider { width: 36px; height: 3px; background: var(--red); border-radius: 2px; margin: 0 auto 20px; }
+    footer { text-align: center; padding: 20px; color: var(--muted); font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="https://www.bluealphabelts.com/wp-content/uploads/2024/04/logo-1.png" alt="Blue Alpha">
+    <div class="header-divider"></div>
+    <span class="header-title">Government Agency Portal</span>
+  </header>
+
+  <div class="main">
+    <div class="card">
+      <div class="icon">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+        </svg>
+      </div>
+      <h1>Login Link Expired</h1>
+      <div class="divider"></div>
+      <p>This login link has expired or is invalid. Login links are valid for a limited time. Please request a new one below.</p>
+      <a href="/login" class="btn">Request a New Login Link</a>
+    </div>
+  </div>
+
+  <footer>
+    Blue Alpha &bull; bluealphabelts.com &bull; info@bluealpha.us &bull; 678-961-3304
+  </footer>
+</body>
+</html>

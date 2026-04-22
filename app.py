@@ -1,11 +1,13 @@
-from flask import Flask, send_from_directory, abort, request, Response
+from flask import Flask, send_from_directory, abort, request, Response, redirect, make_response
 import os
 import re
 import functools
 import json
 import base64
 import threading
+import secrets
 import requests as req_lib
+import jwt as pyjwt
 
 _BUILD_VERSION = "catalog-live"
 
@@ -30,9 +32,17 @@ SENDGRID_FROM_EMAIL  = os.environ.get("SENDGRID_FROM_EMAIL", "info@bluealpha.us"
 TEST_EMAIL_OVERRIDE  = os.environ.get("TEST_EMAIL_OVERRIDE", "")
 CS_ADMIN_PASSWORD    = os.environ.get("CS_ADMIN_PASSWORD", "")
 
+QUOTE_ADMIN_PASSWORD     = os.environ.get("QUOTE_ADMIN_PASSWORD", "")
+QUOTE_SECRET_KEY         = os.environ.get("QUOTE_SECRET_KEY", "change-me-ba-portal-2024")
+
 MANUAL_ORDERS_TABLE_ID   = "tblOOZ2wVzIsR1DyL"
 MO_LINE_ITEMS_TABLE_ID   = "tblNDxbfgyZDMex7n"
 CUSTOMERS_TABLE_ID       = "tblO4AdJE84kFDfEe"
+# NOTE: These two tables must be created manually in Airtable and their IDs updated here.
+# Table 1: "Account Applications" — see task description for required fields
+# Table 2: "Portal Users" — see task description for required fields
+APP_APPLICATIONS_TABLE_ID = os.environ.get("APP_APPLICATIONS_TABLE_ID", "tbl_REPLACE_APPLICATIONS")
+PORTAL_USERS_TABLE_ID     = os.environ.get("PORTAL_USERS_TABLE_ID",     "tbl_REPLACE_PORTAL_USERS")
 PARENT_PRODUCTS_TABLE_ID    = "tbl40th76YvjdQExS"
 COLORS_TABLE_ID             = "tblN08IV26TpRYSMf"
 SIZES_TABLE_ID              = "tblUGwl1YLaVGCeIJ"
@@ -93,7 +103,6 @@ def serve_static(filename):
 
 @app.route("/")
 def index():
-    from flask import redirect
     host = request.host.split(".")[0].lower()
     if host == "exchange":
         return redirect("/exchange")
@@ -160,6 +169,232 @@ def at_get_all(table_id, token, fields=None, formula=None, base_id=None):
         if not offset:
             break
     return records
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Portal Auth Helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def create_portal_token(user_id, customer_id, is_primary):
+    from datetime import datetime, timezone, timedelta
+    payload = {
+        "user_id":    user_id,
+        "customer_id": customer_id,
+        "is_primary": is_primary,
+        "exp": datetime.now(timezone.utc) + timedelta(days=30),
+    }
+    return pyjwt.encode(payload, QUOTE_SECRET_KEY, algorithm="HS256")
+
+
+def get_portal_user(req):
+    token = req.cookies.get("ba_portal_session")
+    if not token:
+        return None
+    try:
+        return pyjwt.decode(token, QUOTE_SECRET_KEY, algorithms=["HS256"])
+    except Exception:
+        return None
+
+
+def portal_login_required(f):
+    @functools.wraps(f)
+    def decorated(*args, **kwargs):
+        user = get_portal_user(request)
+        if not user:
+            return redirect("/login")
+        return f(*args, user=user, **kwargs)
+    return decorated
+
+
+def check_admin_session(req):
+    token = req.cookies.get("ba_admin_session")
+    if not token or not QUOTE_ADMIN_PASSWORD:
+        return False
+    try:
+        data = pyjwt.decode(token, QUOTE_SECRET_KEY + "_admin", algorithms=["HS256"])
+        return data.get("admin") is True
+    except Exception:
+        return False
+
+
+def generate_magic_link(portal_user_record_id, expiry_hours=0.25):
+    from datetime import datetime, timezone, timedelta
+    token = secrets.token_urlsafe(32)
+    expiry = datetime.now(timezone.utc) + timedelta(hours=expiry_hours)
+    expiry_iso = expiry.isoformat().replace("+00:00", "Z")
+    write_token = RETURNS_WRITE_TOKEN
+    try:
+        req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PORTAL_USERS_TABLE_ID}/{portal_user_record_id}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": {"Magic Token": token, "Token Expiry": expiry_iso}},
+            timeout=10,
+        )
+    except Exception as e:
+        print(f"[generate_magic_link] Airtable PATCH failed: {e}")
+    return f"{QUOTE_BASE_URL}/auth/{token}"
+
+
+def send_approval_email(to_email, to_name, company, magic_link):
+    if not SENDGRID_API_KEY:
+        return
+    first_name = to_name.split()[0] if to_name else "there"
+    actual_to = TEST_EMAIL_OVERRIDE or to_email
+    html_body = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7fa;padding:32px 0;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background:#1B2438;padding:24px 36px;">
+          <span style="font-family:Arial;font-size:20px;font-weight:800;color:#fff;letter-spacing:2px;">BLUE ALPHA</span>
+        </td></tr>
+        <tr><td style="padding:32px 36px;">
+          <p style="color:#1a2633;font-size:16px;margin:0 0 8px;">Hi {first_name},</p>
+          <p style="color:#6b7a8d;font-size:14px;line-height:1.6;margin:0 0 20px;">
+            Great news — your application for <strong>{company}</strong> has been approved!
+            You can now access the Blue Alpha Government Agency Quote Portal.
+          </p>
+          <p style="color:#6b7a8d;font-size:14px;line-height:1.6;margin:0 0 24px;">
+            Click the button below to log in. This link is valid for 48 hours.
+          </p>
+          <table cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+            <tr><td>
+              <a href="{magic_link}" style="display:inline-block;background:#1B2438;color:#fff;font-family:Arial;font-size:14px;font-weight:700;text-decoration:none;padding:13px 32px;border-radius:6px;">Access Portal →</a>
+            </td></tr>
+          </table>
+          <p style="color:#6b7a8d;font-size:12px;line-height:1.5;">
+            If you have trouble with the button, copy and paste this link:<br>
+            <a href="{magic_link}" style="color:#1B2438;">{magic_link}</a>
+          </p>
+          <p style="color:#6b7a8d;font-size:12px;margin-top:16px;">
+            Questions? Contact us at <a href="mailto:info@bluealpha.us" style="color:#1B2438;">info@bluealpha.us</a>
+          </p>
+        </td></tr>
+        <tr><td style="background:#f5f7fa;border-top:1px solid #dde3ea;padding:16px 36px;text-align:center;">
+          <p style="color:#6b7a8d;font-size:11px;margin:0;">Blue Alpha &bull; bluealphabelts.com</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+    try:
+        req_lib.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "personalizations": [{"to": [{"email": actual_to, "name": to_name}]}],
+                "from": {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
+                "subject": "Your Blue Alpha Portal Access Has Been Approved",
+                "content": [{"type": "text/html", "value": html_body}],
+            },
+            timeout=15,
+        )
+    except Exception as e:
+        print(f"[send_approval_email] failed: {e}")
+
+
+def send_denial_email(to_email, to_name, company, reason):
+    if not SENDGRID_API_KEY:
+        return
+    first_name = to_name.split()[0] if to_name else "there"
+    actual_to = TEST_EMAIL_OVERRIDE or to_email
+    html_body = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7fa;padding:32px 0;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background:#1B2438;padding:24px 36px;">
+          <span style="font-family:Arial;font-size:20px;font-weight:800;color:#fff;letter-spacing:2px;">BLUE ALPHA</span>
+        </td></tr>
+        <tr><td style="padding:32px 36px;">
+          <p style="color:#1a2633;font-size:16px;margin:0 0 8px;">Hi {first_name},</p>
+          <p style="color:#6b7a8d;font-size:14px;line-height:1.6;margin:0 0 16px;">
+            Thank you for your interest in the Blue Alpha Government Agency Quote Portal.
+            Unfortunately, we're unable to approve the application for <strong>{company}</strong> at this time.
+          </p>
+          <p style="color:#6b7a8d;font-size:14px;line-height:1.6;margin:0 0 16px;">
+            <strong>Reason:</strong> {reason}
+          </p>
+          <p style="color:#6b7a8d;font-size:13px;line-height:1.6;">
+            If you have questions, please contact us at
+            <a href="mailto:info@bluealpha.us" style="color:#1B2438;">info@bluealpha.us</a>.
+          </p>
+        </td></tr>
+        <tr><td style="background:#f5f7fa;border-top:1px solid #dde3ea;padding:16px 36px;text-align:center;">
+          <p style="color:#6b7a8d;font-size:11px;margin:0;">Blue Alpha &bull; bluealphabelts.com</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+    try:
+        req_lib.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "personalizations": [{"to": [{"email": actual_to, "name": to_name}]}],
+                "from": {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
+                "subject": "Blue Alpha Portal Application Update",
+                "content": [{"type": "text/html", "value": html_body}],
+            },
+            timeout=15,
+        )
+    except Exception as e:
+        print(f"[send_denial_email] failed: {e}")
+
+
+def send_magic_link_email(to_email, magic_link):
+    if not SENDGRID_API_KEY:
+        return
+    actual_to = TEST_EMAIL_OVERRIDE or to_email
+    html_body = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7fa;padding:32px 0;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background:#1B2438;padding:24px 36px;">
+          <span style="font-family:Arial;font-size:20px;font-weight:800;color:#fff;letter-spacing:2px;">BLUE ALPHA</span>
+        </td></tr>
+        <tr><td style="padding:32px 36px;">
+          <p style="color:#1a2633;font-size:16px;margin:0 0 16px;">Your portal login link</p>
+          <p style="color:#6b7a8d;font-size:14px;line-height:1.6;margin:0 0 24px;">
+            Click the button below to log in to the Blue Alpha Government Portal. This link expires in 15 minutes and can only be used once.
+          </p>
+          <table cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+            <tr><td>
+              <a href="{magic_link}" style="display:inline-block;background:#1B2438;color:#fff;font-family:Arial;font-size:14px;font-weight:700;text-decoration:none;padding:13px 32px;border-radius:6px;">Log In to Portal →</a>
+            </td></tr>
+          </table>
+          <p style="color:#6b7a8d;font-size:12px;line-height:1.5;">
+            If you didn't request this, you can safely ignore this email.<br><br>
+            Trouble with the button? Copy this link:<br>
+            <a href="{magic_link}" style="color:#1B2438;word-break:break-all;">{magic_link}</a>
+          </p>
+        </td></tr>
+        <tr><td style="background:#f5f7fa;border-top:1px solid #dde3ea;padding:16px 36px;text-align:center;">
+          <p style="color:#6b7a8d;font-size:11px;margin:0;">Blue Alpha &bull; bluealphabelts.com</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+    try:
+        req_lib.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "personalizations": [{"to": [{"email": actual_to}]}],
+                "from": {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
+                "subject": "Your Blue Alpha Portal Login Link",
+                "content": [{"type": "text/html", "value": html_body}],
+            },
+            timeout=15,
+        )
+    except Exception as e:
+        print(f"[send_magic_link_email] failed: {e}")
 
 
 @app.route("/api/raw-material-cost", methods=["GET"])
@@ -1786,11 +2021,22 @@ def submit_exchange():
 # Quote Portal
 # ─────────────────────────────────────────────────────────────────────────────
 
-@app.route("/quote")
-def quote_page():
+@app.route("/quote-builder")
+def quote_builder_page():
     resp = send_from_directory("static", "quote.html")
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     resp.headers["Pragma"] = "no-cache"
+    return resp
+
+
+@app.route("/quote")
+def quote_gate_page():
+    """Gate page — redirect to portal if logged in, else show apply/login page."""
+    user = get_portal_user(request)
+    if user:
+        return redirect("/portal")
+    resp = send_from_directory("static", "portal-gate.html")
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     return resp
 
 @app.route("/view-quote/<record_id>")
@@ -3014,6 +3260,722 @@ def quote_pdf(record_id):
     except Exception as e:
         import traceback; traceback.print_exc()
         return Response(json.dumps({"error": str(e)}), status=500, headers=cors(), mimetype="application/json")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Customer Portal Routes
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/apply", methods=["GET", "POST"])
+def apply_page():
+    if request.method == "GET":
+        return send_from_directory("static", "apply.html")
+
+    from datetime import datetime, timezone
+    c = cors()
+    data = request.get_json() or {}
+
+    company_name           = (data.get("companyName") or "").strip()
+    ein                    = (data.get("ein") or "").strip()
+    business_phone         = (data.get("businessPhone") or "").strip()
+    website                = (data.get("website") or "").strip()
+    billing_contact_name   = (data.get("billingContactName") or "").strip()
+    billing_contact_email  = (data.get("billingContactEmail") or "").strip()
+    billing_contact_phone  = (data.get("billingContactPhone") or "").strip()
+    billing_addr1          = (data.get("billingAddr1") or "").strip()
+    billing_addr2          = (data.get("billingAddr2") or "").strip()
+    billing_city           = (data.get("billingCity") or "").strip()
+    billing_state          = (data.get("billingState") or "").strip()
+    billing_zip            = (data.get("billingZip") or "").strip()
+    shipping_same          = bool(data.get("shippingSameAsBilling", True))
+    tax_exempt             = bool(data.get("taxExempt", False))
+    resale_cert            = (data.get("resaleCertNumber") or "").strip()
+    resale_state           = (data.get("resaleState") or "").strip()
+
+    required_fields = [company_name, ein, business_phone, billing_contact_name,
+                       billing_contact_email, billing_contact_phone,
+                       billing_addr1, billing_city, billing_state, billing_zip]
+    if not all(required_fields):
+        return Response(json.dumps({"error": "Please fill in all required fields."}),
+                        status=400, headers=c, mimetype="application/json")
+
+    fields = {
+        "Company Name":          company_name,
+        "EIN":                   ein,
+        "Business Phone":        business_phone,
+        "Billing Contact Name":  billing_contact_name,
+        "Billing Contact Email": billing_contact_email,
+        "Billing Contact Phone": billing_contact_phone,
+        "Billing Address 1":     billing_addr1,
+        "Billing City":          billing_city,
+        "Billing State":         billing_state,
+        "Billing Zip":           billing_zip,
+        "Shipping Same as Billing": shipping_same,
+        "Tax Exempt":            tax_exempt,
+        "Status":                "Pending",
+        "Applied Date":          datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+    }
+    if website:          fields["Website"]                  = website
+    if billing_addr2:    fields["Billing Address 2"]        = billing_addr2
+    if resale_cert:      fields["Resale Certificate Number"] = resale_cert
+    if resale_state:     fields["Resale State"]             = resale_state
+
+    if not shipping_same:
+        fields["Shipping Contact Name"]  = (data.get("shippingContactName") or "").strip()
+        fields["Shipping Contact Email"] = (data.get("shippingContactEmail") or "").strip()
+        fields["Shipping Contact Phone"] = (data.get("shippingContactPhone") or "").strip()
+        fields["Shipping Address 1"]     = (data.get("shippingAddr1") or "").strip()
+        fields["Shipping Address 2"]     = (data.get("shippingAddr2") or "").strip()
+        fields["Shipping City"]          = (data.get("shippingCity") or "").strip()
+        fields["Shipping State"]         = (data.get("shippingState") or "").strip()
+        fields["Shipping Zip"]           = (data.get("shippingZip") or "").strip()
+
+    try:
+        r = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{APP_APPLICATIONS_TABLE_ID}",
+            headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
+            json={"fields": fields},
+            timeout=15,
+        )
+        if r.status_code not in (200, 201):
+            return Response(json.dumps({"error": "Failed to save application. Please try again."}),
+                            status=500, headers=c, mimetype="application/json")
+        return Response(json.dumps({"success": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login_page():
+    if request.method == "GET":
+        return send_from_directory("static", "login.html")
+
+    c = cors()
+    data = request.get_json() or {}
+    email = (data.get("email") or "").strip().lower()
+
+    # Always return same message — do the real work silently
+    def _try_send_magic_link(email):
+        try:
+            read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+            records = at_get_all(
+                PORTAL_USERS_TABLE_ID, read_token,
+                fields=["Email", "Active", "Customer ID", "Is Primary"],
+                formula=f"AND(LOWER({{Email}})='{email}',{{Active}}=TRUE())",
+            )
+            if not records:
+                return
+            user_rec = records[0]
+            user_id  = user_rec["id"]
+            uf = user_rec.get("fields", {})
+            customer_id = uf.get("Customer ID", "")
+            is_primary  = bool(uf.get("Is Primary", False))
+            magic_link  = generate_magic_link(user_id, expiry_hours=0.25)
+            send_magic_link_email(email, magic_link)
+        except Exception as e:
+            print(f"[login] magic link error: {e}")
+
+    if email:
+        threading.Thread(target=_try_send_magic_link, args=(email,), daemon=True).start()
+
+    return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+
+
+@app.route("/auth/<token>")
+def auth_magic_link(token):
+    from datetime import datetime, timezone
+    read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    try:
+        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        records = at_get_all(
+            PORTAL_USERS_TABLE_ID, read_token,
+            fields=["Magic Token", "Token Expiry", "Customer ID", "Is Primary", "Active"],
+            formula=f"AND({{Magic Token}}='{token}',{{Active}}=TRUE())",
+        )
+        if not records:
+            return send_from_directory("static", "auth-error.html"), 401
+
+        user_rec = records[0]
+        uf = user_rec.get("fields", {})
+        expiry_str = uf.get("Token Expiry", "")
+        if not expiry_str:
+            return send_from_directory("static", "auth-error.html"), 401
+
+        # Check expiry
+        try:
+            exp_dt = datetime.fromisoformat(expiry_str.replace("Z", "+00:00"))
+            if exp_dt.tzinfo is None:
+                from datetime import timezone as tz
+                exp_dt = exp_dt.replace(tzinfo=tz.utc)
+        except Exception:
+            return send_from_directory("static", "auth-error.html"), 401
+
+        if datetime.now(timezone.utc) > exp_dt:
+            return send_from_directory("static", "auth-error.html"), 401
+
+        user_id     = user_rec["id"]
+        customer_id = uf.get("Customer ID", "")
+        is_primary  = bool(uf.get("Is Primary", False))
+
+        # Clear magic token + update last login
+        try:
+            req_lib.patch(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PORTAL_USERS_TABLE_ID}/{user_id}",
+                headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
+                json={"fields": {
+                    "Magic Token":  "",
+                    "Token Expiry": None,
+                    "Last Login":   datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+                }},
+                timeout=10,
+            )
+        except Exception as e:
+            print(f"[auth_magic_link] token clear failed: {e}")
+
+        # Create JWT session cookie
+        jwt_token = create_portal_token(user_id, customer_id, is_primary)
+        resp = make_response(redirect("/portal"))
+        resp.set_cookie(
+            "ba_portal_session",
+            jwt_token,
+            max_age=30 * 24 * 3600,
+            httponly=True,
+            samesite="Lax",
+            secure=True,
+        )
+        return resp
+
+    except Exception as e:
+        print(f"[auth_magic_link] error: {e}")
+        return send_from_directory("static", "auth-error.html"), 500
+
+
+@app.route("/logout")
+def portal_logout():
+    resp = make_response(redirect("/quote"))
+    resp.delete_cookie("ba_portal_session")
+    return resp
+
+
+@app.route("/portal")
+@portal_login_required
+def portal_page(user):
+    return send_from_directory("static", "portal.html")
+
+
+@app.route("/api/portal/me")
+@portal_login_required
+def portal_me(user):
+    c = cors()
+    customer_id = user.get("customer_id", "")
+    is_primary  = user.get("is_primary", False)
+    agency_name = ""
+
+    if customer_id:
+        try:
+            read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+            cr = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
+                headers=at_headers(read_token),
+                timeout=10,
+            )
+            if cr.status_code == 200:
+                agency_name = cr.json().get("fields", {}).get("Organization Name", "")
+        except Exception as e:
+            print(f"[portal_me] customer fetch failed: {e}")
+
+    return Response(json.dumps({
+        "agencyName": agency_name,
+        "isPrimary":  is_primary,
+        "customerId": customer_id,
+    }), headers=c, mimetype="application/json")
+
+
+@app.route("/api/portal/quotes")
+@portal_login_required
+def portal_quotes(user):
+    c = cors()
+    customer_id = user.get("customer_id", "")
+    if not customer_id:
+        return Response(json.dumps({"quotes": []}), headers=c, mimetype="application/json")
+
+    try:
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        formula = (f"AND(FIND(\"{customer_id}\",ARRAYJOIN({{Customer}})),"
+                   f"{{Order Type}}=\"Quote\","
+                   f"NOT({{MO Is Approved}}))")
+        records = at_get_all(
+            MANUAL_ORDERS_TABLE_ID, read_token,
+            fields=["Document ID", "Order ID", "Date", "Expiry Date", "MO Is Approved", "MO Line Items"],
+            formula=formula,
+        )
+        from datetime import date as dt_date
+        today = dt_date.today()
+        quotes = []
+        for r in records:
+            f = r.get("fields", {})
+            quote_number = f.get("Document ID", f"QU-{f.get('Order ID','')}")
+            expiry_str   = f.get("Expiry Date", "")
+            is_expired   = False
+            if expiry_str:
+                try:
+                    is_expired = dt_date.fromisoformat(expiry_str) < today
+                except Exception:
+                    pass
+            # Compute total from line items
+            total = 0.0
+            li_ids = f.get("MO Line Items", [])
+            for li_id in li_ids:
+                try:
+                    li_r = req_lib.get(
+                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+                        headers=at_headers(read_token), timeout=10,
+                    )
+                    if li_r.status_code == 200:
+                        lf = li_r.json().get("fields", {})
+                        total += (lf.get("Qty.", 0) or 0) * (lf.get("Confirmed Unit Price", 0) or 0)
+                except Exception:
+                    pass
+            quotes.append({
+                "record_id":   r["id"],
+                "quote_number": quote_number,
+                "date":        f.get("Date", ""),
+                "expiry_date": expiry_str,
+                "is_expired":  is_expired,
+                "total":       round(total, 2),
+            })
+        # Sort most recent first
+        quotes.sort(key=lambda x: x.get("date", ""), reverse=True)
+        return Response(json.dumps({"quotes": quotes}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/portal/orders")
+@portal_login_required
+def portal_orders(user):
+    c = cors()
+    customer_id = user.get("customer_id", "")
+    if not customer_id:
+        return Response(json.dumps({"orders": []}), headers=c, mimetype="application/json")
+
+    try:
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        formula = (f"AND(FIND(\"{customer_id}\",ARRAYJOIN({{Customer}})),"
+                   f"{{Order Type}}=\"Sales Order\","
+                   f"{{MO Is Approved}}=TRUE())")
+        records = at_get_all(
+            MANUAL_ORDERS_TABLE_ID, read_token,
+            fields=["Document ID", "Order ID", "Date", "MO Line Items"],
+            formula=formula,
+        )
+        orders = []
+        for r in records:
+            f = r.get("fields", {})
+            so_number = f.get("Document ID", f"SO-{f.get('Order ID','')}")
+            total = 0.0
+            li_ids = f.get("MO Line Items", [])
+            for li_id in li_ids:
+                try:
+                    li_r = req_lib.get(
+                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+                        headers=at_headers(read_token), timeout=10,
+                    )
+                    if li_r.status_code == 200:
+                        lf = li_r.json().get("fields", {})
+                        total += (lf.get("Qty.", 0) or 0) * (lf.get("Adj. Unit Price", 0) or lf.get("Confirmed Unit Price", 0) or 0)
+                except Exception:
+                    pass
+            orders.append({
+                "record_id": r["id"],
+                "so_number": so_number,
+                "date":      f.get("Date", ""),
+                "total":     round(total, 2),
+            })
+        orders.sort(key=lambda x: x.get("date", ""), reverse=True)
+        return Response(json.dumps({"orders": orders}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/portal/users")
+@portal_login_required
+def portal_users(user):
+    c = cors()
+    customer_id = user.get("customer_id", "")
+    is_primary  = user.get("is_primary", False)
+    if not is_primary:
+        return Response(json.dumps({"error": "Not authorized"}), status=403, headers=c, mimetype="application/json")
+
+    try:
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        records = at_get_all(
+            PORTAL_USERS_TABLE_ID, read_token,
+            fields=["Name", "Email", "Customer ID", "Is Primary", "Active"],
+            formula=f"AND({{Customer ID}}='{customer_id}',{{Active}}=TRUE())",
+        )
+        users = []
+        for r in records:
+            f = r.get("fields", {})
+            users.append({
+                "id":         r["id"],
+                "name":       f.get("Name", ""),
+                "email":      f.get("Email", ""),
+                "is_primary": bool(f.get("Is Primary", False)),
+            })
+        return Response(json.dumps({"users": users}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/portal/users/add", methods=["POST"])
+@portal_login_required
+def portal_users_add(user):
+    c = cors()
+    is_primary  = user.get("is_primary", False)
+    customer_id = user.get("customer_id", "")
+    if not is_primary:
+        return Response(json.dumps({"error": "Not authorized"}), status=403, headers=c, mimetype="application/json")
+
+    data  = request.get_json() or {}
+    name  = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    if not name or not email:
+        return Response(json.dumps({"error": "Name and email are required."}),
+                        status=400, headers=c, mimetype="application/json")
+
+    try:
+        # Check email isn't already registered
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        existing = at_get_all(
+            PORTAL_USERS_TABLE_ID, read_token,
+            fields=["Email"],
+            formula=f"AND(LOWER({{Email}})='{email}',{{Active}}=TRUE())",
+        )
+        if existing:
+            return Response(json.dumps({"error": "That email is already registered."}),
+                            status=400, headers=c, mimetype="application/json")
+
+        r = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PORTAL_USERS_TABLE_ID}",
+            headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
+            json={"fields": {
+                "Name":        name,
+                "Email":       email,
+                "Customer ID": customer_id,
+                "Is Primary":  False,
+                "Active":      True,
+            }},
+            timeout=10,
+        )
+        if r.status_code not in (200, 201):
+            return Response(json.dumps({"error": "Failed to create user."}),
+                            status=500, headers=c, mimetype="application/json")
+        new_user_id = r.json()["id"]
+        # Send them a magic link
+        def _send_new_user_link(uid, email):
+            try:
+                link = generate_magic_link(uid, expiry_hours=48)
+                send_magic_link_email(email, link)
+            except Exception as ex:
+                print(f"[portal_users_add] link send failed: {ex}")
+        threading.Thread(target=_send_new_user_link, args=(new_user_id, email), daemon=True).start()
+
+        return Response(json.dumps({"success": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/portal/users/remove", methods=["POST"])
+@portal_login_required
+def portal_users_remove(user):
+    c = cors()
+    is_primary = user.get("is_primary", False)
+    customer_id = user.get("customer_id", "")
+    if not is_primary:
+        return Response(json.dumps({"error": "Not authorized"}), status=403, headers=c, mimetype="application/json")
+
+    data    = request.get_json() or {}
+    user_id = (data.get("userId") or "").strip()
+    if not user_id:
+        return Response(json.dumps({"error": "userId required"}), status=400, headers=c, mimetype="application/json")
+
+    try:
+        # Verify user belongs to same customer
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        ur = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PORTAL_USERS_TABLE_ID}/{user_id}",
+            headers=at_headers(read_token), timeout=10,
+        )
+        if ur.status_code != 200:
+            return Response(json.dumps({"error": "User not found."}), status=404, headers=c, mimetype="application/json")
+        uf = ur.json().get("fields", {})
+        if uf.get("Customer ID") != customer_id:
+            return Response(json.dumps({"error": "Not authorized."}), status=403, headers=c, mimetype="application/json")
+        if uf.get("Is Primary"):
+            return Response(json.dumps({"error": "Cannot remove primary user."}), status=400, headers=c, mimetype="application/json")
+
+        # Deactivate (soft delete)
+        req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PORTAL_USERS_TABLE_ID}/{user_id}",
+            headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
+            json={"fields": {"Active": False}},
+            timeout=10,
+        )
+        return Response(json.dumps({"success": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/portal/request-magic-link", methods=["POST"])
+def portal_request_magic_link():
+    c = cors()
+    data  = request.get_json() or {}
+    email = (data.get("email") or "").strip().lower()
+
+    def _send(email):
+        try:
+            read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+            records = at_get_all(
+                PORTAL_USERS_TABLE_ID, read_token,
+                fields=["Email", "Active"],
+                formula=f"AND(LOWER({{Email}})='{email}',{{Active}}=TRUE())",
+            )
+            if records:
+                link = generate_magic_link(records[0]["id"])
+                send_magic_link_email(email, link)
+        except Exception as ex:
+            print(f"[request_magic_link] error: {ex}")
+
+    if email:
+        threading.Thread(target=_send, args=(email,), daemon=True).start()
+    return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Admin Routes
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/admin")
+def admin_page():
+    return send_from_directory("static", "admin.html")
+
+
+@app.route("/api/admin/login", methods=["POST"])
+def admin_login():
+    from datetime import datetime, timezone, timedelta
+    c = cors()
+    data = request.get_json() or {}
+    pw = (data.get("password") or "").strip()
+    if not QUOTE_ADMIN_PASSWORD or pw != QUOTE_ADMIN_PASSWORD:
+        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+
+    payload = {
+        "admin": True,
+        "exp":   datetime.now(timezone.utc) + timedelta(hours=12),
+    }
+    token = pyjwt.encode(payload, QUOTE_SECRET_KEY + "_admin", algorithm="HS256")
+    resp = make_response(Response(json.dumps({"ok": True}), headers=c, mimetype="application/json"))
+    resp.set_cookie(
+        "ba_admin_session",
+        token,
+        max_age=12 * 3600,
+        httponly=True,
+        samesite="Lax",
+        secure=True,
+    )
+    return resp
+
+
+@app.route("/api/admin/applications")
+def admin_applications():
+    c = cors()
+    if not check_admin_session(request):
+        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+
+    try:
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        records = at_get_all(
+            APP_APPLICATIONS_TABLE_ID, read_token,
+            fields=["Company Name", "EIN", "Business Phone", "Website",
+                    "Billing Contact Name", "Billing Contact Email", "Billing Contact Phone",
+                    "Billing Address 1", "Billing Address 2", "Billing City", "Billing State", "Billing Zip",
+                    "Shipping Same as Billing", "Shipping Address 1", "Shipping City", "Shipping State",
+                    "Tax Exempt", "Resale Certificate Number", "Resale State",
+                    "Status", "Denial Reason", "Applied Date"],
+        )
+        apps = []
+        for r in records:
+            f = r.get("fields", {})
+            apps.append({
+                "id":                   r["id"],
+                "company_name":         f.get("Company Name", ""),
+                "ein":                  f.get("EIN", ""),
+                "business_phone":       f.get("Business Phone", ""),
+                "website":              f.get("Website", ""),
+                "billing_contact_name":  f.get("Billing Contact Name", ""),
+                "billing_contact_email": f.get("Billing Contact Email", ""),
+                "billing_contact_phone": f.get("Billing Contact Phone", ""),
+                "billing_addr1":         f.get("Billing Address 1", ""),
+                "billing_addr2":         f.get("Billing Address 2", ""),
+                "billing_city":          f.get("Billing City", ""),
+                "billing_state":         f.get("Billing State", ""),
+                "billing_zip":           f.get("Billing Zip", ""),
+                "shipping_same":         bool(f.get("Shipping Same as Billing", True)),
+                "shipping_addr1":        f.get("Shipping Address 1", ""),
+                "shipping_city":         f.get("Shipping City", ""),
+                "shipping_state":        f.get("Shipping State", ""),
+                "tax_exempt":            bool(f.get("Tax Exempt", False)),
+                "resale_cert":           f.get("Resale Certificate Number", ""),
+                "resale_state":          f.get("Resale State", ""),
+                "status":                f.get("Status", "Pending"),
+                "denial_reason":         f.get("Denial Reason", ""),
+                "applied_date":          f.get("Applied Date", ""),
+            })
+        # Sort most recent first
+        apps.sort(key=lambda x: x.get("applied_date", ""), reverse=True)
+        return Response(json.dumps({"applications": apps}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/admin/approve/<app_id>", methods=["POST"])
+def admin_approve(app_id):
+    c = cors()
+    if not check_admin_session(request):
+        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+
+    write_token = RETURNS_WRITE_TOKEN
+    read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+
+    try:
+        # Fetch application
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{APP_APPLICATIONS_TABLE_ID}/{app_id}",
+            headers=at_headers(read_token), timeout=10,
+        )
+        if r.status_code != 200:
+            return Response(json.dumps({"error": "Application not found."}), status=404, headers=c, mimetype="application/json")
+        f = r.json().get("fields", {})
+
+        company_name  = f.get("Company Name", "")
+        contact_name  = f.get("Billing Contact Name", "")
+        contact_email = f.get("Billing Contact Email", "")
+        contact_phone = f.get("Billing Contact Phone", "")
+        addr1 = f.get("Billing Address 1", "")
+        addr2 = f.get("Billing Address 2", "")
+        city  = f.get("Billing City", "")
+        state = f.get("Billing State", "")
+        zipv  = f.get("Billing Zip", "")
+
+        # Create Customer record
+        line1 = addr1
+        if addr2:
+            line1 = f"{addr1}, {addr2}"
+        line2 = f"{city}, {state} {zipv}".strip(", ") if city else ""
+
+        cust_fields = {
+            "Organization Name":      company_name,
+            "Main Contact Name":      contact_name,
+            "Main Contact Email":     contact_email,
+        }
+        if contact_phone: cust_fields["Main Contact Phone #"]        = contact_phone
+        if line1:         cust_fields["Customer Address (Line 1)"]   = line1
+        if line2:         cust_fields["Customer Address (Line 2)"]   = line2
+
+        # Bill-To from application billing contact
+        cust_fields["Bill-To Contact Name"]  = contact_name
+        cust_fields["Bill-To Contact Email"] = contact_email
+        cust_fields["Bill-To Org Name"]      = company_name
+
+        cr = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": cust_fields},
+            timeout=15,
+        )
+        cr.raise_for_status()
+        customer_record_id = cr.json()["id"]
+
+        # Create Portal User (primary)
+        pu_r = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PORTAL_USERS_TABLE_ID}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": {
+                "Name":        contact_name,
+                "Email":       contact_email,
+                "Customer ID": customer_record_id,
+                "Is Primary":  True,
+                "Active":      True,
+            }},
+            timeout=15,
+        )
+        pu_r.raise_for_status()
+        portal_user_id = pu_r.json()["id"]
+
+        # Update application status
+        req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{APP_APPLICATIONS_TABLE_ID}/{app_id}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": {"Status": "Approved"}},
+            timeout=10,
+        )
+
+        # Generate magic link (48hr for first login)
+        magic_link = generate_magic_link(portal_user_id, expiry_hours=48)
+
+        # Send approval email
+        send_approval_email(contact_email, contact_name, company_name, magic_link)
+
+        return Response(json.dumps({"success": True, "customerId": customer_record_id}),
+                        headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/admin/deny/<app_id>", methods=["POST"])
+def admin_deny(app_id):
+    c = cors()
+    if not check_admin_session(request):
+        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+
+    data   = request.get_json() or {}
+    reason = (data.get("reason") or "").strip()
+    if not reason:
+        return Response(json.dumps({"error": "Denial reason is required."}), status=400, headers=c, mimetype="application/json")
+
+    write_token = RETURNS_WRITE_TOKEN
+    read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+
+    try:
+        # Fetch application to get contact info for email
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{APP_APPLICATIONS_TABLE_ID}/{app_id}",
+            headers=at_headers(read_token), timeout=10,
+        )
+        if r.status_code != 200:
+            return Response(json.dumps({"error": "Application not found."}), status=404, headers=c, mimetype="application/json")
+        f = r.json().get("fields", {})
+
+        contact_name  = f.get("Billing Contact Name", "")
+        contact_email = f.get("Billing Contact Email", "")
+        company_name  = f.get("Company Name", "")
+
+        # Update application status
+        req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{APP_APPLICATIONS_TABLE_ID}/{app_id}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": {"Status": "Denied", "Denial Reason": reason}},
+            timeout=10,
+        )
+
+        # Send denial email
+        if contact_email:
+            send_denial_email(contact_email, contact_name, company_name, reason)
+
+        return Response(json.dumps({"success": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
 
 if __name__ == "__main__":

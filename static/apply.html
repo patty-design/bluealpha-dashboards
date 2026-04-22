@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blue Alpha — Apply for Portal Access</title>
+  <link rel="icon" href="https://www.bluealphabelts.com/wp-content/uploads/2019/05/cropped-BAG-FAV-32x32.png">
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:    #1B2438;
+      --red:     #7B2318;
+      --light:   #f5f7fa;
+      --border:  #dde3ea;
+      --text:    #1a2633;
+      --muted:   #6b7a8d;
+      --white:   #ffffff;
+      --success: #1a7a3c;
+      --error:   #7B2318;
+    }
+    body { font-family: 'Lato', sans-serif; background: var(--light); color: var(--text); min-height: 100vh; }
+    header {
+      background: var(--navy);
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    header img { height: 44px; width: auto; filter: brightness(0) invert(1); }
+    .header-divider { width: 2px; height: 36px; background: var(--red); border-radius: 2px; }
+    .header-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.75);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+    .container { max-width: 720px; margin: 40px auto; padding: 0 20px 80px; }
+    .page-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.55rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+    .page-sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 32px; }
+    .section-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .section-header {
+      background: var(--navy);
+      color: var(--white);
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 12px 20px;
+    }
+    .section-body { padding: 24px 20px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .form-row.full { grid-template-columns: 1fr; }
+    .form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    label { font-size: 0.82rem; font-weight: 600; color: var(--text); }
+    label .req { color: var(--red); margin-left: 2px; }
+    input[type="text"], input[type="email"], input[type="tel"], input[type="url"] {
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      padding: 9px 12px;
+      font-size: 0.9rem;
+      font-family: 'Lato', sans-serif;
+      color: var(--text);
+      transition: border-color 0.15s;
+      background: var(--white);
+    }
+    input:focus { outline: none; border-color: var(--navy); }
+    input.error { border-color: var(--error); }
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .checkbox-row input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--navy); cursor: pointer; }
+    .checkbox-row label { font-size: 0.9rem; font-weight: 600; color: var(--text); cursor: pointer; }
+    #shippingFields { display: none; }
+    .btn-submit {
+      background: var(--navy);
+      color: var(--white);
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      border: none;
+      border-radius: 8px;
+      padding: 14px 40px;
+      cursor: pointer;
+      margin-top: 24px;
+      width: 100%;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-submit:hover { background: #222d47; transform: translateY(-1px); }
+    .btn-submit:disabled { background: var(--muted); cursor: not-allowed; transform: none; }
+    .alert {
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+    .alert-success { background: #e6f7ed; border: 1px solid #a3d9b8; color: #1a5c35; }
+    .alert-error   { background: #fdf0ef; border: 1px solid #f0c0b8; color: #7B2318; }
+    .field-error { font-size: 0.78rem; color: var(--error); margin-top: 2px; }
+    @media (max-width: 580px) {
+      .form-row, .form-row.three { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="https://www.bluealphabelts.com/wp-content/uploads/2024/04/logo-1.png" alt="Blue Alpha">
+    <div class="header-divider"></div>
+    <span class="header-title">Apply for Portal Access</span>
+  </header>
+
+  <div class="container">
+    <h1 class="page-title">Agency Application</h1>
+    <p class="page-sub">Complete this form to request access to the Blue Alpha Government Agency Quote Portal. We'll review your application and respond within 2 business days.</p>
+
+    <div id="alertArea"></div>
+
+    <form id="applyForm" novalidate>
+      <!-- Company Info -->
+      <div class="section-card">
+        <div class="section-header">Company Information</div>
+        <div class="section-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Company / Agency Name <span class="req">*</span></label>
+              <input type="text" name="companyName" required>
+            </div>
+            <div class="form-group">
+              <label>EIN (Tax ID) <span class="req">*</span></label>
+              <input type="text" name="ein" placeholder="XX-XXXXXXX" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Business Phone <span class="req">*</span></label>
+              <input type="tel" name="businessPhone" required>
+            </div>
+            <div class="form-group">
+              <label>Website</label>
+              <input type="url" name="website" placeholder="https://">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Billing -->
+      <div class="section-card">
+        <div class="section-header">Billing Contact &amp; Address</div>
+        <div class="section-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Contact Name <span class="req">*</span></label>
+              <input type="text" name="billingContactName" required>
+            </div>
+            <div class="form-group">
+              <label>Contact Email <span class="req">*</span></label>
+              <input type="email" name="billingContactEmail" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Contact Phone <span class="req">*</span></label>
+              <input type="tel" name="billingContactPhone" required>
+            </div>
+          </div>
+          <div class="form-row full">
+            <div class="form-group">
+              <label>Address Line 1 <span class="req">*</span></label>
+              <input type="text" name="billingAddr1" required>
+            </div>
+          </div>
+          <div class="form-row full">
+            <div class="form-group">
+              <label>Address Line 2</label>
+              <input type="text" name="billingAddr2" placeholder="Suite, building, etc.">
+            </div>
+          </div>
+          <div class="form-row three">
+            <div class="form-group">
+              <label>City <span class="req">*</span></label>
+              <input type="text" name="billingCity" required>
+            </div>
+            <div class="form-group">
+              <label>State <span class="req">*</span></label>
+              <input type="text" name="billingState" maxlength="2" placeholder="GA" required>
+            </div>
+            <div class="form-group">
+              <label>Zip <span class="req">*</span></label>
+              <input type="text" name="billingZip" required>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Shipping -->
+      <div class="section-card">
+        <div class="section-header">Shipping Address</div>
+        <div class="section-body">
+          <div class="checkbox-row">
+            <input type="checkbox" id="sameBilling" name="shippingSameAsBilling" checked>
+            <label for="sameBilling">Same as billing address</label>
+          </div>
+          <div id="shippingFields">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Contact Name</label>
+                <input type="text" name="shippingContactName">
+              </div>
+              <div class="form-group">
+                <label>Contact Email</label>
+                <input type="email" name="shippingContactEmail">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Contact Phone</label>
+                <input type="tel" name="shippingContactPhone">
+              </div>
+            </div>
+            <div class="form-row full">
+              <div class="form-group">
+                <label>Address Line 1</label>
+                <input type="text" name="shippingAddr1">
+              </div>
+            </div>
+            <div class="form-row full">
+              <div class="form-group">
+                <label>Address Line 2</label>
+                <input type="text" name="shippingAddr2">
+              </div>
+            </div>
+            <div class="form-row three">
+              <div class="form-group">
+                <label>City</label>
+                <input type="text" name="shippingCity">
+              </div>
+              <div class="form-group">
+                <label>State</label>
+                <input type="text" name="shippingState" maxlength="2" placeholder="GA">
+              </div>
+              <div class="form-group">
+                <label>Zip</label>
+                <input type="text" name="shippingZip">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tax Info -->
+      <div class="section-card">
+        <div class="section-header">Tax Information</div>
+        <div class="section-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Resale Certificate Number</label>
+              <input type="text" name="resaleCertNumber">
+            </div>
+            <div class="form-group">
+              <label>Resale State</label>
+              <input type="text" name="resaleState" maxlength="2" placeholder="GA">
+            </div>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="taxExempt" name="taxExempt">
+            <label for="taxExempt">This agency is tax exempt</label>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-submit" id="submitBtn">Submit Application</button>
+    </form>
+  </div>
+
+  <script>
+    const sameBillingCb = document.getElementById('sameBilling');
+    const shippingFields = document.getElementById('shippingFields');
+
+    sameBillingCb.addEventListener('change', () => {
+      shippingFields.style.display = sameBillingCb.checked ? 'none' : 'block';
+    });
+
+    document.getElementById('applyForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const alertArea = document.getElementById('alertArea');
+      alertArea.innerHTML = '';
+
+      // Validate required fields
+      const form = e.target;
+      const required = ['companyName','ein','businessPhone','billingContactName','billingContactEmail','billingContactPhone','billingAddr1','billingCity','billingState','billingZip'];
+      let valid = true;
+      for (const name of required) {
+        const el = form.querySelector(`[name="${name}"]`);
+        if (!el.value.trim()) {
+          el.classList.add('error');
+          valid = false;
+        } else {
+          el.classList.remove('error');
+        }
+      }
+      if (!valid) {
+        alertArea.innerHTML = '<div class="alert alert-error">Please fill in all required fields.</div>';
+        alertArea.scrollIntoView({ behavior: 'smooth' });
+        return;
+      }
+
+      const fd = new FormData(form);
+      const payload = {};
+      fd.forEach((v, k) => { payload[k] = v; });
+      payload.shippingSameAsBilling = sameBillingCb.checked;
+      payload.taxExempt = document.getElementById('taxExempt').checked;
+
+      btn.disabled = true;
+      btn.textContent = 'Submitting…';
+
+      try {
+        const resp = await fetch('/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await resp.json();
+        if (data.success) {
+          form.style.display = 'none';
+          alertArea.innerHTML = '<div class="alert alert-success"><strong>Application Received!</strong><br>Thank you — we\'ll review your application and be in touch within 2 business days.</div>';
+        } else {
+          alertArea.innerHTML = `<div class="alert alert-error">${data.error || 'An error occurred. Please try again.'}</div>`;
+          btn.disabled = false;
+          btn.textContent = 'Submit Application';
+        }
+      } catch (err) {
+        alertArea.innerHTML = '<div class="alert alert-error">Network error. Please try again.</div>';
+        btn.disabled = false;
+        btn.textContent = 'Submit Application';
+      }
+    });
+
+    // Clear error on input
+    document.querySelectorAll('input').forEach(el => {
+      el.addEventListener('input', () => el.classList.remove('error'));
+    });
+  </script>
+</body>
+</html>

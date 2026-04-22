@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blue Alpha — Agency Portal</title>
+  <link rel="icon" href="https://www.bluealphabelts.com/wp-content/uploads/2019/05/cropped-BAG-FAV-32x32.png">
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:    #1B2438;
+      --red:     #7B2318;
+      --light:   #f5f7fa;
+      --border:  #dde3ea;
+      --text:    #1a2633;
+      --muted:   #6b7a8d;
+      --white:   #ffffff;
+      --success: #1a7a3c;
+    }
+    body { font-family: 'Lato', sans-serif; background: var(--light); color: var(--text); min-height: 100vh; }
+    header {
+      background: var(--navy);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 64px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .header-left { display: flex; align-items: center; gap: 16px; padding: 14px 0; }
+    header img { height: 38px; width: auto; filter: brightness(0) invert(1); }
+    .header-divider { width: 2px; height: 32px; background: var(--red); border-radius: 2px; }
+    .header-agency {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.85);
+      letter-spacing: 1px;
+    }
+    .header-sub { font-size: 0.75rem; color: rgba(255,255,255,0.5); font-weight: 400; letter-spacing: 0; }
+    .header-right { display: flex; align-items: center; gap: 12px; padding: 14px 0; }
+    .btn-logout {
+      background: rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.8);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      padding: 8px 18px;
+      font-family: 'Lato', sans-serif;
+      font-size: 0.84rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .btn-logout:hover { background: rgba(255,255,255,0.2); }
+    .container { max-width: 960px; margin: 0 auto; padding: 36px 20px 80px; }
+    .tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+    }
+    .tab {
+      padding: 12px 22px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: color 0.15s, border-color 0.15s;
+      user-select: none;
+    }
+    .tab:hover { color: var(--navy); }
+    .tab.active { color: var(--navy); border-bottom-color: var(--red); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 32px;
+    }
+    .card-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 8px;
+    }
+    .card-sub { color: var(--muted); font-size: 0.88rem; margin-bottom: 24px; }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--navy);
+      color: var(--white);
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      border: none;
+      border-radius: 8px;
+      padding: 13px 28px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-primary:hover { background: #222d47; transform: translateY(-1px); }
+    .btn-sm {
+      display: inline-flex;
+      align-items: center;
+      background: var(--navy);
+      color: var(--white);
+      font-size: 0.78rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 5px;
+      padding: 6px 14px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    .btn-sm:hover { background: #222d47; }
+    .btn-danger {
+      background: transparent;
+      color: var(--red);
+      border: 1px solid var(--red);
+      font-size: 0.78rem;
+      font-weight: 600;
+      border-radius: 5px;
+      padding: 5px 12px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+    .btn-danger:hover { background: var(--red); color: var(--white); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th {
+      background: var(--navy);
+      color: var(--white);
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      text-align: left;
+    }
+    td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8f9fb; }
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .badge-pending { background: #fff3cd; color: #856404; }
+    .badge-active  { background: #d4edda; color: #155724; }
+    .badge-expired { background: #f8d7da; color: #721c24; }
+    .empty-state {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--muted);
+    }
+    .empty-state svg { width: 40px; height: 40px; fill: var(--border); margin-bottom: 12px; }
+    .loading { text-align: center; padding: 36px; color: var(--muted); font-size: 0.88rem; }
+    /* Users tab */
+    .users-section { margin-bottom: 28px; }
+    .users-section-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .user-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      background: var(--white);
+    }
+    .user-info .user-name { font-weight: 600; font-size: 0.9rem; }
+    .user-info .user-email { font-size: 0.82rem; color: var(--muted); }
+    .user-primary { font-size: 0.72rem; color: var(--navy); font-weight: 700; background: #e8edf5; border-radius: 4px; padding: 2px 8px; margin-left: 8px; }
+    .add-user-form {
+      border: 1.5px dashed var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      background: #f9fafc;
+    }
+    .add-user-form .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+    .add-user-form input {
+      width: 100%;
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      padding: 9px 12px;
+      font-size: 0.88rem;
+      font-family: 'Lato', sans-serif;
+      color: var(--text);
+    }
+    .add-user-form input:focus { outline: none; border-color: var(--navy); }
+    .add-user-form label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text); margin-bottom: 5px; }
+    .msg { font-size: 0.85rem; padding: 10px 14px; border-radius: 6px; margin-top: 12px; }
+    .msg-success { background: #e6f7ed; color: #1a5c35; border: 1px solid #a3d9b8; }
+    .msg-error   { background: #fdf0ef; color: #7B2318; border: 1px solid #f0c0b8; }
+    @media (max-width: 580px) {
+      .add-user-form .form-row { grid-template-columns: 1fr; }
+      th, td { padding: 8px 10px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <img src="https://www.bluealphabelts.com/wp-content/uploads/2024/04/logo-1.png" alt="Blue Alpha">
+      <div class="header-divider"></div>
+      <div>
+        <div class="header-agency" id="agencyName">Government Portal</div>
+        <div class="header-sub">Blue Alpha Quote Portal</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <a href="/logout" class="btn-logout">Log Out</a>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="tabs" id="tabNav">
+      <div class="tab active" data-tab="new-quote">New Quote</div>
+      <div class="tab" data-tab="our-quotes">Our Quotes</div>
+      <div class="tab" data-tab="our-orders">Our Orders</div>
+      <div class="tab" data-tab="manage-users" id="manageUsersTab" style="display:none">Manage Users</div>
+    </div>
+
+    <!-- New Quote Tab -->
+    <div class="tab-panel active" id="tab-new-quote">
+      <div class="card">
+        <div class="card-title">Request a New Quote</div>
+        <p class="card-sub">Use the quote builder to configure your order and submit it for a formal quote.</p>
+        <a href="/quote-builder" class="btn-primary" id="quoteBuilderLink">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>
+          Build a Quote
+        </a>
+      </div>
+    </div>
+
+    <!-- Our Quotes Tab -->
+    <div class="tab-panel" id="tab-our-quotes">
+      <div class="card">
+        <div class="card-title">Our Quotes</div>
+        <p class="card-sub">Active quotes from Blue Alpha — click View to review, edit, or accept.</p>
+        <div id="quotesContent"><div class="loading">Loading quotes…</div></div>
+      </div>
+    </div>
+
+    <!-- Our Orders Tab -->
+    <div class="tab-panel" id="tab-our-orders">
+      <div class="card">
+        <div class="card-title">Our Orders</div>
+        <p class="card-sub">Accepted quotes converted to sales orders.</p>
+        <div id="ordersContent"><div class="loading">Loading orders…</div></div>
+      </div>
+    </div>
+
+    <!-- Manage Users Tab -->
+    <div class="tab-panel" id="tab-manage-users">
+      <div class="card">
+        <div class="card-title">Manage Portal Users</div>
+        <p class="card-sub">Add or remove users who can access this portal account.</p>
+        <div class="users-section">
+          <div class="users-section-title">Authorized Users</div>
+          <div id="usersList"><div class="loading">Loading users…</div></div>
+        </div>
+        <div class="users-section">
+          <div class="users-section-title">Add a New User</div>
+          <div class="add-user-form">
+            <div class="form-row">
+              <div>
+                <label>Full Name</label>
+                <input type="text" id="newUserName" placeholder="Jane Smith">
+              </div>
+              <div>
+                <label>Email Address</label>
+                <input type="email" id="newUserEmail" placeholder="jsmith@agency.gov">
+              </div>
+            </div>
+            <button class="btn-primary" id="addUserBtn" onclick="addUser()">Add User</button>
+            <div id="addUserMsg"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const IS_PRIMARY = window.__IS_PRIMARY__ || false;
+    let quotesLoaded = false;
+    let ordersLoaded = false;
+    let usersLoaded = false;
+
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        const panel = document.getElementById('tab-' + tab.dataset.tab);
+        if (panel) panel.classList.add('active');
+        // Lazy load
+        if (tab.dataset.tab === 'our-quotes' && !quotesLoaded) loadQuotes();
+        if (tab.dataset.tab === 'our-orders' && !ordersLoaded) loadOrders();
+        if (tab.dataset.tab === 'manage-users' && !usersLoaded) loadUsers();
+      });
+    });
+
+    // Load agency name + determine primary status
+    (async () => {
+      try {
+        const resp = await fetch('/api/portal/me');
+        if (!resp.ok) { window.location = '/login'; return; }
+        const data = await resp.json();
+        document.getElementById('agencyName').textContent = data.agencyName || 'Government Portal';
+        document.title = `Blue Alpha — ${data.agencyName || 'Portal'}`;
+        if (data.isPrimary) {
+          document.getElementById('manageUsersTab').style.display = '';
+          window.__IS_PRIMARY__ = true;
+        }
+        // Update quote builder link with customer pre-fill
+        if (data.customerId) {
+          document.getElementById('quoteBuilderLink').href = '/quote-builder?cid=' + encodeURIComponent(data.customerId);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+
+    function fmt(dateStr) {
+      if (!dateStr) return '—';
+      try { return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); }
+      catch { return dateStr; }
+    }
+    function money(n) {
+      return '$' + (Number(n) || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
+    async function loadQuotes() {
+      quotesLoaded = true;
+      const el = document.getElementById('quotesContent');
+      try {
+        const resp = await fetch('/api/portal/quotes');
+        const data = await resp.json();
+        if (!data.quotes || data.quotes.length === 0) {
+          el.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg><p>No quotes yet</p></div>';
+          return;
+        }
+        el.innerHTML = '<table><thead><tr><th>Quote #</th><th>Date</th><th>Expiry</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>' +
+          data.quotes.map(q => {
+            const expired = q.is_expired;
+            const badge = expired ? '<span class="badge badge-expired">Expired</span>' : '<span class="badge badge-pending">Open</span>';
+            return `<tr>
+              <td><strong>${q.quote_number || '—'}</strong></td>
+              <td>${fmt(q.date)}</td>
+              <td>${fmt(q.expiry_date)}</td>
+              <td>${money(q.total)}</td>
+              <td>${badge}</td>
+              <td><a href="/view-quote/${q.record_id}" class="btn-sm">View →</a></td>
+            </tr>`;
+          }).join('') +
+          '</tbody></table>';
+      } catch (e) {
+        el.innerHTML = '<div class="empty-state"><p>Failed to load quotes. Please refresh.</p></div>';
+      }
+    }
+
+    async function loadOrders() {
+      ordersLoaded = true;
+      const el = document.getElementById('ordersContent');
+      try {
+        const resp = await fetch('/api/portal/orders');
+        const data = await resp.json();
+        if (!data.orders || data.orders.length === 0) {
+          el.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.07-.44.18-.88.18-1.36C18 2.54 15.46 0 12 0 9.24 0 6.8 1.64 5.73 4H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8-4c1.66 0 3 1.34 3 3H9c0-1.66 1.34-3 3-3z"/></svg><p>No orders yet</p></div>';
+          return;
+        }
+        el.innerHTML = '<table><thead><tr><th>Sales Order #</th><th>Date</th><th>Total</th><th>Status</th></tr></thead><tbody>' +
+          data.orders.map(o => `<tr>
+            <td><strong>${o.so_number || '—'}</strong></td>
+            <td>${fmt(o.date)}</td>
+            <td>${money(o.total)}</td>
+            <td><span class="badge badge-active">Confirmed</span></td>
+          </tr>`).join('') +
+          '</tbody></table>';
+      } catch (e) {
+        el.innerHTML = '<div class="empty-state"><p>Failed to load orders. Please refresh.</p></div>';
+      }
+    }
+
+    async function loadUsers() {
+      usersLoaded = true;
+      const el = document.getElementById('usersList');
+      try {
+        const resp = await fetch('/api/portal/users');
+        const data = await resp.json();
+        if (!data.users || data.users.length === 0) {
+          el.innerHTML = '<p style="color:var(--muted);font-size:.88rem;">No users found.</p>';
+          return;
+        }
+        el.innerHTML = data.users.map(u => `
+          <div class="user-row" id="user-${u.id}">
+            <div class="user-info">
+              <div class="user-name">${escHtml(u.name || '')}${u.is_primary ? '<span class="user-primary">Primary</span>' : ''}</div>
+              <div class="user-email">${escHtml(u.email || '')}</div>
+            </div>
+            ${!u.is_primary ? `<button class="btn-danger" onclick="removeUser('${u.id}', '${escHtml(u.name || u.email)}')">Remove</button>` : ''}
+          </div>`).join('');
+      } catch (e) {
+        el.innerHTML = '<p style="color:var(--muted)">Failed to load users.</p>';
+      }
+    }
+
+    function escHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    async function addUser() {
+      const name = document.getElementById('newUserName').value.trim();
+      const email = document.getElementById('newUserEmail').value.trim();
+      const msgEl = document.getElementById('addUserMsg');
+      msgEl.innerHTML = '';
+      if (!name || !email) {
+        msgEl.innerHTML = '<div class="msg msg-error">Please enter a name and email.</div>';
+        return;
+      }
+      try {
+        const resp = await fetch('/api/portal/users/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email })
+        });
+        const data = await resp.json();
+        if (data.success) {
+          msgEl.innerHTML = '<div class="msg msg-success">User added. They\'ll receive a login link by email.</div>';
+          document.getElementById('newUserName').value = '';
+          document.getElementById('newUserEmail').value = '';
+          usersLoaded = false;
+          loadUsers();
+        } else {
+          msgEl.innerHTML = `<div class="msg msg-error">${data.error || 'Failed to add user.'}</div>`;
+        }
+      } catch (e) {
+        msgEl.innerHTML = '<div class="msg msg-error">Network error. Please try again.</div>';
+      }
+    }
+
+    async function removeUser(userId, name) {
+      if (!confirm(`Remove ${name} from this portal account?`)) return;
+      try {
+        const resp = await fetch('/api/portal/users/remove', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+        const data = await resp.json();
+        if (data.success) {
+          const row = document.getElementById('user-' + userId);
+          if (row) row.remove();
+        } else {
+          alert(data.error || 'Failed to remove user.');
+        }
+      } catch (e) {
+        alert('Network error. Please try again.');
+      }
+    }
+  </script>
+</body>
+</html>

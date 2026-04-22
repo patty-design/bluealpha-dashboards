@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blue Alpha — Admin Portal</title>
+  <link rel="icon" href="https://www.bluealphabelts.com/wp-content/uploads/2019/05/cropped-BAG-FAV-32x32.png">
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:   #1B2438;
+      --red:    #7B2318;
+      --light:  #f5f7fa;
+      --border: #dde3ea;
+      --text:   #1a2633;
+      --muted:  #6b7a8d;
+      --white:  #ffffff;
+    }
+    body { font-family: 'Lato', sans-serif; background: var(--light); color: var(--text); min-height: 100vh; }
+    header {
+      background: var(--navy);
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    header img { height: 44px; width: auto; filter: brightness(0) invert(1); }
+    .header-divider { width: 2px; height: 36px; background: var(--red); border-radius: 2px; }
+    .header-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.75);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+    /* Login gate */
+    #loginGate {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 80px);
+      padding: 40px 20px;
+    }
+    .login-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      max-width: 380px;
+      width: 100%;
+      padding: 44px 36px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    }
+    .login-card h2 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    #adminContent { display: none; }
+    .container { max-width: 1000px; margin: 0 auto; padding: 36px 20px 80px; }
+    label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; }
+    input[type="password"], input[type="text"], input[type="email"] {
+      width: 100%;
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 0.9rem;
+      font-family: 'Lato', sans-serif;
+      color: var(--text);
+      margin-bottom: 14px;
+    }
+    input:focus { outline: none; border-color: var(--navy); }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 22px;
+      border-radius: 7px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      border: none;
+      transition: background 0.15s, transform 0.1s;
+      text-decoration: none;
+    }
+    .btn-primary { background: var(--navy); color: var(--white); }
+    .btn-primary:hover { background: #222d47; }
+    .btn-success { background: #1a7a3c; color: var(--white); }
+    .btn-success:hover { background: #155c2c; }
+    .btn-danger  { background: var(--red); color: var(--white); }
+    .btn-danger:hover  { background: #5c1a12; }
+    .btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--text); }
+    .btn-outline:hover { border-color: var(--navy); color: var(--navy); }
+    .btn-full { width: 100%; }
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 28px;
+    }
+    .tab {
+      padding: 12px 22px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: color 0.15s;
+      user-select: none;
+    }
+    .tab:hover { color: var(--navy); }
+    .tab.active { color: var(--navy); border-bottom-color: var(--red); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+    th {
+      background: var(--navy);
+      color: var(--white);
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      text-align: left;
+      white-space: nowrap;
+    }
+    td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8f9fb; }
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .badge-pending  { background: #fff3cd; color: #856404; }
+    .badge-approved { background: #d4edda; color: #155724; }
+    .badge-denied   { background: #f8d7da; color: #721c24; }
+    .empty-state { text-align: center; padding: 48px; color: var(--muted); }
+    .loading { text-align: center; padding: 36px; color: var(--muted); }
+    .alert { border-radius: 8px; padding: 12px 16px; font-size: 0.88rem; margin-bottom: 16px; }
+    .alert-error { background: #fdf0ef; border: 1px solid #f0c0b8; color: #7B2318; }
+    .action-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+    /* Deny modal */
+    .modal-overlay {
+      display: none;
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: var(--white);
+      border-radius: 12px;
+      max-width: 440px;
+      width: 100%;
+      padding: 32px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+    }
+    .modal h3 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 8px;
+    }
+    .modal p { color: var(--muted); font-size: 0.88rem; margin-bottom: 16px; }
+    textarea {
+      width: 100%;
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-family: 'Lato', sans-serif;
+      font-size: 0.88rem;
+      color: var(--text);
+      min-height: 90px;
+      resize: vertical;
+      margin-bottom: 16px;
+    }
+    textarea:focus { outline: none; border-color: var(--navy); }
+    .modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
+    .detail-toggle { color: var(--navy); font-size: 0.8rem; cursor: pointer; text-decoration: underline; }
+    .detail-row { display: none; }
+    .detail-row.show { display: table-row; }
+    .detail-cell { background: #f8f9fc; padding: 14px 18px; }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 20px;
+      font-size: 0.82rem;
+    }
+    .detail-grid .kv { display: flex; flex-direction: column; gap: 2px; }
+    .detail-grid .k { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; }
+    .detail-grid .v { font-weight: 600; color: var(--text); }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="https://www.bluealphabelts.com/wp-content/uploads/2024/04/logo-1.png" alt="Blue Alpha">
+    <div class="header-divider"></div>
+    <span class="header-title">Portal Admin</span>
+  </header>
+
+  <!-- Login Gate -->
+  <div id="loginGate">
+    <div class="login-card">
+      <h2>Admin Access</h2>
+      <div id="loginError"></div>
+      <label>Password</label>
+      <input type="password" id="adminPassword" placeholder="Enter admin password" onkeydown="if(event.key==='Enter') doLogin()">
+      <button class="btn btn-primary btn-full" onclick="doLogin()">Sign In</button>
+    </div>
+  </div>
+
+  <!-- Admin Content -->
+  <div id="adminContent">
+    <div class="container">
+      <div class="tabs">
+        <div class="tab active" data-tab="pending">Pending</div>
+        <div class="tab" data-tab="approved">Approved</div>
+        <div class="tab" data-tab="denied">Denied</div>
+      </div>
+
+      <div class="tab-panel active" id="tab-pending">
+        <div class="card">
+          <div id="pendingContent" class="loading">Loading…</div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-approved">
+        <div class="card">
+          <div id="approvedContent" class="loading">Loading…</div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-denied">
+        <div class="card">
+          <div id="deniedContent" class="loading">Loading…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Deny Modal -->
+  <div class="modal-overlay" id="denyModal">
+    <div class="modal">
+      <h3>Deny Application</h3>
+      <p>Provide a reason for denial. This will be included in the notification email sent to the applicant.</p>
+      <textarea id="denyReason" placeholder="Reason for denial…"></textarea>
+      <div class="modal-btns">
+        <button class="btn btn-outline" onclick="closeDenyModal()">Cancel</button>
+        <button class="btn btn-danger" onclick="submitDeny()">Send Denial</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allApps = [];
+    let pendingLoaded = false;
+    let denyAppId = null;
+
+    // Check for existing admin session
+    (async () => {
+      const resp = await fetch('/api/admin/applications');
+      if (resp.ok) {
+        showAdmin();
+        loadApplications(await resp.json());
+      }
+    })();
+
+    async function doLogin() {
+      const pw = document.getElementById('adminPassword').value;
+      const errEl = document.getElementById('loginError');
+      errEl.innerHTML = '';
+      try {
+        const resp = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pw })
+        });
+        if (resp.ok) {
+          showAdmin();
+          const appsResp = await fetch('/api/admin/applications');
+          if (appsResp.ok) loadApplications(await appsResp.json());
+        } else {
+          errEl.innerHTML = '<div class="alert alert-error">Incorrect password.</div>';
+        }
+      } catch (e) {
+        errEl.innerHTML = '<div class="alert alert-error">Network error.</div>';
+      }
+    }
+
+    function showAdmin() {
+      document.getElementById('loginGate').style.display = 'none';
+      document.getElementById('adminContent').style.display = 'block';
+    }
+
+    function loadApplications(data) {
+      allApps = data.applications || [];
+      renderPending();
+      renderApproved();
+      renderDenied();
+    }
+
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+      });
+    });
+
+    function fmt(s) {
+      if (!s) return '—';
+      try { return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); }
+      catch { return s; }
+    }
+    function esc(s) {
+      return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function renderTable(apps, container, showActions) {
+      if (!apps.length) {
+        document.getElementById(container).innerHTML = '<div class="empty-state">No applications found.</div>';
+        return;
+      }
+      let html = '<table><thead><tr><th>Company</th><th>EIN</th><th>Contact Email</th><th>Phone</th><th>Applied</th><th>Status</th>' +
+        (showActions ? '<th>Actions</th>' : '') + '<th></th></tr></thead><tbody>';
+
+      apps.forEach((a, idx) => {
+        const badge = a.status === 'Approved' ? 'badge-approved' : a.status === 'Denied' ? 'badge-denied' : 'badge-pending';
+        html += `<tr>
+          <td><strong>${esc(a.company_name)}</strong></td>
+          <td>${esc(a.ein)}</td>
+          <td>${esc(a.billing_contact_email)}</td>
+          <td>${esc(a.business_phone)}</td>
+          <td>${fmt(a.applied_date)}</td>
+          <td><span class="badge ${badge}">${esc(a.status)}</span></td>
+          ${showActions ? `<td class="action-btns">
+            <button class="btn btn-success" onclick="approveApp('${a.id}', this)">Approve</button>
+            <button class="btn btn-danger" onclick="openDenyModal('${a.id}')">Deny</button>
+          </td>` : ''}
+          <td><span class="detail-toggle" onclick="toggleDetail('detail-${idx}')">Details</span></td>
+        </tr>
+        <tr class="detail-row" id="detail-${idx}">
+          <td colspan="${showActions ? 8 : 7}" class="detail-cell">
+            <div class="detail-grid">
+              <div class="kv"><span class="k">Company</span><span class="v">${esc(a.company_name)}</span></div>
+              <div class="kv"><span class="k">Business Phone</span><span class="v">${esc(a.business_phone)}</span></div>
+              <div class="kv"><span class="k">Website</span><span class="v">${esc(a.website||'—')}</span></div>
+              <div class="kv"><span class="k">Billing Contact</span><span class="v">${esc(a.billing_contact_name)}</span></div>
+              <div class="kv"><span class="k">Billing Email</span><span class="v">${esc(a.billing_contact_email)}</span></div>
+              <div class="kv"><span class="k">Billing Phone</span><span class="v">${esc(a.billing_contact_phone)}</span></div>
+              <div class="kv"><span class="k">Billing Address</span><span class="v">${esc([a.billing_addr1, a.billing_addr2, a.billing_city, a.billing_state, a.billing_zip].filter(Boolean).join(', '))}</span></div>
+              <div class="kv"><span class="k">Shipping Same</span><span class="v">${a.shipping_same ? 'Yes' : 'No'}</span></div>
+              ${!a.shipping_same ? `<div class="kv"><span class="k">Shipping Address</span><span class="v">${esc([a.shipping_addr1, a.shipping_city, a.shipping_state].filter(Boolean).join(', '))}</span></div>` : ''}
+              <div class="kv"><span class="k">Tax Exempt</span><span class="v">${a.tax_exempt ? 'Yes' : 'No'}</span></div>
+              ${a.resale_cert ? `<div class="kv"><span class="k">Resale Cert</span><span class="v">${esc(a.resale_cert)} (${esc(a.resale_state||'')})</span></div>` : ''}
+              ${a.denial_reason ? `<div class="kv"><span class="k">Denial Reason</span><span class="v">${esc(a.denial_reason)}</span></div>` : ''}
+            </div>
+          </td>
+        </tr>`;
+      });
+
+      html += '</tbody></table>';
+      document.getElementById(container).innerHTML = html;
+    }
+
+    function toggleDetail(id) {
+      const row = document.getElementById(id);
+      row.classList.toggle('show');
+    }
+
+    function renderPending() {
+      const pending = allApps.filter(a => a.status === 'Pending');
+      renderTable(pending, 'pendingContent', true);
+    }
+    function renderApproved() {
+      renderTable(allApps.filter(a => a.status === 'Approved'), 'approvedContent', false);
+    }
+    function renderDenied() {
+      renderTable(allApps.filter(a => a.status === 'Denied'), 'deniedContent', false);
+    }
+
+    async function approveApp(appId, btn) {
+      if (!confirm('Approve this application? A Customer record and portal user will be created, and an approval email sent.')) return;
+      btn.disabled = true;
+      btn.textContent = 'Processing…';
+      try {
+        const resp = await fetch(`/api/admin/approve/${appId}`, { method: 'POST' });
+        const data = await resp.json();
+        if (data.success) {
+          const appsResp = await fetch('/api/admin/applications');
+          if (appsResp.ok) loadApplications(await appsResp.json());
+        } else {
+          alert('Error: ' + (data.error || 'Failed to approve.'));
+          btn.disabled = false;
+          btn.textContent = 'Approve';
+        }
+      } catch (e) {
+        alert('Network error.');
+        btn.disabled = false;
+        btn.textContent = 'Approve';
+      }
+    }
+
+    function openDenyModal(appId) {
+      denyAppId = appId;
+      document.getElementById('denyReason').value = '';
+      document.getElementById('denyModal').classList.add('show');
+    }
+    function closeDenyModal() {
+      denyAppId = null;
+      document.getElementById('denyModal').classList.remove('show');
+    }
+
+    async function submitDeny() {
+      const reason = document.getElementById('denyReason').value.trim();
+      if (!reason) { alert('Please provide a denial reason.'); return; }
+      try {
+        const resp = await fetch(`/api/admin/deny/${denyAppId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason })
+        });
+        const data = await resp.json();
+        closeDenyModal();
+        if (data.success) {
+          const appsResp = await fetch('/api/admin/applications');
+          if (appsResp.ok) loadApplications(await appsResp.json());
+        } else {
+          alert('Error: ' + (data.error || 'Failed to deny.'));
+        }
+      } catch (e) {
+        alert('Network error.');
+      }
+    }
+  </script>
+</body>
+</html>
