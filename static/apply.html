@@ -278,10 +278,7 @@
               <input type="text" name="taxExemptionNumber" placeholder="e.g. 98-00123" required>
             </div>
           </div>
-          <div class="checkbox-row">
-            <input type="checkbox" id="taxExempt" name="taxExempt">
-            <label for="taxExempt">This agency is tax exempt</label>
-          </div>
+
         </div>
       </div>
 
@@ -372,7 +369,7 @@
       const payload = {};
       fd.forEach((v, k) => { payload[k] = v; });
       payload.billingSameAsShipping = sameAsShippingCb.checked;
-      payload.taxExempt = document.getElementById('taxExempt').checked;
+
 
       btn.disabled = true;
       btn.textContent = 'Submitting…';

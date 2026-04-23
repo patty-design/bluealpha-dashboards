@@ -3390,7 +3390,6 @@ def apply_page():
     ein                       = (data.get("ein") or "").strip()
     business_phone            = (data.get("businessPhone") or "").strip()
     website                   = (data.get("website") or "").strip()
-    tax_exempt                = bool(data.get("taxExempt", False))
     tax_exemption_number      = (data.get("taxExemptionNumber") or "").strip()
 
     # Shipping fields (always filled)
@@ -3450,7 +3449,6 @@ def apply_page():
         "Bill-To Phone #":              shipping_contact_phone,
         "Bill-To Address (Line 1)":     shipping_addr1,
         "Bill-To Address (Line 2)":     ship_addr2_full,
-        "Tax Exempt":                   tax_exempt,
         "State Tax Exemption #":        tax_exemption_number,
         "Application Status":           "Pending",
         "Applied Date":                 datetime.now(timezone.utc).strftime("%Y-%m-%d"),
@@ -3912,7 +3910,6 @@ def admin_applications():
                 "shipping_contact_phone":f.get("Bill-To Phone #", ""),
                 "shipping_addr1":        f.get("Bill-To Address (Line 1)", ""),
                 "shipping_addr2":        f.get("Bill-To Address (Line 2)", ""),
-                "tax_exempt":            bool(f.get("Tax Exempt", False)),
                 "tax_exemption_number":  f.get("State Tax Exemption #", ""),
                 "status":                f.get("Application Status", "Pending"),
                 "denial_reason":         f.get("Denial Reason", ""),
