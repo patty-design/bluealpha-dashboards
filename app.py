@@ -3884,7 +3884,7 @@ def admin_applications():
             fields=["Organization Name", "EIN", "Main Contact Name", "Main Contact Email",
                     "Main Contact Phone #", "Website",
                     "Customer Address (Line 1)", "Customer City", "Customer State", "Customer Zip Code",
-                    "Bill-To Contact Name", "Bill-To Phone #",
+                    "Bill-To Contact Name", "Bill-To Contact Email", "Bill-To Phone #",
                     "Bill-To Address (Line 1)", "Bill-To Address (Line 2)",
                     "State Tax Exemption #", "Tax Exempt",
                     "Application Status", "Denial Reason", "Applied Date"],
