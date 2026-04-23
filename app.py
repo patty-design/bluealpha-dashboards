@@ -2610,6 +2610,8 @@ _EXCLUDED_PARENTS = {
     "sentry strap - ba",
     "fanny pack",
     "breaching rescue bar",
+    "medical pouch - side pull outer",
+    "medical pouch - top/bottom pull outer",
 }
 
 # Feature variations to exclude globally (lowercase)
