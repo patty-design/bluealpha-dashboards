@@ -252,14 +252,9 @@
 
     <!-- New Quote Tab -->
     <div class="tab-panel active" id="tab-new-quote">
-      <div class="card">
-        <div class="card-title">Request a New Quote</div>
-        <p class="card-sub">Use the quote builder to configure your order and submit it for a formal quote.</p>
-        <a href="/quote-builder" class="btn-primary" id="quoteBuilderLink">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>
-          Build a Quote
-        </a>
-      </div>
+      <iframe id="quoteBuilderFrame" src="/quote-builder"
+        style="width:100%;border:none;display:block;min-height:600px;"
+        scrolling="no"></iframe>
     </div>
 
     <!-- Our Quotes Tab -->
@@ -343,10 +338,7 @@
           document.getElementById('manageUsersTab').style.display = '';
           window.__IS_PRIMARY__ = true;
         }
-        // Update quote builder link with customer pre-fill
-        if (data.customerId) {
-          document.getElementById('quoteBuilderLink').href = '/quote-builder?cid=' + encodeURIComponent(data.customerId);
-        }
+        // (quote builder link removed — now embedded as iframe)
       } catch (e) {
         console.error(e);
       }
@@ -489,6 +481,21 @@
         alert('Network error. Please try again.');
       }
     }
+  // Auto-resize quote builder iframe and handle post-submit tab switch
+  window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'quoteBuilderHeight') {
+      const frame = document.getElementById('quoteBuilderFrame');
+      if (frame) frame.style.height = (e.data.height + 32) + 'px';
+    }
+    if (e.data && e.data.type === 'quoteSubmitted') {
+      // Switch to Our Quotes tab and reload quotes
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelector('[data-tab="our-quotes"]').classList.add('active');
+      document.getElementById('tab-our-quotes').classList.add('active');
+      loadQuotes();
+    }
+  });
   </script>
 </body>
 </html>
