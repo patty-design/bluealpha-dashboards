@@ -1064,8 +1064,18 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredA
     }
   }
 
-  const addons = Object.entries(addonMap).sort((a,b) => a[1].localeCompare(b[1]));
+  // Sort add-ons: "None" always first, then alphabetically
+  const addons = Object.entries(addonMap).sort((a,b) => {
+    const an = a[1].toLowerCase(), bn = b[1].toLowerCase();
+    if (an === 'none') return -1;
+    if (bn === 'none') return 1;
+    return a[1].localeCompare(b[1]);
+  });
   if (addons.length === 0) { addonRow.classList.add('hidden'); return; }
+
+  // Find the "None" add-on id if present
+  const noneAddonEntry = addons.find(([,name]) => name.toLowerCase() === 'none');
+  const noneAddonId = noneAddonEntry ? noneAddonEntry[0] : null;
 
   addonSel.innerHTML = '';
   if (hasBase) {
@@ -1078,11 +1088,18 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredA
     opt.value = id; opt.textContent = name;
     addonSel.appendChild(opt);
   }
-  // Restore preferred addon if available, otherwise default
-  const preferredIsAvailable = preferredAddonId && (preferredAddonId === '' ? hasBase : addonMap[preferredAddonId]);
-  addonSel.value = (preferredAddonId !== '' && addonMap[preferredAddonId])
-    ? preferredAddonId
-    : (hasBase ? '' : addons[0][0]);
+  // Default: preferred addon if valid, else "None" (base or addon), else first
+  let defaultVal;
+  if (preferredAddonId !== '' && addonMap[preferredAddonId]) {
+    defaultVal = preferredAddonId;
+  } else if (hasBase) {
+    defaultVal = '';
+  } else if (noneAddonId) {
+    defaultVal = noneAddonId;
+  } else {
+    defaultVal = addons[0][0];
+  }
+  addonSel.value = defaultVal;
   addonRow.classList.remove('hidden');
   // Trigger price update now that add-on value is set
   _updatePrice(parentId);
