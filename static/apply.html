@@ -274,8 +274,8 @@
         <div class="section-body">
           <div class="form-row">
             <div class="form-group">
-              <label>State Tax Exemption Number</label>
-              <input type="text" name="taxExemptionNumber" placeholder="e.g. 98-00123">
+              <label>State Tax Exemption Number <span class="req">*</span></label>
+              <input type="text" name="taxExemptionNumber" placeholder="e.g. 98-00123" required>
             </div>
           </div>
           <div class="checkbox-row">
@@ -321,7 +321,8 @@
       const alwaysRequired = [
         'companyName','ein','businessPhone',
         'shippingContactName','shippingContactEmail','shippingContactPhone',
-        'shippingAddr1','shippingCity','shippingState','shippingZip'
+        'shippingAddr1','shippingCity','shippingState','shippingZip',
+        'taxExemptionNumber'
       ];
       for (const name of alwaysRequired) {
         const el = form.querySelector(`[name="${name}"]`);
