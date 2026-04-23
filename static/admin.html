@@ -438,14 +438,15 @@
               <!-- Shipping -->
               <div class="detail-section-label">Shipping</div>
               <div class="kv"><span class="k">Shipping Contact</span><span class="v">${esc(a.shipping_contact_name || '—')}</span></div>
-              <div class="kv"><span class="k">Shipping Address</span><span class="v">${esc([a.shipping_addr1, a.shipping_addr2].filter(Boolean).join(', ') || '—')}</span></div>
-              <div></div>
+              <div class="kv"><span class="k">Shipping Email</span><span class="v">${esc(a.shipping_contact_email || '—')}</span></div>
+              <div class="kv"><span class="k">Shipping Phone</span><span class="v">${esc(a.shipping_contact_phone || '—')}</span></div>
+              <div class="kv"><span class="k">Shipping Address</span><span class="v">${esc([a.shipping_addr1, a.shipping_city, a.shipping_state, a.shipping_zip].filter(Boolean).join(', ') || '—')}</span></div>
               <!-- Billing -->
               <div class="detail-section-label">Billing</div>
               <div class="kv"><span class="k">Billing Contact</span><span class="v">${esc(a.billing_contact_name || '—')}</span></div>
               <div class="kv"><span class="k">Billing Email</span><span class="v">${esc(a.billing_contact_email || '—')}</span></div>
               <div class="kv"><span class="k">Billing Phone</span><span class="v">${esc(a.billing_contact_phone || '—')}</span></div>
-              <div class="kv"><span class="k">Billing Address</span><span class="v">${esc([a.billing_addr1, a.billing_city, a.billing_state, a.billing_zip].filter(Boolean).join(', ') || '—')}</span></div>
+              <div class="kv"><span class="k">Billing Address</span><span class="v">${esc([a.billing_addr1, a.billing_addr2].filter(Boolean).join(', ') || '—')}</span></div>
               ${a.denial_reason ? `<div class="detail-section-label">Notes</div><div class="kv"><span class="k">Denial Reason</span><span class="v">${esc(a.denial_reason)}</span></div><div></div>` : ''}
             </div>
           </td>
