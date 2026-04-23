@@ -2608,6 +2608,7 @@ _EXCLUDED_COLORS_GLOBAL = {
     "splatter",
     "mc arid",
     "mc tropic",
+    "mc australian",
 }
 
 # Parents exempt from a global color exclusion (lowercase color → set of lowercase parent names)
