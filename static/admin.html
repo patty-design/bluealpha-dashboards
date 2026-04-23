@@ -420,10 +420,11 @@
               <div class="kv"><span class="k">Billing Contact</span><span class="v">${esc(a.billing_contact_name)}</span></div>
               <div class="kv"><span class="k">Billing Email</span><span class="v">${esc(a.billing_contact_email)}</span></div>
               <div class="kv"><span class="k">Billing Phone</span><span class="v">${esc(a.billing_contact_phone)}</span></div>
-              <div class="kv"><span class="k">Billing Address</span><span class="v">${esc([a.billing_addr1, a.billing_addr2, a.billing_city, a.billing_state, a.billing_zip].filter(Boolean).join(', '))}</span></div>
-              <div class="kv"><span class="k">Shipping Same</span><span class="v">${a.shipping_same ? 'Yes' : 'No'}</span></div>
-              ${!a.shipping_same ? `<div class="kv"><span class="k">Shipping Address</span><span class="v">${esc([a.shipping_addr1, a.shipping_city, a.shipping_state].filter(Boolean).join(', '))}</span></div>` : ''}
+              <div class="kv"><span class="k">Billing Address</span><span class="v">${esc([a.billing_addr1, a.billing_city, a.billing_state, a.billing_zip].filter(Boolean).join(', '))}</span></div>
+              <div class="kv"><span class="k">Shipping Contact</span><span class="v">${esc(a.shipping_contact_name || '—')}</span></div>
+              <div class="kv"><span class="k">Shipping Address</span><span class="v">${esc([a.shipping_addr1, a.shipping_addr2].filter(Boolean).join(', ') || '—')}</span></div>
               <div class="kv"><span class="k">Tax Exempt</span><span class="v">${a.tax_exempt ? 'Yes' : 'No'}</span></div>
+              ${a.tax_exemption_number ? `<div class="kv"><span class="k">Tax Exemption #</span><span class="v">${esc(a.tax_exemption_number)}</span></div>` : ''}
               ${a.resale_cert ? `<div class="kv"><span class="k">Resale Cert</span><span class="v">${esc(a.resale_cert)} (${esc(a.resale_state||'')})</span></div>` : ''}
               ${a.denial_reason ? `<div class="kv"><span class="k">Denial Reason</span><span class="v">${esc(a.denial_reason)}</span></div>` : ''}
             </div>

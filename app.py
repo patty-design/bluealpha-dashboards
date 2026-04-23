@@ -3422,30 +3422,34 @@ def apply_page():
         return Response(json.dumps({"error": "Please fill in all required fields."}),
                         status=400, headers=c, mimetype="application/json")
 
-    # City/State/Zip are formula fields parsed from Address Line 2 — pack them together
+    # Customer Address = BILLING address (has formula fields for City/State/Zip)
+    # Bill-To Address  = SHIPPING address (plain text fields)
     def pack_addr2(city, state, zip_code, line2=""):
         csz = f"{city}, {state} {zip_code}"
         return (line2 + "\n" + csz) if line2 else csz
 
-    # Customer Address = shipping address
-    ship_addr2_full = pack_addr2(shipping_city, shipping_state, shipping_zip, shipping_addr2)
-    # Bill-To Address = billing address (mirrors shipping when same)
     bill_addr2_full = pack_addr2(billing_city, billing_state, billing_zip, billing_addr2)
+    ship_addr2_full = f"{shipping_city}, {shipping_state} {shipping_zip}"
+    if shipping_addr2:
+        ship_addr2_full = shipping_addr2 + "\n" + ship_addr2_full
 
     fields = {
         "Organization Name":            company_name,
         "EIN":                          ein,
-        "Main Contact Name":            shipping_contact_name,
-        "Main Contact Email":           shipping_contact_email,
-        "Main Contact Phone #":         shipping_contact_phone,
-        "Customer Address (Line 1)":    shipping_addr1,
-        "Customer Address (Line 2)":    ship_addr2_full,
+        # Main Contact = billing contact
+        "Main Contact Name":            billing_contact_name,
+        "Main Contact Email":           billing_contact_email,
+        "Main Contact Phone #":         billing_contact_phone,
+        # Customer Address = billing address (city/state/zip auto-parsed by Airtable formula)
+        "Customer Address (Line 1)":    billing_addr1,
+        "Customer Address (Line 2)":    bill_addr2_full,
+        # Bill-To = shipping contact & address
         "Bill-To Org Name":             company_name,
-        "Bill-To Contact Name":         billing_contact_name,
-        "Bill-To Contact Email":        billing_contact_email,
-        "Bill-To Phone #":              billing_contact_phone,
-        "Bill-To Address (Line 1)":     billing_addr1,
-        "Bill-To Address (Line 2)":     bill_addr2_full,
+        "Bill-To Contact Name":         shipping_contact_name,
+        "Bill-To Contact Email":        shipping_contact_email,
+        "Bill-To Phone #":              shipping_contact_phone,
+        "Bill-To Address (Line 1)":     shipping_addr1,
+        "Bill-To Address (Line 2)":     ship_addr2_full,
         "Tax Exempt":                   tax_exempt,
         "State Tax Exemption #":        tax_exemption_number,
         "Application Status":           "Pending",
@@ -3880,8 +3884,11 @@ def admin_applications():
         records = at_get_all(
             CUSTOMERS_TABLE_ID, read_token,
             fields=["Organization Name", "EIN", "Main Contact Name", "Main Contact Email",
-                    "Main Contact Phone #", "Website", "Customer Address (Line 1)", "Customer City",
-                    "Customer State", "Customer Zip Code", "State Tax Exemption #", "Tax Exempt",
+                    "Main Contact Phone #", "Website",
+                    "Customer Address (Line 1)", "Customer City", "Customer State", "Customer Zip Code",
+                    "Bill-To Contact Name", "Bill-To Phone #",
+                    "Bill-To Address (Line 1)", "Bill-To Address (Line 2)",
+                    "State Tax Exemption #", "Tax Exempt",
                     "Application Status", "Denial Reason", "Applied Date"],
             formula="NOT({Application Status}='')",
         )
@@ -3896,9 +3903,15 @@ def admin_applications():
                 "website":               f.get("Website", ""),
                 "billing_contact_name":  f.get("Main Contact Name", ""),
                 "billing_contact_email": f.get("Main Contact Email", ""),
+                "billing_contact_phone": f.get("Main Contact Phone #", ""),
                 "billing_addr1":         f.get("Customer Address (Line 1)", ""),
                 "billing_city":          f.get("Customer City", ""),
                 "billing_state":         f.get("Customer State", ""),
+                "billing_zip":           f.get("Customer Zip Code", ""),
+                "shipping_contact_name": f.get("Bill-To Contact Name", ""),
+                "shipping_contact_phone":f.get("Bill-To Phone #", ""),
+                "shipping_addr1":        f.get("Bill-To Address (Line 1)", ""),
+                "shipping_addr2":        f.get("Bill-To Address (Line 2)", ""),
                 "tax_exempt":            bool(f.get("Tax Exempt", False)),
                 "tax_exemption_number":  f.get("State Tax Exemption #", ""),
                 "status":                f.get("Application Status", "Pending"),
