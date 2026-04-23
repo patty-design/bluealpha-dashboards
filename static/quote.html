@@ -1244,7 +1244,7 @@ async function goStep2() {
   // Pre-fill form with account info (only once per session)
   if (!_profileLoaded) {
     try {
-      const r = await fetch('/api/portal/profile');
+      const r = await fetch('/api/portal/profile', { credentials: 'same-origin' });
       if (r.ok) {
         const { profile } = await r.json();
         if (profile && profile.email) {
@@ -1372,6 +1372,7 @@ async function saveProfileChanges() {
   try {
     await fetch('/api/portal/update-profile', {
       method: 'POST',
+      credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(window._pendingProfileUpdate),
     });
