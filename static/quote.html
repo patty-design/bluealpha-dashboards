@@ -597,6 +597,18 @@
 
 </div>
 
+<!-- Save-to-account modal -->
+<div id="saveProfileModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;padding:32px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.18);">
+    <div style="font-size:1.1rem;font-weight:700;color:var(--navy);margin-bottom:10px;">Save changes to your account?</div>
+    <div style="font-size:0.88rem;color:var(--muted);margin-bottom:24px;">Your contact or address info was updated for this quote. Would you like to save these changes to your account as well?</div>
+    <div style="display:flex;gap:12px;justify-content:flex-end;">
+      <button onclick="dismissSaveModal()" style="padding:9px 20px;border-radius:6px;border:1.5px solid #dde3ea;background:#fff;cursor:pointer;font-size:0.88rem;">No thanks</button>
+      <button onclick="saveProfileChanges()" style="padding:9px 20px;border-radius:6px;border:none;background:var(--navy);color:#fff;cursor:pointer;font-size:0.88rem;font-weight:600;">Yes, update account</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ─── State ───────────────────────────────────────────────────────────────────
 let catalog      = null;   // { parents, skus }
@@ -1218,13 +1230,39 @@ function onCountryChange() {
 }
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
-function goStep2() {
+let _profileLoaded = false;
+let _profileSnapshot = {};
+
+async function goStep2() {
   document.getElementById('step1').classList.add('hidden');
   document.getElementById('step2').classList.remove('hidden');
   document.getElementById('pStep1').classList.remove('active');
   document.getElementById('pStep1').classList.add('done');
   document.getElementById('pStep2').classList.add('active');
   window.scrollTo(0,0);
+
+  // Pre-fill form with account info (only once per session)
+  if (!_profileLoaded) {
+    try {
+      const r = await fetch('/api/portal/profile');
+      if (r.ok) {
+        const { profile } = await r.json();
+        if (profile && profile.email) {
+          const set = (id, val) => { if (val && !document.getElementById(id).value) document.getElementById(id).value = val; };
+          set('f_org',   profile.orgName);
+          set('f_name',  profile.contactName);
+          set('f_email', profile.email);
+          set('f_phone', profile.phone);
+          set('f_addr1', profile.addr1);
+          set('f_city',  profile.city);
+          set('f_state', profile.state);
+          set('f_zip',   profile.zip);
+          _profileSnapshot = { ...profile };
+        }
+      }
+    } catch(e) { /* not logged in or no profile — silent */ }
+    _profileLoaded = true;
+  }
 }
 
 function goStep1() {
@@ -1296,11 +1334,49 @@ async function submitQuote() {
     document.getElementById('progressBar').classList.add('hidden');
     document.getElementById('step3').classList.remove('hidden');
     window.scrollTo(0, 0);
+
+    // Check if any account fields changed — if so, offer to save back
+    if (_profileSnapshot.email) {
+      const current = {
+        orgName: document.getElementById('f_org').value.trim(),
+        contactName: document.getElementById('f_name').value.trim(),
+        email: document.getElementById('f_email').value.trim(),
+        phone: document.getElementById('f_phone').value.trim(),
+        addr1: document.getElementById('f_addr1').value.trim(),
+        city:  document.getElementById('f_city').value.trim(),
+        state: document.getElementById('f_state').value.trim(),
+        zip:   document.getElementById('f_zip').value.trim(),
+      };
+      const changed = Object.keys(current).some(k => current[k] !== (_profileSnapshot[k] || ''));
+      if (changed) {
+        window._pendingProfileUpdate = current;
+        const modal = document.getElementById('saveProfileModal');
+        modal.style.display = 'flex';
+      }
+    }
   } catch (e) {
     showError(e.message || 'An error occurred. Please try again.');
     btnEl.disabled = false;
     btnEl.textContent = 'Submit Quote Request';
   }
+}
+
+function dismissSaveModal() {
+  document.getElementById('saveProfileModal').style.display = 'none';
+}
+
+async function saveProfileChanges() {
+  const btn = document.querySelector('#saveProfileModal button:last-child');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    await fetch('/api/portal/update-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(window._pendingProfileUpdate),
+    });
+  } catch(e) { /* silent */ }
+  dismissSaveModal();
 }
 
 function showError(msg) {

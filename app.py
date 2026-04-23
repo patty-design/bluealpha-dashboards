@@ -3648,6 +3648,84 @@ def portal_me(user):
     }), headers=c, mimetype="application/json")
 
 
+@app.route("/api/portal/profile", methods=["GET", "OPTIONS"])
+@portal_login_required
+def portal_profile(user):
+    """Return full contact/address info for the logged-in customer."""
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Methods": "GET"})
+    c = cors()
+    customer_id = user.get("customer_id", "")
+    if not customer_id:
+        return Response(json.dumps({"profile": {}}), headers=c, mimetype="application/json")
+    try:
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        cr = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
+            headers=at_headers(read_token),
+            timeout=10,
+        )
+        if cr.status_code != 200:
+            return Response(json.dumps({"profile": {}}), headers=c, mimetype="application/json")
+        f = cr.json().get("fields", {})
+        profile = {
+            "orgName":     f.get("Organization Name", ""),
+            "contactName": f.get("Main Contact Name", ""),
+            "email":       f.get("Main Contact Email", ""),
+            "phone":       f.get("Main Contact Phone #", ""),
+            "addr1":       f.get("Customer Address (Line 1)", ""),
+            "city":        f.get("Customer City", ""),
+            "state":       f.get("Customer State", ""),
+            "zip":         f.get("Customer Zip Code", ""),
+        }
+        return Response(json.dumps({"profile": profile}), headers=c, mimetype="application/json")
+    except Exception as e:
+        print(f"[portal_profile] error: {e}")
+        return Response(json.dumps({"profile": {}}), headers=c, mimetype="application/json")
+
+
+@app.route("/api/portal/update-profile", methods=["POST", "OPTIONS"])
+@portal_login_required
+def portal_update_profile(user):
+    """Update the logged-in customer's contact/address info in Airtable."""
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    customer_id = user.get("customer_id", "")
+    if not customer_id:
+        return Response(json.dumps({"error": "Not authenticated"}), status=401, headers=c, mimetype="application/json")
+    data = request.get_json() or {}
+    def pack(city, state, zip_code):
+        parts = [p for p in [city, f"{state} {zip_code}".strip()] if p]
+        return ", ".join(parts)
+    fields = {}
+    if data.get("orgName"):     fields["Organization Name"]            = data["orgName"].strip()
+    if data.get("contactName"): fields["Main Contact Name"]            = data["contactName"].strip()
+    if data.get("email"):       fields["Main Contact Email"]           = data["email"].strip()
+    if data.get("phone"):       fields["Main Contact Phone #"]         = data["phone"].strip()
+    if data.get("addr1"):       fields["Customer Address (Line 1)"]    = data["addr1"].strip()
+    city  = data.get("city",  "").strip()
+    state = data.get("state", "").strip()
+    zip_  = data.get("zip",   "").strip()
+    if city or state or zip_:
+        fields["Customer Address (Line 2)"] = pack(city, state, zip_)
+    if not fields:
+        return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+    try:
+        write_token = APPLY_WRITE_TOKEN or RETURNS_WRITE_TOKEN
+        pr = req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": fields},
+            timeout=15,
+        )
+        pr.raise_for_status()
+        return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        print(f"[portal_update_profile] error: {e}")
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
 @app.route("/api/portal/quotes")
 @portal_login_required
 def portal_quotes(user):
