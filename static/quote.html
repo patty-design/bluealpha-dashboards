@@ -739,10 +739,11 @@ function _productHtml(p) {
 function buildCatalogUI() {
   const catOrder = ['EDC Belts','Battle Belts','Duty Belts','Mag Pouches','Handcuff Cases','Pouches','Medical Kits','Accessories','Support Accessories','Apparel'];
 
-  // Custom product order within specific categories (case-insensitive substring match)
+  // Custom product order within specific categories.
+  // Use exact lowercase name for precise matching; falls back to substring if no exact match.
   const catProductOrder = {
-    'Mag Pouches':     ['3"','4"','rifle pouch','horizontal rifle','308'],
-    'Handcuff Cases':  ['gen 2','enclosed','double enclosed','handcuff strap'],
+    'Mag Pouches':    ['3" pistol pouch','4" pistol pouch','rifle pouch','horizontal rifle pouch','308 rifle pouch'],
+    'Handcuff Cases': ['gen 2','enclosed','double enclosed','handcuff strap'],
   };
   const catMap   = {};
   for (const p of catalog.parents) {
@@ -766,15 +767,20 @@ function buildCatalogUI() {
     let parents = catMap[cat];
     if (catProductOrder[cat]) {
       const order = catProductOrder[cat].map(s => s.toLowerCase());
+      const rankOf = name => {
+        const n = name.toLowerCase();
+        // Exact match first, then substring
+        const exact = order.findIndex(s => n === s);
+        if (exact !== -1) return exact;
+        return order.findIndex(s => n.includes(s));
+      };
       parents = [...parents].sort((a, b) => {
-        const an = (a.name || '').toLowerCase();
-        const bn = (b.name || '').toLowerCase();
-        const ai = order.findIndex(s => an.includes(s));
-        const bi = order.findIndex(s => bn.includes(s));
+        const ai = rankOf(a.name || '');
+        const bi = rankOf(b.name || '');
         if (ai !== -1 && bi !== -1) return ai - bi;
         if (ai !== -1) return -1;
         if (bi !== -1) return 1;
-        return an.localeCompare(bn);
+        return (a.name || '').localeCompare(b.name || '');
       });
     }
     const section = document.createElement('div');
