@@ -207,6 +207,18 @@
     .detail-row { display: none; }
     .detail-row.show { display: table-row; }
     .detail-cell { background: #f8f9fc; padding: 14px 18px; }
+    .detail-sections { display: flex; flex-direction: column; gap: 14px; }
+    .detail-section-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 4px;
+      margin-bottom: 6px;
+      grid-column: 1 / -1;
+    }
     .detail-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -414,18 +426,27 @@
         <tr class="detail-row" id="detail-${idx}">
           <td colspan="${showActions ? 8 : 7}" class="detail-cell">
             <div class="detail-grid">
+              <!-- Company Info -->
+              <div class="detail-section-label">Company</div>
               <div class="kv"><span class="k">Company</span><span class="v">${esc(a.company_name)}</span></div>
-              <div class="kv"><span class="k">Business Phone</span><span class="v">${esc(a.business_phone)}</span></div>
-              <div class="kv"><span class="k">Website</span><span class="v">${esc(a.website||'—')}</span></div>
-              <div class="kv"><span class="k">Billing Contact</span><span class="v">${esc(a.billing_contact_name)}</span></div>
-              <div class="kv"><span class="k">Billing Email</span><span class="v">${esc(a.billing_contact_email)}</span></div>
-              <div class="kv"><span class="k">Billing Phone</span><span class="v">${esc(a.billing_contact_phone)}</span></div>
-              <div class="kv"><span class="k">Billing Address</span><span class="v">${esc([a.billing_addr1, a.billing_city, a.billing_state, a.billing_zip].filter(Boolean).join(', '))}</span></div>
+              <div class="kv"><span class="k">Business Phone</span><span class="v">${esc(a.business_phone || '—')}</span></div>
+              <div class="kv"><span class="k">EIN</span><span class="v">${esc(a.ein || '—')}</span></div>
+              <div class="kv"><span class="k">Website</span><span class="v">${esc(a.website || '—')}</span></div>
+              <div class="kv"><span class="k">Tax Exemption #</span><span class="v">${esc(a.tax_exemption_number || '—')}</span></div>
+              <div></div>
+              <!-- Billing -->
+              <div class="detail-section-label">Billing</div>
+              <div class="kv"><span class="k">Billing Contact</span><span class="v">${esc(a.billing_contact_name || '—')}</span></div>
+              <div class="kv"><span class="k">Billing Email</span><span class="v">${esc(a.billing_contact_email || '—')}</span></div>
+              <div class="kv"><span class="k">Billing Phone</span><span class="v">${esc(a.billing_contact_phone || '—')}</span></div>
+              <div class="kv"><span class="k">Billing Address</span><span class="v">${esc([a.billing_addr1, a.billing_city, a.billing_state, a.billing_zip].filter(Boolean).join(', ') || '—')}</span></div>
+              <!-- Shipping -->
+              <div class="detail-section-label">Shipping</div>
               <div class="kv"><span class="k">Shipping Contact</span><span class="v">${esc(a.shipping_contact_name || '—')}</span></div>
+              <div class="kv"><span class="k">Shipping Phone</span><span class="v">${esc(a.shipping_contact_phone || '—')}</span></div>
               <div class="kv"><span class="k">Shipping Address</span><span class="v">${esc([a.shipping_addr1, a.shipping_addr2].filter(Boolean).join(', ') || '—')}</span></div>
-              ${a.tax_exemption_number ? `<div class="kv"><span class="k">Tax Exemption #</span><span class="v">${esc(a.tax_exemption_number)}</span></div>` : ''}
-              ${a.resale_cert ? `<div class="kv"><span class="k">Resale Cert</span><span class="v">${esc(a.resale_cert)} (${esc(a.resale_state||'')})</span></div>` : ''}
-              ${a.denial_reason ? `<div class="kv"><span class="k">Denial Reason</span><span class="v">${esc(a.denial_reason)}</span></div>` : ''}
+              <div></div>
+              ${a.denial_reason ? `<div class="detail-section-label">Notes</div><div class="kv"><span class="k">Denial Reason</span><span class="v">${esc(a.denial_reason)}</span></div><div></div>` : ''}
             </div>
           </td>
         </tr>`;
