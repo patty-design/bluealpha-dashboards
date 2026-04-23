@@ -474,9 +474,13 @@ if (window.self !== window.top) {
       </div>
 
       <div class="badges" id="badges">
-        <span class="badge badge-navy">Net 30 Terms</span>
         <!-- accepted badge injected here -->
       </div>
+    </div>
+
+    <!-- PDF button pinned below summary card -->
+    <div id="pdfBtnRow" style="margin-bottom:12px;">
+      <button class="btn btn-secondary" onclick="window.open('/quote-pdf/'+recordId)">Download PDF</button>
     </div>
 
     <!-- Customer card -->
@@ -688,7 +692,13 @@ function render() {
   const metaRow = document.getElementById('metaRow');
   metaRow.innerHTML = '';
 
-  const dateEl = makeMetaItem(`Date: <strong>${q.date || '—'}</strong>`);
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    const [y, m, d] = iso.split('-').map(Number);
+    return `${m}-${d}-${y}`;
+  }
+
+  const dateEl = makeMetaItem(`Date: <strong>${fmtDate(q.date)}</strong>`);
   metaRow.appendChild(dateEl);
 
   if (q.expiryDate) {
@@ -698,21 +708,16 @@ function render() {
       expEl = makeMetaItem(`Expires: <strong>EXPIRED</strong>`);
       expEl.classList.add('exp');
     } else if (daysLeft < 30) {
-      expEl = makeMetaItem(`Expires: <strong>${q.expiryDate}</strong> (${daysLeft}d left)`);
+      expEl = makeMetaItem(`Expires: <strong>${fmtDate(q.expiryDate)}</strong> (${daysLeft}d left)`);
       expEl.classList.add('warn');
     } else {
-      expEl = makeMetaItem(`Expires: <strong>${q.expiryDate}</strong>`);
+      expEl = makeMetaItem(`Expires: <strong>${fmtDate(q.expiryDate)}</strong>`);
     }
     metaRow.appendChild(expEl);
   }
 
-  if (q.poNumber) {
-    metaRow.appendChild(makeMetaItem(`PO #: <strong>${escHtml(q.poNumber)}</strong>`));
-  }
-
-  // Badges
+  // Badges (no Net 30, no PO #)
   const badges = document.getElementById('badges');
-  badges.innerHTML = '<span class="badge badge-navy">Net 30 Terms</span>';
   if (q.isAccepted) {
     const soNumber = q.soNumber || '';
     const label = soNumber ? `✓ Order Accepted — ${soNumber}` : '✓ Order Accepted';
@@ -826,13 +831,6 @@ function updateTotals() {
 function buildActions(editable) {
   const bar = document.getElementById('actionsBar');
   bar.innerHTML = '';
-
-  // PDF always
-  const pdfBtn = document.createElement('button');
-  pdfBtn.className = 'btn btn-secondary';
-  pdfBtn.textContent = 'Download PDF';
-  pdfBtn.onclick = () => window.open(`/quote-pdf/${recordId}`);
-  bar.appendChild(pdfBtn);
 
   if (editable) {
     const acceptBtn = document.createElement('button');
@@ -1169,7 +1167,7 @@ async function confirmOrder() {
     document.getElementById('addItemSection').classList.add('hidden');
     document.getElementById('saveRow').classList.add('hidden');
     const badges = document.getElementById('badges');
-    badges.innerHTML = '<span class="badge badge-navy">Net 30 Terms</span>';
+    badges.innerHTML = '';
     const label = soNumber ? `\u2713 Order Accepted \u2014 ${soNumber}` : '\u2713 Order Accepted';
     badges.insertAdjacentHTML('beforeend', `<span class="badge badge-success">${escHtml(label)}</span>`);
     buildActions(false);
