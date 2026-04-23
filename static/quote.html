@@ -1221,6 +1221,7 @@ function onCountryChange() {
 // ─── Navigation ──────────────────────────────────────────────────────────────
 let _profileLoaded = false;
 let _profileSnapshot = {};
+let _profileCustomerId = null;
 
 async function goStep2() {
   document.getElementById('step1').classList.add('hidden');
@@ -1237,6 +1238,7 @@ async function goStep2() {
       if (r.ok) {
         const { profile } = await r.json();
         if (profile && profile.email) {
+          _profileCustomerId = profile.customerId || null;
           const set = (id, val) => { if (val) document.getElementById(id).value = val; };
           set('f_org',   profile.orgName);
           set('f_name',  profile.contactName);
@@ -1298,6 +1300,7 @@ async function submitQuote() {
     country:     country,
     poNumber:    document.getElementById('f_po').value.trim(),
     notes:       document.getElementById('f_notes').value.trim(),
+    customerId:  _profileCustomerId || undefined,
     items:       items.map(it => ({
       skuRecordId: it.skuRecordId,
       name:        it.name,

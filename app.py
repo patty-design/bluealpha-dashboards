@@ -2734,17 +2734,22 @@ def create_quote():
     po_number    = (data.get("poNumber") or "").strip()
     notes        = (data.get("notes") or "").strip()
 
+    provided_cust_id = (data.get("customerId") or "").strip()
+
     try:
         read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-        # 1. Find or create customer by email
-        existing = at_get_all(
+        # 1. Use provided customer ID if available, otherwise find/create by email
+        if provided_cust_id:
+            cust_id = provided_cust_id
+        else:
+          existing = at_get_all(
             CUSTOMERS_TABLE_ID, read_token,
             fields=["Main Contact Email", "Organization Name"],
             formula=f"{{Main Contact Email}}='{email}'",
-        )
-        if existing:
+          )
+          if existing:
             cust_id = existing[0]["id"]
-        else:
+          else:
             # Build address lines in the format the Airtable formulas expect:
             # Line 1 = street (+ suite/unit if provided)
             # Line 2 = "City, State ZIP"  ← parsed by Customer City/State/Zip formulas
@@ -3669,6 +3674,7 @@ def portal_profile(user):
             return Response(json.dumps({"profile": {}}), headers=c, mimetype="application/json")
         f = cr.json().get("fields", {})
         profile = {
+            "customerId":  customer_id,
             "orgName":     f.get("Organization Name", ""),
             "contactName": f.get("Main Contact Name", ""),
             "email":       f.get("Main Contact Email", ""),
