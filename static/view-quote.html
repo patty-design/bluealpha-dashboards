@@ -417,13 +417,24 @@
 </head>
 <body>
 
-<header>
+<header id="vqHeader">
   <img src="https://www.bluealphabelts.com/wp-content/uploads/2019/05/Blue-Alpha-Logo-White.png"
        alt="Blue Alpha"
        onerror="this.onerror=null;this.src='/static/ba-logo.jpg'">
   <div class="header-divider"></div>
   <div class="header-title">Quote Portal</div>
 </header>
+
+<script>
+if (window.self !== window.top) {
+  document.getElementById('vqHeader').style.display = 'none';
+  function _notifyVQHeight() {
+    window.parent.postMessage({ type: 'viewQuoteHeight', height: document.body.scrollHeight }, '*');
+  }
+  window.addEventListener('load', _notifyVQHeight);
+  new MutationObserver(_notifyVQHeight).observe(document.body, { childList: true, subtree: true, attributes: true });
+}
+</script>
 
 <div class="container">
 

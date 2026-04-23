@@ -266,6 +266,18 @@
       </div>
     </div>
 
+    <!-- View Quote Panel (not a nav tab — shown when View → is clicked) -->
+    <div class="tab-panel" id="tab-view-quote">
+      <div style="margin-bottom:12px;">
+        <button onclick="closeViewQuote()" style="background:none;border:none;cursor:pointer;color:var(--navy);font-size:0.9rem;font-weight:600;display:flex;align-items:center;gap:6px;padding:0;">
+          ← Back to Quotes
+        </button>
+      </div>
+      <iframe id="viewQuoteFrame" src=""
+        style="width:100%;border:none;display:block;min-height:600px;"
+        scrolling="no"></iframe>
+    </div>
+
     <!-- Our Orders Tab -->
     <div class="tab-panel" id="tab-our-orders">
       <div class="card">
@@ -373,7 +385,7 @@
               <td>${fmt(q.expiry_date)}</td>
               <td>${money(q.total)}</td>
               <td>${badge}</td>
-              <td><a href="/view-quote/${q.record_id}" class="btn-sm">View →</a></td>
+              <td><button class="btn-sm" onclick="openViewQuote('${q.record_id}')">View →</button></td>
             </tr>`;
           }).join('') +
           '</tbody></table>';
@@ -481,14 +493,17 @@
         alert('Network error. Please try again.');
       }
     }
-  // Auto-resize quote builder iframe and handle post-submit tab switch
+  // Auto-resize iframes and handle inter-frame messages
   window.addEventListener('message', function(e) {
     if (e.data && e.data.type === 'quoteBuilderHeight') {
       const frame = document.getElementById('quoteBuilderFrame');
       if (frame) frame.style.height = (e.data.height + 32) + 'px';
     }
+    if (e.data && e.data.type === 'viewQuoteHeight') {
+      const frame = document.getElementById('viewQuoteFrame');
+      if (frame) frame.style.height = (e.data.height + 32) + 'px';
+    }
     if (e.data && e.data.type === 'quoteSubmitted') {
-      // Switch to Our Quotes tab and reload quotes
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.querySelector('[data-tab="our-quotes"]').classList.add('active');
@@ -496,6 +511,24 @@
       loadQuotes();
     }
   });
+
+  function openViewQuote(recordId) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    const frame = document.getElementById('viewQuoteFrame');
+    frame.src = '/view-quote/' + recordId;
+    frame.style.height = '600px';
+    document.getElementById('tab-view-quote').classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  function closeViewQuote() {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelector('[data-tab="our-quotes"]').classList.add('active');
+    document.getElementById('tab-our-quotes').classList.add('active');
+    document.getElementById('viewQuoteFrame').src = '';
+  }
   </script>
 </body>
 </html>
