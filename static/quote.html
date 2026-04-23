@@ -1316,13 +1316,7 @@ async function submitQuote() {
     const data = await r.json();
     if (!r.ok || !data.success) throw new Error(data.error || 'Submission failed');
 
-    document.getElementById('successEmail').textContent = email;
-    document.getElementById('successQuoteNumber').textContent = data.quoteNumber;
-
-    document.getElementById('step2').classList.add('hidden');
-    document.getElementById('progressBar').classList.add('hidden');
-    document.getElementById('step3').classList.remove('hidden');
-    window.scrollTo(0, 0);
+    window.location.href = '/portal';
 
 
   } catch (e) {
