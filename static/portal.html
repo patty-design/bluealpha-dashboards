@@ -247,7 +247,7 @@
       <div class="tab active" data-tab="new-quote">New Quote</div>
       <div class="tab" data-tab="our-quotes">Our Quotes</div>
       <div class="tab" data-tab="our-orders">Our Orders</div>
-
+      <div class="tab" data-tab="manage-users" id="manageUsersTab" style="display:none">Manage Users</div>
     </div>
 
     <!-- New Quote Tab -->
@@ -288,6 +288,33 @@
     </div>
 
     <!-- Manage Users Tab -->
+    <div class="tab-panel" id="tab-manage-users">
+      <div class="card">
+        <div class="card-title">Manage Users</div>
+        <p class="card-sub">Add additional people from your organization so they can log in and view quotes.</p>
+        <div class="users-section">
+          <div class="users-section-title">Additional Users</div>
+          <div id="usersList"><div class="loading">Loading…</div></div>
+        </div>
+        <div class="users-section">
+          <div class="users-section-title">Add a User</div>
+          <div class="add-user-form">
+            <div class="form-row">
+              <div>
+                <label>Full Name</label>
+                <input type="text" id="newUserName" placeholder="Jane Smith">
+              </div>
+              <div>
+                <label>Email Address</label>
+                <input type="email" id="newUserEmail" placeholder="jsmith@agency.gov">
+              </div>
+            </div>
+            <button class="btn-primary" id="addUserBtn" onclick="addUser()">Add User</button>
+            <div id="addUserMsg"></div>
+          </div>
+        </div>
+      </div>
+    </div>
 
   </div>
 
@@ -397,17 +424,19 @@
       try {
         const resp = await fetch('/api/portal/users');
         const data = await resp.json();
-        if (!data.users || data.users.length === 0) {
-          el.innerHTML = '<p style="color:var(--muted);font-size:.88rem;">No users found.</p>';
+        // Show only non-primary users (primary = the account owner, not an "additional" user)
+        const additional = (data.users || []).filter(u => !u.is_primary);
+        if (additional.length === 0) {
+          el.innerHTML = '<p style="color:var(--muted);font-size:.88rem;">No additional users yet. Add someone below to give them portal access.</p>';
           return;
         }
-        el.innerHTML = data.users.map(u => `
+        el.innerHTML = additional.map(u => `
           <div class="user-row" id="user-${u.id}">
             <div class="user-info">
-              <div class="user-name">${escHtml(u.name || '')}${u.is_primary ? '<span class="user-primary">Primary</span>' : ''}</div>
+              <div class="user-name">${escHtml(u.name || '')}</div>
               <div class="user-email">${escHtml(u.email || '')}</div>
             </div>
-            ${!u.is_primary ? `<button class="btn-danger" onclick="removeUser('${u.id}', '${escHtml(u.name || u.email)}')">Remove</button>` : ''}
+            <button class="btn-danger" onclick="removeUser('${u.id}', '${escHtml(u.name || u.email)}')">Remove</button>
           </div>`).join('');
       } catch (e) {
         el.innerHTML = '<p style="color:var(--muted)">Failed to load users.</p>';
