@@ -316,6 +316,16 @@
 
       const form = e.target;
       let valid = true;
+      let firstErrorEl = null;
+
+      function checkField(el) {
+        if (!el || !el.value.trim()) {
+          if (el) { el.classList.add('error'); firstErrorEl = firstErrorEl || el; }
+          return false;
+        }
+        if (el) el.classList.remove('error');
+        return true;
+      }
 
       // Always-required fields
       const alwaysRequired = [
@@ -325,13 +335,7 @@
         'taxExemptionNumber'
       ];
       for (const name of alwaysRequired) {
-        const el = form.querySelector(`[name="${name}"]`);
-        if (!el || !el.value.trim()) {
-          if (el) el.classList.add('error');
-          valid = false;
-        } else {
-          el.classList.remove('error');
-        }
+        if (!checkField(form.querySelector(`[name="${name}"]`))) valid = false;
       }
 
       // Billing required only when not same as shipping
@@ -341,13 +345,7 @@
           'billingAddr1','billingCity','billingState','billingZip'
         ];
         for (const name of billingRequired) {
-          const el = form.querySelector(`[name="${name}"]`);
-          if (!el || !el.value.trim()) {
-            if (el) el.classList.add('error');
-            valid = false;
-          } else {
-            el.classList.remove('error');
-          }
+          if (!checkField(form.querySelector(`[name="${name}"]`))) valid = false;
         }
       }
 
@@ -362,8 +360,11 @@
       }
 
       if (!valid) {
-        alertArea.innerHTML = '<div class="alert alert-error">Please fill in all required fields and check the confirmation box.</div>';
-        alertArea.scrollIntoView({ behavior: 'smooth' });
+        // Scroll to first missing field so it's visible, not just to the top alert
+        const scrollTarget = firstErrorEl || certifyCb;
+        scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        scrollTarget.focus({ preventScroll: true });
+        alertArea.innerHTML = '<div class="alert alert-error">Please fill in all required fields marked in red and check the confirmation box before submitting.</div>';
         return;
       }
 
