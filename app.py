@@ -3742,14 +3742,17 @@ def portal_quotes(user):
 
     try:
         read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-        formula = (f"AND(FIND(\"{customer_id}\",ARRAYJOIN({{Customer}})),"
-                   f"{{Order Type}}=\"Quote\","
-                   f"NOT({{MO Is Approved}}))")
+        # Note: ARRAYJOIN({Customer}) in Airtable formulas returns the linked record's
+        # primary field (name), not its record ID — so we can't filter by customer_id
+        # in the formula. Fetch all open quotes and filter in Python instead.
+        formula = 'AND({Order Type}="Quote",NOT({MO Is Approved}))'
         records = at_get_all(
             MANUAL_ORDERS_TABLE_ID, read_token,
-            fields=["Document ID", "Order ID", "Date", "Expiry Date", "MO Is Approved", "MO Line Items"],
+            fields=["Document ID", "Order ID", "Date", "Expiry Date", "MO Is Approved", "MO Line Items", "Customer"],
             formula=formula,
         )
+        # Filter to only this customer's quotes (Customer field returns record ID array)
+        records = [r for r in records if customer_id in r.get("fields", {}).get("Customer", [])]
         from datetime import date as dt_date
         today = dt_date.today()
         quotes = []
