@@ -3421,8 +3421,8 @@ def apply_page():
         return Response(json.dumps({"error": "Please fill in all required fields."}),
                         status=400, headers=c, mimetype="application/json")
 
-    # Customer Address = BILLING address (has formula fields for City/State/Zip)
-    # Bill-To Address  = SHIPPING address (plain text fields)
+    # Customer Address = SHIPPING address (city/state/zip auto-parsed by Airtable formula)
+    # Bill-To Address  = BILLING address (plain text)
     def pack_addr2(city, state, zip_code, line2=""):
         csz = f"{city}, {state} {zip_code}"
         return (line2 + "\n" + csz) if line2 else csz
