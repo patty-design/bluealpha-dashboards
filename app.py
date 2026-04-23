@@ -3335,25 +3335,38 @@ def apply_page():
     c = cors()
     data = request.get_json() or {}
 
-    company_name           = (data.get("companyName") or "").strip()
-    ein                    = (data.get("ein") or "").strip()
-    business_phone         = (data.get("businessPhone") or "").strip()
-    website                = (data.get("website") or "").strip()
-    billing_contact_name   = (data.get("billingContactName") or "").strip()
-    billing_contact_email  = (data.get("billingContactEmail") or "").strip()
-    billing_contact_phone  = (data.get("billingContactPhone") or "").strip()
-    billing_addr1          = (data.get("billingAddr1") or "").strip()
-    billing_addr2          = (data.get("billingAddr2") or "").strip()
-    billing_city           = (data.get("billingCity") or "").strip()
-    billing_state          = (data.get("billingState") or "").strip()
-    billing_zip            = (data.get("billingZip") or "").strip()
-    shipping_same          = bool(data.get("shippingSameAsBilling", True))
-    tax_exempt             = bool(data.get("taxExempt", False))
-    tax_exemption_number   = (data.get("taxExemptionNumber") or "").strip()
+    company_name              = (data.get("companyName") or "").strip()
+    ein                       = (data.get("ein") or "").strip()
+    business_phone            = (data.get("businessPhone") or "").strip()
+    website                   = (data.get("website") or "").strip()
+    tax_exempt                = bool(data.get("taxExempt", False))
+    tax_exemption_number      = (data.get("taxExemptionNumber") or "").strip()
 
-    required_fields = [company_name, ein, business_phone, billing_contact_name,
-                       billing_contact_email, billing_contact_phone,
-                       billing_addr1, billing_city, billing_state, billing_zip]
+    # Shipping fields (always filled)
+    shipping_contact_name  = (data.get("shippingContactName") or "").strip()
+    shipping_contact_email = (data.get("shippingContactEmail") or "").strip()
+    shipping_contact_phone = (data.get("shippingContactPhone") or "").strip()
+    shipping_addr1         = (data.get("shippingAddr1") or "").strip()
+    shipping_addr2         = (data.get("shippingAddr2") or "").strip()
+    shipping_city          = (data.get("shippingCity") or "").strip()
+    shipping_state         = (data.get("shippingState") or "").strip()
+    shipping_zip           = (data.get("shippingZip") or "").strip()
+
+    # Billing fields — fall back to shipping when same-as-shipping is checked
+    billing_same           = bool(data.get("billingSameAsShipping", True))
+    billing_contact_name   = (data.get("billingContactName") or "").strip() if not billing_same else shipping_contact_name
+    billing_contact_email  = (data.get("billingContactEmail") or "").strip() if not billing_same else shipping_contact_email
+    billing_contact_phone  = (data.get("billingContactPhone") or "").strip() if not billing_same else shipping_contact_phone
+    billing_addr1          = (data.get("billingAddr1") or "").strip() if not billing_same else shipping_addr1
+    billing_addr2          = (data.get("billingAddr2") or "").strip() if not billing_same else shipping_addr2
+    billing_city           = (data.get("billingCity") or "").strip() if not billing_same else shipping_city
+    billing_state          = (data.get("billingState") or "").strip() if not billing_same else shipping_state
+    billing_zip            = (data.get("billingZip") or "").strip() if not billing_same else shipping_zip
+
+    required_fields = [company_name, ein, business_phone,
+                       shipping_contact_name, shipping_contact_email, shipping_contact_phone,
+                       shipping_addr1, shipping_city, shipping_state, shipping_zip,
+                       tax_exemption_number]
     if not all(required_fields):
         return Response(json.dumps({"error": "Please fill in all required fields."}),
                         status=400, headers=c, mimetype="application/json")
@@ -3362,9 +3375,9 @@ def apply_page():
         "Organization Name":         company_name,
         "EIN":                       ein,
         "Main Contact Phone #":      business_phone,
-        "Main Contact Name":         billing_contact_name,
+        "Main Contact Name":         shipping_contact_name,
+        "Main Contact Email":        shipping_contact_email,
         "Bill-To Contact Name":      billing_contact_name,
-        "Main Contact Email":        billing_contact_email,
         "Bill-To Contact Email":     billing_contact_email,
         "Bill-To Org Name":          company_name,
         "Customer Address (Line 1)": billing_addr1,
@@ -3372,12 +3385,12 @@ def apply_page():
         "Customer State":            billing_state,
         "Customer Zip Code":         billing_zip,
         "Tax Exempt":                tax_exempt,
+        "State Tax Exemption #":     tax_exemption_number,
         "Application Status":        "Pending",
         "Applied Date":              datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
     }
-    if website:              fields["Website"]                    = website
-    if billing_addr2:        fields["Customer Address (Line 2)"]  = billing_addr2
-    if tax_exemption_number: fields["State Tax Exemption #"]      = tax_exemption_number
+    if website:      fields["Website"]                   = website
+    if billing_addr2: fields["Customer Address (Line 2)"] = billing_addr2
 
     try:
         r = req_lib.post(
