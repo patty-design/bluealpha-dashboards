@@ -408,16 +408,14 @@
         document.getElementById(container).innerHTML = '<div class="empty-state">No applications found.</div>';
         return;
       }
-      let html = '<table><thead><tr><th>Company</th><th>EIN</th><th>Contact Email</th><th>Phone</th><th>Applied</th><th>Status</th>' +
+      let html = '<table><thead><tr><th>Company</th><th>Applied</th><th>Status</th>' +
         (showActions ? '<th>Actions</th>' : '') + '<th></th></tr></thead><tbody>';
 
       apps.forEach((a, idx) => {
         const badge = a.status === 'Approved' ? 'badge-approved' : a.status === 'Denied' ? 'badge-denied' : 'badge-pending';
         html += `<tr>
           <td><strong>${esc(a.company_name)}</strong></td>
-          <td>${esc(a.ein)}</td>
-          <td>${esc(a.billing_contact_email)}</td>
-          <td>${esc(a.business_phone)}</td>
+
           <td>${fmt(a.applied_date)}</td>
           <td><span class="badge ${badge}">${esc(a.status)}</span></td>
           ${showActions ? `<td class="action-btns">
