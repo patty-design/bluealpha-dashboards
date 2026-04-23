@@ -3327,6 +3327,56 @@ def quote_pdf(record_id):
 # Customer Portal Routes
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _send_application_received_email(to_email, to_name, company):
+    if not SENDGRID_API_KEY:
+        return
+    first_name = to_name.split()[0] if to_name else "there"
+    actual_to = TEST_EMAIL_OVERRIDE or to_email
+    html_body = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7fa;padding:32px 0;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background:#1B2438;padding:24px 36px;">
+          <span style="font-family:Arial;font-size:20px;font-weight:800;color:#fff;letter-spacing:2px;">BLUE ALPHA</span>
+        </td></tr>
+        <tr><td style="padding:32px 36px;">
+          <p style="color:#1a2633;font-size:16px;margin:0 0 8px;">Hi {first_name},</p>
+          <p style="color:#6b7a8d;font-size:14px;line-height:1.6;margin:0 0 16px;">
+            Thank you for applying for access to the Blue Alpha Government Agency Quote Portal.
+            We've received your application for <strong>{company}</strong> and will review it within 2 business days.
+          </p>
+          <p style="color:#6b7a8d;font-size:14px;line-height:1.6;margin:0 0 24px;">
+            You'll receive another email once your application has been reviewed. If you have any questions in the meantime, feel free to reach out to us.
+          </p>
+          <p style="color:#6b7a8d;font-size:12px;margin-top:16px;">
+            Questions? Contact us at <a href="mailto:info@bluealpha.us" style="color:#1B2438;">info@bluealpha.us</a>
+          </p>
+        </td></tr>
+        <tr><td style="background:#f5f7fa;border-top:1px solid #dde3ea;padding:16px 36px;text-align:center;">
+          <p style="color:#6b7a8d;font-size:11px;margin:0;">Blue Alpha &bull; bluealphabelts.com</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+    try:
+        req_lib.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "personalizations": [{"to": [{"email": actual_to, "name": to_name}]}],
+                "from": {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
+                "subject": "We received your Blue Alpha portal application",
+                "content": [{"type": "text/html", "value": html_body}],
+            },
+            timeout=10,
+        )
+    except Exception as e:
+        print(f"[apply] confirmation email error: {e}")
+
+
 @app.route("/apply", methods=["GET", "POST"])
 def apply_page():
     if request.method == "GET":
@@ -3373,24 +3423,33 @@ def apply_page():
                         status=400, headers=c, mimetype="application/json")
 
     # City/State/Zip are formula fields parsed from Address Line 2 — pack them together
-    billing_addr2_full = f"{billing_city}, {billing_state} {billing_zip}"
-    if billing_addr2:
-        billing_addr2_full = billing_addr2 + "\n" + billing_addr2_full
+    def pack_addr2(city, state, zip_code, line2=""):
+        csz = f"{city}, {state} {zip_code}"
+        return (line2 + "\n" + csz) if line2 else csz
+
+    # Customer Address = shipping address
+    ship_addr2_full = pack_addr2(shipping_city, shipping_state, shipping_zip, shipping_addr2)
+    # Bill-To Address = billing address (mirrors shipping when same)
+    bill_addr2_full = pack_addr2(billing_city, billing_state, billing_zip, billing_addr2)
 
     fields = {
-        "Organization Name":         company_name,
-        "EIN":                       ein,
-        "Main Contact Phone #":      shipping_contact_phone,
-        "Main Contact Name":         shipping_contact_name,
-        "Main Contact Email":        shipping_contact_email,
-        "Bill-To Contact Name":      billing_contact_name,
-        "Bill-To Contact Email":     billing_contact_email,
-        "Bill-To Org Name":          company_name,
-        "Customer Address (Line 1)": billing_addr1,
-        "Customer Address (Line 2)": billing_addr2_full,
-        "Tax Exempt":                tax_exempt,
-        "State Tax Exemption #":     tax_exemption_number,
-        "Application Status":        "Pending",
+        "Organization Name":            company_name,
+        "EIN":                          ein,
+        "Main Contact Name":            shipping_contact_name,
+        "Main Contact Email":           shipping_contact_email,
+        "Main Contact Phone #":         shipping_contact_phone,
+        "Customer Address (Line 1)":    shipping_addr1,
+        "Customer Address (Line 2)":    ship_addr2_full,
+        "Bill-To Org Name":             company_name,
+        "Bill-To Contact Name":         billing_contact_name,
+        "Bill-To Contact Email":        billing_contact_email,
+        "Bill-To Phone #":              billing_contact_phone,
+        "Bill-To Address (Line 1)":     billing_addr1,
+        "Bill-To Address (Line 2)":     bill_addr2_full,
+        "Tax Exempt":                   tax_exempt,
+        "State Tax Exemption #":        tax_exemption_number,
+        "Application Status":           "Pending",
+        "Applied Date":                 datetime.now(timezone.utc).strftime("%Y-%m-%d"),
     }
     if website: fields["Website"] = website
 
@@ -3404,6 +3463,14 @@ def apply_page():
         if r.status_code not in (200, 201):
             return Response(json.dumps({"error": "Failed to save application. Please try again."}),
                             status=500, headers=c, mimetype="application/json")
+
+        # Send confirmation email to applicant
+        threading.Thread(
+            target=_send_application_received_email,
+            args=(shipping_contact_email, shipping_contact_name, company_name),
+            daemon=True
+        ).start()
+
         return Response(json.dumps({"success": True}), headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
