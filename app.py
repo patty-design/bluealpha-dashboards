@@ -57,8 +57,14 @@ app = Flask(__name__, static_folder="static")
 @app.before_request
 def redirect_http_to_https():
     # Railway sets X-Forwarded-Proto when behind the proxy
-    if request.headers.get("X-Forwarded-Proto") == "http":
+    proto = request.headers.get("X-Forwarded-Proto") or request.headers.get("X-Forwarded-Scheme")
+    if proto == "http":
         return redirect(request.url.replace("http://", "https://", 1), 301)
+
+@app.after_request
+def add_security_headers(response):
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
 
 # In-memory status cache for return submissions (cleared on restart, only needed during ~60s poll window)
 _return_status_cache = {}
