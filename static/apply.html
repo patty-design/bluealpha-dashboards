@@ -164,104 +164,104 @@
         </div>
       </div>
 
-      <!-- Billing -->
+      <!-- Shipping -->
       <div class="section-card">
-        <div class="section-header">Billing Contact &amp; Address</div>
+        <div class="section-header">Shipping Address</div>
         <div class="section-body">
           <div class="form-row">
             <div class="form-group">
               <label>Contact Name <span class="req">*</span></label>
-              <input type="text" name="billingContactName" required>
+              <input type="text" name="shippingContactName" required>
             </div>
             <div class="form-group">
               <label>Contact Email <span class="req">*</span></label>
-              <input type="email" name="billingContactEmail" required>
+              <input type="email" name="shippingContactEmail" required>
             </div>
           </div>
           <div class="form-row">
             <div class="form-group">
               <label>Contact Phone <span class="req">*</span></label>
-              <input type="tel" name="billingContactPhone" required>
+              <input type="tel" name="shippingContactPhone" required>
             </div>
           </div>
           <div class="form-row full">
             <div class="form-group">
               <label>Address Line 1 <span class="req">*</span></label>
-              <input type="text" name="billingAddr1" required>
+              <input type="text" name="shippingAddr1" required>
             </div>
           </div>
           <div class="form-row full">
             <div class="form-group">
               <label>Address Line 2</label>
-              <input type="text" name="billingAddr2" placeholder="Suite, building, etc.">
+              <input type="text" name="shippingAddr2" placeholder="Suite, building, etc.">
             </div>
           </div>
           <div class="form-row three">
             <div class="form-group">
               <label>City <span class="req">*</span></label>
-              <input type="text" name="billingCity" required>
+              <input type="text" name="shippingCity" required>
             </div>
             <div class="form-group">
               <label>State <span class="req">*</span></label>
-              <input type="text" name="billingState" maxlength="2" placeholder="GA" required>
+              <input type="text" name="shippingState" maxlength="2" placeholder="GA" required>
             </div>
             <div class="form-group">
               <label>Zip <span class="req">*</span></label>
-              <input type="text" name="billingZip" required>
+              <input type="text" name="shippingZip" required>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Shipping -->
+      <!-- Billing -->
       <div class="section-card">
-        <div class="section-header">Shipping Address</div>
+        <div class="section-header">Billing Contact &amp; Address</div>
         <div class="section-body">
           <div class="checkbox-row">
-            <input type="checkbox" id="sameBilling" name="shippingSameAsBilling" checked>
-            <label for="sameBilling">Same as billing address</label>
+            <input type="checkbox" id="sameAsShipping" name="billingSameAsShipping" checked>
+            <label for="sameAsShipping">Same as shipping address</label>
           </div>
-          <div id="shippingFields">
+          <div id="billingFields" style="display:none;">
             <div class="form-row">
               <div class="form-group">
-                <label>Contact Name</label>
-                <input type="text" name="shippingContactName">
+                <label>Contact Name <span class="req">*</span></label>
+                <input type="text" name="billingContactName">
               </div>
               <div class="form-group">
-                <label>Contact Email</label>
-                <input type="email" name="shippingContactEmail">
+                <label>Contact Email <span class="req">*</span></label>
+                <input type="email" name="billingContactEmail">
               </div>
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label>Contact Phone</label>
-                <input type="tel" name="shippingContactPhone">
+                <label>Contact Phone <span class="req">*</span></label>
+                <input type="tel" name="billingContactPhone">
               </div>
             </div>
             <div class="form-row full">
               <div class="form-group">
-                <label>Address Line 1</label>
-                <input type="text" name="shippingAddr1">
+                <label>Address Line 1 <span class="req">*</span></label>
+                <input type="text" name="billingAddr1">
               </div>
             </div>
             <div class="form-row full">
               <div class="form-group">
                 <label>Address Line 2</label>
-                <input type="text" name="shippingAddr2">
+                <input type="text" name="billingAddr2" placeholder="Suite, building, etc.">
               </div>
             </div>
             <div class="form-row three">
               <div class="form-group">
-                <label>City</label>
-                <input type="text" name="shippingCity">
+                <label>City <span class="req">*</span></label>
+                <input type="text" name="billingCity">
               </div>
               <div class="form-group">
-                <label>State</label>
-                <input type="text" name="shippingState" maxlength="2" placeholder="GA">
+                <label>State <span class="req">*</span></label>
+                <input type="text" name="billingState" maxlength="2" placeholder="GA">
               </div>
               <div class="form-group">
-                <label>Zip</label>
-                <input type="text" name="shippingZip">
+                <label>Zip <span class="req">*</span></label>
+                <input type="text" name="billingZip">
               </div>
             </div>
           </div>
@@ -285,16 +285,27 @@
         </div>
       </div>
 
+      <!-- Acknowledgment -->
+      <div class="section-card">
+        <div class="section-body">
+          <div class="checkbox-row" style="margin-bottom:0;">
+            <input type="checkbox" id="certify" name="certify">
+            <label for="certify">I confirm that the information provided in this application is accurate and complete to the best of my knowledge.</label>
+          </div>
+          <div id="certifyError" class="field-error" style="display:none; margin-top:6px;">You must confirm the information is accurate before submitting.</div>
+        </div>
+      </div>
+
       <button type="submit" class="btn-submit" id="submitBtn">Submit Application</button>
     </form>
   </div>
 
   <script>
-    const sameBillingCb = document.getElementById('sameBilling');
-    const shippingFields = document.getElementById('shippingFields');
+    const sameAsShippingCb = document.getElementById('sameAsShipping');
+    const billingFields = document.getElementById('billingFields');
 
-    sameBillingCb.addEventListener('change', () => {
-      shippingFields.style.display = sameBillingCb.checked ? 'none' : 'block';
+    sameAsShippingCb.addEventListener('change', () => {
+      billingFields.style.display = sameAsShippingCb.checked ? 'none' : 'block';
     });
 
     document.getElementById('applyForm').addEventListener('submit', async (e) => {
@@ -303,21 +314,54 @@
       const alertArea = document.getElementById('alertArea');
       alertArea.innerHTML = '';
 
-      // Validate required fields
       const form = e.target;
-      const required = ['companyName','ein','businessPhone','billingContactName','billingContactEmail','billingContactPhone','billingAddr1','billingCity','billingState','billingZip'];
       let valid = true;
-      for (const name of required) {
+
+      // Always-required fields
+      const alwaysRequired = [
+        'companyName','ein','businessPhone',
+        'shippingContactName','shippingContactEmail','shippingContactPhone',
+        'shippingAddr1','shippingCity','shippingState','shippingZip'
+      ];
+      for (const name of alwaysRequired) {
         const el = form.querySelector(`[name="${name}"]`);
-        if (!el.value.trim()) {
-          el.classList.add('error');
+        if (!el || !el.value.trim()) {
+          if (el) el.classList.add('error');
           valid = false;
         } else {
           el.classList.remove('error');
         }
       }
+
+      // Billing required only when not same as shipping
+      if (!sameAsShippingCb.checked) {
+        const billingRequired = [
+          'billingContactName','billingContactEmail','billingContactPhone',
+          'billingAddr1','billingCity','billingState','billingZip'
+        ];
+        for (const name of billingRequired) {
+          const el = form.querySelector(`[name="${name}"]`);
+          if (!el || !el.value.trim()) {
+            if (el) el.classList.add('error');
+            valid = false;
+          } else {
+            el.classList.remove('error');
+          }
+        }
+      }
+
+      // Acknowledgment checkbox
+      const certifyCb = document.getElementById('certify');
+      const certifyError = document.getElementById('certifyError');
+      if (!certifyCb.checked) {
+        certifyError.style.display = 'block';
+        valid = false;
+      } else {
+        certifyError.style.display = 'none';
+      }
+
       if (!valid) {
-        alertArea.innerHTML = '<div class="alert alert-error">Please fill in all required fields.</div>';
+        alertArea.innerHTML = '<div class="alert alert-error">Please fill in all required fields and check the confirmation box.</div>';
         alertArea.scrollIntoView({ behavior: 'smooth' });
         return;
       }
@@ -325,7 +369,7 @@
       const fd = new FormData(form);
       const payload = {};
       fd.forEach((v, k) => { payload[k] = v; });
-      payload.shippingSameAsBilling = sameBillingCb.checked;
+      payload.billingSameAsShipping = sameAsShippingCb.checked;
       payload.taxExempt = document.getElementById('taxExempt').checked;
 
       btn.disabled = true;
@@ -353,9 +397,12 @@
       }
     });
 
-    // Clear error on input
+    // Clear errors on input
     document.querySelectorAll('input').forEach(el => {
       el.addEventListener('input', () => el.classList.remove('error'));
+    });
+    document.getElementById('certify').addEventListener('change', () => {
+      document.getElementById('certifyError').style.display = 'none';
     });
   </script>
 </body>
