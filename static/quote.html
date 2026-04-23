@@ -1075,6 +1075,15 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredA
 
   // Find the "None" add-on id if present
   const noneAddonEntry = addons.find(([,name]) => name.toLowerCase() === 'none');
+
+  // If "None" is the only add-on (and no base SKU), hide the row — nothing meaningful to choose
+  if (!hasBase && addons.length === 1 && noneAddonEntry) {
+    addonRow.classList.add('hidden');
+    addonSel.innerHTML = `<option value="${noneAddonEntry[0]}">None</option>`;
+    addonSel.value = noneAddonEntry[0];
+    _updatePrice(parentId);
+    return;
+  }
   const noneAddonId = noneAddonEntry ? noneAddonEntry[0] : null;
 
   addonSel.innerHTML = '';
