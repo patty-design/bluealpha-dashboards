@@ -400,7 +400,8 @@
     const shippingStateEl = document.querySelector('[name="shippingState"]');
     const taxExemptEl     = document.querySelector('[name="taxExemptionNumber"]');
     shippingStateEl.addEventListener('input', () => {
-      const state = shippingStateEl.value.trim().toUpperCase();
+      const raw = shippingStateEl.value.trim();
+      const state = raw.length <= 2 ? raw.toUpperCase() : '';
       const current = taxExemptEl.value;
       // Only update if field is empty or still just a state prefix (user hasn't typed anything else)
       const prefixPattern = /^[A-Z]{0,2}-?$/;
