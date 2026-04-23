@@ -54,6 +54,12 @@ QUOTE_BASE_URL           = os.environ.get("QUOTE_BASE_URL", "https://quote.bluea
 
 app = Flask(__name__, static_folder="static")
 
+@app.before_request
+def redirect_http_to_https():
+    # Railway sets X-Forwarded-Proto when behind the proxy
+    if request.headers.get("X-Forwarded-Proto") == "http":
+        return redirect(request.url.replace("http://", "https://", 1), 301)
+
 # In-memory status cache for return submissions (cleared on restart, only needed during ~60s poll window)
 _return_status_cache = {}
 
