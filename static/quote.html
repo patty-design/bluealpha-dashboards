@@ -880,7 +880,13 @@ function onSelColor(parentId) {
   // One size (0 or 1 options) — skip size entirely, move on
   if (sizes.length <= 1) {
     szField.classList.add('hidden');
-    if (sizes.length === 1) sizeSel.value = sizes[0][0];
+    if (sizes.length === 1) {
+      // Must add the option before setting .value, otherwise the browser ignores it
+      const opt = document.createElement('option');
+      opt.value = sizes[0][0]; opt.textContent = sizes[0][1];
+      sizeSel.appendChild(opt);
+      sizeSel.value = sizes[0][0];
+    }
     populateFeatures(parentId);
     return;
   }
