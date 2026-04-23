@@ -2436,6 +2436,8 @@ def _build_catalog():
         name = r["fields"].get("Name", "").strip()
         if not name or name.lower() == "none":
             continue
+        if name.lower() in _EXCLUDED_ADDONS_GLOBAL:
+            continue
         addon_name_map[r["id"]] = name
         for pid in r["fields"].get("Parent Products", []):
             addon_parent_map.setdefault(pid, []).append({"id": r["id"], "name": name})
@@ -2601,6 +2603,12 @@ _EXCLUDED_PARENTS = {
 # Feature variations to exclude globally (lowercase)
 _EXCLUDED_FEATURE_VARS_GLOBAL = {
     "base only (-onb)",
+}
+
+# Add-ons to exclude globally (lowercase add-on names)
+_EXCLUDED_ADDONS_GLOBAL = {
+    "easy tape",
+    "one wrap",
 }
 
 # Colors to exclude globally (lowercase color names)
