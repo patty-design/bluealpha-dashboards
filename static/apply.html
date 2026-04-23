@@ -81,7 +81,8 @@
       background: var(--white);
     }
     input:focus { outline: none; border-color: var(--navy); }
-    input.error { border-color: var(--error); }
+    input.error { border-color: var(--error); background: #fff0ee; }
+    .certify-row.error { outline: 2px solid var(--error); border-radius: 6px; padding: 8px; background: #fff0ee; }
     .checkbox-row {
       display: flex;
       align-items: center;
@@ -285,11 +286,11 @@
       <!-- Acknowledgment -->
       <div class="section-card">
         <div class="section-body">
-          <div class="checkbox-row" style="margin-bottom:0;">
+          <div id="certifyRow" class="checkbox-row" style="margin-bottom:0;">
             <input type="checkbox" id="certify" name="certify">
             <label for="certify">I confirm that the information provided in this application is accurate and complete to the best of my knowledge.</label>
           </div>
-          <div id="certifyError" class="field-error" style="display:none; margin-top:6px;">You must confirm the information is accurate before submitting.</div>
+          <div id="certifyError" class="field-error" style="display:none; margin-top:6px;">⚠️ You must check this box before submitting.</div>
         </div>
       </div>
 
@@ -349,19 +350,21 @@
       // Acknowledgment checkbox
       const certifyCb = document.getElementById('certify');
       const certifyError = document.getElementById('certifyError');
+      const certifyRow = document.getElementById('certifyRow');
       if (!certifyCb.checked) {
         certifyError.style.display = 'block';
+        certifyRow.classList.add('error');
         valid = false;
       } else {
         certifyError.style.display = 'none';
+        certifyRow.classList.remove('error');
       }
 
       if (!valid) {
-        // Scroll to first missing field so it's visible, not just to the top alert
-        const scrollTarget = firstErrorEl || certifyCb;
+        const scrollTarget = firstErrorEl || certifyRow;
         scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        scrollTarget.focus({ preventScroll: true });
-        alertArea.innerHTML = '<div class="alert alert-error">Please fill in all required fields marked in red and check the confirmation box before submitting.</div>';
+        if (firstErrorEl) firstErrorEl.focus({ preventScroll: true });
+        alertArea.innerHTML = '<div class="alert alert-error">Please fill in all highlighted fields and check the confirmation box before submitting.</div>';
         return;
       }
 
@@ -416,6 +419,7 @@
     });
     document.getElementById('certify').addEventListener('change', () => {
       document.getElementById('certifyError').style.display = 'none';
+      document.getElementById('certifyRow').classList.remove('error');
     });
   </script>
 </body>
