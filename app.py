@@ -2595,6 +2595,7 @@ _EXCLUDED_PARENTS = {
     "hat", "hoodie", "t-shirt",
     "sentry strap - ba",
     "fanny pack",
+    "breaching rescue bar",
 }
 
 # Feature variations to exclude globally (lowercase)
