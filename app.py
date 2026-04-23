@@ -2446,7 +2446,7 @@ def _build_catalog():
     addon_parent_map = {}  # parentId → [{id, name}]
     for r in addon_records:
         name = r["fields"].get("Name", "").strip()
-        if not name or name.lower() == "none":
+        if not name:
             continue
         if name.lower() in _EXCLUDED_ADDONS_GLOBAL:
             continue
