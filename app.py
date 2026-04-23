@@ -2653,6 +2653,7 @@ _PARENT_NAME_OVERRIDES = {
 # Color display name overrides (lowercase color name from Airtable → desired display name)
 _COLOR_NAME_OVERRIDES = {
     "mc classic": "Multicam Classic",
+    "mc black":   "Multicam Black",
 }
 
 # Parents that should sort last within their category (post-clean lowercase)
