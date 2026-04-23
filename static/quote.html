@@ -738,6 +738,11 @@ function _productHtml(p) {
 
 function buildCatalogUI() {
   const catOrder = ['EDC Belts','Battle Belts','Duty Belts','Mag Pouches','Handcuff Cases','Pouches','Medical Kits','Accessories','Support Accessories','Apparel'];
+
+  // Custom product order within specific categories (case-insensitive substring match)
+  const catProductOrder = {
+    'Mag Pouches': ['3"','4"','rifle pouch','horizontal rifle','308'],
+  };
   const catMap   = {};
   for (const p of catalog.parents) {
     const cat = p.category || 'Other';
@@ -757,7 +762,20 @@ function buildCatalogUI() {
   wrap.innerHTML = '';
 
   for (const cat of cats) {
-    const parents = catMap[cat];
+    let parents = catMap[cat];
+    if (catProductOrder[cat]) {
+      const order = catProductOrder[cat].map(s => s.toLowerCase());
+      parents = [...parents].sort((a, b) => {
+        const an = (a.name || '').toLowerCase();
+        const bn = (b.name || '').toLowerCase();
+        const ai = order.findIndex(s => an.includes(s));
+        const bi = order.findIndex(s => bn.includes(s));
+        if (ai !== -1 && bi !== -1) return ai - bi;
+        if (ai !== -1) return -1;
+        if (bi !== -1) return 1;
+        return an.localeCompare(bn);
+      });
+    }
     const section = document.createElement('div');
     section.className = 'cat-section';
     section.innerHTML = `
