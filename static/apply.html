@@ -154,8 +154,8 @@
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>Business Phone <span class="req">*</span></label>
-              <input type="tel" name="businessPhone" required>
+              <label>State Tax Exemption Number <span class="req">*</span></label>
+              <input type="text" name="taxExemptionNumber" placeholder="e.g. TX-98-00123" required>
             </div>
             <div class="form-group">
               <label>Website</label>
@@ -269,19 +269,7 @@
         </div>
       </div>
 
-      <!-- Tax Info -->
-      <div class="section-card">
-        <div class="section-header">Tax Information</div>
-        <div class="section-body">
-          <div class="form-row">
-            <div class="form-group">
-              <label>State Tax Exemption Number <span class="req">*</span></label>
-              <input type="text" name="taxExemptionNumber" placeholder="e.g. 98-00123" required>
-            </div>
-          </div>
 
-        </div>
-      </div>
 
       <!-- Acknowledgment -->
       <div class="section-card">
@@ -327,10 +315,9 @@
 
       // Always-required fields
       const alwaysRequired = [
-        'companyName','ein','businessPhone',
+        'companyName','ein','taxExemptionNumber',
         'shippingContactName','shippingContactEmail','shippingContactPhone',
-        'shippingAddr1','shippingCity','shippingState','shippingZip',
-        'taxExemptionNumber'
+        'shippingAddr1','shippingCity','shippingState','shippingZip'
       ];
       for (const name of alwaysRequired) {
         if (!checkField(form.querySelector(`[name="${name}"]`))) valid = false;

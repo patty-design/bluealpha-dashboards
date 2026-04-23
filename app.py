@@ -3413,10 +3413,9 @@ def apply_page():
     billing_state          = (data.get("billingState") or "").strip() if not billing_same else shipping_state
     billing_zip            = (data.get("billingZip") or "").strip() if not billing_same else shipping_zip
 
-    required_fields = [company_name, ein, business_phone,
+    required_fields = [company_name, ein, tax_exemption_number,
                        shipping_contact_name, shipping_contact_email, shipping_contact_phone,
-                       shipping_addr1, shipping_city, shipping_state, shipping_zip,
-                       tax_exemption_number]
+                       shipping_addr1, shipping_city, shipping_state, shipping_zip]
     if not all(required_fields):
         return Response(json.dumps({"error": "Please fill in all required fields."}),
                         status=400, headers=c, mimetype="application/json")
