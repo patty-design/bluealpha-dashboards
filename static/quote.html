@@ -509,42 +509,42 @@
 
       <div class="field">
         <label>Organization Name <span class="req">*</span></label>
-        <input type="text" id="f_org" placeholder="Acme Corp" autocomplete="organization">
+        <input type="text" id="f_org" placeholder="Acme Corp" autocomplete="off">
       </div>
       <div class="field">
         <label>Contact Name <span class="req">*</span></label>
-        <input type="text" id="f_name" placeholder="Jane Smith" autocomplete="name">
+        <input type="text" id="f_name" placeholder="Jane Smith" autocomplete="off">
       </div>
       <div class="field">
         <label>Email Address <span class="req">*</span></label>
-        <input type="email" id="f_email" placeholder="jane@example.com" autocomplete="email">
+        <input type="email" id="f_email" placeholder="jane@example.com" autocomplete="off">
       </div>
       <div class="field">
         <label>Phone</label>
-        <input type="text" id="f_phone" placeholder="(555) 000-0000" autocomplete="tel">
+        <input type="text" id="f_phone" placeholder="(555) 000-0000" autocomplete="off">
       </div>
 
       <hr class="form-divider">
 
       <div class="field">
         <label>Address Line 1</label>
-        <input type="text" id="f_addr1" placeholder="123 Main St" autocomplete="address-line1">
+        <input type="text" id="f_addr1" placeholder="123 Main St" autocomplete="off">
       </div>
       <div class="field">
         <label>Address Line 2</label>
-        <input type="text" id="f_addr2" placeholder="Suite 400" autocomplete="address-line2">
+        <input type="text" id="f_addr2" placeholder="Suite 400" autocomplete="off">
       </div>
       <div class="field">
         <label>City</label>
-        <input type="text" id="f_city" placeholder="Atlanta" autocomplete="address-level2">
+        <input type="text" id="f_city" placeholder="Atlanta" autocomplete="off">
       </div>
       <div class="field">
         <label>State / Province</label>
-        <input type="text" id="f_state" placeholder="GA" autocomplete="address-level1">
+        <input type="text" id="f_state" placeholder="GA" autocomplete="off">
       </div>
       <div class="field">
         <label>Zip / Postal Code</label>
-        <input type="text" id="f_zip" placeholder="30301" autocomplete="postal-code">
+        <input type="text" id="f_zip" placeholder="30301" autocomplete="off">
       </div>
       <div class="field">
         <label>Country</label>
@@ -1248,7 +1248,7 @@ async function goStep2() {
       if (r.ok) {
         const { profile } = await r.json();
         if (profile && profile.email) {
-          const set = (id, val) => { if (val && !document.getElementById(id).value) document.getElementById(id).value = val; };
+          const set = (id, val) => { if (val) document.getElementById(id).value = val; };
           set('f_org',   profile.orgName);
           set('f_name',  profile.contactName);
           set('f_email', profile.email);
