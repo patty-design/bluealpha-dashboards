@@ -146,6 +146,8 @@
     td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; text-align: left; }
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: #f8f9fb; }
+    tbody tr.app-row { border-top: 3px solid var(--border); }
+    tbody tr.app-row:first-of-type { border-top: none; }
     .badge {
       display: inline-block;
       padding: 3px 10px;
@@ -413,7 +415,7 @@
 
       apps.forEach((a, idx) => {
         const badge = a.status === 'Approved' ? 'badge-approved' : a.status === 'Denied' ? 'badge-denied' : 'badge-pending';
-        html += `<tr>
+        html += `<tr class="app-row">
           <td><strong>${esc(a.company_name)}</strong></td>
 
           <td>${fmt(a.applied_date)}</td>
