@@ -3414,34 +3414,42 @@ def apply_page():
 
     from datetime import datetime, timezone
     c = cors()
-    data = request.get_json() or {}
 
-    company_name              = (data.get("companyName") or "").strip()
-    ein                       = (data.get("ein") or "").strip()
-    business_phone            = (data.get("businessPhone") or "").strip()
-    website                   = (data.get("website") or "").strip()
-    tax_exemption_number      = (data.get("taxExemptionNumber") or "").strip()
+    # Accept both multipart/form-data (new, supports file upload) and JSON (legacy)
+    if request.content_type and request.content_type.startswith("multipart/form-data"):
+        def gf(k): return (request.form.get(k) or "").strip()
+        cert_file = request.files.get("exemptionCert")
+    else:
+        data = request.get_json() or {}
+        def gf(k): return (data.get(k) or "").strip()
+        cert_file = None
+
+    company_name              = gf("companyName")
+    ein                       = gf("ein")
+    website                   = gf("website")
+    tax_exemption_number      = gf("taxExemptionNumber")
 
     # Shipping fields (always filled)
-    shipping_contact_name  = (data.get("shippingContactName") or "").strip()
-    shipping_contact_email = (data.get("shippingContactEmail") or "").strip()
-    shipping_contact_phone = (data.get("shippingContactPhone") or "").strip()
-    shipping_addr1         = (data.get("shippingAddr1") or "").strip()
-    shipping_addr2         = (data.get("shippingAddr2") or "").strip()
-    shipping_city          = (data.get("shippingCity") or "").strip()
-    shipping_state         = (data.get("shippingState") or "").strip()
-    shipping_zip           = (data.get("shippingZip") or "").strip()
+    shipping_contact_name  = gf("shippingContactName")
+    shipping_contact_email = gf("shippingContactEmail")
+    shipping_contact_phone = gf("shippingContactPhone")
+    shipping_addr1         = gf("shippingAddr1")
+    shipping_addr2         = gf("shippingAddr2")
+    shipping_city          = gf("shippingCity")
+    shipping_state         = gf("shippingState")
+    shipping_zip           = gf("shippingZip")
 
     # Billing fields — fall back to shipping when same-as-shipping is checked
-    billing_same           = bool(data.get("billingSameAsShipping", True))
-    billing_contact_name   = (data.get("billingContactName") or "").strip() if not billing_same else shipping_contact_name
-    billing_contact_email  = (data.get("billingContactEmail") or "").strip() if not billing_same else shipping_contact_email
-    billing_contact_phone  = (data.get("billingContactPhone") or "").strip() if not billing_same else shipping_contact_phone
-    billing_addr1          = (data.get("billingAddr1") or "").strip() if not billing_same else shipping_addr1
-    billing_addr2          = (data.get("billingAddr2") or "").strip() if not billing_same else shipping_addr2
-    billing_city           = (data.get("billingCity") or "").strip() if not billing_same else shipping_city
-    billing_state          = (data.get("billingState") or "").strip() if not billing_same else shipping_state
-    billing_zip            = (data.get("billingZip") or "").strip() if not billing_same else shipping_zip
+    billing_same_raw = gf("billingSameAsShipping")
+    billing_same     = billing_same_raw.lower() not in ("false", "0", "no")
+    billing_contact_name   = gf("billingContactName")  if not billing_same else shipping_contact_name
+    billing_contact_email  = gf("billingContactEmail") if not billing_same else shipping_contact_email
+    billing_contact_phone  = gf("billingContactPhone") if not billing_same else shipping_contact_phone
+    billing_addr1          = gf("billingAddr1")        if not billing_same else shipping_addr1
+    billing_addr2          = gf("billingAddr2")        if not billing_same else shipping_addr2
+    billing_city           = gf("billingCity")         if not billing_same else shipping_city
+    billing_state          = gf("billingState")        if not billing_same else shipping_state
+    billing_zip            = gf("billingZip")          if not billing_same else shipping_zip
 
     required_fields = [company_name, ein, tax_exemption_number,
                        shipping_contact_name, shipping_contact_email, shipping_contact_phone,
@@ -3494,6 +3502,27 @@ def apply_page():
         if r.status_code not in (200, 201):
             return Response(json.dumps({"error": "Failed to save application. Please try again."}),
                             status=500, headers=c, mimetype="application/json")
+
+        record_id = r.json().get("id")
+
+        # Upload tax exemption certificate to Airtable if provided
+        EXEMPTION_CERT_FIELD_ID = os.environ.get("EXEMPTION_CERT_FIELD_ID", "")
+        if cert_file and cert_file.filename and record_id and EXEMPTION_CERT_FIELD_ID:
+            try:
+                file_bytes = cert_file.read()
+                filename   = cert_file.filename or "exemption-certificate"
+                req_lib.post(
+                    f"https://content.airtable.com/v0/{AIRTABLE_BASE_ID}/{record_id}/{EXEMPTION_CERT_FIELD_ID}/uploadAttachment",
+                    params={"filename": filename},
+                    headers={
+                        "Authorization": f"Bearer {APPLY_WRITE_TOKEN}",
+                        "Content-Type":  "application/octet-stream",
+                    },
+                    data=file_bytes,
+                    timeout=30,
+                )
+            except Exception:
+                pass  # Don't fail the whole application if cert upload fails
 
         # Send confirmation email to applicant
         threading.Thread(

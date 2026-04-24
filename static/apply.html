@@ -119,6 +119,20 @@
     .alert-success { background: #e6f7ed; border: 1px solid #a3d9b8; color: #1a5c35; }
     .alert-error   { background: #fdf0ef; border: 1px solid #f0c0b8; color: #7B2318; }
     .field-error { font-size: 0.78rem; color: var(--error); margin-top: 2px; }
+    .upload-area {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 24px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: var(--white);
+    }
+    .upload-area:hover { border-color: var(--navy); background: #f0f3f8; }
+    .upload-area.has-file { border-color: var(--success); background: #f0faf4; }
+    .upload-icon { font-size: 2rem; margin-bottom: 6px; }
+    .upload-text { font-weight: 600; font-size: 0.9rem; color: var(--text); margin-bottom: 4px; }
+    .upload-hint { font-size: 0.78rem; color: var(--muted); }
     @media (max-width: 580px) {
       .form-row, .form-row.three { grid-template-columns: 1fr; }
     }
@@ -160,6 +174,17 @@
             <div class="form-group">
               <label>Website</label>
               <input type="url" name="website" placeholder="https://">
+            </div>
+          </div>
+          <div class="form-row full">
+            <div class="form-group">
+              <label>Tax Exemption Certificate <span style="font-weight:400;color:var(--muted)">(PDF recommended)</span></label>
+              <div class="upload-area" id="uploadArea" onclick="document.getElementById('exemptionCert').click()">
+                <div class="upload-icon">📄</div>
+                <div class="upload-text" id="uploadText">Click to upload your exemption certificate</div>
+                <div class="upload-hint">PDF, JPG, or PNG · Max 10 MB</div>
+              </div>
+              <input type="file" id="exemptionCert" name="exemptionCert" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="onFileSelected(this)">
             </div>
           </div>
         </div>
@@ -356,10 +381,7 @@
       }
 
       const fd = new FormData(form);
-      const payload = {};
-      fd.forEach((v, k) => { payload[k] = v; });
-      payload.billingSameAsShipping = sameAsShippingCb.checked;
-
+      fd.set('billingSameAsShipping', sameAsShippingCb.checked ? 'true' : 'false');
 
       btn.disabled = true;
       btn.textContent = 'Submitting…';
@@ -367,8 +389,7 @@
       try {
         const resp = await fetch('/apply', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: fd   // multipart — lets the file come through
         });
         const data = await resp.json();
         if (data.success) {
@@ -385,6 +406,27 @@
         btn.textContent = 'Submit Application';
       }
     });
+
+    // File upload handler
+    function onFileSelected(input) {
+      const area = document.getElementById('uploadArea');
+      const text = document.getElementById('uploadText');
+      if (input.files && input.files[0]) {
+        const f = input.files[0];
+        if (f.size > 10 * 1024 * 1024) {
+          alert('File is too large. Please upload a file under 10 MB.');
+          input.value = '';
+          area.classList.remove('has-file');
+          text.textContent = 'Click to upload your exemption certificate';
+          return;
+        }
+        area.classList.add('has-file');
+        text.textContent = '✓ ' + f.name;
+      } else {
+        area.classList.remove('has-file');
+        text.textContent = 'Click to upload your exemption certificate';
+      }
+    }
 
     // Auto-populate tax exemption number prefix from shipping state
     const shippingStateEl = document.querySelector('[name="shippingState"]');
