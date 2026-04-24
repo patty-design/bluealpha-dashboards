@@ -3506,21 +3506,31 @@ def apply_page():
         record_id = r.json().get("id")
 
         # Upload tax exemption certificate to Airtable if provided
-        EXEMPTION_CERT_FIELD_ID = os.environ.get("EXEMPTION_CERT_FIELD_ID", "")
-        if cert_file and cert_file.filename and record_id and EXEMPTION_CERT_FIELD_ID:
+        # Strategy: upload file to tmpfiles.org → get public URL → PATCH Airtable record
+        if cert_file and cert_file.filename and record_id:
             try:
                 file_bytes = cert_file.read()
                 filename   = cert_file.filename or "exemption-certificate"
-                req_lib.post(
-                    f"https://content.airtable.com/v0/{AIRTABLE_BASE_ID}/{record_id}/{EXEMPTION_CERT_FIELD_ID}/uploadAttachment",
-                    params={"filename": filename},
-                    headers={
-                        "Authorization": f"Bearer {APPLY_WRITE_TOKEN}",
-                        "Content-Type":  "application/octet-stream",
-                    },
-                    data=file_bytes,
+                # 1. Upload to tmpfiles.org to get a public URL
+                tmp_resp = req_lib.post(
+                    "https://tmpfiles.org/api/v1/upload",
+                    files={"file": (filename, file_bytes, cert_file.content_type or "application/octet-stream")},
                     timeout=30,
                 )
+                if tmp_resp.status_code == 200:
+                    tmp_data = tmp_resp.json()
+                    tmp_url  = tmp_data.get("data", {}).get("url", "")
+                    # tmpfiles.org returns http:// — Airtable needs https://
+                    if tmp_url.startswith("http://"):
+                        tmp_url = "https://" + tmp_url[7:]
+                    if tmp_url:
+                        # 2. PATCH Airtable record with the attachment URL
+                        req_lib.patch(
+                            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{record_id}",
+                            headers={**at_headers(APPLY_WRITE_TOKEN), "Content-Type": "application/json"},
+                            json={"fields": {"Tax Exemption Certificate": [{"url": tmp_url, "filename": filename}]}},
+                            timeout=15,
+                        )
             except Exception:
                 pass  # Don't fail the whole application if cert upload fails
 
