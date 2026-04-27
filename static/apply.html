@@ -178,7 +178,7 @@
           </div>
           <div class="form-row full">
             <div class="form-group">
-              <label>Tax Exemption Certificate <span style="font-weight:400;color:var(--muted)">(PDF recommended)</span></label>
+              <label>Tax Exemption Certificate <span style="color:var(--error)">*</span> <span style="font-weight:400;color:var(--muted)">(PDF recommended)</span></label>
               <div class="upload-area" id="uploadArea" onclick="document.getElementById('exemptionCert').click()">
                 <div class="upload-icon">📄</div>
                 <div class="upload-text" id="uploadText">Click to upload your exemption certificate</div>
@@ -359,6 +359,19 @@
         }
       }
 
+      // Certificate upload required
+      const certFile = document.getElementById('exemptionCert');
+      const uploadArea = document.getElementById('uploadArea');
+      if (!certFile.files || certFile.files.length === 0) {
+        uploadArea.style.outline = '2px solid var(--error)';
+        uploadArea.style.background = '#fff0ee';
+        if (!firstErrorEl) firstErrorEl = uploadArea;
+        valid = false;
+      } else {
+        uploadArea.style.outline = '';
+        uploadArea.style.background = '';
+      }
+
       // Acknowledgment checkbox
       const certifyCb = document.getElementById('certify');
       const certifyError = document.getElementById('certifyError');
@@ -376,7 +389,7 @@
         const scrollTarget = firstErrorEl || certifyRow;
         scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
         if (firstErrorEl) firstErrorEl.focus({ preventScroll: true });
-        alertArea.innerHTML = '<div class="alert alert-error">Please fill in all highlighted fields and check the confirmation box before submitting.</div>';
+        alertArea.innerHTML = '<div class="alert alert-error">Please fill in all highlighted fields, upload your tax exemption certificate, and check the confirmation box before submitting.</div>';
         return;
       }
 
