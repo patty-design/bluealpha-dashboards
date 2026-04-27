@@ -414,7 +414,7 @@
       let html = '<table><thead><tr><th>Company</th><th>Applied</th><th>Status</th>' +
         (showActions ? '<th>Actions</th>' : '') + '<th></th></tr></thead><tbody>';
 
-      apps.forEach((a, idx) => {
+      apps.forEach((a) => {
         const badge = a.status === 'Approved' ? 'badge-approved' : a.status === 'Denied' ? 'badge-denied' : 'badge-pending';
         html += `<tr class="app-row">
           <td><strong>${esc(a.company_name)}</strong></td>
@@ -425,9 +425,9 @@
             <button class="btn btn-success" onclick="approveApp('${a.id}', this)">Approve</button>
             <button class="btn btn-danger" onclick="openDenyModal('${a.id}')">Deny</button>
           </td>` : ''}
-          <td><span class="detail-toggle" onclick="toggleDetail('detail-${idx}')">Details</span></td>
+          <td><span class="detail-toggle" onclick="toggleDetail('detail-${a.id}')">Details</span></td>
         </tr>
-        <tr class="detail-row" id="detail-${idx}">
+        <tr class="detail-row" id="detail-${a.id}">
           <td colspan="${showActions ? 8 : 7}" class="detail-cell">
             <div class="detail-grid">
               <!-- Company Info -->
