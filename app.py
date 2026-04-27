@@ -1356,17 +1356,57 @@ def submit_return():
     }
     fields = {k: v for k, v in fields.items() if v}
 
+    # ── Reuse existing "Needs Review" record if one exists for this order ─
+    # This prevents duplicate records when label generation fails and the
+    # customer (or CS) retries the submission.
+    read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    existing_nr_ids = []
+    record_id = None
+    if data.get("orderNumber"):
+        try:
+            nr_formula = (f"AND({{Order Number}}='{data.get('orderNumber','')}'"
+                          f",{{Status}}='Needs Review',{{Type}}='Return')")
+            nr_resp = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
+                params={"filterByFormula": nr_formula, "fields[]": ["Status"], "maxRecords": 10},
+                headers={"Authorization": f"Bearer {read_token}"},
+                timeout=10,
+            )
+            existing_nr_ids = [r["id"] for r in nr_resp.json().get("records", [])]
+        except Exception as nr_err:
+            print(f"[submit-return] Could not check existing Needs Review records: {nr_err}")
+
     try:
-        r = req_lib.post(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
-            headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
-            json={"fields": fields},
-            timeout=10,
-        )
-        if r.status_code not in (200, 201):
-            return Response(json.dumps({"success": False, "error": r.text}),
-                            status=500, headers=c, mimetype="application/json")
-        record_id = r.json().get("id", "")
+        if existing_nr_ids:
+            # Reuse the first existing record; delete any extras
+            record_id = existing_nr_ids[0]
+            patch_fields = {**fields, "Status": "New", "Status Notes": ""}
+            req_lib.patch(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
+                headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
+                json={"fields": patch_fields},
+                timeout=10,
+            )
+            for stale_id in existing_nr_ids[1:]:
+                try:
+                    req_lib.delete(
+                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{stale_id}",
+                        headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
+                        timeout=10,
+                    )
+                except Exception:
+                    pass
+        else:
+            r = req_lib.post(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
+                headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
+                json={"fields": fields},
+                timeout=10,
+            )
+            if r.status_code not in (200, 201):
+                return Response(json.dumps({"success": False, "error": r.text}),
+                                status=500, headers=c, mimetype="application/json")
+            record_id = r.json().get("id", "")
     except Exception as e:
         return Response(json.dumps({"success": False, "error": str(e)}),
                         status=500, headers=c, mimetype="application/json")
@@ -1433,6 +1473,28 @@ def submit_return():
             )
             # Cache result so the poll endpoint can read it without needing Airtable read scope
             _return_status_cache[record_id] = status_update.get("Status", "Needs Review")
+
+            # ── On success, delete any other stale "Needs Review" records for this order ──
+            if status_update.get("Status") == "Label Sent":
+                try:
+                    order_num = data.get("orderNumber", "")
+                    stale_formula = (f"AND({{Order Number}}='{order_num}'"
+                                     f",{{Status}}='Needs Review',{{Type}}='Return')")
+                    stale_resp = req_lib.get(
+                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
+                        params={"filterByFormula": stale_formula, "fields[]": ["Status"], "maxRecords": 10},
+                        headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
+                        timeout=10,
+                    )
+                    for stale in stale_resp.json().get("records", []):
+                        if stale["id"] != record_id:
+                            req_lib.delete(
+                                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{stale['id']}",
+                                headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
+                                timeout=10,
+                            )
+                except Exception as cleanup_err:
+                    print(f"[process_label] Stale record cleanup failed: {cleanup_err}")
         except Exception as e:
             print(f"[process_label] Failed for record {record_id}: {e}")
             _return_status_cache[record_id] = "Needs Review"
