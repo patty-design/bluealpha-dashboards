@@ -1596,17 +1596,14 @@ def mark_all_received(record_id):
             )
             items.append({"id": item_id, "fields": ir.json().get("fields", {})})
 
-        # Mark each item received + create inventory adjustment
+        # Mark each item received
         updated = []
-        inv_notes = []
         for item in items:
             item_id       = item["id"]
             fields        = item.get("fields", {})
             qty_submitted = int(fields.get("Qty Submitted", 1) or 1)
-            sku_text      = fields.get("SKU", "")
             item_name     = fields.get("Item Name", item_id)
 
-            # Mark received
             req_lib.patch(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURN_ITEMS_TABLE_ID}/{item_id}",
                 headers={**at_headers(write_token), "Content-Type": "application/json"},
@@ -1615,42 +1612,85 @@ def mark_all_received(record_id):
             )
             updated.append(item_name)
 
-            # Create inventory adjustment
-            if sku_text:
-                ok, msg = _create_inventory_adjustment_for_return(
-                    sku_text, qty_submitted, read_token, write_token)
-                inv_notes.append(f"{'✓' if ok else '⚠'} {msg}")
-            else:
-                inv_notes.append(f"⚠ No SKU for {item_name} — inventory not updated")
-
-        # Update parent Returns status to "Items Received"
-        try:
-            req_lib.patch(
-                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
-                headers={**at_headers(write_token), "Content-Type": "application/json"},
-                json={"fields": {"Status": "Items Received"}},
-                timeout=10,
-            )
-        except Exception as status_err:
-            print(f"[mark_all_received] Status update failed: {status_err}")
-
         html = """<!DOCTYPE html>
 <html><head><meta charset="utf-8">
-<style>body{{font-family:sans-serif;max-width:560px;margin:60px auto;padding:0 20px;text-align:center}}
-h2{{color:#2d7a2d}}ul{{text-align:left;display:inline-block;margin-bottom:20px}}
-.inv{{font-size:0.85rem;color:#555;text-align:left;margin-top:16px;border-top:1px solid #eee;padding-top:12px}}
+<style>body{{font-family:sans-serif;max-width:500px;margin:60px auto;text-align:center}}
+h2{{color:#2d7a2d}}ul{{text-align:left;display:inline-block}}
 p{{color:#555;margin-top:20px}}</style></head><body>
 <h2>✓ All Items Marked as Received</h2>
 <ul>{items}</ul>
-<div class="inv"><strong>Inventory Adjustments:</strong><ul>{inv}</ul></div>
-<p>Return status set to <strong>Items Received</strong>. You can close this tab.</p>
-</body></html>""".format(
-            items="".join(f"<li>{name}</li>" for name in updated),
-            inv="".join(f"<li>{n}</li>" for n in inv_notes),
-        )
+<p>You can close this tab and refresh the interface.</p>
+</body></html>""".format(items="".join(f"<li>{name}</li>" for name in updated))
         return Response(html, mimetype="text/html")
     except Exception as e:
         return Response(f"<h2>Error: {e}</h2>", status=500, mimetype="text/html")
+
+
+@app.route("/api/return-received-webhook/<record_id>", methods=["GET", "POST"])
+def return_received_webhook(record_id):
+    """Called by an Airtable automation when a Returns record status changes to
+    'Items Received' or 'Partial Received'. Finds all Return Items where
+    Received=True and Qty Received > 0, then creates Inventory Adjustment records."""
+    read_token  = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    write_token = RETURNS_WRITE_TOKEN
+    results = []
+
+    try:
+        # Fetch the Return record to get linked Return Items
+        ret_r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
+            headers=at_headers(read_token),
+            timeout=10,
+        )
+        if ret_r.status_code != 200:
+            return Response(json.dumps({"ok": False, "error": "Return record not found"}),
+                            status=404, mimetype="application/json")
+
+        ret_fields = ret_r.json().get("fields", {})
+        item_ids   = ret_fields.get("Return Items", [])
+        status     = ret_fields.get("Status", "")
+
+        if status not in ("Items Received", "Partial Received"):
+            return Response(json.dumps({"ok": False,
+                "error": f"Status '{status}' does not require inventory adjustment"}),
+                mimetype="application/json")
+
+        if not item_ids:
+            return Response(json.dumps({"ok": True, "message": "No Return Items linked", "adjustments": []}),
+                            mimetype="application/json")
+
+        # Fetch each Return Item, process only those marked Received with a Qty
+        for item_id in item_ids:
+            ir = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURN_ITEMS_TABLE_ID}/{item_id}",
+                headers=at_headers(read_token),
+                timeout=10,
+            )
+            if ir.status_code != 200:
+                continue
+            f        = ir.json().get("fields", {})
+            received = f.get("Received", False)
+            qty      = int(f.get("Qty Received") or 0)
+            sku      = (f.get("SKU") or "").strip()
+            name     = f.get("Item Name", sku)
+
+            if not received or qty <= 0 or not sku:
+                results.append({"item": name, "ok": False,
+                    "reason": "Skipped — not received, zero qty, or no SKU"})
+                continue
+
+            ok, msg = _create_inventory_adjustment_for_return(sku, qty, read_token, write_token)
+            results.append({"item": name, "sku": sku, "qty": qty, "ok": ok, "message": msg})
+            print(f"[return-received-webhook] {name}: {msg}")
+
+        return Response(json.dumps({"ok": True, "record_id": record_id,
+                                     "status": status, "adjustments": results}),
+                        mimetype="application/json")
+
+    except Exception as e:
+        print(f"[return-received-webhook] Error for {record_id}: {e}")
+        return Response(json.dumps({"ok": False, "error": str(e)}),
+                        status=500, mimetype="application/json")
 
 
 @app.route("/api/return-label/<record_id>")
