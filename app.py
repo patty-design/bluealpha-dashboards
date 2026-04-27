@@ -46,6 +46,7 @@ EMPLOYEES_TABLE_ID       = "tblUDcItnhNhe2GgO"
 APP_APPLICATIONS_TABLE_ID = os.environ.get("APP_APPLICATIONS_TABLE_ID", "tbl_REPLACE_APPLICATIONS")
 PORTAL_USERS_TABLE_ID     = os.environ.get("PORTAL_USERS_TABLE_ID",     "tbl_REPLACE_PORTAL_USERS")
 PARENT_PRODUCTS_TABLE_ID    = "tbl40th76YvjdQExS"
+INVENTORY_ADJUSTMENTS_TABLE_ID = "tbl95iUeitvqYwggK"
 COLORS_TABLE_ID             = "tblN08IV26TpRYSMf"
 SIZES_TABLE_ID              = "tblUGwl1YLaVGCeIJ"
 FEATURE_VARIATIONS_TABLE_ID = "tblwbWDNFSjJSV9hh"
@@ -1524,52 +1525,129 @@ def return_status(record_id):
     return Response(json.dumps({"status": "New"}), headers=cors(), mimetype="application/json")
 
 
+def _create_inventory_adjustment_for_return(sku_text, qty, read_token, write_token):
+    """Look up Product SKU record by SKU ID and create an Inventory Adjustment for a return receipt.
+    Returns (success: bool, message: str).
+    NOTE: 'Return Received' must exist as an option in the Adjustment Reason field in Airtable."""
+    try:
+        # Look up the Product SKU record ID
+        sku_recs = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}",
+            params={"filterByFormula": f'{{SKU ID}}="{sku_text}"', "maxRecords": 1,
+                    "fields[]": ["SKU ID", "Name + Variations"]},
+            headers=at_headers(read_token),
+            timeout=10,
+        ).json().get("records", [])
+        if not sku_recs:
+            return False, f"SKU '{sku_text}' not found in Product SKUs"
+        sku_record_id = sku_recs[0]["id"]
+        sku_name      = sku_recs[0]["fields"].get("Name + Variations", sku_text)
+
+        # Create the Inventory Adjustment record
+        adj_fields = {
+            "Inventory Type":     "Product SKU",
+            "Adjustment Reason":  "Return Received",
+            "Amount":             int(qty),
+            "Product SKU":        [sku_record_id],
+            "Ready":              True,
+            "Adjusted":           True,
+        }
+        r = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INVENTORY_ADJUSTMENTS_TABLE_ID}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": adj_fields},
+            timeout=10,
+        )
+        if r.status_code not in (200, 201):
+            return False, f"Airtable error {r.status_code}: {r.text[:200]}"
+        return True, f"Adjustment created for {sku_name} (+{qty})"
+    except Exception as e:
+        return False, str(e)
+
+
 @app.route("/api/mark-all-received/<record_id>")
 def mark_all_received(record_id):
-    """Mark all Return Items linked to a return record as Received, Qty Received = Qty Submitted."""
+    """Mark all Return Items as Received (Qty Received = Qty Submitted), create inventory
+    adjustments for each, and update the parent Returns status to 'Items Received'."""
     if not RETURN_ITEMS_TABLE_ID or not AIRTABLE_OPS_TOKEN:
         return Response("<h2>Not configured</h2>", status=500, mimetype="text/html")
     try:
+        read_token  = AIRTABLE_OPS_TOKEN
+        write_token = RETURNS_WRITE_TOKEN
+
         # Fetch the return record to get linked Return Items record IDs
         ret_r = req_lib.get(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
-            headers={"Authorization": f"Bearer {AIRTABLE_OPS_TOKEN}"},
+            headers={"Authorization": f"Bearer {read_token}"},
             timeout=10,
         )
         item_ids = ret_r.json().get("fields", {}).get("Return Items", [])
         if not item_ids:
             return Response("<h2 style='font-family:sans-serif'>No items found for this return.</h2>",
                             status=404, mimetype="text/html")
-        # Fetch each Return Item to get Qty Submitted and Item Name
+
+        # Fetch each Return Item
         items = []
         for item_id in item_ids:
             ir = req_lib.get(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURN_ITEMS_TABLE_ID}/{item_id}",
-                headers={"Authorization": f"Bearer {AIRTABLE_OPS_TOKEN}"},
+                headers={"Authorization": f"Bearer {read_token}"},
                 timeout=10,
             )
             items.append({"id": item_id, "fields": ir.json().get("fields", {})})
-        # Patch each item
+
+        # Mark each item received + create inventory adjustment
         updated = []
+        inv_notes = []
         for item in items:
-            item_id = item["id"]
-            qty_submitted = item.get("fields", {}).get("Qty Submitted", 1) or 1
+            item_id       = item["id"]
+            fields        = item.get("fields", {})
+            qty_submitted = int(fields.get("Qty Submitted", 1) or 1)
+            sku_text      = fields.get("SKU", "")
+            item_name     = fields.get("Item Name", item_id)
+
+            # Mark received
             req_lib.patch(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURN_ITEMS_TABLE_ID}/{item_id}",
-                headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
+                headers={**at_headers(write_token), "Content-Type": "application/json"},
                 json={"fields": {"Received": True, "Qty Received": qty_submitted}},
                 timeout=10,
             )
-            updated.append(item.get("fields", {}).get("Item Name", item_id))
+            updated.append(item_name)
+
+            # Create inventory adjustment
+            if sku_text:
+                ok, msg = _create_inventory_adjustment_for_return(
+                    sku_text, qty_submitted, read_token, write_token)
+                inv_notes.append(f"{'✓' if ok else '⚠'} {msg}")
+            else:
+                inv_notes.append(f"⚠ No SKU for {item_name} — inventory not updated")
+
+        # Update parent Returns status to "Items Received"
+        try:
+            req_lib.patch(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
+                headers={**at_headers(write_token), "Content-Type": "application/json"},
+                json={"fields": {"Status": "Items Received"}},
+                timeout=10,
+            )
+        except Exception as status_err:
+            print(f"[mark_all_received] Status update failed: {status_err}")
+
         html = """<!DOCTYPE html>
 <html><head><meta charset="utf-8">
-<style>body{{font-family:sans-serif;max-width:500px;margin:60px auto;text-align:center}}
-h2{{color:#2d7a2d}}ul{{text-align:left;display:inline-block}}
+<style>body{{font-family:sans-serif;max-width:560px;margin:60px auto;padding:0 20px;text-align:center}}
+h2{{color:#2d7a2d}}ul{{text-align:left;display:inline-block;margin-bottom:20px}}
+.inv{{font-size:0.85rem;color:#555;text-align:left;margin-top:16px;border-top:1px solid #eee;padding-top:12px}}
 p{{color:#555;margin-top:20px}}</style></head><body>
 <h2>✓ All Items Marked as Received</h2>
 <ul>{items}</ul>
-<p>You can close this tab and refresh the interface.</p>
-</body></html>""".format(items="".join(f"<li>{name}</li>" for name in updated))
+<div class="inv"><strong>Inventory Adjustments:</strong><ul>{inv}</ul></div>
+<p>Return status set to <strong>Items Received</strong>. You can close this tab.</p>
+</body></html>""".format(
+            items="".join(f"<li>{name}</li>" for name in updated),
+            inv="".join(f"<li>{n}</li>" for n in inv_notes),
+        )
         return Response(html, mimetype="text/html")
     except Exception as e:
         return Response(f"<h2>Error: {e}</h2>", status=500, mimetype="text/html")
