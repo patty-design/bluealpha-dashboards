@@ -436,6 +436,7 @@
                 <div class="kv"><span class="k">Company</span><span class="v">${esc(a.company_name)}</span></div>
                 <div class="kv"><span class="k">EIN</span><span class="v">${esc(a.ein || '—')}</span></div>
                 <div class="kv"><span class="k">Tax Exemption #</span><span class="v">${esc(a.tax_exemption_number || '—')}</span></div>
+                <div class="kv"><span class="k">Tax Exempt Certificate</span><span class="v">${a.tax_cert_url ? `<a href="${esc(a.tax_cert_url)}" target="_blank" style="color:#1a6fc4;">View Certificate</a>` : '—'}</span></div>
                 <div class="kv"><span class="k">Website</span><span class="v">${esc(a.website || '—')}</span></div>
               </div>
               <!-- Shipping + Billing side by side -->

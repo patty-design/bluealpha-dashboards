@@ -4093,7 +4093,7 @@ def admin_applications():
                     "Customer Address (Line 1)", "Customer City", "Customer State", "Customer Zip Code",
                     "Bill-To Contact Name", "Bill-To Contact Email", "Bill-To Phone #",
                     "Bill-To Address (Line 1)", "Bill-To Address (Line 2)",
-                    "State Tax Exemption #", "Tax Exempt",
+                    "State Tax Exemption #", "Tax Exempt", "Tax Exemption Certificate",
                     "Application Status", "Denial Reason", "Applied Date"],
             formula="NOT({Application Status}='')",
         )
@@ -4119,6 +4119,8 @@ def admin_applications():
                 "billing_addr1":         f.get("Bill-To Address (Line 1)", ""),
                 "billing_addr2":         f.get("Bill-To Address (Line 2)", ""),
                 "tax_exemption_number":  f.get("State Tax Exemption #", ""),
+                "tax_cert_url":          (f.get("Tax Exemption Certificate") or [{}])[0].get("url", ""),
+                "tax_cert_filename":     (f.get("Tax Exemption Certificate") or [{}])[0].get("filename", ""),
                 "status":                f.get("Application Status", "Pending"),
                 "denial_reason":         f.get("Denial Reason", ""),
                 "applied_date":          f.get("Applied Date", ""),
