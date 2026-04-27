@@ -1875,61 +1875,85 @@ def submit_exchange():
 
             # ── LP Inner lookup ───────────────────────────────────────────────
             selected_is_onb = bool(re.search(r'-ONB$', selected_sku, re.IGNORECASE))
+            inner_added = False
+
+            # Shared color map used by all inner lookup paths
+            LP_COLOR_MAP = [
+                (["mc black", "mc tropic", "woodland", "black"], "Black"),
+                (["coyote brown", "coyote", "mc australian", "mc arid"], "Coyote Brown"),
+                (["mc classic", "multicam"],                             "Multicam"),
+                (["ranger green", "ranger", "od green"],                 "OD Green"),
+                (["wolf gray"],                                          "Wolf Gray"),
+            ]
+
+            def _lp_inner_item(color, size, key_suffix):
+                """Look up LP INNER ONLY Belt by color+size; return order item dict or None."""
+                search_str    = f"LP INNER ONLY Belt {color} {size}"
+                inner_formula = (
+                    f'AND(NOT(SEARCH("WPS",{{Name + Variations}})),'
+                    f'SEARCH("{search_str}",{{Name + Variations}}))'
+                )
+                recs = at_get_all(
+                    PRODUCT_SKUS_TABLE_ID, airtable_read_token,
+                    fields=["Name + Variations", "SKU ID"],
+                    formula=inner_formula,
+                )
+                if recs:
+                    ir = recs[0]["fields"]
+                    return {
+                        "lineItemKey":    key_suffix,
+                        "name":          ir.get("Name + Variations", ""),
+                        "sku":           ir.get("SKU ID", ""),
+                        "quantity":      quantity,
+                        "unitPrice":     0.00,
+                        "taxAmount":     0.00,
+                        "shippingAmount": 0.00,
+                    }
+                return None
+
+            def _extract_lp_color_size(name):
+                """Extract LP inner color and belt size from a product name."""
+                name_lower = name.lower()
+                color = None
+                for keywords, c in LP_COLOR_MAP:
+                    for kw in keywords:
+                        if kw in name_lower:
+                            color = c
+                            break
+                    if color:
+                        break
+                # Find a 2-digit number in belt-size range (24–64) not adjacent to other digits
+                size_matches = re.findall(r'(?<!\d)(\d{2})(?!\d)', name)
+                size = next((s for s in size_matches if 24 <= int(s) <= 64), None)
+                return color, size
 
             if selected_is_onb:
-                # ONB selection → find LP inner by color + size from selected belt name
+                # Path 1 — ONB selection: extract color+size from SKU/name
                 try:
-                    # Extract size from SKU (e.g. MOL-RAN-36-ONB → 36)
-                    size_m = re.search(r'-(\d+)-ONB$', selected_sku, re.IGNORECASE)
+                    size_m     = re.search(r'-(\d+)-ONB$', selected_sku, re.IGNORECASE)
                     inner_size = size_m.group(1) if size_m else None
-
-                    # Map belt color → LP inner color
-                    COLOR_MAP = [
-                        (["mc black", "mc tropic", "woodland", "black"], "Black"),
-                        (["coyote brown", "mc australian", "mc arid"],   "Coyote Brown"),
-                        (["mc classic", "multicam"],                      "Multicam"),
-                        (["ranger green", "ranger", "od green"],          "OD Green"),
-                        (["wolf gray"],                                    "Wolf Gray"),
-                    ]
                     name_lower = selected_name.lower()
                     inner_color = None
-                    for keywords, color in COLOR_MAP:
+                    for keywords, color in LP_COLOR_MAP:
                         for kw in keywords:
                             if kw in name_lower:
                                 inner_color = color
                                 break
                         if inner_color:
                             break
-
                     if inner_color and inner_size:
-                        search_str = f"LP INNER ONLY Belt {inner_color} {inner_size}"
-                        inner_formula = (
-                            f'AND(NOT(SEARCH("WPS",{{Name + Variations}})),'
-                            f'SEARCH("{search_str}",{{Name + Variations}}))'
-                        )
-                        inner_recs = at_get_all(
-                            PRODUCT_SKUS_TABLE_ID, airtable_read_token,
-                            fields=["Name + Variations", "SKU ID"],
-                            formula=inner_formula,
-                        )
-                        if inner_recs:
-                            ir = inner_recs[0]["fields"]
-                            order_items.append({
-                                "lineItemKey":    f"exchange-{item_idx + 1}-inner",
-                                "name":          ir.get("Name + Variations", ""),
-                                "sku":           ir.get("SKU ID", ""),
-                                "quantity":      quantity,
-                                "unitPrice":     0.00,
-                                "taxAmount":     0.00,
-                                "shippingAmount": 0.00,
-                            })
+                        item = _lp_inner_item(inner_color, inner_size,
+                                              f"exchange-{item_idx + 1}-inner")
+                        if item:
+                            order_items.append(item)
+                            inner_added = True
                         else:
                             print(f"[submit-exchange] No LP inner found for {inner_color} size {inner_size}")
                 except Exception as lp_err:
                     print(f"[submit-exchange] ONB LP inner lookup failed for {selected_sku}: {lp_err}")
 
             elif not re.search(r'(-O)$', original_sku, re.IGNORECASE):
-                # Full-combo selected belt → find inner via Component(s) in Airtable
+                # Path 2 — Full-combo selected belt: find inner via Component(s) in Airtable
                 try:
                     combo_sku = re.sub(r'(-ONB|-O)$', '', selected_sku, flags=re.IGNORECASE).strip()
                     combo_recs = req_lib.get(
@@ -1958,9 +1982,30 @@ def submit_exchange():
                             "taxAmount":     0.00,
                             "shippingAmount": 0.00,
                         })
+                        inner_added = True
                         break
                 except Exception as lp_err:
                     print(f"[submit-exchange] Component LP inner lookup failed for {selected_sku}: {lp_err}")
+
+            # Path 3 — Parent-based LP inner lookup (for products whose exchange options are
+            # outer-only base SKUs with no Component(s), e.g. 1.75" Battle Belt, 2" MOLLE Duty Belt)
+            if not inner_added:
+                item_parent_id = item_data.get("parentProductId", "")
+                if item_parent_id in _LP_INNER_REQUIRED_PARENT_IDS:
+                    try:
+                        inner_color, inner_size = _extract_lp_color_size(selected_name)
+                        if inner_color and inner_size:
+                            item = _lp_inner_item(inner_color, inner_size,
+                                                  f"exchange-{item_idx + 1}-inner")
+                            if item:
+                                order_items.append(item)
+                                inner_added = True
+                            else:
+                                print(f"[submit-exchange] Path3: No LP inner for {inner_color} size {inner_size} (parent {item_parent_id})")
+                        else:
+                            print(f"[submit-exchange] Path3: Could not extract color/size from '{selected_name}'")
+                    except Exception as lp_err:
+                        print(f"[submit-exchange] Path3 LP inner lookup failed for {selected_sku}: {lp_err}")
 
         original_skus_csv = ",".join(i.get("originalSku", "") for i in items_payload)
         selected_names    = ", ".join(i.get("selectedName", "") for i in items_payload)
@@ -2587,6 +2632,17 @@ def _refresh_catalog_bg():
 
 # Warm cache on startup so the first visitor never waits
 threading.Thread(target=_refresh_catalog_bg, daemon=True).start()
+# Parent product Airtable IDs whose exchange selections are outer-only SKUs (no components),
+# but still require an LP inner belt to be added to the exchange order.
+# These use the same LP INNER ONLY Belt color+size lookup as the ONB path.
+_LP_INNER_REQUIRED_PARENT_IDS = {
+    "recMx2geTxsMGq4H8",  # 1.75" Battle Belt - Aluminum COBRA® Buckle
+    "recyoI521Kdbbkz6x",  # 1.75" Battle Belt - D-ring COBRA® Buckle
+    "rec8H08vrdCtZ0yrn",  # 2" Duty Belt Lite - MOLLE
+    "recobDC5byTEvR81w",  # 2" Duty Belt Lite - Standard
+    "rec7KI77AOb7qMe0g",  # 2" MOLLE Duty Belt
+}
+
 _EXCLUDED_PARENTS = {
     # WPS / NeoMag products
     "wps lp inner", "wps low profile", "wps 1.75\" cobra", "wps 1.75\" d-ring",
