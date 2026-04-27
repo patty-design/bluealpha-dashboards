@@ -1969,6 +1969,7 @@ def submit_exchange():
         order_payload = {
             "orderNumber":   exchange_order_number,
             "orderDate":     today_iso,
+            "paymentDate":   today_iso,
             "orderStatus":   "awaiting_shipment",
             "customerEmail": customer_email,
             "billTo": {
