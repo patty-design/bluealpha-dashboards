@@ -352,6 +352,7 @@
     <div class="mode-toggle">
       <button class="mode-btn active" id="btn-mode-return" onclick="setMode('return')">↩ Return</button>
       <button class="mode-btn" id="btn-mode-cancel" onclick="setMode('cancel')">✕ Cancellation</button>
+      <button class="mode-btn" id="btn-mode-lost" onclick="setMode('lost')">📦 Lost Order</button>
     </div>
 
     <div class="card">
@@ -364,6 +365,11 @@
       <!-- Cancellation banner -->
       <div id="banner-cancel" class="info-banner banner-green hidden">
         ✓ <strong>Cancellation request</strong> — For unshipped orders only. Select which items the customer wants cancelled. The order will be updated in ShipStation and flagged for refund.
+      </div>
+
+      <!-- Lost Order banner -->
+      <div id="banner-lost" class="info-banner banner-amber hidden">
+        📦 <strong>Lost order reshipment</strong> — Creates a new ShipStation order with the same items. Edit the shipping address if needed before submitting.
       </div>
 
       <!-- Order lookup (shared) -->
@@ -437,8 +443,28 @@
           <div class="validation-msg" id="msg-no-reason-cancel">⚠ Please select a reason.</div>
         </div>
 
+        <!-- Lost Order: address review -->
+        <div id="section-lost-address" class="hidden">
+          <div class="field" style="margin-top:4px;">
+            <label>Shipping Address <span class="req">*</span></label>
+            <p style="font-size:0.85rem;color:var(--muted);margin-bottom:12px;">Review and update the address before creating the reshipment.</p>
+            <div style="display:grid;gap:10px;">
+              <input type="text" id="lost-name" placeholder="Full Name" class="input-field">
+              <input type="text" id="lost-street1" placeholder="Address Line 1" class="input-field">
+              <input type="text" id="lost-street2" placeholder="Address Line 2 (optional)" class="input-field">
+              <div style="display:grid;grid-template-columns:1fr 80px 100px;gap:10px;">
+                <input type="text" id="lost-city" placeholder="City" class="input-field">
+                <input type="text" id="lost-state" placeholder="State" class="input-field" maxlength="2">
+                <input type="text" id="lost-zip" placeholder="ZIP" class="input-field">
+              </div>
+              <input type="text" id="lost-country" placeholder="Country" class="input-field" value="US">
+            </div>
+            <div class="validation-msg" id="msg-lost-address">⚠ Please fill in all required address fields.</div>
+          </div>
+        </div>
+
         <!-- Notes (shared) -->
-        <div class="field">
+        <div class="field" id="field-notes">
           <label id="notes-label">Exception Notes</label>
           <textarea id="cs-notes" placeholder="Who approved it, why, any relevant context…"></textarea>
         </div>
@@ -500,6 +526,17 @@
         </div>
       </div>
 
+      <!-- Lost Order: success -->
+      <div id="lost-success" class="success-screen hidden">
+        <div class="success-icon">✓</div>
+        <h2>Reshipment Created</h2>
+        <p id="lost-success-msg">A new order has been created in ShipStation.</p>
+        <a id="lost-ss-link" href="#" target="_blank" style="display:inline-block;margin-top:12px;color:var(--navy);font-weight:700;text-decoration:none;">View in ShipStation →</a>
+        <div style="margin-top:28px;">
+          <button onclick="resetForm()" class="btn btn-primary">Submit Another</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -509,7 +546,7 @@
 const API_BASE = '';
 let csPassword  = '';
 let orderData   = null;
-let currentMode = 'return'; // 'return' | 'cancel'
+let currentMode = 'return'; // 'return' | 'cancel' | 'lost'
 let orderBlocked = false;   // true when cancel mode + order already shipped
 
 const CANCELLABLE_STATUSES = ['awaiting_shipment', 'awaiting_payment', 'on_hold', 'cancelled'];
@@ -546,20 +583,32 @@ document.addEventListener('DOMContentLoaded', () => {
 function setMode(mode) {
   currentMode = mode;
   const isReturn = mode === 'return';
+  const isCancel = mode === 'cancel';
+  const isLost   = mode === 'lost';
 
   document.getElementById('btn-mode-return').classList.toggle('active', isReturn);
-  document.getElementById('btn-mode-cancel').classList.toggle('active', !isReturn);
+  document.getElementById('btn-mode-cancel').classList.toggle('active', isCancel);
+  document.getElementById('btn-mode-lost').classList.toggle('active', isLost);
 
   // Titles
-  document.getElementById('form-title').textContent     = isReturn ? 'CS Exception Return'          : 'CS Cancellation Request';
-  document.getElementById('form-subtitle').textContent  = isReturn ? "For customers whose orders don't pass normal eligibility — exception already approved."
-                                                                    : 'For unshipped orders the customer wants cancelled. Select items to cancel and submit.';
+  if (isReturn) {
+    document.getElementById('form-title').textContent    = 'CS Exception Return';
+    document.getElementById('form-subtitle').textContent = "For customers whose orders don't pass normal eligibility — exception already approved.";
+  } else if (isCancel) {
+    document.getElementById('form-title').textContent    = 'CS Cancellation Request';
+    document.getElementById('form-subtitle').textContent = 'For unshipped orders the customer wants cancelled. Select items to cancel and submit.';
+  } else {
+    document.getElementById('form-title').textContent    = 'Lost Order / Reshipment';
+    document.getElementById('form-subtitle').textContent = 'Look up the original order, confirm the shipping address, and create a reshipment in ShipStation.';
+  }
+
   // Banners
   document.getElementById('banner-return').classList.toggle('hidden', !isReturn);
-  document.getElementById('banner-cancel').classList.toggle('hidden', isReturn);
+  document.getElementById('banner-cancel').classList.toggle('hidden', !isCancel);
+  document.getElementById('banner-lost').classList.toggle('hidden', !isLost);
 
   // Items label
-  document.getElementById('items-label').innerHTML = (isReturn ? 'Items to Return' : 'Items to Cancel') + ' <span class="req">*</span>';
+  document.getElementById('items-label').innerHTML = (isReturn ? 'Items to Return' : isCancel ? 'Items to Cancel' : 'Items to Reship') + ' <span class="req">*</span>';
 
   // Return-only fields
   document.getElementById('field-email').classList.toggle('hidden', !isReturn);
@@ -567,7 +616,13 @@ function setMode(mode) {
 
   // Reason fields
   document.getElementById('field-reason-return').classList.toggle('hidden', !isReturn);
-  document.getElementById('field-reason-cancel').classList.toggle('hidden', isReturn);
+  document.getElementById('field-reason-cancel').classList.toggle('hidden', !isCancel);
+
+  // Lost address section
+  document.getElementById('section-lost-address').classList.toggle('hidden', !isLost);
+
+  // Notes field — hide in lost mode (not needed)
+  document.getElementById('field-notes').classList.toggle('hidden', isLost);
 
   // Notes label
   document.getElementById('notes-label').textContent = isReturn ? 'Exception Notes' : 'CS Notes';
@@ -575,7 +630,9 @@ function setMode(mode) {
                                                                  : 'Any additional context from the customer…';
 
   // Submit button
-  document.getElementById('btn-cs-submit').innerHTML = isReturn ? 'Submit &amp; Send Label' : 'Submit Cancellation Request';
+  if (isReturn)      document.getElementById('btn-cs-submit').innerHTML = 'Submit &amp; Send Label';
+  else if (isCancel) document.getElementById('btn-cs-submit').innerHTML = 'Submit Cancellation Request';
+  else               document.getElementById('btn-cs-submit').innerHTML = 'Create Reshipment';
 
   // Reset order info when mode changes — require a fresh lookup
   orderData = null;
@@ -635,6 +692,16 @@ function populateOrderInfo(data) {
   const addrLines = [a.name, a.street1, a.street2, a.city && (a.city + ', ' + a.state + ' ' + a.postalCode)].filter(Boolean);
   document.getElementById('cs-address-display').innerHTML = addrLines.join('<br>');
 
+  // Populate lost order address fields from shipTo
+  const st = data.shipTo || data.address || {};
+  document.getElementById('lost-name').value    = data.customerName || st.name || '';
+  document.getElementById('lost-street1').value = st.street1 || '';
+  document.getElementById('lost-street2').value = st.street2 || '';
+  document.getElementById('lost-city').value    = st.city || '';
+  document.getElementById('lost-state').value   = st.state || '';
+  document.getElementById('lost-zip').value     = st.postalCode || '';
+  document.getElementById('lost-country').value = st.country || 'US';
+
   // In cancellation mode, block if order has already shipped
   const canCancel = !data.orderStatus || CANCELLABLE_STATUSES.indexOf(data.orderStatus) !== -1;
   orderBlocked = (currentMode === 'cancel' && !canCancel);
@@ -646,22 +713,36 @@ function populateOrderInfo(data) {
 function buildItemsList(items) {
   const list = document.getElementById('cs-items-list');
   list.innerHTML = '';
+  const lostMode = currentMode === 'lost';
   items.forEach(function(item, idx) {
     const isMulti = item.quantity > 1;
     const row = document.createElement('div');
-    row.className = 'item-row' + (isMulti ? ' multi-qty' : '');
-    row.dataset.idx = idx;
-    row.innerHTML =
-      '<div class="item-checkbox"></div>' +
-      '<div class="item-info">' +
-        '<div class="item-name">' + item.name + '</div>' +
-        '<div class="item-sku">' + item.sku + '</div>' +
-      '</div>' +
-      '<div class="item-qty">Qty: ' + item.quantity + '</div>' +
-      (isMulti
-        ? '<div class="item-qty-selector"><input type="number" min="1" max="' + item.quantity + '" value="' + item.quantity + '" class="cancel-qty-input" onclick="event.stopPropagation()" oninput="this.value=Math.min(' + item.quantity + ',Math.max(1,parseInt(this.value)||1))"> of ' + item.quantity + '</div>'
-        : '');
-    row.addEventListener('click', function() { row.classList.toggle('selected'); });
+    if (lostMode) {
+      // In lost mode, all items are always reshipped — show as read-only selected
+      row.className = 'item-row selected' + (isMulti ? ' multi-qty' : '');
+      row.style.cursor = 'default';
+      row.innerHTML =
+        '<div class="item-checkbox"></div>' +
+        '<div class="item-info">' +
+          '<div class="item-name">' + item.name + '</div>' +
+          '<div class="item-sku">' + item.sku + '</div>' +
+        '</div>' +
+        '<div class="item-qty">Qty: ' + item.quantity + '</div>';
+    } else {
+      row.className = 'item-row' + (isMulti ? ' multi-qty' : '');
+      row.dataset.idx = idx;
+      row.innerHTML =
+        '<div class="item-checkbox"></div>' +
+        '<div class="item-info">' +
+          '<div class="item-name">' + item.name + '</div>' +
+          '<div class="item-sku">' + item.sku + '</div>' +
+        '</div>' +
+        '<div class="item-qty">Qty: ' + item.quantity + '</div>' +
+        (isMulti
+          ? '<div class="item-qty-selector"><input type="number" min="1" max="' + item.quantity + '" value="' + item.quantity + '" class="cancel-qty-input" onclick="event.stopPropagation()" oninput="this.value=Math.min(' + item.quantity + ',Math.max(1,parseInt(this.value)||1))"> of ' + item.quantity + '</div>'
+          : '');
+      row.addEventListener('click', function() { row.classList.toggle('selected'); });
+    }
     list.appendChild(row);
   });
 }
@@ -693,8 +774,10 @@ function _applyBlockState() {
 function handleSubmit() {
   if (currentMode === 'return') {
     csSubmitReturn();
-  } else {
+  } else if (currentMode === 'cancel') {
     csSubmitCancellation();
+  } else {
+    csSubmitReshipment();
   }
 }
 
@@ -813,9 +896,81 @@ async function csSubmitCancellation() {
   btn.innerHTML = 'Submit Cancellation Request';
 }
 
+// ── Submit: Reshipment ─────────────────────────────────────────────────────
+async function csSubmitReshipment() {
+  const btn = document.getElementById('btn-cs-submit');
+  const errEl = document.getElementById('msg-submit-error');
+  errEl.classList.remove('show');
+  document.getElementById('msg-lost-address').style.display = 'none';
+
+  const name    = document.getElementById('lost-name').value.trim();
+  const street1 = document.getElementById('lost-street1').value.trim();
+  const city    = document.getElementById('lost-city').value.trim();
+  const state   = document.getElementById('lost-state').value.trim();
+  const zip     = document.getElementById('lost-zip').value.trim();
+
+  if (!name || !street1 || !city || !state || !zip) {
+    document.getElementById('msg-lost-address').style.display = 'block';
+    return;
+  }
+
+  const orderNum = document.getElementById('cs-order-number').value.trim();
+  const items = (orderData && orderData.items) ? orderData.items : [];
+
+  if (!items.length) {
+    errEl.querySelector('strong').textContent = 'No items found';
+    errEl.classList.add('show');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Creating reshipment…';
+
+  try {
+    const res = await fetch(API_BASE + '/api/submit-reshipment', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        password: csPassword,
+        orderNumber: orderNum,
+        items: items,
+        shipTo: {
+          name:       name,
+          street1:    street1,
+          street2:    document.getElementById('lost-street2').value.trim(),
+          city:       city,
+          state:      state,
+          postalCode: zip,
+          country:    document.getElementById('lost-country').value.trim() || 'US',
+        }
+      })
+    });
+    const result = await res.json();
+    if (result.status === 'ok') {
+      document.getElementById('lost-success-msg').textContent =
+        'Reshipment order ' + result.reshipOrderNumber + ' has been created in ShipStation.';
+      document.getElementById('lost-ss-link').href = result.ssUrl;
+      document.getElementById('screen-main').classList.add('hidden');
+      document.getElementById('screen-success').classList.remove('hidden');
+      showSuccessState('lost-success');
+    } else {
+      errEl.innerHTML = '<strong>Reshipment failed</strong>' + (result.message || 'Something went wrong.');
+      errEl.classList.remove('hidden');
+      errEl.classList.add('show');
+    }
+  } catch (e) {
+    errEl.innerHTML = '<strong>Reshipment failed</strong>Something went wrong. Please try again.';
+    errEl.classList.remove('hidden');
+    errEl.classList.add('show');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = 'Create Reshipment';
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 function showSuccessState(id) {
-  ['return-success-pending','return-success-sent','return-success-review','cancel-success']
+  ['return-success-pending','return-success-sent','return-success-review','cancel-success','lost-success']
     .forEach(s => document.getElementById(s).classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');
 }
@@ -843,6 +998,13 @@ function resetForm() {
   document.getElementById('cs-reason-return').value  = '';
   document.getElementById('cs-reason-cancel').value  = '';
   document.getElementById('cs-notes').value          = '';
+  document.getElementById('lost-name').value         = '';
+  document.getElementById('lost-street1').value      = '';
+  document.getElementById('lost-street2').value      = '';
+  document.getElementById('lost-city').value         = '';
+  document.getElementById('lost-state').value        = '';
+  document.getElementById('lost-zip').value          = '';
+  document.getElementById('lost-country').value      = 'US';
   document.getElementById('order-info-block').classList.add('hidden');
   document.getElementById('screen-success').classList.add('hidden');
   document.getElementById('screen-main').classList.remove('hidden');

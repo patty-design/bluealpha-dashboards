@@ -902,6 +902,108 @@ def cancel_in_shipstation(order_id, items_to_cancel):
         return False, f"Exception during ShipStation cancellation: {e}"
 
 
+@app.route("/api/submit-reshipment", methods=["POST", "OPTIONS"])
+def submit_reshipment():
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    data = request.get_json() or {}
+
+    # Validate CS password
+    if not CS_ADMIN_PASSWORD or data.get("password", "") != CS_ADMIN_PASSWORD:
+        return Response(json.dumps({"status": "unauthorized"}), status=401, headers=c, mimetype="application/json")
+
+    original_order_number = data.get("orderNumber", "").strip()
+    items = data.get("items", [])  # [{"sku": ..., "name": ..., "quantity": ...}]
+    ship_to = data.get("shipTo", {})  # edited address from CS
+
+    if not original_order_number or not items or not ship_to:
+        return Response(json.dumps({"status": "error", "message": "Missing required fields"}), headers=c, mimetype="application/json")
+
+    try:
+        from datetime import datetime as _dt
+        # Determine reshipment order number (-R, -R2, -R3...)
+        reship_number = None
+        for suffix in ["-R"] + [f"-R{i}" for i in range(2, 20)]:
+            candidate = original_order_number + suffix
+            r = req_lib.get("https://ssapi.shipstation.com/orders",
+                           params={"orderNumber": candidate},
+                           headers=ss_headers(), timeout=10)
+            if not r.json().get("orders"):
+                reship_number = candidate
+                break
+
+        if not reship_number:
+            return Response(json.dumps({"status": "error", "message": "Could not determine reshipment order number"}), headers=c, mimetype="application/json")
+
+        # Build ShipStation order payload
+        order_payload = {
+            "orderNumber": reship_number,
+            "orderDate": _dt.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "orderStatus": "awaiting_shipment",
+            "amountPaid": 0,
+            "taxAmount": 0,
+            "shippingAmount": 0,
+            "internalNotes": f"Reshipment of order {original_order_number}",
+            "customerNotes": "",
+            "shipTo": {
+                "name": ship_to.get("name", ""),
+                "street1": ship_to.get("street1", ""),
+                "street2": ship_to.get("street2", ""),
+                "city": ship_to.get("city", ""),
+                "state": ship_to.get("state", ""),
+                "postalCode": ship_to.get("postalCode", ""),
+                "country": ship_to.get("country", "US"),
+                "phone": ship_to.get("phone", ""),
+                "residential": True,
+            },
+            "billTo": {
+                "name": ship_to.get("name", ""),
+                "street1": ship_to.get("street1", ""),
+                "city": ship_to.get("city", ""),
+                "state": ship_to.get("state", ""),
+                "postalCode": ship_to.get("postalCode", ""),
+                "country": ship_to.get("country", "US"),
+            },
+            "items": [
+                {
+                    "sku": item["sku"],
+                    "name": item["name"],
+                    "quantity": item["quantity"],
+                    "unitPrice": 0,
+                }
+                for item in items
+            ],
+            "carrierCode": "stamps_com",
+            "serviceCode": "usps_ground_advantage_mail",
+            "packageCode": "package",
+            "confirmation": "delivery",
+            "weight": {"value": 8, "units": "ounces"},
+            "dimensions": {"units": "inches", "length": 8, "width": 8, "height": 2},
+        }
+
+        create_r = req_lib.post(
+            "https://ssapi.shipstation.com/orders/createorder",
+            headers={**ss_headers(), "Content-Type": "application/json"},
+            json=order_payload,
+            timeout=15,
+        )
+        result = create_r.json()
+        new_order_id = result.get("orderId")
+        if not new_order_id:
+            return Response(json.dumps({"status": "error", "message": f"ShipStation error: {result}"}), headers=c, mimetype="application/json")
+
+        return Response(json.dumps({
+            "status": "ok",
+            "reshipOrderNumber": reship_number,
+            "reshipOrderId": new_order_id,
+            "ssUrl": f"https://ship11.shipstation.com/orders/all-orders-search-result?quickSearch={reship_number}",
+        }), headers=c, mimetype="application/json")
+
+    except Exception as e:
+        return Response(json.dumps({"status": "error", "message": str(e)}), headers=c, mimetype="application/json")
+
+
 @app.route("/api/submit-cancellation", methods=["POST", "OPTIONS"])
 def submit_cancellation():
     if request.method == "OPTIONS":
