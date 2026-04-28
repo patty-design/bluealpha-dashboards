@@ -969,9 +969,11 @@ def submit_reshipment():
 
     try:
         from datetime import datetime as _dt
-        # Determine reshipment order number (-R, -R2, -R3...)
+        now_str = _dt.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+        # Determine reshipment order number (-L, -L2, -L3...)
         reship_number = None
-        for suffix in ["-R"] + [f"-R{i}" for i in range(2, 20)]:
+        for suffix in ["-L"] + [f"-L{i}" for i in range(2, 20)]:
             candidate = original_order_number + suffix
             r = req_lib.get("https://ssapi.shipstation.com/orders",
                            params={"orderNumber": candidate},
@@ -983,10 +985,23 @@ def submit_reshipment():
         if not reship_number:
             return Response(json.dumps({"status": "error", "message": "Could not determine reshipment order number"}), headers=c, mimetype="application/json")
 
+        # Look up "Lost Item" store ID
+        lost_store_id = None
+        try:
+            stores_r = req_lib.get("https://ssapi.shipstation.com/stores",
+                                   headers=ss_headers(), timeout=10)
+            for store in stores_r.json():
+                if "lost" in store.get("storeName", "").lower():
+                    lost_store_id = store.get("storeId")
+                    break
+        except Exception:
+            pass  # Proceed without store if lookup fails
+
         # Build ShipStation order payload
         order_payload = {
             "orderNumber": reship_number,
-            "orderDate": _dt.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "orderDate": now_str,
+            "paymentDate": now_str,
             "orderStatus": "awaiting_shipment",
             "amountPaid": 0,
             "taxAmount": 0,
@@ -1027,6 +1042,7 @@ def submit_reshipment():
             "confirmation": "delivery",
             "weight": {"value": 8, "units": "ounces"},
             "dimensions": {"units": "inches", "length": 8, "width": 8, "height": 2},
+            "advancedOptions": {"storeId": lost_store_id} if lost_store_id else {},
         }
 
         create_r = req_lib.post(
