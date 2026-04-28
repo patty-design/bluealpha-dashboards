@@ -367,9 +367,15 @@
         ✓ <strong>Cancellation request</strong> — For unshipped orders only. Select which items the customer wants cancelled. The order will be updated in ShipStation and flagged for refund.
       </div>
 
-      <!-- Lost Order banner -->
-      <div id="banner-lost" class="info-banner banner-amber hidden">
-        📦 <strong>Lost order reshipment</strong> — Creates a new ShipStation order with the same items. Edit the shipping address if needed before submitting.
+      <!-- Lost Order banner + action toggle -->
+      <div id="banner-lost" class="hidden">
+        <div class="info-banner banner-amber" style="margin-bottom:10px;">
+          📦 <strong>Lost order</strong> — Choose whether to reship or refund.
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:4px;">
+          <button id="btn-lost-reship" class="mode-btn active" onclick="setLostAction('reship')">📦 Reship</button>
+          <button id="btn-lost-refund" class="mode-btn" onclick="setLostAction('refund')">💰 Refund</button>
+        </div>
       </div>
 
       <!-- Order lookup (shared) -->
@@ -526,12 +532,22 @@
         </div>
       </div>
 
-      <!-- Lost Order: success -->
+      <!-- Lost Order: reship success -->
       <div id="lost-success" class="success-screen hidden">
         <div class="success-icon">✓</div>
         <h2>Reshipment Created</h2>
         <p id="lost-success-msg">A new order has been created in ShipStation.</p>
         <a id="lost-ss-link" href="#" target="_blank" style="display:inline-block;margin-top:12px;color:var(--navy);font-weight:700;text-decoration:none;">View in ShipStation →</a>
+        <div style="margin-top:28px;">
+          <button onclick="resetForm()" class="btn btn-primary">Submit Another</button>
+        </div>
+      </div>
+
+      <!-- Lost Order: refund success -->
+      <div id="lost-refund-success" class="success-screen hidden">
+        <div class="success-icon">✓</div>
+        <h2>Refund Logged</h2>
+        <p id="lost-refund-success-msg">The lost order refund request has been recorded.</p>
         <div style="margin-top:28px;">
           <button onclick="resetForm()" class="btn btn-primary">Submit Another</button>
         </div>
@@ -547,6 +563,7 @@ const API_BASE = '';
 let csPassword  = '';
 let orderData   = null;
 let currentMode = 'return'; // 'return' | 'cancel' | 'lost'
+let lostAction  = 'reship'; // 'reship' | 'refund'
 let orderBlocked = false;   // true when cancel mode + order already shipped
 
 const CANCELLABLE_STATUSES = ['awaiting_shipment', 'awaiting_payment', 'on_hold', 'cancelled'];
@@ -632,7 +649,7 @@ function setMode(mode) {
   // Submit button
   if (isReturn)      document.getElementById('btn-cs-submit').innerHTML = 'Submit &amp; Send Label';
   else if (isCancel) document.getElementById('btn-cs-submit').innerHTML = 'Submit Cancellation Request';
-  else               document.getElementById('btn-cs-submit').innerHTML = 'Create Reshipment';
+  else               document.getElementById('btn-cs-submit').innerHTML = lostAction === 'refund' ? 'Log Refund Request' : 'Create Reshipment';
 
   // Reset order info when mode changes — require a fresh lookup
   orderData = null;
@@ -643,6 +660,17 @@ function setMode(mode) {
   document.getElementById('cs-order-number').value = '';
   // Re-show submit button (may have been hidden by block state)
   document.getElementById('btn-cs-submit').classList.remove('hidden');
+}
+
+// ── Lost action sub-toggle ─────────────────────────────────────────────────
+function setLostAction(action) {
+  lostAction = action;
+  document.getElementById('btn-lost-reship').classList.toggle('active', action === 'reship');
+  document.getElementById('btn-lost-refund').classList.toggle('active',  action === 'refund');
+  // Show/hide address section
+  document.getElementById('section-lost-address').classList.toggle('hidden', action === 'refund');
+  // Update submit button label
+  document.getElementById('btn-cs-submit').innerHTML = action === 'refund' ? 'Log Refund Request' : 'Create Reshipment';
 }
 
 // ── Order lookup ───────────────────────────────────────────────────────────
@@ -896,13 +924,58 @@ async function csSubmitCancellation() {
   btn.innerHTML = 'Submit Cancellation Request';
 }
 
-// ── Submit: Reshipment ─────────────────────────────────────────────────────
+// ── Submit: Reshipment / Lost Refund ───────────────────────────────────────
 async function csSubmitReshipment() {
   const btn = document.getElementById('btn-cs-submit');
   const errEl = document.getElementById('msg-submit-error');
   errEl.classList.remove('show');
-  document.getElementById('msg-lost-address').style.display = 'none';
 
+  const orderNum = document.getElementById('cs-order-number').value.trim();
+  const items = (orderData && orderData.items) ? orderData.items : [];
+
+  if (!items.length) {
+    errEl.innerHTML = '<strong>No items found.</strong> Please look up the order first.';
+    errEl.classList.add('show');
+    return;
+  }
+
+  // ── Refund path ──────────────────────────────────────────────────────────
+  if (lostAction === 'refund') {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Logging refund…';
+    try {
+      const res = await fetch(API_BASE + '/api/submit-lost-refund', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          password:    csPassword,
+          orderNumber: orderNum,
+          items:       items,
+          customerName: (orderData && orderData.customerName) || '',
+        })
+      });
+      const result = await res.json();
+      if (result.status === 'ok') {
+        document.getElementById('lost-refund-success-msg').textContent =
+          'Lost order refund for ' + orderNum + ' has been logged.';
+        document.getElementById('screen-main').classList.add('hidden');
+        document.getElementById('screen-success').classList.remove('hidden');
+        showSuccessState('lost-refund-success');
+      } else {
+        errEl.innerHTML = '<strong>Error:</strong> ' + (result.message || 'Something went wrong.');
+        errEl.classList.add('show');
+      }
+    } catch (e) {
+      errEl.innerHTML = '<strong>Error:</strong> Something went wrong. Please try again.';
+      errEl.classList.add('show');
+    }
+    btn.disabled = false;
+    btn.innerHTML = 'Log Refund Request';
+    return;
+  }
+
+  // ── Reship path ──────────────────────────────────────────────────────────
+  document.getElementById('msg-lost-address').style.display = 'none';
   const name    = document.getElementById('lost-name').value.trim();
   const street1 = document.getElementById('lost-street1').value.trim();
   const city    = document.getElementById('lost-city').value.trim();
@@ -911,15 +984,6 @@ async function csSubmitReshipment() {
 
   if (!name || !street1 || !city || !state || !zip) {
     document.getElementById('msg-lost-address').style.display = 'block';
-    return;
-  }
-
-  const orderNum = document.getElementById('cs-order-number').value.trim();
-  const items = (orderData && orderData.items) ? orderData.items : [];
-
-  if (!items.length) {
-    errEl.querySelector('strong').textContent = 'No items found';
-    errEl.classList.add('show');
     return;
   }
 
@@ -970,7 +1034,7 @@ async function csSubmitReshipment() {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function showSuccessState(id) {
-  ['return-success-pending','return-success-sent','return-success-review','cancel-success','lost-success']
+  ['return-success-pending','return-success-sent','return-success-review','cancel-success','lost-success','lost-refund-success']
     .forEach(s => document.getElementById(s).classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');
 }
@@ -1008,7 +1072,8 @@ function resetForm() {
   document.getElementById('order-info-block').classList.add('hidden');
   document.getElementById('screen-success').classList.add('hidden');
   document.getElementById('screen-main').classList.remove('hidden');
-  // Stay in current mode
+  // Reset lost sub-toggle to reship
+  if (currentMode === 'lost') setLostAction('reship');
 }
 </script>
 </body>

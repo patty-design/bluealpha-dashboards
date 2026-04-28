@@ -902,6 +902,53 @@ def cancel_in_shipstation(order_id, items_to_cancel):
         return False, f"Exception during ShipStation cancellation: {e}"
 
 
+@app.route("/api/submit-lost-refund", methods=["POST", "OPTIONS"])
+def submit_lost_refund():
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    data = request.get_json() or {}
+
+    if not CS_ADMIN_PASSWORD or data.get("password", "") != CS_ADMIN_PASSWORD:
+        return Response(json.dumps({"status": "unauthorized"}), status=401, headers=c, mimetype="application/json")
+
+    order_number  = data.get("orderNumber", "").strip()
+    items         = data.get("items", [])
+    customer_name = data.get("customerName", "").strip()
+
+    if not order_number or not items:
+        return Response(json.dumps({"status": "error", "message": "Missing required fields"}), headers=c, mimetype="application/json")
+
+    items_text = "\n".join(
+        f"{i.get('quantity', 1)}x {i.get('sku', '')} — {i.get('name', '')}" for i in items
+    )
+    wc_link = f"https://www.bluealphabelts.com/wp-admin/post.php?post={order_number}&action=edit"
+
+    fields = {
+        "Order Number":                   order_number,
+        "Customer Name from Shipstation": customer_name,
+        "Items to Return":                items_text,
+        "Reason for Return":              "[LOST ORDER] Refund requested",
+        "Submission Date":                datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "Status":                         "Refund Lost Order",
+        "Type":                           "Lost",
+        "WooCommerce Order Link":         wc_link,
+    }
+    fields = {k: v for k, v in fields.items() if v}
+
+    try:
+        r = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
+            headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
+            json={"fields": fields},
+            timeout=10,
+        )
+        if r.status_code not in (200, 201):
+            return Response(json.dumps({"status": "error", "message": r.text}), status=500, headers=c, mimetype="application/json")
+        return Response(json.dumps({"status": "ok"}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"status": "error", "message": str(e)}), status=500, headers=c, mimetype="application/json")
+
 @app.route("/api/submit-reshipment", methods=["POST", "OPTIONS"])
 def submit_reshipment():
     if request.method == "OPTIONS":
