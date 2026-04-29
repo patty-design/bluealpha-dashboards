@@ -1001,7 +1001,8 @@ def submit_reshipment():
         try:
             stores_r = req_lib.get("https://ssapi.shipstation.com/stores",
                                    headers=ss_headers(), timeout=10)
-            for store in stores_r.json():
+            stores_data = stores_r.json() if stores_r.content else []
+            for store in (stores_data if isinstance(stores_data, list) else []):
                 if "lost" in store.get("storeName", "").lower():
                     lost_store_id = store.get("storeId")
                     break
@@ -1062,7 +1063,10 @@ def submit_reshipment():
             json=order_payload,
             timeout=15,
         )
-        result = create_r.json()
+        try:
+            result = create_r.json()
+        except Exception:
+            return Response(json.dumps({"status": "error", "message": f"ShipStation returned unexpected response (HTTP {create_r.status_code}): {create_r.text[:300]}"}), headers=c, mimetype="application/json")
         new_order_id = result.get("orderId")
         if not new_order_id:
             return Response(json.dumps({"status": "error", "message": f"ShipStation error: {result}"}), headers=c, mimetype="application/json")
