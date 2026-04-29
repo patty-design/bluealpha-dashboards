@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blue Alpha — International Belt Exchange</title>
+  <link rel="icon" href="https://www.bluealphabelts.com/wp-content/uploads/2019/05/cropped-BAG-FAV-32x32.png">
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:   #003a6c;
+      --red:    #ae0000;
+      --light:  #f5f7fa;
+      --border: #dde3ea;
+      --text:   #1a2633;
+      --muted:  #6b7a8d;
+      --white:  #ffffff;
+      --success:#1a7a3c;
+      --error:  #ae0000;
+    }
+
+    body {
+      font-family: 'Lato', sans-serif;
+      background: var(--light);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--navy);
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    header img { height: 44px; width: auto; filter: brightness(0) invert(1); }
+    .header-divider { width: 2px; height: 36px; background: var(--red); border-radius: 2px; }
+    .header-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.75);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+
+    /* ── Container ── */
+    .container {
+      max-width: 640px;
+      margin: 48px auto;
+      padding: 0 20px 60px;
+    }
+
+    .page-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+    .page-subtitle {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 28px;
+      line-height: 1.5;
+    }
+
+    /* ── Tab toggle ── */
+    .tab-bar {
+      display: flex;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 32px;
+      background: var(--white);
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 13px 16px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      text-align: center;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      transition: background 0.2s, color 0.2s;
+    }
+    .tab-btn.active {
+      background: var(--navy);
+      color: var(--white);
+    }
+    .tab-btn:first-child { border-right: 1px solid var(--border); }
+
+    /* ── Progress ── */
+    .progress {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 28px;
+      align-items: center;
+    }
+    .progress-step {
+      flex: 1;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      transition: background 0.3s;
+    }
+    .progress-step.active { background: var(--navy); }
+    .progress-step.done   { background: var(--navy); opacity: 0.4; }
+
+    /* ── Card ── */
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 32px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+    .card-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+    .card-subtitle {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 24px;
+    }
+
+    /* ── Form ── */
+    .field { margin-bottom: 18px; }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 7px;
+    }
+    label .req { color: var(--red); margin-left: 3px; }
+
+    input[type="text"],
+    input[type="email"],
+    textarea,
+    select {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 11px 14px;
+      font-family: 'Lato', sans-serif;
+      font-size: 0.95rem;
+      color: var(--text);
+      background: var(--white);
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--navy);
+      box-shadow: 0 0 0 3px rgba(0,58,108,0.08);
+    }
+    textarea { resize: vertical; min-height: 80px; }
+
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .field-row-3 { display: grid; grid-template-columns: 2fr 1fr 1.2fr; gap: 14px; }
+
+    /* ── Exchange item rows ── */
+    .exchange-items-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+    .exchange-item-row {
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .exchange-item-row.checked { border-color: var(--navy); }
+    .item-check-label {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 14px;
+      cursor: pointer;
+      background: #fff;
+      transition: background 0.15s;
+    }
+    .exchange-item-row.checked .item-check-label { background: #e8f0f9; }
+    .item-check-label input[type="checkbox"] {
+      width: 18px; height: 18px;
+      accent-color: var(--navy);
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+    .item-check-info { flex: 1; }
+    .eligible-name { font-weight: 700; font-size: 0.95rem; color: var(--text); }
+    .eligible-sku  { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+    .item-options-wrap {
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+      background: #f7f9fc;
+    }
+    .item-options-wrap.hidden { display: none; }
+
+    /* ── Return address info box ── */
+    .info-box {
+      background: #e8f0f9;
+      border: 1px solid #5B7FA0;
+      border-radius: 6px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+    }
+    .info-box-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--navy);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .info-box p {
+      font-size: 0.92rem;
+      color: var(--text);
+      line-height: 1.55;
+    }
+    .info-box strong { color: var(--navy); }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-block;
+      padding: 12px 28px;
+      border-radius: 6px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn:hover { opacity: 0.88; }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: var(--navy); color: var(--white); width: 100%; text-align: center; }
+    .btn-secondary { background: transparent; color: var(--navy); border: 1.5px solid var(--navy); }
+    .btn-row { display: flex; gap: 12px; margin-top: 24px; }
+    .btn-row .btn-primary { flex: 1; }
+    .btn-stripe {
+      background: #635bff;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      margin-top: 0;
+      text-align: center;
+    }
+
+    /* ── Messages ── */
+    .message {
+      border-radius: 6px;
+      padding: 16px 20px;
+      margin-top: 20px;
+      font-size: 0.92rem;
+      line-height: 1.55;
+      display: none;
+    }
+    .message.show { display: block; }
+    .message-error   { background: #fff0f0; border: 1px solid #f5c2c2; color: #7a1515; }
+    .message-warning { background: #fff8ed; border: 1px solid #f5dca0; color: #7a4e00; }
+    .message-success { background: #edf7f1; border: 1px solid #a3d9b8; color: #145228; }
+    .message strong { display: block; margin-bottom: 4px; font-size: 1rem; }
+    .message a { color: inherit; font-weight: 700; }
+
+    /* ── Top-level banners (from URL params) ── */
+    .banner {
+      border-radius: 6px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    .banner-success { background: #edf7f1; border: 1px solid #a3d9b8; color: #145228; }
+    .banner-warning { background: #fff8ed; border: 1px solid #f5dca0; color: #7a4e00; }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+
+    .section-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 32px 0;
+    }
+
+    @media (max-width: 520px) {
+      .card { padding: 24px 16px; }
+      .field-row, .field-row-3 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="https://www.bluealphabelts.com" target="_blank">
+    <img src="https://www.bluealphabelts.com/wp-content/uploads/2024/04/logo-1.png" alt="Blue Alpha">
+  </a>
+  <div class="header-divider"></div>
+  <span class="header-title">International Exchange</span>
+</header>
+
+<div class="container">
+  <h1 class="page-title">International Belt Exchange</h1>
+  <p class="page-subtitle">Exchanges accepted within 45 days of shipment. A $10 shipping fee applies. You ship your belt to us; we'll ship your new size once we see tracking movement.</p>
+
+  <!-- URL param banners -->
+  <div id="banner-success" class="banner banner-success hidden">
+    <strong>✓ Payment received!</strong>
+    Check your email for return shipping instructions. Once you've shipped your belt, come back here to submit your tracking number.
+  </div>
+  <div id="banner-cancelled" class="banner banner-warning hidden">
+    <strong>Payment cancelled.</strong>
+    Your exchange was not submitted. You can try again below.
+  </div>
+
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-btn-new" onclick="switchTab('new')">New Exchange Request</button>
+    <button class="tab-btn" id="tab-btn-tracking" onclick="switchTab('tracking')">Submit Tracking Number</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       TAB A — NEW EXCHANGE REQUEST
+  ══════════════════════════════════════════════════════════ -->
+  <div id="tab-new">
+
+    <!-- Progress bar -->
+    <div class="progress" id="new-progress">
+      <div class="progress-step active" id="nprog-1"></div>
+      <div class="progress-step" id="nprog-2"></div>
+      <div class="progress-step" id="nprog-3"></div>
+      <div class="progress-step" id="nprog-4"></div>
+    </div>
+
+    <!-- Step 1: Order Lookup -->
+    <div id="new-step-1" class="card">
+      <div class="card-title">Step 1 — Verify Your Order</div>
+      <p class="card-subtitle">Enter your order details to check eligibility (45-day window)</p>
+
+      <div class="field">
+        <label>Order Number <span class="req">*</span></label>
+        <input type="text" id="n-order-number" placeholder="e.g. 265160" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Last Name</label>
+        <input type="text" id="n-last-name" placeholder="Last name on the order" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Email Address</label>
+        <input type="email" id="n-email" placeholder="Email used on the order" autocomplete="off">
+      </div>
+      <p style="font-size:0.82rem; color:var(--muted); margin-top:-8px; margin-bottom:16px;">Provide last name OR email (or both).</p>
+
+      <button class="btn btn-primary" id="n-btn-verify" onclick="verifyIntlExchange()">
+        Continue
+      </button>
+
+      <div id="n-msg-checking" class="message hidden" style="background:#f0f5fb; border-color:#5B7FA0; color:#1a2633; margin-top:14px;">
+        ⏳ Looking up your order — this may take up to a minute…
+      </div>
+      <div class="message message-error" id="n-msg-not-found">
+        <strong>Order not found</strong>
+        Please check your order number and name/email, or <a href="mailto:info@bluealpha.us">contact us</a>.
+      </div>
+      <div class="message message-warning" id="n-msg-outside-window">
+        <strong>Outside Exchange Window</strong>
+        This order is outside the 45-day exchange window. <a href="mailto:info@bluealpha.us">Contact us</a> if you have questions.
+      </div>
+      <div class="message message-warning" id="n-msg-already-exchanged">
+        <strong>Exchange Already Submitted</strong>
+        An exchange has already been submitted for this order. <a href="mailto:info@bluealpha.us">Contact us</a> if you need help.
+      </div>
+      <div class="message message-warning" id="n-msg-no-eligible-items">
+        <strong>No Eligible Items</strong>
+        No exchange-eligible items found. <a href="mailto:info@bluealpha.us">Contact us</a> for assistance.
+      </div>
+      <div class="message message-error" id="n-msg-error-1">
+        <strong>Something went wrong</strong>
+        Please try again or <a href="mailto:info@bluealpha.us">contact us</a>.
+      </div>
+    </div>
+
+    <!-- Step 2: Select items -->
+    <div id="new-step-2" class="card hidden">
+      <div class="card-title">Step 2 — Select Your New Belt(s)</div>
+      <p class="card-subtitle" id="n-step2-subheading"></p>
+
+      <div class="exchange-items-list" id="n-exchange-items-list"></div>
+
+      <div class="message message-error hidden" id="n-msg-no-selection">Please check at least one belt and choose a new size/color.</div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="nGoBack(1)">Back</button>
+        <button class="btn btn-primary" onclick="nGoStep3()">Continue</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Delivery address -->
+    <div id="new-step-3" class="card hidden">
+      <div class="card-title">Step 3 — Delivery Address</div>
+      <p class="card-subtitle">Where should we ship your new belt(s)?</p>
+
+      <div class="field">
+        <label>Full Name <span class="req">*</span></label>
+        <input type="text" id="n-addr-name" placeholder="Name on package" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Street Address <span class="req">*</span></label>
+        <input type="text" id="n-addr-street1" placeholder="Street address" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Apartment / Suite / Unit</label>
+        <input type="text" id="n-addr-street2" placeholder="Optional" autocomplete="off">
+      </div>
+      <div class="field-row">
+        <div class="field" style="margin-bottom:0;">
+          <label>City <span class="req">*</span></label>
+          <input type="text" id="n-addr-city" placeholder="City" autocomplete="off">
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label>State / Province</label>
+          <input type="text" id="n-addr-state" placeholder="State / Province" autocomplete="off">
+        </div>
+      </div>
+      <div style="margin-bottom:14px;"></div>
+      <div class="field-row">
+        <div class="field" style="margin-bottom:0;">
+          <label>Postal Code <span class="req">*</span></label>
+          <input type="text" id="n-addr-postal" placeholder="Postal / ZIP" autocomplete="off">
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label>Country <span class="req">*</span></label>
+          <select id="n-addr-country">
+            <option value="">Select country…</option>
+            <option value="AU">Australia</option>
+            <option value="AT">Austria</option>
+            <option value="BE">Belgium</option>
+            <option value="BR">Brazil</option>
+            <option value="CA">Canada</option>
+            <option value="CL">Chile</option>
+            <option value="DK">Denmark</option>
+            <option value="FI">Finland</option>
+            <option value="FR">France</option>
+            <option value="DE">Germany</option>
+            <option value="GR">Greece</option>
+            <option value="HK">Hong Kong</option>
+            <option value="HU">Hungary</option>
+            <option value="IN">India</option>
+            <option value="ID">Indonesia</option>
+            <option value="IE">Ireland</option>
+            <option value="IL">Israel</option>
+            <option value="IT">Italy</option>
+            <option value="JP">Japan</option>
+            <option value="KR">South Korea</option>
+            <option value="MX">Mexico</option>
+            <option value="NL">Netherlands</option>
+            <option value="NZ">New Zealand</option>
+            <option value="NO">Norway</option>
+            <option value="PH">Philippines</option>
+            <option value="PL">Poland</option>
+            <option value="PT">Portugal</option>
+            <option value="RO">Romania</option>
+            <option value="SG">Singapore</option>
+            <option value="ZA">South Africa</option>
+            <option value="ES">Spain</option>
+            <option value="SE">Sweden</option>
+            <option value="CH">Switzerland</option>
+            <option value="TW">Taiwan</option>
+            <option value="TH">Thailand</option>
+            <option value="TR">Turkey</option>
+            <option value="UA">Ukraine</option>
+            <option value="AE">United Arab Emirates</option>
+            <option value="GB">United Kingdom</option>
+            <option value="US">United States</option>
+            <option value="VN">Vietnam</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-bottom:18px;"></div>
+
+      <div class="info-box">
+        <div class="info-box-title">📦 Ship Your Belt To Us First</div>
+        <p>Please ship your original belt(s) to:<br>
+        <strong>35 Andrew St., Newnan, GA 30263 USA</strong><br><br>
+        Once we confirm movement on your shipment, we'll send your new belt(s) to the delivery address above.</p>
+      </div>
+
+      <div class="message message-error hidden" id="n-msg-addr-error">Please fill in all required address fields.</div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="nGoBack(2)">Back</button>
+        <button class="btn btn-primary" onclick="nGoStep4()">Review &amp; Pay</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Review & Pay -->
+    <div id="new-step-4" class="card hidden">
+      <div class="card-title">Step 4 — Review &amp; Pay</div>
+      <p class="card-subtitle">Confirm your exchange details and pay the $10 international shipping fee.</p>
+
+      <div id="n-review-content" style="margin-bottom:20px; font-size:0.93rem; line-height:1.65; color:var(--text);"></div>
+
+      <div class="info-box">
+        <div class="info-box-title">📦 Return Address</div>
+        <p>Ship your belt(s) to:<br><strong>35 Andrew St., Newnan, GA 30263 USA</strong><br>
+        Return instructions will also be emailed to you after payment.</p>
+      </div>
+
+      <div class="message message-error hidden" id="n-msg-pay-error">
+        <strong>Something went wrong</strong>
+        Could not create checkout session. Please try again or <a href="mailto:info@bluealpha.us">contact us</a>.
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="nGoBack(3)">Back</button>
+        <button class="btn btn-primary btn-stripe" id="n-btn-pay" onclick="startCheckout()">
+          Pay $10 &amp; Submit →
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /tab-new -->
+
+
+  <!-- ══════════════════════════════════════════════════════════
+       TAB B — SUBMIT TRACKING NUMBER
+  ══════════════════════════════════════════════════════════ -->
+  <div id="tab-tracking" class="hidden">
+    <div class="card">
+      <div class="card-title">Submit Your Return Tracking Number</div>
+      <p class="card-subtitle">Already paid and shipped your belt? Enter your tracking number below so our team can monitor the shipment and prepare your new belt(s).</p>
+
+      <div class="field">
+        <label>Order Number <span class="req">*</span></label>
+        <input type="text" id="t-order-number" placeholder="e.g. 265160" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Return Tracking Number <span class="req">*</span></label>
+        <input type="text" id="t-tracking" placeholder="Tracking number from your carrier" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Carrier <span class="req">*</span></label>
+        <select id="t-carrier">
+          <option value="">Select carrier…</option>
+          <option value="USPS">USPS</option>
+          <option value="FedEx">FedEx</option>
+          <option value="UPS">UPS</option>
+          <option value="DHL">DHL</option>
+          <option value="Canada Post">Canada Post</option>
+          <option value="Royal Mail">Royal Mail</option>
+          <option value="Australia Post">Australia Post</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+
+      <div class="message message-error hidden" id="t-msg-error">
+        <strong>Submission failed</strong>
+        <span id="t-msg-error-text">Please check your order number and try again.</span>
+      </div>
+      <div class="message message-success hidden" id="t-msg-success">
+        <strong>✓ Tracking submitted!</strong>
+        We'll ship your exchange once we see movement on the package. Allow 2-4 weeks for international delivery.
+      </div>
+
+      <button class="btn btn-primary" id="t-btn-submit" onclick="submitTracking()" style="margin-top:8px;">
+        Submit Tracking
+      </button>
+    </div>
+  </div><!-- /tab-tracking -->
+
+</div><!-- /container -->
+
+<script>
+const API_BASE = '';
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let verifyData   = null;   // response from verify-international-exchange
+let selections   = [];     // [{originalSku, originalName, selectedSku, selectedName, quantity, parentProductId}]
+let deliveryAddr = {};     // delivery address object
+let optionsCache = {};     // parentProductId → options[]
+
+// ── URL param handling ────────────────────────────────────────────────────────
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('success') === '1') {
+    document.getElementById('banner-success').classList.remove('hidden');
+    // Switch to tracking tab automatically after payment success
+    switchTab('tracking');
+  }
+  if (params.get('cancelled') === '1') {
+    document.getElementById('banner-cancelled').classList.remove('hidden');
+  }
+  // Clean URL
+  if (params.get('success') || params.get('cancelled') || params.get('ref')) {
+    history.replaceState({}, '', window.location.pathname);
+  }
+})();
+
+// ── Tab switch ────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('tab-new').classList.toggle('hidden', tab !== 'new');
+  document.getElementById('tab-tracking').classList.toggle('hidden', tab !== 'tracking');
+  document.getElementById('tab-btn-new').classList.toggle('active', tab === 'new');
+  document.getElementById('tab-btn-tracking').classList.toggle('active', tab === 'tracking');
+}
+
+// ── Progress helper ───────────────────────────────────────────────────────────
+function setNewStep(n) {
+  [1,2,3,4].forEach(i => {
+    const el = document.getElementById('new-step-' + i);
+    if (el) el.classList.toggle('hidden', i !== n);
+  });
+  [1,2,3,4].forEach(i => {
+    const p = document.getElementById('nprog-' + i);
+    if (!p) return;
+    p.classList.remove('active','done');
+    if (i < n) p.classList.add('done');
+    else if (i === n) p.classList.add('active');
+  });
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function nGoBack(toStep) { setNewStep(toStep); }
+
+// ── Message helpers ───────────────────────────────────────────────────────────
+function hideAllMsgs(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.querySelectorAll('.message').forEach(m => {
+    m.classList.remove('show');
+    m.classList.add('hidden');
+  });
+}
+function showMsg(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('hidden');
+  el.classList.add('show');
+}
+function hideMsg(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.add('hidden');
+  el.classList.remove('show');
+}
+
+// ── Step 1: Verify order ──────────────────────────────────────────────────────
+async function verifyIntlExchange() {
+  const btn       = document.getElementById('n-btn-verify');
+  const orderNum  = document.getElementById('n-order-number').value.trim();
+  const email     = document.getElementById('n-email').value.trim();
+  const lastName  = document.getElementById('n-last-name').value.trim();
+
+  hideMsg('n-msg-not-found');
+  hideMsg('n-msg-outside-window');
+  hideMsg('n-msg-already-exchanged');
+  hideMsg('n-msg-no-eligible-items');
+  hideMsg('n-msg-error-1');
+  hideMsg('n-msg-checking');
+
+  if (!orderNum || (!email && !lastName)) {
+    showMsg('n-msg-not-found');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Checking…';
+  showMsg('n-msg-checking');
+
+  try {
+    const res  = await fetch(API_BASE + '/api/verify-international-exchange', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ orderNumber: orderNum, email, lastName }),
+    });
+    const data = await res.json();
+
+    if (data.status === 'eligible') {
+      verifyData = data;
+      await buildStep2(data);
+      setNewStep(2);
+    } else if (data.status === 'not_found')       { showMsg('n-msg-not-found'); }
+    else if (data.status === 'outside_window')    { showMsg('n-msg-outside-window'); }
+    else if (data.status === 'already_exchanged') { showMsg('n-msg-already-exchanged'); }
+    else if (data.status === 'no_eligible_items') { showMsg('n-msg-no-eligible-items'); }
+    else                                          { showMsg('n-msg-error-1'); }
+
+  } catch(e) {
+    showMsg('n-msg-error-1');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = 'Continue';
+  hideMsg('n-msg-checking');
+}
+
+// ── Step 2: Build item list ───────────────────────────────────────────────────
+async function buildStep2(data) {
+  document.getElementById('n-step2-subheading').textContent =
+    `Order #${data.orderNumber} — ${data.customerName}`;
+
+  const items = data.eligibleItems || [];
+  optionsCache = {};
+
+  const uniqueParents = [...new Set(items.map(i => i.parentProductId).filter(Boolean))];
+  await Promise.all(uniqueParents.map(async pid => {
+    try {
+      const res  = await fetch(API_BASE + '/api/intl-exchange-options', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ parentProductId: pid }),
+      });
+      const d = await res.json();
+      optionsCache[pid] = d.options || [];
+    } catch(e) { optionsCache[pid] = []; }
+  }));
+
+  const list = document.getElementById('n-exchange-items-list');
+  list.innerHTML = '';
+
+  items.forEach((item, idx) => {
+    const autoCheck = items.length === 1;
+    const row = document.createElement('div');
+    row.className = 'exchange-item-row' + (autoCheck ? ' checked' : '');
+    row.id = `n-item-row-${idx}`;
+
+    const allOpts = optionsCache[item.parentProductId] || [];
+    const opts    = allOpts.filter(o => o.sku !== item.sku);
+    let optionsHtml = '<option value="">Select a size/color…</option>';
+    if (opts.length === 0) {
+      optionsHtml = '<option value="">No other sizes available — contact us</option>';
+    } else {
+      opts.forEach(opt => {
+        optionsHtml += `<option value='${JSON.stringify({sku: opt.sku, name: opt.name}).replace(/'/g, "&#39;")}'>${opt.name}</option>`;
+      });
+    }
+
+    let qtyHtml = '';
+    if (item.quantity > 1) {
+      let qOpts = '';
+      for (let i = 1; i <= item.quantity; i++) qOpts += `<option value="${i}">${i}</option>`;
+      qtyHtml = `<div style="margin-top:8px;"><label style="margin-bottom:4px;">Quantity</label><select id="n-qty-${idx}">${qOpts}</select></div>`;
+    }
+
+    row.innerHTML = `
+      <label class="item-check-label" for="n-check-${idx}">
+        <input type="checkbox" id="n-check-${idx}" ${autoCheck ? 'checked' : ''}>
+        <div class="item-check-info">
+          <div class="eligible-name">${item.name}</div>
+          <div class="eligible-sku">${item.sku}</div>
+        </div>
+      </label>
+      <div class="item-options-wrap ${autoCheck ? '' : 'hidden'}" id="n-opts-${idx}">
+        <label style="margin-bottom:6px;">New Size / Color</label>
+        <select id="n-sel-${idx}">${optionsHtml}</select>
+        ${qtyHtml}
+      </div>`;
+
+    row.querySelector(`#n-check-${idx}`).addEventListener('change', () => {
+      const cb  = document.getElementById(`n-check-${idx}`);
+      row.classList.toggle('checked', cb.checked);
+      document.getElementById(`n-opts-${idx}`).classList.toggle('hidden', !cb.checked);
+    });
+    list.appendChild(row);
+  });
+}
+
+// ── Step 2 → Step 3 ───────────────────────────────────────────────────────────
+function nGoStep3() {
+  hideMsg('n-msg-no-selection');
+  const items = verifyData.eligibleItems || [];
+  selections = [];
+
+  for (let idx = 0; idx < items.length; idx++) {
+    const cb  = document.getElementById(`n-check-${idx}`);
+    if (!cb || !cb.checked) continue;
+    const sel = document.getElementById(`n-sel-${idx}`);
+    const qtyEl = document.getElementById(`n-qty-${idx}`);
+    const qty   = qtyEl ? parseInt(qtyEl.value) || 1 : 1;
+    let parsed;
+    try { parsed = JSON.parse(sel.value); } catch(e) { parsed = null; }
+    if (!parsed) {
+      showMsg('n-msg-no-selection');
+      return;
+    }
+    selections.push({
+      originalSku:     items[idx].sku,
+      originalName:    items[idx].name,
+      selectedSku:     parsed.sku,
+      selectedName:    parsed.name,
+      quantity:        qty,
+      parentProductId: items[idx].parentProductId,
+    });
+  }
+
+  if (selections.length === 0) {
+    showMsg('n-msg-no-selection');
+    return;
+  }
+
+  // Pre-fill delivery address from order's shipTo
+  if (verifyData.shipTo) {
+    const s = verifyData.shipTo;
+    document.getElementById('n-addr-name').value    = s.name    || verifyData.customerName || '';
+    document.getElementById('n-addr-street1').value = s.street1 || '';
+    document.getElementById('n-addr-street2').value = s.street2 || '';
+    document.getElementById('n-addr-city').value    = s.city    || '';
+    document.getElementById('n-addr-state').value   = s.state   || '';
+    document.getElementById('n-addr-postal').value  = s.postalCode || '';
+    // Try to match country
+    const countrySelect = document.getElementById('n-addr-country');
+    const countryCode = s.country || '';
+    for (const opt of countrySelect.options) {
+      if (opt.value === countryCode) { countrySelect.value = countryCode; break; }
+    }
+  }
+
+  setNewStep(3);
+}
+
+// ── Step 3 → Step 4 ───────────────────────────────────────────────────────────
+function nGoStep4() {
+  hideMsg('n-msg-addr-error');
+
+  const name    = document.getElementById('n-addr-name').value.trim();
+  const street1 = document.getElementById('n-addr-street1').value.trim();
+  const city    = document.getElementById('n-addr-city').value.trim();
+  const postal  = document.getElementById('n-addr-postal').value.trim();
+  const country = document.getElementById('n-addr-country').value.trim();
+
+  if (!name || !street1 || !city || !postal || !country) {
+    showMsg('n-msg-addr-error');
+    return;
+  }
+
+  deliveryAddr = {
+    name:       name,
+    street1:    street1,
+    street2:    document.getElementById('n-addr-street2').value.trim(),
+    city:       city,
+    state:      document.getElementById('n-addr-state').value.trim(),
+    postalCode: postal,
+    country:    country,
+  };
+
+  // Build review content
+  const beltLines = selections.map(s =>
+    `<li><strong>${s.selectedName}</strong> (replacing: ${s.originalName})</li>`
+  ).join('');
+  const addrStr = [
+    deliveryAddr.name,
+    deliveryAddr.street1,
+    deliveryAddr.street2,
+    `${deliveryAddr.city}${deliveryAddr.state ? ', ' + deliveryAddr.state : ''} ${deliveryAddr.postalCode}`,
+    deliveryAddr.country,
+  ].filter(Boolean).join('<br>');
+
+  document.getElementById('n-review-content').innerHTML = `
+    <p><strong>Order:</strong> #${verifyData.orderNumber} — ${verifyData.customerName}</p>
+    <p style="margin-top:12px;"><strong>New Belt(s):</strong></p>
+    <ul style="margin:6px 0 12px 20px;">${beltLines}</ul>
+    <p><strong>Ship To:</strong><br>${addrStr}</p>
+    <p style="margin-top:12px;"><strong>Fee:</strong> $10.00 USD (international shipping)</p>
+  `;
+
+  setNewStep(4);
+}
+
+// ── Stripe Checkout ───────────────────────────────────────────────────────────
+async function startCheckout() {
+  const btn = document.getElementById('n-btn-pay');
+  hideMsg('n-msg-pay-error');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Redirecting to payment…';
+
+  try {
+    const res  = await fetch(API_BASE + '/api/create-international-checkout', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        orderId:       verifyData.orderId,
+        orderNumber:   verifyData.orderNumber,
+        customerName:  verifyData.customerName,
+        customerEmail: verifyData.customerEmail,
+        nextSuffix:    verifyData.nextSuffix || '-E',
+        items:         selections,
+        deliveryAddress: deliveryAddr,
+      }),
+    });
+    const data = await res.json();
+
+    if (data.url) {
+      window.location.href = data.url;
+      return;  // navigation happening
+    } else {
+      throw new Error(data.error || 'No checkout URL returned');
+    }
+  } catch(e) {
+    showMsg('n-msg-pay-error');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = 'Pay $10 &amp; Submit →';
+}
+
+// ── Tab B: Submit tracking ────────────────────────────────────────────────────
+async function submitTracking() {
+  const btn     = document.getElementById('t-btn-submit');
+  const orderNum = document.getElementById('t-order-number').value.trim();
+  const tracking = document.getElementById('t-tracking').value.trim();
+  const carrier  = document.getElementById('t-carrier').value.trim();
+
+  hideMsg('t-msg-error');
+  hideMsg('t-msg-success');
+
+  if (!orderNum || !tracking || !carrier) {
+    document.getElementById('t-msg-error-text').textContent = 'Please fill in all fields.';
+    showMsg('t-msg-error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Submitting…';
+
+  try {
+    const res  = await fetch(API_BASE + '/api/submit-international-tracking', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ orderNumber: orderNum, trackingNumber: tracking, carrier }),
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      showMsg('t-msg-success');
+      document.getElementById('t-order-number').value = '';
+      document.getElementById('t-tracking').value = '';
+      document.getElementById('t-carrier').value = '';
+    } else {
+      document.getElementById('t-msg-error-text').textContent =
+        data.error || 'Please check your order number and try again.';
+      showMsg('t-msg-error');
+    }
+  } catch(e) {
+    document.getElementById('t-msg-error-text').textContent = 'A network error occurred. Please try again.';
+    showMsg('t-msg-error');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = 'Submit Tracking';
+}
+
+// ── Enter key support ─────────────────────────────────────────────────────────
+['n-order-number','n-last-name','n-email'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') verifyIntlExchange(); });
+});
+['t-order-number','t-tracking'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') submitTracking(); });
+});
+</script>
+</body>
+</html>

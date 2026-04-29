@@ -36,6 +36,10 @@ CS_ADMIN_PASSWORD    = os.environ.get("CS_ADMIN_PASSWORD", "")
 QUOTE_ADMIN_PASSWORD     = os.environ.get("QUOTE_ADMIN_PASSWORD", "")
 QUOTE_SECRET_KEY         = os.environ.get("QUOTE_SECRET_KEY", "change-me-ba-portal-2024")
 
+STRIPE_SECRET_KEY        = os.environ.get("STRIPE_SECRET_KEY", "")
+INT_EXCHANGE_TABLE_ID    = os.environ.get("INT_EXCHANGE_TABLE_ID", "")
+RETURN_ADDRESS_INTL      = "35 Andrew St., Newnan, GA 30263 USA"
+
 MANUAL_ORDERS_TABLE_ID   = "tblOOZ2wVzIsR1DyL"
 MO_LINE_ITEMS_TABLE_ID   = "tblNDxbfgyZDMex7n"
 CUSTOMERS_TABLE_ID       = "tblO4AdJE84kFDfEe"
@@ -69,6 +73,9 @@ def add_security_headers(response):
 
 # In-memory status cache for return submissions (cleared on restart, only needed during ~60s poll window)
 _return_status_cache = {}
+
+# In-memory store for pending international exchange checkout sessions (keyed by UUID ref_id)
+_intl_pending = {}
 
 DASHBOARDS = {
     "kurt": "kurt.html",
@@ -4734,6 +4741,798 @@ def admin_deny(app_id):
         return Response(json.dumps({"success": True}), headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# International Exchange Portal
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/exchange/international")
+def international_exchange_portal():
+    return send_from_directory("static", "exchange-international.html")
+
+
+@app.route("/api/verify-international-exchange", methods=["POST", "OPTIONS"])
+def verify_international_exchange():
+    """Like verify-exchange but: 45-day window, no international/military block."""
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    data = request.get_json() or {}
+    order_number    = data.get("orderNumber", "").strip().lstrip("#")
+    email_input     = data.get("email", "").strip().lower()
+    last_name_input = data.get("lastName", "").strip().lower()
+
+    if not order_number or (not email_input and not last_name_input):
+        return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
+
+    try:
+        from datetime import datetime, timezone, timedelta
+
+        r = req_lib.get("https://ssapi.shipstation.com/orders",
+                        params={"orderNumber": order_number},
+                        headers=ss_headers(), timeout=10)
+        orders = r.json().get("orders", [])
+
+        if not orders:
+            return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
+
+        order = orders[0]
+
+        # Verify identity — last name OR email must match
+        ship_name   = order.get("shipTo", {}).get("name", "").strip()
+        order_last  = ship_name.split()[-1].lower() if ship_name else ""
+        order_email = (order.get("customerEmail") or "").strip().lower()
+        name_match  = last_name_input and last_name_input == order_last
+        email_match = email_input and email_input == order_email
+        if not name_match and not email_match:
+            return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
+
+        # NOTE: intentionally NOT blocking international/military addresses
+
+        # Check ship date within 45 days
+        sr = req_lib.get("https://ssapi.shipstation.com/shipments",
+                         params={"orderNumber": order_number},
+                         headers=ss_headers(), timeout=10)
+        shipments = sr.json().get("shipments", [])
+        ship_date_str = shipments[0].get("shipDate", "") if shipments else ""
+
+        def parse_dt(s):
+            s = s.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(s)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+
+        if ship_date_str:
+            ship_date = parse_dt(ship_date_str)
+        else:
+            od = order.get("orderDate", "")
+            ship_date = parse_dt(od) if od else datetime.now(timezone.utc)
+
+        eligible_until = ship_date + timedelta(days=45)
+        if datetime.now(timezone.utc) > eligible_until:
+            return Response(json.dumps({"status": "outside_window"}), headers=c, mimetype="application/json")
+
+        # Find exchange-eligible items via Airtable
+        airtable_read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+
+        all_exchange_options = at_get_all(
+            PRODUCT_SKUS_TABLE_ID,
+            airtable_read_token,
+            fields=["Parent Product"],
+            formula="{Can Exchange}=TRUE()",
+        )
+        eligible_parent_ids = set()
+        for opt in all_exchange_options:
+            for pid in opt["fields"].get("Parent Product", []):
+                eligible_parent_ids.add(pid)
+
+        eligible_items = []
+        for item in order.get("items", []):
+            sku = (item.get("sku") or "").strip()
+            if not sku:
+                continue
+            at_r = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}",
+                params={"filterByFormula": f'{{SKU ID}}="{sku}"', "maxRecords": 1,
+                        "fields[]": ["Name + Variations", "SKU ID", "Parent Product"]},
+                headers=at_headers(airtable_read_token),
+                timeout=10,
+            )
+            records = at_r.json().get("records", [])
+            if not records:
+                continue
+            rec = records[0]
+            parent_products = rec["fields"].get("Parent Product", [])
+            parent_product_id = parent_products[0] if parent_products else ""
+            if not parent_product_id or parent_product_id not in eligible_parent_ids:
+                continue
+            eligible_items.append({
+                "name":            item.get("name", ""),
+                "sku":             sku,
+                "quantity":        int(item.get("quantity", 1)),
+                "airtableId":      rec["id"],
+                "parentProductId": parent_product_id,
+            })
+
+        if not eligible_items:
+            return Response(json.dumps({"status": "no_eligible_items"}), headers=c, mimetype="application/json")
+
+        # Check for existing exchange orders
+        already_exchanged_skus = set()
+        next_suffix = "-E"
+        try:
+            for n in range(1, 10):
+                suffix = "-E" if n == 1 else f"-E{n}"
+                ex_r = req_lib.get("https://ssapi.shipstation.com/orders",
+                                   params={"orderNumber": f"{order_number}{suffix}"},
+                                   headers=ss_headers(), timeout=10)
+                ex_orders = ex_r.json().get("orders", [])
+                if not ex_orders:
+                    next_suffix = suffix
+                    break
+                for ex_order in ex_orders:
+                    orig_sku = ((ex_order.get("advancedOptions") or {}).get("customField3") or "").strip()
+                    if not orig_sku:
+                        notes_text = ex_order.get("internalNotes") or ""
+                        m = re.search(r'Original SKUs?:\s*([^\.\n]+)', notes_text)
+                        if m:
+                            orig_sku = m.group(1).strip()
+                    for s in orig_sku.split(","):
+                        s = s.strip()
+                        if s:
+                            already_exchanged_skus.add(s)
+        except Exception as ex_check_err:
+            print(f"[verify-international-exchange] exchange-order check failed (non-fatal): {ex_check_err}")
+
+        eligible_items = [i for i in eligible_items if i["sku"] not in already_exchanged_skus]
+
+        if not eligible_items:
+            return Response(json.dumps({"status": "already_exchanged"}), headers=c, mimetype="application/json")
+
+        ship_to = order.get("shipTo", {})
+        return Response(json.dumps({
+            "status":        "eligible",
+            "orderId":       order.get("orderId"),
+            "orderNumber":   order_number,
+            "customerName":  ship_to.get("name", ""),
+            "customerEmail": order.get("customerEmail", ""),
+            "shipTo": {
+                "name":       ship_to.get("name", ""),
+                "street1":    ship_to.get("street1", ""),
+                "street2":    ship_to.get("street2", ""),
+                "city":       ship_to.get("city", ""),
+                "state":      ship_to.get("state", ""),
+                "postalCode": ship_to.get("postalCode", ""),
+                "country":    ship_to.get("country", "US"),
+            },
+            "eligibleItems": eligible_items,
+            "nextSuffix":    next_suffix,
+        }), headers=c, mimetype="application/json")
+
+    except Exception as e:
+        import traceback
+        print(f"[verify-international-exchange] ERROR: {e}\n{traceback.format_exc()}")
+        return Response(json.dumps({"status": "error", "error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/intl-exchange-options", methods=["POST", "OPTIONS"])
+def intl_exchange_options():
+    """Same logic as /api/exchange-options — reused for international flow."""
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    data = request.get_json() or {}
+    parent_product_id = data.get("parentProductId", "").strip()
+
+    if not parent_product_id:
+        return Response(json.dumps({"options": []}), headers=c, mimetype="application/json")
+
+    try:
+        airtable_read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        records = at_get_all(
+            PRODUCT_SKUS_TABLE_ID,
+            airtable_read_token,
+            fields=["Name + Variations", "SKU ID", "Parent Product"],
+            formula="{Can Exchange}=TRUE()",
+        )
+        options = []
+        for rec in records:
+            fields = rec.get("fields", {})
+            if parent_product_id not in fields.get("Parent Product", []):
+                continue
+            raw_name = fields.get("Name + Variations", "")
+            clean_name = raw_name.replace(" - Base Only (-ONB)", "").replace(" - Base Only", "").replace(" (-ONB)", "").strip()
+            options.append({
+                "id":   rec["id"],
+                "name": clean_name,
+                "sku":  fields.get("SKU ID", ""),
+            })
+        options.sort(key=lambda x: x["name"])
+        return Response(json.dumps({"options": options}), headers=c, mimetype="application/json")
+
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/create-international-checkout", methods=["POST", "OPTIONS"])
+def create_international_checkout():
+    """Store pending exchange data and create a Stripe Checkout session."""
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    data = request.get_json() or {}
+
+    if not STRIPE_SECRET_KEY:
+        return Response(json.dumps({"error": "Stripe not configured"}),
+                        status=500, headers=c, mimetype="application/json")
+
+    import uuid
+    ref_id = str(uuid.uuid4())
+
+    # Store all exchange data keyed by ref_id (in-memory; retrieved on success callback)
+    _intl_pending[ref_id] = {
+        "orderId":       data.get("orderId"),
+        "orderNumber":   data.get("orderNumber", ""),
+        "customerName":  data.get("customerName", ""),
+        "customerEmail": data.get("customerEmail", ""),
+        "items":         data.get("items", []),        # list of {originalSku, selectedSku, selectedName, quantity, parentProductId}
+        "deliveryAddress": data.get("deliveryAddress", {}),  # {name, street1, street2, city, state, postalCode, country}
+        "nextSuffix":    data.get("nextSuffix", "-E"),
+    }
+
+    success_url = f"https://exchange.bluealphabelts.com/exchange/international?success=1&ref={ref_id}"
+    cancel_url  = "https://exchange.bluealphabelts.com/exchange/international?cancelled=1"
+
+    try:
+        stripe_resp = req_lib.post(
+            "https://api.stripe.com/v1/checkout/sessions",
+            auth=(STRIPE_SECRET_KEY, ""),
+            data={
+                "line_items[0][price_data][currency]":                  "usd",
+                "line_items[0][price_data][product_data][name]":        "International Belt Exchange Fee",
+                "line_items[0][price_data][unit_amount]":               "1000",
+                "line_items[0][quantity]":                              "1",
+                "mode":                                                 "payment",
+                "success_url":                                          success_url,
+                "cancel_url":                                           cancel_url,
+                "client_reference_id":                                  ref_id,
+            },
+            timeout=15,
+        )
+        if stripe_resp.status_code not in (200, 201):
+            raise Exception(f"Stripe error {stripe_resp.status_code}: {stripe_resp.text}")
+
+        session = stripe_resp.json()
+        checkout_url = session.get("url")
+        if not checkout_url:
+            raise Exception("No checkout URL returned from Stripe")
+
+        return Response(json.dumps({"url": checkout_url}), headers=c, mimetype="application/json")
+
+    except Exception as e:
+        import traceback
+        print(f"[create-international-checkout] ERROR: {e}\n{traceback.format_exc()}")
+        # Clean up pending record on failure
+        _intl_pending.pop(ref_id, None)
+        return Response(json.dumps({"error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/international-success", methods=["GET"])
+def international_success():
+    """
+    Stripe redirects here after successful payment.
+    Creates Airtable record and sends confirmation email, then redirects to thank-you page.
+    """
+    ref_id = request.args.get("ref", "").strip()
+
+    if not ref_id or ref_id not in _intl_pending:
+        # Already processed or invalid — just redirect to success page without ref
+        return redirect("https://exchange.bluealphabelts.com/exchange/international?success=1")
+
+    pending = _intl_pending.pop(ref_id)
+    order_number   = pending.get("orderNumber", "")
+    customer_name  = pending.get("customerName", "")
+    customer_email = pending.get("customerEmail", "")
+    items          = pending.get("items", [])
+    delivery_addr  = pending.get("deliveryAddress", {})
+    next_suffix    = pending.get("nextSuffix", "-E")
+    order_id       = pending.get("orderId")
+
+    try:
+        # Format items fields
+        items_to_exchange = "\n".join(
+            f"{i.get('quantity', 1)}x {i.get('originalSku', '')} — {i.get('originalName', i.get('selectedName', ''))}"
+            for i in items
+        )
+        desired_items = "\n".join(
+            f"{i.get('quantity', 1)}x {i.get('selectedSku', '')} — {i.get('selectedName', '')}"
+            for i in items
+        )
+        delivery_str = (
+            f"{delivery_addr.get('name', '')}\n"
+            f"{delivery_addr.get('street1', '')}"
+            + (f"\n{delivery_addr['street2']}" if delivery_addr.get('street2') else "")
+            + f"\n{delivery_addr.get('city', '')}, {delivery_addr.get('state', '')} {delivery_addr.get('postalCode', '')}\n"
+            f"{delivery_addr.get('country', '')}"
+        )
+
+        # Create Airtable record
+        at_fields = {
+            "Order Number":      order_number,
+            "Customer Name":     customer_name,
+            "Customer Email":    customer_email,
+            "Items to Exchange": items_to_exchange,
+            "Desired Items":     desired_items,
+            "Delivery Address":  delivery_str,
+            "Stripe Payment ID": ref_id,
+            "Status":            "Awaiting Return Shipment",
+            "Original Order ID": str(order_id) if order_id else "",
+            "Next Suffix":       next_suffix,
+        }
+        at_resp = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}",
+            headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
+            json={"fields": at_fields},
+            timeout=15,
+        )
+        if at_resp.status_code not in (200, 201):
+            print(f"[international-success] Airtable create failed: {at_resp.status_code} {at_resp.text}")
+
+    except Exception as e:
+        import traceback
+        print(f"[international-success] Airtable error: {e}\n{traceback.format_exc()}")
+
+    # Send confirmation email
+    try:
+        if SENDGRID_API_KEY and customer_email:
+            first_name = customer_name.split()[0] if customer_name else "there"
+            email_body = (
+                f"Hi {first_name},\n\n"
+                f"We've received your international exchange request for order #{order_number}.\n\n"
+                f"Please ship your belt(s) to:\n"
+                f"  {RETURN_ADDRESS_INTL}\n\n"
+                f"Once you've shipped, come back to exchange.bluealphabelts.com/exchange/international "
+                f"and submit your tracking number.\n\n"
+                f"Once we see movement on the package, we'll ship your new belt(s).\n\n"
+                f"Please allow 2-4 weeks for international delivery.\n\n"
+                f"Questions? Reply to this email.\n\n"
+                f"— Blue Alpha"
+            )
+            req_lib.post(
+                "https://api.sendgrid.com/v3/mail/send",
+                headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+                json={
+                    "personalizations": [{"to": [{"email": TEST_EMAIL_OVERRIDE or customer_email}]}],
+                    "from":    {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
+                    "reply_to": {"email": SENDGRID_FROM_EMAIL},
+                    "subject": f"Your Blue Alpha International Exchange — Order #{order_number}",
+                    "content": [{"type": "text/plain", "value": email_body}],
+                },
+                timeout=15,
+            )
+    except Exception as email_err:
+        print(f"[international-success] Email failed: {email_err}")
+
+    return redirect(f"https://exchange.bluealphabelts.com/exchange/international?success=1")
+
+
+@app.route("/api/submit-international-tracking", methods=["POST", "OPTIONS"])
+def submit_international_tracking():
+    """Customer submits return tracking number for their international exchange."""
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    data = request.get_json() or {}
+    order_number    = data.get("orderNumber", "").strip().lstrip("#")
+    tracking_number = data.get("trackingNumber", "").strip()
+    carrier         = data.get("carrier", "").strip()
+
+    if not order_number or not tracking_number:
+        return Response(json.dumps({"success": False, "error": "Missing order number or tracking number"}),
+                        status=400, headers=c, mimetype="application/json")
+
+    try:
+        airtable_read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+
+        # Find the Airtable record for this order number
+        search_resp = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}",
+            params={
+                "filterByFormula": f'{{Order Number}}="{order_number}"',
+                "maxRecords": 1,
+            },
+            headers=at_headers(airtable_read_token),
+            timeout=10,
+        )
+        records = search_resp.json().get("records", [])
+        if not records:
+            return Response(json.dumps({"success": False, "error": "No exchange request found for this order number"}),
+                            headers=c, mimetype="application/json")
+
+        record = records[0]
+        record_id = record["id"]
+        current_status = record.get("fields", {}).get("Status", "")
+
+        # Only update if in a valid state
+        if current_status not in ("Awaiting Return Shipment", "Tracking Submitted"):
+            return Response(json.dumps({
+                "success": False,
+                "error": f"Cannot submit tracking — current status is '{current_status}'"
+            }), headers=c, mimetype="application/json")
+
+        # Update the record
+        update_resp = req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}/{record_id}",
+            headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
+            json={"fields": {
+                "Return Tracking #": tracking_number,
+                "Return Carrier":    carrier,
+                "Status":            "Tracking Submitted",
+            }},
+            timeout=10,
+        )
+        if update_resp.status_code not in (200, 201):
+            raise Exception(f"Airtable update failed: {update_resp.status_code} {update_resp.text}")
+
+        return Response(json.dumps({"success": True}), headers=c, mimetype="application/json")
+
+    except Exception as e:
+        import traceback
+        print(f"[submit-international-tracking] ERROR: {e}\n{traceback.format_exc()}")
+        return Response(json.dumps({"success": False, "error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/confirm-international-movement/<record_id>", methods=["POST", "OPTIONS"])
+def confirm_international_movement(record_id):
+    """
+    CS-triggered endpoint: looks up the Airtable record, creates a ShipStation exchange order,
+    and updates the record with the new exchange order number and status 'Order Created'.
+    """
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+
+    try:
+        from datetime import datetime, timezone
+
+        airtable_read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+
+        # 1. Look up the AT record
+        rec_resp = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}/{record_id}",
+            headers=at_headers(airtable_read_token),
+            timeout=10,
+        )
+        if rec_resp.status_code == 404:
+            return Response(json.dumps({"success": False, "error": "Record not found"}),
+                            status=404, headers=c, mimetype="application/json")
+        rec_resp.raise_for_status()
+        record = rec_resp.json()
+        fields = record.get("fields", {})
+
+        order_number    = fields.get("Order Number", "")
+        customer_name   = fields.get("Customer Name", "")
+        customer_email  = fields.get("Customer Email", "")
+        desired_items_raw = fields.get("Desired Items", "")
+        delivery_addr_raw = fields.get("Delivery Address", "")
+        next_suffix     = fields.get("Next Suffix", "-E")
+        original_order_id = fields.get("Original Order ID", "")
+
+        exchange_order_number = f"{order_number}{next_suffix}"
+
+        # 2. Parse desired items  (format: "1x SKU-123 — Item Name\n...")
+        items_payload = []
+        for line in desired_items_raw.strip().splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            # e.g. "2x BA-SKU-XL — Blue Alpha Duty Belt XL Black"
+            m = re.match(r'^(\d+)x\s+(\S+)\s+[—\-]+\s+(.+)$', line)
+            if m:
+                qty          = int(m.group(1))
+                selected_sku = m.group(2)
+                selected_name = m.group(3)
+            else:
+                # Fallback: try splitting on whitespace
+                parts = line.split(None, 1)
+                qty_str = parts[0].rstrip('x') if parts else "1"
+                try:
+                    qty = int(qty_str)
+                except ValueError:
+                    qty = 1
+                selected_sku  = parts[0] if len(parts) > 0 else ""
+                selected_name = parts[1] if len(parts) > 1 else line
+            items_payload.append({
+                "selectedSku":  selected_sku,
+                "selectedName": selected_name,
+                "quantity":     qty,
+            })
+
+        # 3. Parse delivery address (multi-line text field)
+        addr_lines = [l.strip() for l in delivery_addr_raw.strip().splitlines() if l.strip()]
+        ship_to = {
+            "name":       addr_lines[0] if len(addr_lines) > 0 else customer_name,
+            "street1":    addr_lines[1] if len(addr_lines) > 1 else "",
+            "street2":    addr_lines[2] if len(addr_lines) > 2 else "",
+            "city":       "",
+            "state":      "",
+            "postalCode": "",
+            "country":    "",
+        }
+        # Try to parse "City, State PostalCode" line
+        if len(addr_lines) >= 3:
+            city_state_line = addr_lines[-2] if len(addr_lines) >= 4 else (addr_lines[2] if len(addr_lines) == 3 else "")
+            country_line    = addr_lines[-1]
+            # "city, state postalcode" pattern
+            csz_m = re.match(r'^(.+),\s*(\S+)\s+(\S+)$', city_state_line)
+            if csz_m:
+                ship_to["city"]       = csz_m.group(1).strip()
+                ship_to["state"]      = csz_m.group(2).strip()
+                ship_to["postalCode"] = csz_m.group(3).strip()
+            ship_to["country"] = country_line
+
+        # 4. Build ShipStation order items (same LP inner logic as submit-exchange)
+        airtable_rt = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+
+        # Routing tag: EDC/LP vs Battle/Duty — based on item names
+        all_names_lower = " ".join(i.get("selectedName", "") for i in items_payload).lower()
+        if any(k in all_names_lower for k in ["edc", "low profile", "inner only", "1.5"]):
+            tag_id = 105813
+        else:
+            tag_id = 102014
+
+        today     = datetime.now(timezone.utc)
+        today_iso = today.isoformat()
+
+        LP_COLOR_MAP = [
+            (["mc black", "mc tropic", "woodland", "black"], "Black"),
+            (["coyote brown", "coyote", "mc australian", "mc arid"], "Coyote Brown"),
+            (["mc classic", "multicam"],                             "Multicam"),
+            (["ranger green", "ranger", "od green"],                 "OD Green"),
+            (["wolf gray"],                                          "Wolf Gray"),
+        ]
+
+        def _lp_inner_item_intl(color, size, key_suffix):
+            search_str    = f"LP INNER ONLY Belt {color} {size}"
+            inner_formula = (
+                f'AND(NOT(SEARCH("WPS",{{Name + Variations}})),'
+                f'SEARCH("{search_str}",{{Name + Variations}}))'
+            )
+            recs = at_get_all(
+                PRODUCT_SKUS_TABLE_ID, airtable_rt,
+                fields=["Name + Variations", "SKU ID"],
+                formula=inner_formula,
+            )
+            if recs:
+                ir = recs[0]["fields"]
+                return {
+                    "lineItemKey":    key_suffix,
+                    "name":          ir.get("Name + Variations", ""),
+                    "sku":           ir.get("SKU ID", ""),
+                    "quantity":      1,
+                    "unitPrice":     0.00,
+                    "taxAmount":     0.00,
+                    "shippingAmount": 0.00,
+                }
+            return None
+
+        def _extract_lp_color_size_intl(name):
+            name_lower = name.lower()
+            color = None
+            for keywords, c_name in LP_COLOR_MAP:
+                for kw in keywords:
+                    if kw in name_lower:
+                        color = c_name
+                        break
+                if color:
+                    break
+            size_matches = re.findall(r'(?<!\d)(\d{2})(?!\d)', name)
+            size = next((s for s in size_matches if 24 <= int(s) <= 64), None)
+            return color, size
+
+        order_items = []
+        for item_idx, item_data in enumerate(items_payload):
+            selected_sku  = item_data.get("selectedSku", "")
+            selected_name = item_data.get("selectedName", "")
+            quantity      = int(item_data.get("quantity", 1))
+
+            order_items.append({
+                "lineItemKey":    f"exchange-{item_idx + 1}",
+                "name":          selected_name,
+                "sku":           selected_sku,
+                "quantity":      quantity,
+                "unitPrice":     0.00,
+                "taxAmount":     0.00,
+                "shippingAmount": 0.00,
+            })
+
+            # LP inner lookup (same three paths as domestic)
+            selected_is_onb = bool(re.search(r'-ONB$', selected_sku, re.IGNORECASE))
+            inner_added = False
+
+            if selected_is_onb:
+                try:
+                    size_m     = re.search(r'-(\d+)-ONB$', selected_sku, re.IGNORECASE)
+                    inner_size = size_m.group(1) if size_m else None
+                    name_lower = selected_name.lower()
+                    inner_color = None
+                    for keywords, color in LP_COLOR_MAP:
+                        for kw in keywords:
+                            if kw in name_lower:
+                                inner_color = color
+                                break
+                        if inner_color:
+                            break
+                    if inner_color and inner_size:
+                        item = _lp_inner_item_intl(inner_color, inner_size,
+                                                   f"exchange-{item_idx + 1}-inner")
+                        if item:
+                            item["quantity"] = quantity
+                            order_items.append(item)
+                            inner_added = True
+                except Exception as lp_err:
+                    print(f"[confirm-intl-movement] ONB LP inner lookup failed: {lp_err}")
+
+            elif not re.search(r'(-O)$', selected_sku, re.IGNORECASE):
+                try:
+                    combo_sku = re.sub(r'(-ONB|-O)$', '', selected_sku, flags=re.IGNORECASE).strip()
+                    combo_recs = req_lib.get(
+                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}",
+                        params={"filterByFormula": f'{{SKU ID}}="{combo_sku}"', "maxRecords": 1,
+                                "fields[]": ["Component(s)"]},
+                        headers=at_headers(airtable_rt), timeout=10
+                    ).json().get("records", [])
+                    component_ids = combo_recs[0]["fields"].get("Component(s)", []) if combo_recs else []
+                    for comp_id in component_ids:
+                        comp_rec    = req_lib.get(
+                            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}/{comp_id}",
+                            headers=at_headers(airtable_rt), timeout=10
+                        ).json()
+                        comp_fields = comp_rec.get("fields", {})
+                        comp_name   = comp_fields.get("Name + Variations", "")
+                        comp_sku    = comp_fields.get("SKU ID", "")
+                        if "inner" not in comp_name.lower():
+                            continue
+                        order_items.append({
+                            "lineItemKey":    f"exchange-{item_idx + 1}-inner",
+                            "name":          comp_name,
+                            "sku":           comp_sku,
+                            "quantity":      quantity,
+                            "unitPrice":     0.00,
+                            "taxAmount":     0.00,
+                            "shippingAmount": 0.00,
+                        })
+                        inner_added = True
+                        break
+                except Exception as lp_err:
+                    print(f"[confirm-intl-movement] Component LP inner lookup failed: {lp_err}")
+
+            # Path 3: parent-based LP inner lookup
+            if not inner_added:
+                # We don't have parentProductId stored in Airtable, so look it up via SKU
+                try:
+                    sku_recs = req_lib.get(
+                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}",
+                        params={"filterByFormula": f'{{SKU ID}}="{selected_sku}"', "maxRecords": 1,
+                                "fields[]": ["Parent Product"]},
+                        headers=at_headers(airtable_rt), timeout=10
+                    ).json().get("records", [])
+                    item_parent_id = ""
+                    if sku_recs:
+                        parents = sku_recs[0]["fields"].get("Parent Product", [])
+                        item_parent_id = parents[0] if parents else ""
+                    if item_parent_id in _LP_INNER_REQUIRED_PARENT_IDS:
+                        inner_color, inner_size = _extract_lp_color_size_intl(selected_name)
+                        if inner_color and inner_size:
+                            item = _lp_inner_item_intl(inner_color, inner_size,
+                                                       f"exchange-{item_idx + 1}-inner")
+                            if item:
+                                item["quantity"] = quantity
+                                order_items.append(item)
+                                inner_added = True
+                except Exception as lp_err:
+                    print(f"[confirm-intl-movement] Path3 LP inner lookup failed: {lp_err}")
+
+        original_skus_csv = fields.get("Items to Exchange", "")
+
+        # 5. Create ShipStation order (no carrierCode/serviceCode — CS picks carrier for international)
+        order_payload = {
+            "orderNumber":   exchange_order_number,
+            "orderDate":     today_iso,
+            "paymentDate":   today_iso,
+            "orderStatus":   "awaiting_shipment",
+            "customerEmail": customer_email,
+            "billTo": {
+                "name":       ship_to.get("name", customer_name),
+                "street1":    ship_to.get("street1", ""),
+                "city":       ship_to.get("city", ""),
+                "state":      ship_to.get("state", ""),
+                "postalCode": ship_to.get("postalCode", ""),
+                "country":    ship_to.get("country", ""),
+            },
+            "shipTo": {
+                "name":       ship_to.get("name", customer_name),
+                "street1":    ship_to.get("street1", ""),
+                "street2":    ship_to.get("street2", ""),
+                "city":       ship_to.get("city", ""),
+                "state":      ship_to.get("state", ""),
+                "postalCode": ship_to.get("postalCode", ""),
+                "country":    ship_to.get("country", ""),
+            },
+            "items": order_items,
+            "amountPaid":     0.00,
+            "taxAmount":      0.00,
+            "shippingAmount": 0.00,
+            "internalNotes":  f"International exchange for order #{order_number}. Customer ships belt(s) to us first.",
+            "advancedOptions": {
+                "storeId":      SIZING_EXCHANGE_STORE_ID,
+                "customField1": f"Intl exchange for order #{order_number}",
+                "customField3": original_skus_csv,
+            },
+        }
+
+        ss_resp = req_lib.post(
+            "https://ssapi.shipstation.com/orders/createorder",
+            headers={**ss_headers(), "Content-Type": "application/json"},
+            json=order_payload,
+            timeout=20,
+        )
+        if ss_resp.status_code not in (200, 201):
+            raise Exception(f"ShipStation order creation failed: {ss_resp.status_code} {ss_resp.text}")
+
+        new_order    = ss_resp.json()
+        new_order_id = new_order.get("orderId")
+
+        # Add routing tag
+        try:
+            req_lib.post(
+                "https://ssapi.shipstation.com/orders/addtag",
+                headers={**ss_headers(), "Content-Type": "application/json"},
+                json={"orderId": new_order_id, "tagId": tag_id},
+                timeout=10,
+            )
+        except Exception as tag_err:
+            print(f"[confirm-intl-movement] Routing tag failed: {tag_err}")
+
+        # Add Expedite tag
+        try:
+            req_lib.post(
+                "https://ssapi.shipstation.com/orders/addtag",
+                headers={**ss_headers(), "Content-Type": "application/json"},
+                json={"orderId": new_order_id, "tagId": 49845},
+                timeout=10,
+            )
+        except Exception as tag_err:
+            print(f"[confirm-intl-movement] Expedite tag failed: {tag_err}")
+
+        # 6. Update Airtable record
+        req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}/{record_id}",
+            headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
+            json={"fields": {
+                "Exchange Order #": exchange_order_number,
+                "Status":           "Order Created",
+            }},
+            timeout=10,
+        )
+
+        return Response(json.dumps({
+            "success":             True,
+            "exchangeOrderNumber": exchange_order_number,
+            "shipStationOrderId":  new_order_id,
+        }), headers=c, mimetype="application/json")
+
+    except Exception as e:
+        import traceback
+        print(f"[confirm-international-movement] ERROR: {e}\n{traceback.format_exc()}")
+        return Response(json.dumps({"success": False, "error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
 
 
 if __name__ == "__main__":
