@@ -1858,6 +1858,79 @@ def return_received_webhook(record_id):
                         status=500, mimetype="application/json")
 
 
+@app.route("/api/cron-return-inventory", methods=["GET", "POST"])
+def cron_return_inventory():
+    """Cron endpoint — runs at 1am daily.
+    Finds all Return Items where Received=True AND Inventory Added is not checked,
+    creates an Inventory Adjustment for each, then marks Inventory Added=True."""
+    read_token  = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    write_token = RETURNS_WRITE_TOKEN
+    results = []
+
+    try:
+        # Fetch all received Return Items that haven't been added to inventory yet
+        filter_formula = "AND({Received}=TRUE(), NOT({Inventory Added}=TRUE()), {Qty Received}>0)"
+        all_items = []
+        offset = None
+        while True:
+            params = {
+                "filterByFormula": filter_formula,
+                "fields[]": ["Item Name", "SKU", "Qty Received"],
+            }
+            if offset:
+                params["offset"] = offset
+            r = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURN_ITEMS_TABLE_ID}",
+                headers=at_headers(read_token),
+                params=params,
+                timeout=15,
+            )
+            data = r.json()
+            all_items.extend(data.get("records", []))
+            offset = data.get("offset")
+            if not offset:
+                break
+
+        if not all_items:
+            print("[cron-return-inventory] No pending items found.")
+            return Response(json.dumps({"ok": True, "message": "No pending items", "adjustments": []}),
+                            mimetype="application/json")
+
+        for item in all_items:
+            item_id = item["id"]
+            f       = item.get("fields", {})
+            sku     = (f.get("SKU") or "").strip()
+            name    = f.get("Item Name", sku)
+            qty     = int(f.get("Qty Received") or 0)
+
+            if not sku or qty <= 0:
+                results.append({"item": name, "ok": False, "reason": "No SKU or zero qty"})
+                continue
+
+            ok, msg = _create_inventory_adjustment_for_return(sku, qty, read_token, write_token)
+            results.append({"item": name, "sku": sku, "qty": qty, "ok": ok, "message": msg})
+            print(f"[cron-return-inventory] {name}: {msg}")
+
+            if ok:
+                try:
+                    req_lib.patch(
+                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURN_ITEMS_TABLE_ID}/{item_id}",
+                        headers={**at_headers(write_token), "Content-Type": "application/json"},
+                        json={"fields": {"Inventory Added": True}},
+                        timeout=10,
+                    )
+                except Exception as mark_err:
+                    print(f"[cron-return-inventory] Could not mark Inventory Added for {item_id}: {mark_err}")
+
+        return Response(json.dumps({"ok": True, "processed": len(results), "adjustments": results}),
+                        mimetype="application/json")
+
+    except Exception as e:
+        print(f"[cron-return-inventory] Error: {e}")
+        return Response(json.dumps({"ok": False, "error": str(e)}),
+                        status=500, mimetype="application/json")
+
+
 @app.route("/api/refunded-webhook/<record_id>", methods=["GET", "POST"])
 def refunded_webhook(record_id):
     """Called by an Airtable automation when a Returns record status changes to 'Refunded'.
