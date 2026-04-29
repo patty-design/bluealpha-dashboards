@@ -985,7 +985,11 @@ def submit_reshipment():
             r = req_lib.get("https://ssapi.shipstation.com/orders",
                            params={"orderNumber": candidate},
                            headers=ss_headers(), timeout=10)
-            if not r.json().get("orders"):
+            try:
+                r_data = r.json()
+            except Exception:
+                r_data = {}
+            if not r_data.get("orders"):
                 reship_number = candidate
                 break
 
@@ -1044,7 +1048,7 @@ def submit_reshipment():
                 for item in items
             ],
             "carrierCode": "stamps_com",
-            "serviceCode": "usps_ground_advantage_mail",
+            "serviceCode": "usps_ground_advantage",
             "packageCode": "package",
             "confirmation": "delivery",
             "weight": {"value": 8, "units": "ounces"},
