@@ -1695,20 +1695,22 @@ def _create_inventory_adjustment_for_return(sku_text, qty, read_token, write_tok
     Returns (success: bool, message: str).
     NOTE: 'Return Received' must exist as an option in the Adjustment Reason field in Airtable."""
     try:
-        # Look up the Product SKU record ID
+        # Look up the Product SKU record ID and current Finished Inventory
         sku_recs = req_lib.get(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}",
             params={"filterByFormula": f'{{SKU ID}}="{sku_text}"', "maxRecords": 1,
-                    "fields[]": ["SKU ID", "Name + Variations"]},
+                    "fields[]": ["SKU ID", "Name + Variations", "Finished Inventory"]},
             headers=at_headers(read_token),
             timeout=10,
         ).json().get("records", [])
         if not sku_recs:
             return False, f"SKU '{sku_text}' not found in Product SKUs"
-        sku_record_id = sku_recs[0]["id"]
-        sku_name      = sku_recs[0]["fields"].get("Name + Variations", sku_text)
+        sku_record_id    = sku_recs[0]["id"]
+        sku_name         = sku_recs[0]["fields"].get("Name + Variations", sku_text)
+        current_inv      = int(sku_recs[0]["fields"].get("Finished Inventory") or 0)
+        new_inv          = current_inv + int(qty)
 
-        # Create the Inventory Adjustment record
+        # Create the Inventory Adjustment record (audit trail)
         adj_fields = {
             "Adjustment Reason":  "Return Received",
             "Amount":             int(qty),
@@ -1724,7 +1726,18 @@ def _create_inventory_adjustment_for_return(sku_text, qty, read_token, write_tok
         )
         if r.status_code not in (200, 201):
             return False, f"Airtable error {r.status_code}: {r.text[:200]}"
-        return True, f"Adjustment created for {sku_name} (+{qty})"
+
+        # Directly increment Finished Inventory on the Product SKU record
+        upd = req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}/{sku_record_id}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": {"Finished Inventory": new_inv}},
+            timeout=10,
+        )
+        if upd.status_code not in (200, 201):
+            return False, f"Adjustment created but inventory update failed ({upd.status_code}): {upd.text[:200]}"
+
+        return True, f"Adjustment created for {sku_name}: {current_inv} → {new_inv} (+{qty})"
     except Exception as e:
         return False, str(e)
 
