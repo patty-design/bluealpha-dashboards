@@ -1858,6 +1858,91 @@ def return_received_webhook(record_id):
                         status=500, mimetype="application/json")
 
 
+@app.route("/api/refunded-webhook/<record_id>", methods=["GET", "POST"])
+def refunded_webhook(record_id):
+    """Called by an Airtable automation when a Returns record status changes to 'Refunded'.
+    Looks up all linked Return Items and creates an Inventory Adjustment (+qty) for each
+    item that has a SKU and Qty Submitted > 0.  Skips items already adjusted (Inventory Added = True)
+    and marks each processed item with Inventory Added = True to prevent double-counting."""
+    read_token  = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    write_token = RETURNS_WRITE_TOKEN
+    results = []
+
+    try:
+        # Fetch the Return record
+        ret_r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
+            headers=at_headers(read_token),
+            timeout=10,
+        )
+        if ret_r.status_code != 200:
+            return Response(json.dumps({"ok": False, "error": "Return record not found"}),
+                            status=404, mimetype="application/json")
+
+        ret_fields = ret_r.json().get("fields", {})
+        item_ids   = ret_fields.get("Return Items", [])
+        status     = ret_fields.get("Status", "")
+
+        if status != "Refunded":
+            return Response(json.dumps({"ok": False,
+                "error": f"Status is '{status}', not 'Refunded' — skipping"}),
+                mimetype="application/json")
+
+        if not item_ids:
+            return Response(json.dumps({"ok": True, "message": "No Return Items linked", "adjustments": []}),
+                            mimetype="application/json")
+
+        # Process each Return Item
+        for item_id in item_ids:
+            ir = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURN_ITEMS_TABLE_ID}/{item_id}",
+                headers=at_headers(read_token),
+                timeout=10,
+            )
+            if ir.status_code != 200:
+                continue
+            f    = ir.json().get("fields", {})
+            sku  = (f.get("SKU") or "").strip()
+            name = f.get("Item Name", sku)
+            qty  = int(f.get("Qty Submitted") or 0)
+
+            # Skip if already adjusted (idempotency guard)
+            if f.get("Inventory Added"):
+                results.append({"item": name, "sku": sku, "ok": True,
+                    "message": "Skipped — already added to inventory"})
+                continue
+
+            if not sku or qty <= 0:
+                results.append({"item": name, "ok": False,
+                    "reason": "Skipped — no SKU or zero qty"})
+                continue
+
+            ok, msg = _create_inventory_adjustment_for_return(sku, qty, read_token, write_token)
+            results.append({"item": name, "sku": sku, "qty": qty, "ok": ok, "message": msg})
+            print(f"[refunded-webhook] {name}: {msg}")
+
+            # Mark item so we don't double-count if webhook fires again
+            if ok:
+                try:
+                    req_lib.patch(
+                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURN_ITEMS_TABLE_ID}/{item_id}",
+                        headers={**at_headers(write_token), "Content-Type": "application/json"},
+                        json={"fields": {"Inventory Added": True}},
+                        timeout=10,
+                    )
+                except Exception as mark_err:
+                    print(f"[refunded-webhook] Could not mark Inventory Added for {item_id}: {mark_err}")
+
+        return Response(json.dumps({"ok": True, "record_id": record_id,
+                                     "status": status, "adjustments": results}),
+                        mimetype="application/json")
+
+    except Exception as e:
+        print(f"[refunded-webhook] Error for {record_id}: {e}")
+        return Response(json.dumps({"ok": False, "error": str(e)}),
+                        status=500, mimetype="application/json")
+
+
 @app.route("/api/return-label/<record_id>")
 def return_label_pdf(record_id):
     """Serve a return label PDF from the base64 data stored in Airtable."""
