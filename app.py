@@ -5525,7 +5525,7 @@ def confirm_international_movement(record_id):
             headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
             json={"fields": {
                 "Exchange Order #": exchange_order_number,
-                "Status":           "Order Created",
+                "Status":           "Complete",
             }},
             timeout=10,
         )
