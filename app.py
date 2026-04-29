@@ -1710,7 +1710,6 @@ def _create_inventory_adjustment_for_return(sku_text, qty, read_token, write_tok
 
         # Create the Inventory Adjustment record
         adj_fields = {
-            "Inventory Type":     "Product SKU",
             "Adjustment Reason":  "Return Received",
             "Amount":             int(qty),
             "Product SKU":        [sku_record_id],
