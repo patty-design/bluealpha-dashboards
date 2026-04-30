@@ -624,6 +624,11 @@ let optionsCache = {};     // parentProductId → options[]
   }
 })();
 
+// ── Display name helpers ──────────────────────────────────────────────────────
+function displayName(name) {
+  return name.replace(/^DBL No Buckle Outer\b/i, 'Duty Belt Lite');
+}
+
 // ── Tab switch ────────────────────────────────────────────────────────────────
 function switchTab(tab) {
   document.getElementById('tab-new').classList.toggle('hidden', tab !== 'new');
@@ -759,7 +764,7 @@ async function buildStep2(data) {
       optionsHtml = '<option value="">No other sizes available — contact us</option>';
     } else {
       opts.forEach(opt => {
-        optionsHtml += `<option value='${JSON.stringify({sku: opt.sku, name: opt.name}).replace(/'/g, "&#39;")}'>${opt.name}</option>`;
+        optionsHtml += `<option value='${JSON.stringify({sku: opt.sku, name: opt.name}).replace(/'/g, "&#39;")}'>${displayName(opt.name)}</option>`;
       });
     }
 
