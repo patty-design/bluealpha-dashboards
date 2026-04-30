@@ -4906,6 +4906,7 @@ def verify_international_exchange():
             "orderNumber":   order_number,
             "customerName":  ship_to.get("name", ""),
             "customerEmail": order.get("customerEmail", ""),
+            "eligibleUntil": eligible_until.strftime("%B %-d, %Y"),
             "shipTo": {
                 "name":       ship_to.get("name", ""),
                 "street1":    ship_to.get("street1", ""),
