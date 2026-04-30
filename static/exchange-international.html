@@ -299,7 +299,12 @@
 
 <div class="container">
   <h1 class="page-title">International Belt Exchange</h1>
-  <p class="page-subtitle" id="page-subtitle">Ship your belt to us first, then come back here with your tracking number to complete your exchange.</p>
+  <div id="page-subtitle" class="info-box" style="margin-bottom:28px;">
+    <div class="info-box-title">📦 Ship Your Belt To Us First</div>
+    <p>Ship your original belt(s) to:<br>
+    <strong>35 Andrew St., Newnan, GA 30263 USA</strong><br><br>
+    Once you've shipped and have your tracking number, come back here to complete your exchange.</p>
+  </div>
 
   <!-- Success screen (shown after Stripe redirect) -->
   <div id="screen-success" class="hidden">
@@ -382,12 +387,6 @@
   <div id="new-step-2" class="card hidden">
     <div class="card-title">Step 2 — Return Tracking Number</div>
     <p class="card-subtitle">Enter the tracking number for the belt(s) you're shipping back to us.</p>
-    <div class="info-box">
-      <div class="info-box-title">📦 Ship Your Belt To Us First</div>
-      <p>Ship your original belt(s) to:<br>
-      <strong>35 Andrew St., Newnan, GA 30263 USA</strong><br><br>
-      Once you've shipped and have your tracking number, enter it below to continue.</p>
-    </div>
     <div class="field">
       <label>Return Tracking Number <span class="req">*</span></label>
       <input type="text" id="n-tracking" placeholder="Tracking number from your carrier" autocomplete="off">
