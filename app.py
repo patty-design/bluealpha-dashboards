@@ -5074,20 +5074,23 @@ def international_success():
         )
 
         # Create Airtable record
+        tracking_str = f"{tracking_number} ({carrier})" if carrier else tracking_number
         at_fields = {
-            "Order Number":      order_number,
             "Customer Name":     customer_name,
             "Customer Email":    customer_email,
             "Items to Exchange": items_to_exchange,
             "Desired Items":     desired_items,
             "Delivery Address":  delivery_str,
-            "Return Tracking #": tracking_number,
-            "Return Carrier":    carrier,
+            "Return Tracking #": tracking_str,
             "Stripe Payment ID": ref_id,
-            "Status":            "Awaiting Return Shipment",
             "Original Order ID": str(order_id) if order_id else "",
             "Next Suffix":       next_suffix,
         }
+        # Order # is a number field
+        try:
+            at_fields["Order #"] = int(order_number)
+        except (ValueError, TypeError):
+            at_fields["Exchange Order #"] = order_number
         at_resp = req_lib.post(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}",
             headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
