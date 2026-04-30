@@ -4990,6 +4990,8 @@ def create_international_checkout():
         "items":         data.get("items", []),        # list of {originalSku, selectedSku, selectedName, quantity, parentProductId}
         "deliveryAddress": data.get("deliveryAddress", {}),  # {name, street1, street2, city, state, postalCode, country}
         "nextSuffix":    data.get("nextSuffix", "-E"),
+        "trackingNumber": data.get("trackingNumber", ""),
+        "carrier":        data.get("carrier", ""),
     }
 
     success_url = f"https://exchange.bluealphabelts.com/exchange/international?success=1&ref={ref_id}"
@@ -5043,13 +5045,15 @@ def international_success():
         return redirect("https://exchange.bluealphabelts.com/exchange/international?success=1")
 
     pending = _intl_pending.pop(ref_id)
-    order_number   = pending.get("orderNumber", "")
-    customer_name  = pending.get("customerName", "")
-    customer_email = pending.get("customerEmail", "")
-    items          = pending.get("items", [])
-    delivery_addr  = pending.get("deliveryAddress", {})
-    next_suffix    = pending.get("nextSuffix", "-E")
-    order_id       = pending.get("orderId")
+    order_number    = pending.get("orderNumber", "")
+    customer_name   = pending.get("customerName", "")
+    customer_email  = pending.get("customerEmail", "")
+    items           = pending.get("items", [])
+    delivery_addr   = pending.get("deliveryAddress", {})
+    next_suffix     = pending.get("nextSuffix", "-E")
+    order_id        = pending.get("orderId")
+    tracking_number = pending.get("trackingNumber", "")
+    carrier         = pending.get("carrier", "")
 
     try:
         # Format items fields
@@ -5077,6 +5081,8 @@ def international_success():
             "Items to Exchange": items_to_exchange,
             "Desired Items":     desired_items,
             "Delivery Address":  delivery_str,
+            "Return Tracking #": tracking_number,
+            "Return Carrier":    carrier,
             "Stripe Payment ID": ref_id,
             "Status":            "Awaiting Return Shipment",
             "Original Order ID": str(order_id) if order_id else "",
@@ -5102,11 +5108,7 @@ def international_success():
             email_body = (
                 f"Hi {first_name},\n\n"
                 f"We've received your international exchange request for order #{order_number}.\n\n"
-                f"Please ship your belt(s) to:\n"
-                f"  {RETURN_ADDRESS_INTL}\n\n"
-                f"Once you've shipped, come back to exchange.bluealphabelts.com/exchange/international "
-                f"and submit your tracking number.\n\n"
-                f"Once we see movement on the package, we'll ship your new belt(s).\n\n"
+                f"We'll begin preparing your new belt(s) once we see movement on your shipment.\n\n"
                 f"Please allow 2-4 weeks for international delivery.\n\n"
                 f"Questions? Reply to this email.\n\n"
                 f"— Blue Alpha"
