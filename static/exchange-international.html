@@ -817,7 +817,7 @@ function nGoStep5() {
 
   // Build review content
   const beltLines = selections.map(s =>
-    `<li><strong>${s.selectedName}</strong> (replacing: ${s.originalName})</li>`
+    `<li><strong>${displayName(s.selectedName)}</strong> (replacing: ${displayName(s.originalName)})</li>`
   ).join('');
   const addrStr = [
     deliveryAddr.name,
