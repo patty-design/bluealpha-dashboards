@@ -4982,7 +4982,7 @@ def create_international_checkout():
     import uuid
     ref_id = str(uuid.uuid4())
 
-    # Store all exchange data keyed by ref_id (in-memory; retrieved on success callback)
+    # Store all exchange data keyed by ref_id (in-memory cache; Airtable is the source of truth)
     _intl_pending[ref_id] = {
         "orderId":       data.get("orderId"),
         "orderNumber":   data.get("orderNumber", ""),
@@ -4994,6 +4994,56 @@ def create_international_checkout():
         "trackingNumber": data.get("trackingNumber", ""),
         "carrier":        data.get("carrier", ""),
     }
+
+    # Write to Airtable immediately so success handler survives redeploys
+    try:
+        tracking_str = f"{data.get('trackingNumber', '')} ({data.get('carrier', '')})" if data.get('carrier') else data.get('trackingNumber', '')
+        items = data.get('items', [])
+        delivery_addr = data.get('deliveryAddress', {})
+        items_to_exchange = "\n".join(
+            f"{i.get('quantity', 1)}x {i.get('originalSku', '')} — {i.get('originalName', i.get('selectedName', ''))}"
+            for i in items
+        )
+        desired_items = "\n".join(
+            f"{i.get('quantity', 1)}x {i.get('selectedSku', '')} — {i.get('selectedName', '')}"
+            for i in items
+        )
+        delivery_str = (
+            f"{delivery_addr.get('name', '')}\n"
+            f"{delivery_addr.get('street1', '')}"
+            + (f"\n{delivery_addr['street2']}" if delivery_addr.get('street2') else "")
+            + f"\n{delivery_addr.get('city', '')}, {delivery_addr.get('state', '')} {delivery_addr.get('postalCode', '')}\n"
+            f"{delivery_addr.get('country', '')}"
+        )
+        at_fields = {
+            "Customer Name":     data.get("customerName", ""),
+            "Customer Email":    data.get("customerEmail", ""),
+            "Items to Exchange": items_to_exchange,
+            "Desired Items":     desired_items,
+            "Delivery Address":  delivery_str,
+            "Return Tracking #": tracking_str,
+            "Stripe Payment ID": ref_id,
+            "Original Order ID": str(data.get("orderId", "")) if data.get("orderId") else "",
+            "Next Suffix":       data.get("nextSuffix", "-E"),
+            "Notes":             "Pending payment",
+        }
+        try:
+            at_fields["Order #"] = int(data.get("orderNumber", ""))
+        except (ValueError, TypeError):
+            pass
+        write_token = os.environ.get("AIRTABLE_WRITE_TOKEN_2", RETURNS_WRITE_TOKEN)
+        at_resp = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": at_fields},
+            timeout=15,
+        )
+        if at_resp.status_code in (200, 201):
+            _intl_pending[ref_id]["airtableRecordId"] = at_resp.json().get("id", "")
+        else:
+            print(f"[create-international-checkout] Airtable pre-write failed: {at_resp.status_code} {at_resp.text}")
+    except Exception as at_err:
+        print(f"[create-international-checkout] Airtable pre-write error: {at_err}")
 
     success_url = f"https://exchange.bluealphabelts.com/exchange/international?success=1&ref={ref_id}"
     cancel_url  = "https://exchange.bluealphabelts.com/exchange/international?cancelled=1"
@@ -5037,75 +5087,93 @@ def create_international_checkout():
 def international_success():
     """
     Stripe redirects here after successful payment.
-    Creates Airtable record and sends confirmation email, then redirects to thank-you page.
+    Looks up the Airtable record by Stripe Payment ID (ref_id), clears the
+    "Pending payment" Notes marker, sends a confirmation email, then redirects.
+    Falls back to Airtable lookup if _intl_pending was wiped by a redeploy.
     """
     ref_id = request.args.get("ref", "").strip()
 
-    if not ref_id or ref_id not in _intl_pending:
-        # Already processed or invalid — just redirect to success page without ref
+    if not ref_id:
         return redirect("https://exchange.bluealphabelts.com/exchange/international?success=1")
 
-    pending = _intl_pending.pop(ref_id)
-    order_number    = pending.get("orderNumber", "")
-    customer_name   = pending.get("customerName", "")
-    customer_email  = pending.get("customerEmail", "")
-    items           = pending.get("items", [])
-    delivery_addr   = pending.get("deliveryAddress", {})
-    next_suffix     = pending.get("nextSuffix", "-E")
-    order_id        = pending.get("orderId")
-    tracking_number = pending.get("trackingNumber", "")
-    carrier         = pending.get("carrier", "")
+    # --- Resolve data from in-memory cache or Airtable ---
+    airtable_record_id = None
+    order_number   = ""
+    customer_name  = ""
+    customer_email = ""
 
-    try:
-        # Format items fields
-        items_to_exchange = "\n".join(
-            f"{i.get('quantity', 1)}x {i.get('originalSku', '')} — {i.get('originalName', i.get('selectedName', ''))}"
-            for i in items
-        )
-        desired_items = "\n".join(
-            f"{i.get('quantity', 1)}x {i.get('selectedSku', '')} — {i.get('selectedName', '')}"
-            for i in items
-        )
-        delivery_str = (
-            f"{delivery_addr.get('name', '')}\n"
-            f"{delivery_addr.get('street1', '')}"
-            + (f"\n{delivery_addr['street2']}" if delivery_addr.get('street2') else "")
-            + f"\n{delivery_addr.get('city', '')}, {delivery_addr.get('state', '')} {delivery_addr.get('postalCode', '')}\n"
-            f"{delivery_addr.get('country', '')}"
-        )
-
-        # Create Airtable record
-        tracking_str = f"{tracking_number} ({carrier})" if carrier else tracking_number
-        at_fields = {
-            "Customer Name":     customer_name,
-            "Customer Email":    customer_email,
-            "Items to Exchange": items_to_exchange,
-            "Desired Items":     desired_items,
-            "Delivery Address":  delivery_str,
-            "Return Tracking #": tracking_str,
-            "Stripe Payment ID": ref_id,
-            "Original Order ID": str(order_id) if order_id else "",
-            "Next Suffix":       next_suffix,
-        }
-        # Order # is a number field
+    if ref_id in _intl_pending:
+        # Fast path: still in memory
+        pending = _intl_pending.pop(ref_id)
+        airtable_record_id = pending.get("airtableRecordId", "")
+        order_number   = pending.get("orderNumber", "")
+        customer_name  = pending.get("customerName", "")
+        customer_email = pending.get("customerEmail", "")
+    else:
+        # Slow path: redeploy wiped in-memory state — look up from Airtable
         try:
-            at_fields["Order #"] = int(order_number)
-        except (ValueError, TypeError):
-            at_fields["Exchange Order #"] = order_number
-        at_resp = req_lib.post(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}",
-            headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
-            json={"fields": at_fields},
-            timeout=15,
-        )
-        if at_resp.status_code not in (200, 201):
-            print(f"[international-success] Airtable create failed: {at_resp.status_code} {at_resp.text}")
+            import urllib.parse
+            write_token = os.environ.get("AIRTABLE_WRITE_TOKEN_2", RETURNS_WRITE_TOKEN)
+            formula = urllib.parse.quote(f'{{Stripe Payment ID}}="{ref_id}"')
+            lookup_resp = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}"
+                f"?filterByFormula={formula}&maxRecords=1",
+                headers=at_headers(write_token),
+                timeout=15,
+            )
+            if lookup_resp.status_code == 200:
+                records = lookup_resp.json().get("records", [])
+                if not records:
+                    print(f"[international-success] No Airtable record found for ref_id={ref_id}")
+                    return redirect("https://exchange.bluealphabelts.com/exchange/international?success=1")
+                rec = records[0]
+                airtable_record_id = rec.get("id", "")
+                fields = rec.get("fields", {})
+                order_number   = str(fields.get("Order #", ""))
+                customer_name  = fields.get("Customer Name", "")
+                customer_email = fields.get("Customer Email", "")
+            else:
+                print(f"[international-success] Airtable lookup failed: {lookup_resp.status_code} {lookup_resp.text}")
+                return redirect("https://exchange.bluealphabelts.com/exchange/international?success=1")
+        except Exception as lookup_err:
+            import traceback
+            print(f"[international-success] Airtable lookup error: {lookup_err}\n{traceback.format_exc()}")
+            return redirect("https://exchange.bluealphabelts.com/exchange/international?success=1")
 
-    except Exception as e:
-        import traceback
-        print(f"[international-success] Airtable error: {e}\n{traceback.format_exc()}")
+    # --- Idempotency check + clear "Pending payment" marker ---
+    already_processed = False
+    if airtable_record_id:
+        try:
+            write_token = os.environ.get("AIRTABLE_WRITE_TOKEN_2", RETURNS_WRITE_TOKEN)
+            # Fetch current Notes to check idempotency
+            rec_resp = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}/{airtable_record_id}",
+                headers=at_headers(write_token),
+                timeout=15,
+            )
+            if rec_resp.status_code == 200:
+                current_notes = rec_resp.json().get("fields", {}).get("Notes", "")
+                if "Pending payment" not in current_notes:
+                    already_processed = True
+                else:
+                    # Clear the pending marker
+                    patch_resp = req_lib.patch(
+                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}/{airtable_record_id}",
+                        headers={**at_headers(write_token), "Content-Type": "application/json"},
+                        json={"fields": {"Notes": ""}},
+                        timeout=15,
+                    )
+                    if patch_resp.status_code not in (200, 201):
+                        print(f"[international-success] Airtable PATCH failed: {patch_resp.status_code} {patch_resp.text}")
+        except Exception as patch_err:
+            import traceback
+            print(f"[international-success] Airtable PATCH error: {patch_err}\n{traceback.format_exc()}")
 
-    # Send confirmation email
+    if already_processed:
+        # Already handled (e.g. duplicate redirect) — just redirect
+        return redirect("https://exchange.bluealphabelts.com/exchange/international?success=1")
+
+    # --- Send confirmation email ---
     try:
         if SENDGRID_API_KEY and customer_email:
             first_name = customer_name.split()[0] if customer_name else "there"
