@@ -301,10 +301,21 @@
   <h1 class="page-title">International Belt Exchange</h1>
   <p class="page-subtitle">Ship your belt to us first, then come back here with your tracking number to complete your exchange.</p>
 
-  <!-- URL param banners -->
-  <div id="banner-success" class="banner banner-success hidden">
-    ✓ Exchange submitted! Check your email for confirmation. We'll ship your new belt(s) once we see movement on your tracking.
+  <!-- Success screen (shown after Stripe redirect) -->
+  <div id="screen-success" class="hidden">
+    <div class="card" style="text-align:center; padding: 48px 32px;">
+      <div style="font-size:3rem; margin-bottom:16px;">✅</div>
+      <div class="card-title" style="font-size:1.4rem; margin-bottom:12px;">Exchange Submitted!</div>
+      <p style="color:var(--muted); font-size:0.95rem; line-height:1.65; max-width:420px; margin:0 auto;">
+        Check your email for confirmation. We'll ship your new belt(s) once we see movement on your tracking number.
+      </p>
+      <p style="color:var(--muted); font-size:0.88rem; margin-top:20px;">
+        Questions? Email us at <a href="mailto:info@bluealpha.us" style="color:var(--navy); font-weight:700;">info@bluealpha.us</a>
+      </p>
+    </div>
   </div>
+
+  <!-- Cancelled banner -->
   <div id="banner-cancelled" class="banner banner-warning hidden">
     <strong>Payment cancelled.</strong>
     Your exchange was not submitted. You can try again below.
@@ -545,7 +556,12 @@ let returnTracking = { number: '', carrier: '' };
 (function() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('success') === '1') {
-    document.getElementById('banner-success').classList.remove('hidden');
+    document.getElementById('screen-success').classList.remove('hidden');
+    document.getElementById('new-progress').classList.add('hidden');
+    [1,2,3,4,5].forEach(i => {
+      const el = document.getElementById('new-step-' + i);
+      if (el) el.classList.add('hidden');
+    });
   }
   if (params.get('cancelled') === '1') {
     document.getElementById('banner-cancelled').classList.remove('hidden');
