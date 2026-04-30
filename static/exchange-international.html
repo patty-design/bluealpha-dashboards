@@ -299,7 +299,7 @@
 
 <div class="container">
   <h1 class="page-title">International Belt Exchange</h1>
-  <p class="page-subtitle">Ship your belt to us first, then come back here with your tracking number to complete your exchange.</p>
+  <p class="page-subtitle" id="page-subtitle">Ship your belt to us first, then come back here with your tracking number to complete your exchange.</p>
 
   <!-- Success screen (shown after Stripe redirect) -->
   <div id="screen-success" class="hidden">
@@ -561,6 +561,7 @@ let returnTracking = { number: '', carrier: '' };
   const params = new URLSearchParams(window.location.search);
   if (params.get('success') === '1') {
     document.getElementById('screen-success').classList.remove('hidden');
+    document.getElementById('page-subtitle').classList.add('hidden');
     document.getElementById('new-progress').classList.add('hidden');
     [1,2,3,4,5].forEach(i => {
       const el = document.getElementById('new-step-' + i);
