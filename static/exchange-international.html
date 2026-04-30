@@ -394,7 +394,7 @@
     </div>
     <div class="field">
       <label>Carrier <span class="req">*</span></label>
-      <select id="n-carrier">
+      <select id="n-carrier" onchange="toggleOtherCarrier()">
         <option value="">Select carrier…</option>
         <option value="USPS">USPS</option>
         <option value="FedEx">FedEx</option>
@@ -405,6 +405,10 @@
         <option value="Australia Post">Australia Post</option>
         <option value="Other">Other</option>
       </select>
+    </div>
+    <div class="field hidden" id="n-carrier-other-wrap">
+      <label>Carrier Name <span class="req">*</span></label>
+      <input type="text" id="n-carrier-other" placeholder="Enter your carrier name" autocomplete="off">
     </div>
     <div class="message message-error hidden" id="n-msg-tracking-error">Please enter a tracking number and select a carrier.</div>
     <div class="btn-row">
@@ -571,6 +575,14 @@ let returnTracking = { number: '', carrier: '' };
     history.replaceState({}, '', window.location.pathname);
   }
 })();
+
+// ── Carrier "Other" toggle ────────────────────────────────────────────────────
+function toggleOtherCarrier() {
+  const sel = document.getElementById('n-carrier');
+  const wrap = document.getElementById('n-carrier-other-wrap');
+  wrap.classList.toggle('hidden', sel.value !== 'Other');
+  if (sel.value !== 'Other') document.getElementById('n-carrier-other').value = '';
+}
 
 // ── Display name helpers ──────────────────────────────────────────────────────
 function displayName(name) {
@@ -742,7 +754,10 @@ async function buildStep3(data) {
 function nGoStep3() {
   hideMsg('n-msg-tracking-error');
   const trackingNum = document.getElementById('n-tracking').value.trim();
-  const carrier     = document.getElementById('n-carrier').value.trim();
+  const carrierSel  = document.getElementById('n-carrier').value.trim();
+  const carrier     = carrierSel === 'Other'
+    ? document.getElementById('n-carrier-other').value.trim()
+    : carrierSel;
 
   if (!trackingNum || !carrier) {
     showMsg('n-msg-tracking-error');
