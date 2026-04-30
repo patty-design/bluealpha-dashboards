@@ -4995,6 +4995,31 @@ def create_international_checkout():
         "carrier":        data.get("carrier", ""),
     }
 
+    # Clean up any abandoned pending records for this order
+    try:
+        order_num_int = int(data.get("orderNumber", ""))
+        write_token = os.environ.get("AIRTABLE_WRITE_TOKEN_2", RETURNS_WRITE_TOKEN)
+        search_resp = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}",
+            params={
+                "filterByFormula": f'AND({{Order #}}={order_num_int}, NOT({{Payment Confirmed}}))',
+                "fields[]": ["Order #", "Payment Confirmed"],
+                "maxRecords": 10,
+            },
+            headers=at_headers(write_token),
+            timeout=10,
+        )
+        if search_resp.status_code == 200:
+            stale = search_resp.json().get("records", [])
+            for rec in stale:
+                req_lib.delete(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}/{rec['id']}",
+                    headers=at_headers(write_token),
+                    timeout=10,
+                )
+    except Exception as cleanup_err:
+        print(f"[create-international-checkout] cleanup error (non-fatal): {cleanup_err}")
+
     # Write to Airtable immediately so success handler survives redeploys
     try:
         tracking_str = f"{data.get('trackingNumber', '')} ({data.get('carrier', '')})" if data.get('carrier') else data.get('trackingNumber', '')
@@ -5025,7 +5050,7 @@ def create_international_checkout():
             "Stripe Payment ID": ref_id,
             "Original Order ID": str(data.get("orderId", "")) if data.get("orderId") else "",
             "Next Suffix":       data.get("nextSuffix", "-E"),
-            "Notes":             "Pending payment",
+            "Payment Confirmed": False,
         }
         try:
             at_fields["Order #"] = int(data.get("orderNumber", ""))
@@ -5087,8 +5112,8 @@ def create_international_checkout():
 def international_success():
     """
     Stripe redirects here after successful payment.
-    Looks up the Airtable record by Stripe Payment ID (ref_id), clears the
-    "Pending payment" Notes marker, sends a confirmation email, then redirects.
+    Looks up the Airtable record by Stripe Payment ID (ref_id), sets the
+    "Payment Confirmed" checkbox, sends a confirmation email, then redirects.
     Falls back to Airtable lookup if _intl_pending was wiped by a redeploy.
     """
     ref_id = request.args.get("ref", "").strip()
@@ -5140,27 +5165,27 @@ def international_success():
             print(f"[international-success] Airtable lookup error: {lookup_err}\n{traceback.format_exc()}")
             return redirect("https://exchange.bluealphabelts.com/exchange/international?success=1")
 
-    # --- Idempotency check + clear "Pending payment" marker ---
+    # --- Idempotency check + set "Payment Confirmed" ---
     already_processed = False
     if airtable_record_id:
         try:
             write_token = os.environ.get("AIRTABLE_WRITE_TOKEN_2", RETURNS_WRITE_TOKEN)
-            # Fetch current Notes to check idempotency
+            # Fetch current fields to check idempotency
             rec_resp = req_lib.get(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}/{airtable_record_id}",
                 headers=at_headers(write_token),
                 timeout=15,
             )
             if rec_resp.status_code == 200:
-                current_notes = rec_resp.json().get("fields", {}).get("Notes", "")
-                if "Pending payment" not in current_notes:
+                fields = rec_resp.json().get("fields", {})
+                if fields.get("Payment Confirmed"):
                     already_processed = True
                 else:
-                    # Clear the pending marker
+                    # Mark payment as confirmed
                     patch_resp = req_lib.patch(
                         f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}/{airtable_record_id}",
                         headers={**at_headers(write_token), "Content-Type": "application/json"},
-                        json={"fields": {"Notes": ""}},
+                        json={"fields": {"Payment Confirmed": True}},
                         timeout=15,
                     )
                     if patch_resp.status_code not in (200, 201):
