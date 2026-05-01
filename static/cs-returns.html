@@ -312,6 +312,41 @@
       .lookup-bar { flex-direction: column; }
       .lookup-bar .btn { width: 100%; }
     }
+
+    /* ── Exchange mode item rows ── */
+    .exchange-items-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+    .exchange-item-row {
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .exchange-item-row.checked { border-color: var(--navy); }
+    .ex-item-check-label {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 14px;
+      cursor: pointer;
+      background: #fff;
+      transition: background 0.15s;
+    }
+    .exchange-item-row.checked .ex-item-check-label { background: #e8f0f9; }
+    .ex-item-check-label input[type="checkbox"] {
+      width: 18px; height: 18px;
+      accent-color: var(--navy);
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+    .ex-item-check-info { flex: 1; }
+    .ex-eligible-name { font-weight: 700; font-size: 0.95rem; color: var(--text); }
+    .ex-eligible-sku  { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+    .ex-item-options-wrap {
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+      background: #f7f9fc;
+    }
+    .ex-item-options-wrap.hidden { display: none; }
   </style>
 </head>
 <body>
@@ -353,6 +388,7 @@
       <button class="mode-btn active" id="btn-mode-return" onclick="setMode('return')">↩ Return</button>
       <button class="mode-btn" id="btn-mode-cancel" onclick="setMode('cancel')">✕ Cancellation</button>
       <button class="mode-btn" id="btn-mode-lost" onclick="setMode('lost')">📦 Lost Order</button>
+      <button class="mode-btn" id="btn-mode-exchange" onclick="setMode('exchange')">↔ Size Exchange</button>
     </div>
 
     <div class="card">
@@ -365,6 +401,11 @@
       <!-- Cancellation banner -->
       <div id="banner-cancel" class="info-banner banner-green hidden">
         ✓ <strong>Cancellation request</strong> — For unshipped orders only. Select which items the customer wants cancelled. The order will be updated in ShipStation and flagged for refund.
+      </div>
+
+      <!-- Exchange banner -->
+      <div id="banner-exchange" class="info-banner banner-amber hidden">
+        ↔ <strong>CS Size Exchange override</strong> — Date eligibility check is bypassed. Only use this after the exception has been approved.
       </div>
 
       <!-- Lost Order banner + action toggle -->
@@ -488,6 +529,37 @@
 
       </div>
     </div>
+
+    <!-- Exchange info block (only shown in exchange mode) -->
+    <div id="exchange-info-block" class="hidden" style="margin-top: 24px;">
+      <div class="card">
+        <div class="order-info" id="exchange-order-info-text"></div>
+
+        <div class="field">
+          <label>Customer Email <span class="req">*</span></label>
+          <input type="email" id="exchange-email" placeholder="Customer's email for confirmation">
+          <div class="validation-msg" id="msg-exchange-no-email">⚠ Email required.</div>
+        </div>
+
+        <div class="field">
+          <label>Items to Exchange <span class="req">*</span></label>
+          <div class="exchange-items-list" id="exchange-items-list"></div>
+          <div class="validation-msg" id="msg-exchange-no-selection">⚠ Please check at least one item and choose a new size/color for each selected item.</div>
+        </div>
+
+        <div class="message message-error hidden" id="msg-exchange-submit-error">
+          <strong>Submission failed</strong>
+          Something went wrong. Please try again.
+        </div>
+
+        <div style="margin-top: 24px;">
+          <button class="btn btn-primary" id="btn-exchange-submit" onclick="csSubmitExchange()">
+            Submit Size Exchange
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- SUCCESS (shared container, different inner screens) -->
@@ -553,6 +625,17 @@
         </div>
       </div>
 
+      <!-- Exchange: submitted -->
+      <div id="exchange-success" class="success-screen hidden">
+        <div class="success-icon">↔</div>
+        <h2>Size Exchange Submitted!</h2>
+        <p id="exchange-success-msg">The exchange order has been created in ShipStation.</p>
+        <div class="exchange-order-pill" id="exchange-success-order" style="display:inline-block;margin-top:18px;background:#eef1f5;border:1px solid #dde3ea;border-radius:20px;padding:8px 20px;font-size:0.9rem;font-weight:700;color:#003a6c;letter-spacing:0.3px;"></div>
+        <div style="margin-top:28px;">
+          <button onclick="resetForm()" class="btn btn-primary">Submit Another</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -562,9 +645,15 @@
 const API_BASE = '';
 let csPassword  = '';
 let orderData   = null;
-let currentMode = 'return'; // 'return' | 'cancel' | 'lost'
+let currentMode = 'return'; // 'return' | 'cancel' | 'lost' | 'exchange'
 let lostAction  = 'reship'; // 'reship' | 'refund'
 let orderBlocked = false;   // true when cancel mode + order already shipped
+let exchangeVerifyData = null;
+let exchangeOptionsCache = {};
+
+function displayName(name) {
+  return name.replace(/^DBL No Buckle Outer\b/i, 'Duty Belt Lite');
+}
 
 const CANCELLABLE_STATUSES = ['awaiting_shipment', 'awaiting_payment', 'on_hold', 'cancelled'];
 
@@ -599,13 +688,15 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── Mode toggle ────────────────────────────────────────────────────────────
 function setMode(mode) {
   currentMode = mode;
-  const isReturn = mode === 'return';
-  const isCancel = mode === 'cancel';
-  const isLost   = mode === 'lost';
+  const isReturn   = mode === 'return';
+  const isCancel   = mode === 'cancel';
+  const isLost     = mode === 'lost';
+  const isExchange = mode === 'exchange';
 
   document.getElementById('btn-mode-return').classList.toggle('active', isReturn);
   document.getElementById('btn-mode-cancel').classList.toggle('active', isCancel);
   document.getElementById('btn-mode-lost').classList.toggle('active', isLost);
+  document.getElementById('btn-mode-exchange').classList.toggle('active', isExchange);
 
   // Titles
   if (isReturn) {
@@ -614,17 +705,21 @@ function setMode(mode) {
   } else if (isCancel) {
     document.getElementById('form-title').textContent    = 'CS Cancellation Request';
     document.getElementById('form-subtitle').textContent = 'For unshipped orders the customer wants cancelled. Select items to cancel and submit.';
-  } else {
+  } else if (isLost) {
     document.getElementById('form-title').textContent    = 'Lost Order / Reshipment';
     document.getElementById('form-subtitle').textContent = 'Look up the original order, confirm the shipping address, and create a reshipment in ShipStation.';
+  } else {
+    document.getElementById('form-title').textContent    = 'CS Size Exchange Exception';
+    document.getElementById('form-subtitle').textContent = 'For customers outside the 37-day exchange window — exception already approved.';
   }
 
   // Banners
   document.getElementById('banner-return').classList.toggle('hidden', !isReturn);
   document.getElementById('banner-cancel').classList.toggle('hidden', !isCancel);
   document.getElementById('banner-lost').classList.toggle('hidden', !isLost);
+  document.getElementById('banner-exchange').classList.toggle('hidden', !isExchange);
 
-  // Items label
+  // Items label (only relevant for non-exchange modes)
   document.getElementById('items-label').innerHTML = (isReturn ? 'Items to Return' : isCancel ? 'Items to Cancel' : 'Items to Reship') + ' <span class="req">*</span>';
 
   // Return-only fields
@@ -638,28 +733,37 @@ function setMode(mode) {
   // Lost address section
   document.getElementById('section-lost-address').classList.toggle('hidden', !isLost);
 
-  // Notes field — hide in lost mode (not needed)
-  document.getElementById('field-notes').classList.toggle('hidden', isLost);
+  // Notes field — hide in lost/exchange mode
+  document.getElementById('field-notes').classList.toggle('hidden', isLost || isExchange);
 
   // Notes label
   document.getElementById('notes-label').textContent = isReturn ? 'Exception Notes' : 'CS Notes';
   document.getElementById('cs-notes').placeholder    = isReturn ? 'Who approved it, why, any relevant context…'
                                                                  : 'Any additional context from the customer…';
 
-  // Submit button
+  // Submit button: hide in exchange mode (exchange block has its own submit button)
+  document.getElementById('btn-cs-submit').classList.toggle('hidden', isExchange);
   if (isReturn)      document.getElementById('btn-cs-submit').innerHTML = 'Submit &amp; Send Label';
   else if (isCancel) document.getElementById('btn-cs-submit').innerHTML = 'Submit Cancellation Request';
-  else               document.getElementById('btn-cs-submit').innerHTML = lostAction === 'refund' ? 'Log Refund Request' : 'Create Reshipment';
+  else if (isLost)   document.getElementById('btn-cs-submit').innerHTML = lostAction === 'refund' ? 'Log Refund Request' : 'Create Reshipment';
 
-  // Reset order info when mode changes — require a fresh lookup
+  // In exchange mode, hide the shared order-info-block; show exchange-info-block only after lookup
+  document.getElementById('order-info-block').classList.add('hidden');
+  document.getElementById('exchange-info-block').classList.toggle('hidden', !isExchange || !exchangeVerifyData);
+
+  // Reset state on mode switch
   orderData = null;
   orderBlocked = false;
-  document.getElementById('order-info-block').classList.add('hidden');
+  if (!isExchange) {
+    exchangeVerifyData = null;
+    exchangeOptionsCache = {};
+    document.getElementById('exchange-info-block').classList.add('hidden');
+  }
   document.getElementById('msg-order-not-found').classList.remove('show');
   document.getElementById('msg-lookup-error').classList.remove('show');
   document.getElementById('cs-order-number').value = '';
-  // Re-show submit button (may have been hidden by block state)
-  document.getElementById('btn-cs-submit').classList.remove('hidden');
+  // Re-show submit button in case it was hidden by block state (non-exchange modes)
+  if (!isExchange) document.getElementById('btn-cs-submit').classList.remove('hidden');
 }
 
 // ── Lost action sub-toggle ─────────────────────────────────────────────────
@@ -675,6 +779,7 @@ function setLostAction(action) {
 
 // ── Order lookup ───────────────────────────────────────────────────────────
 async function lookupOrder() {
+  if (currentMode === 'exchange') { lookupExchangeOrder(); return; }
   const btn = document.getElementById('btn-lookup');
   const orderNum = document.getElementById('cs-order-number').value.trim();
   document.getElementById('msg-order-not-found').classList.remove('show');
@@ -1032,9 +1137,204 @@ async function csSubmitReshipment() {
   btn.innerHTML = 'Create Reshipment';
 }
 
+// ── Exchange lookup & submit ────────────────────────────────────────────────
+async function lookupExchangeOrder() {
+  const btn = document.getElementById('btn-lookup');
+  const orderNum = document.getElementById('cs-order-number').value.trim();
+  document.getElementById('msg-order-not-found').classList.remove('show');
+  document.getElementById('msg-lookup-error').classList.remove('show');
+  document.getElementById('exchange-info-block').classList.add('hidden');
+  exchangeVerifyData = null;
+  exchangeOptionsCache = {};
+  if (!orderNum) return;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    const res = await fetch(API_BASE + '/api/cs-verify-exchange', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ csPassword: csPassword, orderNumber: orderNum })
+    });
+    const data = await res.json();
+    if (data.status === 'eligible') {
+      exchangeVerifyData = data;
+      await buildExchangeBlock(data);
+      document.getElementById('exchange-info-block').classList.remove('hidden');
+    } else if (data.status === 'not_found') {
+      document.getElementById('msg-order-not-found').classList.add('show');
+    } else if (data.status === 'international') {
+      document.getElementById('msg-lookup-error').classList.add('show');
+      document.getElementById('msg-lookup-error').textContent = 'International / military order — cannot process size exchange here.';
+    } else if (data.status === 'no_eligible_items') {
+      document.getElementById('msg-order-not-found').classList.add('show');
+      document.getElementById('msg-order-not-found').textContent = 'No exchange-eligible items found in this order.';
+    } else {
+      document.getElementById('msg-lookup-error').classList.add('show');
+    }
+  } catch (e) {
+    document.getElementById('msg-lookup-error').classList.add('show');
+  }
+  btn.disabled = false;
+  btn.innerHTML = 'Look Up';
+}
+
+async function buildExchangeBlock(data) {
+  const orderNum = data.orderNumber;
+  document.getElementById('exchange-order-info-text').innerHTML =
+    '<strong>Order #' + orderNum + '</strong> — ' + (data.customerName || 'Unknown customer') + '<br>' +
+    (data.customerEmail ? '📧 ' + data.customerEmail : '');
+  document.getElementById('exchange-email').value = data.customerEmail || '';
+
+  const items = data.eligibleItems || [];
+  exchangeOptionsCache = {};
+
+  // Pre-fetch options for all unique parent products
+  const uniqueParents = [...new Set(items.map(i => i.parentProductId).filter(Boolean))];
+  await Promise.all(uniqueParents.map(async pid => {
+    try {
+      const res  = await fetch(API_BASE + '/api/exchange-options', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ parentProductId: pid })
+      });
+      const resp = await res.json();
+      exchangeOptionsCache[pid] = resp.options || [];
+    } catch(e) {
+      exchangeOptionsCache[pid] = [];
+    }
+  }));
+
+  const list = document.getElementById('exchange-items-list');
+  list.innerHTML = '';
+
+  items.forEach((item, idx) => {
+    const autoCheck = items.length === 1;
+    const row = document.createElement('div');
+    row.className = 'exchange-item-row' + (autoCheck ? ' checked' : '');
+    row.id = 'ex-item-row-' + idx;
+
+    const allOpts = exchangeOptionsCache[item.parentProductId] || [];
+    const opts = allOpts.filter(o => o.sku !== item.sku);
+    let optionsHtml = '<option value="">Select a size/color…</option>';
+    if (opts.length === 0) {
+      optionsHtml = '<option value="">No other sizes available — contact us</option>';
+    } else {
+      opts.forEach(opt => {
+        optionsHtml += '<option value=\'' + JSON.stringify({sku: opt.sku, name: opt.name}).replace(/'/g, '&#39;') + '\'>' + displayName(opt.name) + '</option>';
+      });
+    }
+
+    const itemQty = item.quantity || 1;
+    let qtyHtml = '';
+    if (itemQty > 1) {
+      let qOpts = '';
+      for (let i = 1; i <= itemQty; i++) qOpts += '<option value="' + i + '">' + i + '</option>';
+      qtyHtml = '<select id="ex-item-qty-' + idx + '" style="margin-top:8px;">' + qOpts + '</select>';
+    } else {
+      qtyHtml = '<input type="hidden" id="ex-item-qty-' + idx + '" value="1">';
+    }
+
+    row.innerHTML =
+      '<label class="ex-item-check-label" for="ex-item-check-' + idx + '">' +
+        '<input type="checkbox" id="ex-item-check-' + idx + '"' + (autoCheck ? ' checked' : '') + '>' +
+        '<div class="ex-item-check-info">' +
+          '<div class="ex-eligible-name">' + item.name + '</div>' +
+          '<div class="ex-eligible-sku">' + item.sku + '</div>' +
+        '</div>' +
+      '</label>' +
+      '<div class="ex-item-options-wrap' + (autoCheck ? '' : ' hidden') + '" id="ex-item-options-' + idx + '">' +
+        '<select id="ex-item-select-' + idx + '">' + optionsHtml + '</select>' +
+        qtyHtml +
+      '</div>';
+
+    row.querySelector('#ex-item-check-' + idx).addEventListener('change', () => {
+      const cb = document.getElementById('ex-item-check-' + idx);
+      const r  = document.getElementById('ex-item-row-' + idx);
+      const ow = document.getElementById('ex-item-options-' + idx);
+      if (cb.checked) { r.classList.add('checked'); ow.classList.remove('hidden'); }
+      else            { r.classList.remove('checked'); ow.classList.add('hidden'); }
+    });
+    list.appendChild(row);
+  });
+}
+
+async function csSubmitExchange() {
+  const btn   = document.getElementById('btn-exchange-submit');
+  const errEl = document.getElementById('msg-exchange-submit-error');
+  const noSelEl = document.getElementById('msg-exchange-no-selection');
+  const noEmailEl = document.getElementById('msg-exchange-no-email');
+
+  errEl.classList.add('hidden'); errEl.classList.remove('show');
+  noSelEl.style.display = 'none';
+  noEmailEl.style.display = 'none';
+
+  const emailVal = document.getElementById('exchange-email').value.trim();
+  if (!emailVal) { noEmailEl.style.display = 'block'; return; }
+
+  const items = (exchangeVerifyData && exchangeVerifyData.eligibleItems) || [];
+  const selections = [];
+  for (let idx = 0; idx < items.length; idx++) {
+    const cb = document.getElementById('ex-item-check-' + idx);
+    if (!cb || !cb.checked) continue;
+    const sel = document.getElementById('ex-item-select-' + idx);
+    const qtyEl = document.getElementById('ex-item-qty-' + idx);
+    const qty = parseInt(qtyEl ? qtyEl.value : 1) || 1;
+    let parsed;
+    try { parsed = JSON.parse(sel.value); } catch(e) { parsed = null; }
+    if (!parsed) { noSelEl.style.display = 'block'; return; }
+    selections.push({
+      originalSku:        items[idx].sku,
+      originalAirtableId: items[idx].airtableId,
+      selectedSku:        parsed.sku,
+      selectedName:       parsed.name,
+      quantity:           qty,
+      parentProductId:    items[idx].parentProductId,
+    });
+  }
+
+  if (selections.length === 0) { noSelEl.style.display = 'block'; return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Submitting…';
+
+  try {
+    const res = await fetch(API_BASE + '/api/submit-exchange', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        originalOrderId:     exchangeVerifyData.orderId,
+        originalOrderNumber: exchangeVerifyData.orderNumber,
+        customerEmail:       emailVal,
+        customerName:        exchangeVerifyData.customerName,
+        shipTo:              exchangeVerifyData.shipTo,
+        notes:               'CS exception: size exchange outside 37-day window.',
+        nextSuffix:          exchangeVerifyData.nextSuffix || '-E',
+        items:               selections,
+      })
+    });
+    const respData = await res.json();
+    if (respData.success) {
+      const names = selections.map(s => s.selectedName).join(', ');
+      document.getElementById('exchange-success-msg').textContent = 'Exchange order created. Items: ' + names;
+      document.getElementById('exchange-success-order').textContent = 'Exchange Order: ' + (respData.exchangeOrderNumber || '');
+      document.getElementById('screen-main').classList.add('hidden');
+      document.getElementById('exchange-info-block').classList.add('hidden');
+      document.getElementById('screen-success').classList.remove('hidden');
+      showSuccessState('exchange-success');
+    } else {
+      throw new Error(respData.error || 'Unknown error');
+    }
+  } catch (e) {
+    errEl.classList.remove('hidden'); errEl.classList.add('show');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = 'Submit Size Exchange';
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 function showSuccessState(id) {
-  ['return-success-pending','return-success-sent','return-success-review','cancel-success','lost-success','lost-refund-success']
+  ['return-success-pending','return-success-sent','return-success-review','cancel-success','lost-success','lost-refund-success','exchange-success']
     .forEach(s => document.getElementById(s).classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');
 }
@@ -1056,6 +1356,8 @@ async function pollStatus(recordId, attempts) {
 
 function resetForm() {
   orderData = null;
+  exchangeVerifyData = null;
+  exchangeOptionsCache = {};
   document.getElementById('cs-order-number').value  = '';
   document.getElementById('cs-items-list').innerHTML = '';
   document.getElementById('cs-email').value          = '';
@@ -1069,7 +1371,9 @@ function resetForm() {
   document.getElementById('lost-state').value        = '';
   document.getElementById('lost-zip').value          = '';
   document.getElementById('lost-country').value      = 'US';
+  document.getElementById('exchange-items-list').innerHTML = '';
   document.getElementById('order-info-block').classList.add('hidden');
+  document.getElementById('exchange-info-block').classList.add('hidden');
   document.getElementById('screen-success').classList.add('hidden');
   document.getElementById('screen-main').classList.remove('hidden');
   // Reset lost sub-toggle to reship

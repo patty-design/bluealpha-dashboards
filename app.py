@@ -909,6 +909,141 @@ def cancel_in_shipstation(order_id, items_to_cancel):
         return False, f"Exception during ShipStation cancellation: {e}"
 
 
+@app.route("/api/cs-verify-exchange", methods=["POST", "OPTIONS"])
+def cs_verify_exchange():
+    """CS override: look up order for size exchange, skipping identity check and date window."""
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    data = request.get_json() or {}
+
+    # Validate CS password
+    if not CS_ADMIN_PASSWORD or data.get("csPassword", "") != CS_ADMIN_PASSWORD:
+        return Response(json.dumps({"status": "unauthorized"}), status=401, headers=c, mimetype="application/json")
+
+    order_number = data.get("orderNumber", "").strip().lstrip("#")
+    if not order_number:
+        return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
+
+    try:
+        r = req_lib.get("https://ssapi.shipstation.com/orders",
+                        params={"orderNumber": order_number},
+                        headers=ss_headers(), timeout=10)
+        orders = r.json().get("orders", [])
+        if not orders:
+            return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
+
+        order = orders[0]
+        ship_to = order.get("shipTo", {})
+
+        # Block international and military overseas orders
+        MILITARY_STATES = {"AA", "AE", "AP"}
+        country = ship_to.get("country", "US")
+        state   = ship_to.get("state", "").upper()
+        if country not in ("US", "USA") or state in MILITARY_STATES:
+            return Response(json.dumps({"status": "international"}), headers=c, mimetype="application/json")
+
+        # Find exchange-eligible items via Airtable (same logic as /api/verify-exchange)
+        airtable_read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+
+        all_exchange_options = at_get_all(
+            PRODUCT_SKUS_TABLE_ID,
+            airtable_read_token,
+            fields=["Parent Product"],
+            formula="{Can Exchange}=TRUE()",
+        )
+        eligible_parent_ids = set()
+        for opt in all_exchange_options:
+            for pid in opt["fields"].get("Parent Product", []):
+                eligible_parent_ids.add(pid)
+
+        eligible_items = []
+        for item in order.get("items", []):
+            sku = (item.get("sku") or "").strip()
+            if not sku:
+                continue
+            at_r = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}",
+                params={"filterByFormula": f'{{SKU ID}}="{sku}"', "maxRecords": 1,
+                        "fields[]": ["Name + Variations", "SKU ID", "Parent Product"]},
+                headers=at_headers(airtable_read_token),
+                timeout=10,
+            )
+            records = at_r.json().get("records", [])
+            if not records:
+                continue
+            rec = records[0]
+            parent_products = rec["fields"].get("Parent Product", [])
+            parent_product_id = parent_products[0] if parent_products else ""
+            if not parent_product_id or parent_product_id not in eligible_parent_ids:
+                continue
+            eligible_items.append({
+                "name":            item.get("name", ""),
+                "sku":             sku,
+                "quantity":        int(item.get("quantity", 1)),
+                "airtableId":      rec["id"],
+                "parentProductId": parent_product_id,
+            })
+
+        if not eligible_items:
+            return Response(json.dumps({"status": "no_eligible_items"}), headers=c, mimetype="application/json")
+
+        # Determine next exchange order suffix
+        already_exchanged_skus = set()
+        next_suffix = "-E"
+        try:
+            for n in range(1, 10):
+                suffix = "-E" if n == 1 else f"-E{n}"
+                ex_r = req_lib.get("https://ssapi.shipstation.com/orders",
+                                    params={"orderNumber": f"{order_number}{suffix}"},
+                                    headers=ss_headers(), timeout=10)
+                ex_orders = ex_r.json().get("orders", [])
+                if not ex_orders:
+                    next_suffix = suffix
+                    break
+                for ex_order in ex_orders:
+                    orig_sku = ((ex_order.get("advancedOptions") or {}).get("customField3") or "").strip()
+                    if not orig_sku:
+                        notes_text = ex_order.get("internalNotes") or ""
+                        m = re.search(r'Original SKUs?:\s*([^\.\n]+)', notes_text)
+                        if m:
+                            orig_sku = m.group(1).strip()
+                    for s in orig_sku.split(","):
+                        s = s.strip()
+                        if s:
+                            already_exchanged_skus.add(s)
+        except Exception as ex_check_err:
+            print(f"[cs-verify-exchange] exchange-order check failed (non-fatal): {ex_check_err}")
+
+        # CS override: do NOT filter out already-exchanged items (exception flow)
+
+        return Response(json.dumps({
+            "status":        "eligible",
+            "orderId":       order.get("orderId"),
+            "orderNumber":   order_number,
+            "orderKey":      order.get("orderKey", ""),
+            "customerName":  ship_to.get("name", ""),
+            "customerEmail": order.get("customerEmail", ""),
+            "shipTo": {
+                "name":       ship_to.get("name", ""),
+                "street1":    ship_to.get("street1", ""),
+                "street2":    ship_to.get("street2", ""),
+                "city":       ship_to.get("city", ""),
+                "state":      ship_to.get("state", ""),
+                "postalCode": ship_to.get("postalCode", ""),
+                "country":    ship_to.get("country", "US"),
+            },
+            "eligibleItems": eligible_items,
+            "nextSuffix":    next_suffix,
+        }), headers=c, mimetype="application/json")
+
+    except Exception as e:
+        import traceback
+        print(f"[cs-verify-exchange] ERROR: {e}\n{traceback.format_exc()}")
+        return Response(json.dumps({"status": "error", "error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
+
+
 @app.route("/api/submit-lost-refund", methods=["POST", "OPTIONS"])
 def submit_lost_refund():
     if request.method == "OPTIONS":
