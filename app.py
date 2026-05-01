@@ -5183,7 +5183,10 @@ def international_success():
             patch_resp = req_lib.patch(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}/{airtable_record_id}",
                 headers={**at_headers(write_token), "Content-Type": "application/json"},
-                json={"fields": {"Payment Confirmed": True}},
+                json={"fields": {
+                    "Payment Confirmed": True,
+                    "Date Submitted": datetime.utcnow().strftime("%Y-%m-%d"),
+                }},
                 timeout=15,
             )
             print(f"[international-success] PATCH Payment Confirmed: {patch_resp.status_code} {patch_resp.text[:200]}")
@@ -5332,6 +5335,7 @@ def confirm_international_movement(record_id):
         delivery_addr_raw = fields.get("Delivery Address", "")
         next_suffix     = fields.get("Next Suffix", "-E")
         original_order_id = fields.get("Original Order ID", "")
+        date_submitted  = fields.get("Date Submitted", today_iso) or today_iso
 
         # Find next available suffix — skip any existing cancelled orders
         def _next_intl_suffix(base_order_num, start_suffix):
@@ -5581,8 +5585,8 @@ def confirm_international_movement(record_id):
         # 5. Create ShipStation order — GlobalPost Economy International
         order_payload = {
             "orderNumber":   exchange_order_number,
-            "orderDate":     today_iso,
-            "paymentDate":   today_iso,
+            "orderDate":     date_submitted,
+            "paymentDate":   date_submitted,
             "orderStatus":   "awaiting_shipment",
             "customerEmail": customer_email,
             "billTo": {
