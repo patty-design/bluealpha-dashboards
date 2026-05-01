@@ -5325,7 +5325,7 @@ def confirm_international_movement(record_id):
         record = rec_resp.json()
         fields = record.get("fields", {})
 
-        order_number    = fields.get("Order Number", "")
+        order_number    = str(fields.get("Order #", "") or fields.get("Order Number", ""))
         customer_name   = fields.get("Customer Name", "")
         customer_email  = fields.get("Customer Email", "")
         desired_items_raw = fields.get("Desired Items", "")
@@ -5550,7 +5550,7 @@ def confirm_international_movement(record_id):
 
         original_skus_csv = fields.get("Items to Exchange", "")
 
-        # 5. Create ShipStation order (no carrierCode/serviceCode — CS picks carrier for international)
+        # 5. Create ShipStation order — GlobalPost Economy International
         order_payload = {
             "orderNumber":   exchange_order_number,
             "orderDate":     today_iso,
@@ -5578,6 +5578,8 @@ def confirm_international_movement(record_id):
             "amountPaid":     0.00,
             "taxAmount":      0.00,
             "shippingAmount": 0.00,
+            "carrierCode":    "stamps_com",
+            "serviceCode":    "stamps_globalpost_economy_intl",
             "internalNotes":  f"International exchange for order #{order_number}. Customer ships belt(s) to us first.",
             "advancedOptions": {
                 "storeId":      SIZING_EXCHANGE_STORE_ID,
