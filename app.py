@@ -5333,6 +5333,34 @@ def confirm_international_movement(record_id):
         next_suffix     = fields.get("Next Suffix", "-E")
         original_order_id = fields.get("Original Order ID", "")
 
+        # Find next available suffix — skip any existing cancelled orders
+        def _next_intl_suffix(base_order_num, start_suffix):
+            idx = 1
+            if start_suffix.startswith("-E") and len(start_suffix) > 2:
+                try: idx = int(start_suffix[2:])
+                except: idx = 1
+            for attempt in range(idx, idx + 20):
+                sfx = "-E" if attempt == 1 else f"-E{attempt}"
+                candidate = f"{base_order_num}{sfx}"
+                try:
+                    r = req_lib.get("https://ssapi.shipstation.com/orders",
+                                    params={"orderNumber": candidate, "pageSize": 5},
+                                    headers=ss_headers(), timeout=10)
+                    if r.status_code == 200:
+                        orders = r.json().get("orders", [])
+                        if not orders:
+                            return sfx  # Unused — take it
+                        active = [o for o in orders if o.get("orderStatus") != "cancelled"]
+                        if not active:
+                            return sfx  # Only cancelled orders — reuse this number
+                        # Active order exists, try next suffix
+                    else:
+                        return sfx
+                except Exception:
+                    return sfx
+            return f"-E{idx + 20}"
+
+        next_suffix = _next_intl_suffix(order_number, next_suffix)
         exchange_order_number = f"{order_number}{next_suffix}"
 
         # 2. Parse desired items  (format: "1x SKU-123 — Item Name\n...")
@@ -5643,6 +5671,46 @@ def confirm_international_movement(record_id):
         print(f"[confirm-international-movement] ERROR: {e}\n{traceback.format_exc()}")
         return Response(json.dumps({"success": False, "error": str(e)}),
                         status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/cron-intl-exchange", methods=["GET", "POST"])
+def cron_intl_exchange():
+    """
+    Called by Make daily at 11 PM ET.
+    Finds international exchange records where Movement Confirmed = true
+    and Exchange Order # is blank, then creates ShipStation orders for each.
+    """
+    read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    results = []
+    try:
+        formula = 'AND({Movement Confirmed}=TRUE(), {Exchange Order #}="")'
+        records = at_get_all(
+            INT_EXCHANGE_TABLE_ID, read_token,
+            fields=["Exchange Order #", "Customer Name"],
+            formula=formula,
+        )
+        print(f"[cron-intl-exchange] {len(records)} record(s) to process")
+        for rec in records:
+            record_id = rec["id"]
+            try:
+                resp = req_lib.post(
+                    f"https://exchange.bluealphabelts.com/api/confirm-international-movement/{record_id}",
+                    timeout=30,
+                )
+                result = resp.json()
+                results.append({"recordId": record_id, "success": result.get("success"),
+                                 "order": result.get("exchangeOrderNumber"), "error": result.get("error")})
+                print(f"[cron-intl-exchange] {record_id} → {result.get('exchangeOrderNumber')} ok={result.get('success')}")
+            except Exception as rec_err:
+                results.append({"recordId": record_id, "success": False, "error": str(rec_err)})
+                print(f"[cron-intl-exchange] {record_id} ERROR: {rec_err}")
+    except Exception as e:
+        import traceback
+        print(f"[cron-intl-exchange] OUTER ERROR: {e}\n{traceback.format_exc()}")
+        return Response(json.dumps({"success": False, "error": str(e), "results": results}),
+                        status=500, mimetype="application/json")
+    return Response(json.dumps({"success": True, "processed": len(results), "results": results}),
+                    mimetype="application/json")
 
 
 if __name__ == "__main__":
