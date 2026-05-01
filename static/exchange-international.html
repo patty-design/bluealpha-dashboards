@@ -361,6 +361,10 @@
       <strong>Order not found</strong>
       Please check your order number and name/email, or <a href="mailto:info@bluealpha.us">contact us</a>.
     </div>
+    <div class="message message-warning" id="n-msg-domestic">
+      <strong>This looks like a US order</strong>
+      US orders use the <a href="https://exchange.bluealphabelts.com/exchange" style="font-weight:700;">Domestic Exchange Portal</a>.
+    </div>
     <div class="message message-warning" id="n-msg-outside-window">
       <strong>Outside Exchange Window</strong>
       This order is outside the 45-day exchange window. <a href="mailto:info@bluealpha.us">Contact us</a> if you have questions.
@@ -649,6 +653,7 @@ async function verifyIntlExchange() {
   const lastName  = document.getElementById('n-last-name').value.trim();
 
   hideMsg('n-msg-not-found');
+  hideMsg('n-msg-domestic');
   hideMsg('n-msg-outside-window');
   hideMsg('n-msg-already-exchanged');
   hideMsg('n-msg-no-eligible-items');
@@ -680,6 +685,7 @@ async function verifyIntlExchange() {
       }
       setNewStep(2);
     } else if (data.status === 'not_found')       { showMsg('n-msg-not-found'); }
+    else if  (data.status === 'domestic')          { showMsg('n-msg-domestic'); }
     else if (data.status === 'outside_window')    { showMsg('n-msg-outside-window'); }
     else if (data.status === 'already_exchanged') { showMsg('n-msg-already-exchanged'); }
     else if (data.status === 'no_eligible_items') { showMsg('n-msg-no-eligible-items'); }

@@ -4936,7 +4936,12 @@ def verify_international_exchange():
         if not name_match and not email_match:
             return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
 
-        # NOTE: intentionally NOT blocking international/military addresses
+        # Block US domestic orders — they should use the domestic exchange form
+        MILITARY_STATES = {"AA", "AE", "AP"}
+        country = order.get("shipTo", {}).get("country", "").strip().upper()
+        state   = order.get("shipTo", {}).get("state", "").strip().upper()
+        if country in ("US", "USA") and state not in MILITARY_STATES:
+            return Response(json.dumps({"status": "domestic"}), headers=c, mimetype="application/json")
 
         # Check ship date within 45 days
         sr = req_lib.get("https://ssapi.shipstation.com/shipments",
