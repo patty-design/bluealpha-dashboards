@@ -4838,21 +4838,39 @@ def admin_add_user():
         return Response(json.dumps({"error": "Password must be at least 8 characters"}), status=400, headers=c, mimetype="application/json")
     pw_hash = _hash_password(password)
     fields = {
-        "Portal Username": username,
-        "Password Hash":   pw_hash,
+        "Portal Username":    username,
+        "Password Hash":      pw_hash,
         "Quote Portal Admin": role == "admin",
         "Quote Portal CS":    role == "cs",
     }
     if full_name:
         fields["Full Name"] = full_name
+    read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
     write_token = RETURNS_WRITE_TOKEN
     try:
-        r = req_lib.post(
+        # Check if an employee with this username already exists — update instead of creating
+        existing = req_lib.get(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}",
-            headers={**at_headers(write_token), "Content-Type": "application/json"},
-            json={"fields": fields},
-            timeout=15,
+            headers=at_headers(read_token),
+            params={"filterByFormula": f"{{Portal Username}}='{username}'", "maxRecords": 1},
+            timeout=10,
         )
+        existing_records = existing.json().get("records", []) if existing.status_code == 200 else []
+        if existing_records:
+            record_id = existing_records[0]["id"]
+            r = req_lib.patch(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}/{record_id}",
+                headers={**at_headers(write_token), "Content-Type": "application/json"},
+                json={"fields": fields},
+                timeout=15,
+            )
+        else:
+            r = req_lib.post(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}",
+                headers={**at_headers(write_token), "Content-Type": "application/json"},
+                json={"fields": fields},
+                timeout=15,
+            )
         if r.status_code not in (200, 201):
             return Response(json.dumps({"error": f"Airtable error: {r.text}"}), status=500, headers=c, mimetype="application/json")
         return Response(json.dumps({"ok": True, "id": r.json().get("id")}), headers=c, mimetype="application/json")
