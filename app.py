@@ -5211,7 +5211,7 @@ def international_success():
             first_name = customer_name.split()[0] if customer_name else "there"
             email_body = (
                 f"Hi {first_name},\n\n"
-                f"We've received your international exchange request for order #{order_number}.\n\n"
+                f"We've received your size exchange request for order #{order_number}.\n\n"
                 f"We'll begin preparing your new belt(s) once we see movement on your shipment.\n\n"
                 f"Please allow 2-4 weeks for international delivery.\n\n"
                 f"Questions? Reply to this email.\n\n"
@@ -5224,7 +5224,7 @@ def international_success():
                     "personalizations": [{"to": [{"email": TEST_EMAIL_OVERRIDE or customer_email}]}],
                     "from":    {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
                     "reply_to": {"email": SENDGRID_FROM_EMAIL},
-                    "subject": f"Your Blue Alpha International Exchange — Order #{order_number}",
+                    "subject": f"Your Blue Alpha Size Exchange — Order #{order_number}",
                     "content": [{"type": "text/plain", "value": email_body}],
                 },
                 timeout=15,
