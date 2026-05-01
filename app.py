@@ -5174,29 +5174,37 @@ def international_success():
 
     # --- Idempotency check + set "Payment Confirmed" ---
     already_processed = False
+    print(f"[international-success] airtable_record_id={airtable_record_id!r} customer_email={customer_email!r}")
     if airtable_record_id:
         try:
             write_token = os.environ.get("AIRTABLE_WRITE_TOKEN_2", RETURNS_WRITE_TOKEN)
+            print(f"[international-success] Using token prefix: {write_token[:12] if write_token else 'NONE'}")
             # Fetch current fields to check idempotency
             rec_resp = req_lib.get(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}/{airtable_record_id}",
                 headers=at_headers(write_token),
                 timeout=15,
             )
+            print(f"[international-success] GET record status: {rec_resp.status_code}")
             if rec_resp.status_code == 200:
                 fields = rec_resp.json().get("fields", {})
                 if fields.get("Payment Confirmed"):
                     already_processed = True
+                    print(f"[international-success] Already processed, skipping")
                 else:
                     # Mark payment as confirmed
+                    print(f"[international-success] Attempting PATCH to set Payment Confirmed...")
                     patch_resp = req_lib.patch(
                         f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}/{airtable_record_id}",
                         headers={**at_headers(write_token), "Content-Type": "application/json"},
                         json={"fields": {"Payment Confirmed": True}},
                         timeout=15,
                     )
+                    print(f"[international-success] PATCH status: {patch_resp.status_code} body: {patch_resp.text[:300]}")
                     if patch_resp.status_code not in (200, 201):
                         print(f"[international-success] Airtable PATCH failed: {patch_resp.status_code} {patch_resp.text}")
+            else:
+                print(f"[international-success] GET record failed: {rec_resp.status_code} {rec_resp.text[:300]}")
         except Exception as patch_err:
             import traceback
             print(f"[international-success] Airtable PATCH error: {patch_err}\n{traceback.format_exc()}")
