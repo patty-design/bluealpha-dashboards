@@ -564,6 +564,12 @@ let returnTracking = { number: '', carrier: '' };
 (function() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('success') === '1') {
+    // Notify backend to set Payment Confirmed + send email
+    const ref = params.get('ref');
+    if (ref) {
+      fetch('/api/international-success?ref=' + encodeURIComponent(ref))
+        .catch(function(e) { console.error('[intl-exchange] success notify failed:', e); });
+    }
     document.getElementById('screen-success').classList.remove('hidden');
     document.getElementById('page-subtitle').classList.add('hidden');
     document.getElementById('new-progress').classList.add('hidden');

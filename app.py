@@ -5011,12 +5011,19 @@ def create_international_checkout():
         )
         if search_resp.status_code == 200:
             stale = search_resp.json().get("records", [])
+            print(f"[create-international-checkout] Found {len(stale)} stale record(s) to clean up for order {order_num_int}")
             for rec in stale:
-                req_lib.delete(
+                del_resp = req_lib.delete(
                     f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}/{rec['id']}",
                     headers=at_headers(write_token),
                     timeout=10,
                 )
+                if del_resp.status_code in (200, 204):
+                    print(f"[create-international-checkout] Deleted stale record {rec['id']}")
+                else:
+                    print(f"[create-international-checkout] DELETE failed for {rec['id']}: {del_resp.status_code} {del_resp.text}")
+        else:
+            print(f"[create-international-checkout] Stale record search failed: {search_resp.status_code} {search_resp.text}")
     except Exception as cleanup_err:
         print(f"[create-international-checkout] cleanup error (non-fatal): {cleanup_err}")
 
@@ -5225,6 +5232,9 @@ def international_success():
     except Exception as email_err:
         print(f"[international-success] Email failed: {email_err}")
 
+    # If called via fetch() from the frontend, return JSON instead of redirect
+    if request.headers.get("X-Requested-With") == "fetch" or "application/json" in request.headers.get("Accept", ""):
+        return Response(json.dumps({"ok": True}), headers=cors(), mimetype="application/json")
     return redirect(f"https://exchange.bluealphabelts.com/exchange/international?success=1")
 
 
