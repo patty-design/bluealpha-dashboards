@@ -338,8 +338,12 @@
             <div id="addUserMsg"></div>
             <div class="add-user-form">
               <div>
-                <label>Full Name</label>
-                <input type="text" id="newFullName" placeholder="Jane Smith">
+                <label>First Name</label>
+                <input type="text" id="newFirstName" placeholder="Jane">
+              </div>
+              <div>
+                <label>Last Name</label>
+                <input type="text" id="newLastName" placeholder="Smith">
               </div>
               <div>
                 <label>Username</label>
@@ -734,10 +738,11 @@
     }
 
     async function doAddUser() {
-      const fullName = document.getElementById('newFullName').value.trim();
-      const username = document.getElementById('newUsername').value.trim().toLowerCase();
-      const password = document.getElementById('newPassword').value;
-      const role     = document.getElementById('newRole').value;
+      const firstName = document.getElementById('newFirstName').value.trim();
+      const lastName  = document.getElementById('newLastName').value.trim();
+      const username  = document.getElementById('newUsername').value.trim().toLowerCase();
+      const password  = document.getElementById('newPassword').value;
+      const role      = document.getElementById('newRole').value;
       const msgEl    = document.getElementById('addUserMsg');
       msgEl.innerHTML = '';
       if (!username || !password) { msgEl.innerHTML = '<div class="alert alert-error">Username and password are required.</div>'; return; }
@@ -746,12 +751,13 @@
         const resp = await fetch('/api/admin/users/add', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password, role, fullName })
+          body: JSON.stringify({ username, password, role, firstName, lastName })
         });
         const data = await resp.json();
         if (resp.ok) {
           msgEl.innerHTML = '<div class="alert alert-success">User added successfully.</div>';
-          document.getElementById('newFullName').value = '';
+          document.getElementById('newFirstName').value = '';
+          document.getElementById('newLastName').value = '';
           document.getElementById('newUsername').value = '';
           document.getElementById('newPassword').value = '';
           document.getElementById('newRole').value = 'cs';

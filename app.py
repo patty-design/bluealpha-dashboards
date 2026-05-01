@@ -4829,7 +4829,8 @@ def admin_add_user():
     username  = (data.get("username") or "").strip().lower()
     password  = (data.get("password") or "").strip()
     role      = (data.get("role") or "cs").strip()
-    full_name = (data.get("fullName") or "").strip()
+    first_name = (data.get("firstName") or "").strip()
+    last_name  = (data.get("lastName") or "").strip()
     if not username or not password:
         return Response(json.dumps({"error": "username and password are required"}), status=400, headers=c, mimetype="application/json")
     if role not in ("admin", "cs"):
@@ -4843,8 +4844,10 @@ def admin_add_user():
         "Quote Portal Admin": role == "admin",
         "Quote Portal CS":    role == "cs",
     }
-    if full_name:
-        fields["Full Name"] = full_name
+    if first_name:
+        fields["First Name"] = first_name
+    if last_name:
+        fields["Last Name"] = last_name
     read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
     write_token = RETURNS_WRITE_TOKEN
     try:
