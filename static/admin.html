@@ -73,7 +73,18 @@
       color: var(--text);
       margin-bottom: 14px;
     }
-    input:focus { outline: none; border-color: var(--navy); }
+    select {
+      width: 100%;
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 0.9rem;
+      font-family: 'Lato', sans-serif;
+      color: var(--text);
+      margin-bottom: 14px;
+      background: var(--white);
+    }
+    input:focus, select:focus { outline: none; border-color: var(--navy); }
     .btn {
       display: inline-flex;
       align-items: center;
@@ -98,6 +109,7 @@
     .btn-danger:hover  { background: #5c1a12; }
     .btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--text); }
     .btn-outline:hover { border-color: var(--navy); color: var(--navy); }
+    .btn-sm { padding: 6px 14px; font-size: 0.76rem; }
     .btn-full { width: 100%; }
     /* Tabs */
     .tabs {
@@ -105,6 +117,7 @@
       gap: 0;
       border-bottom: 2px solid var(--border);
       margin-bottom: 28px;
+      flex-wrap: wrap;
     }
     .tab {
       padding: 12px 22px;
@@ -130,6 +143,7 @@
       border-radius: 10px;
       overflow: hidden;
     }
+    .card-padded { padding: 28px 32px; }
     table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
     th {
       background: var(--navy);
@@ -160,10 +174,13 @@
     .badge-pending  { background: #fff3cd; color: #856404; }
     .badge-approved { background: #d4edda; color: #155724; }
     .badge-denied   { background: #f8d7da; color: #721c24; }
+    .badge-admin    { background: #e0e7ff; color: #3730a3; }
+    .badge-cs       { background: #fef3c7; color: #92400e; }
     .empty-state { text-align: center; padding: 48px; color: var(--muted); }
     .loading { text-align: center; padding: 36px; color: var(--muted); }
     .alert { border-radius: 8px; padding: 12px 16px; font-size: 0.88rem; margin-bottom: 16px; }
-    .alert-error { background: #fdf0ef; border: 1px solid #f0c0b8; color: #7B2318; }
+    .alert-error   { background: #fdf0ef; border: 1px solid #f0c0b8; color: #7B2318; }
+    .alert-success { background: #edf7ed; border: 1px solid #b8dbb9; color: #1a5c2a; }
     .action-btns { display: flex; gap: 8px; flex-wrap: wrap; }
     /* Deny modal */
     .modal-overlay {
@@ -234,6 +251,15 @@
     .detail-grid .kv { display: flex; flex-direction: column; gap: 2px; }
     .detail-grid .k { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; }
     .detail-grid .v { font-weight: 600; color: var(--text); }
+    /* Users panel */
+    .users-section { margin-bottom: 32px; }
+    .users-section h3 { font-family: 'Montserrat', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--navy); margin-bottom: 14px; }
+    .reset-pw-form { display: none; margin-top: 8px; }
+    .reset-pw-form.show { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .reset-pw-form input { margin-bottom: 0; flex: 1; min-width: 160px; }
+    .add-user-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
+    .add-user-form .form-col-full { grid-column: 1 / -1; }
+    @media (max-width: 600px) { .add-user-form { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -246,44 +272,102 @@
   <!-- Login Gate -->
   <div id="loginGate">
     <div class="login-card">
-      <h2>Admin Access</h2>
+      <h2>Portal Access</h2>
       <div id="loginError"></div>
       <label>Username</label>
-      <input type="text" id="adminUsername" placeholder="patty or kelly" autocomplete="username" onkeydown="if(event.key==='Enter') doLogin()">
+      <input type="text" id="adminUsername" placeholder="Enter username" autocomplete="username" onkeydown="if(event.key==='Enter') doLogin()">
       <label style="margin-top:12px;">Password</label>
       <input type="password" id="adminPassword" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()">
       <button class="btn btn-primary btn-full" style="margin-top:16px;" onclick="doLogin()">Sign In</button>
     </div>
   </div>
 
-  <!-- Admin Content -->
+  <!-- Portal Content (shown after login) -->
   <div id="adminContent">
     <div class="container">
-      <div class="tabs">
-        <div class="tab active" data-tab="pending">Pending</div>
-        <div class="tab" data-tab="approved">Approved</div>
-        <div class="tab" data-tab="denied">Denied</div>
-        <div class="tab" data-tab="password" style="margin-left:auto;">🔑 Change Password</div>
+      <!-- Tabs (controlled by JS based on role) -->
+      <div class="tabs" id="tabBar">
+        <!-- Admin tabs -->
+        <div class="tab admin-only active" data-tab="pending">Pending</div>
+        <div class="tab admin-only" data-tab="approved">Approved</div>
+        <div class="tab admin-only" data-tab="denied">Denied</div>
+        <!-- CS-only tab -->
+        <div class="tab cs-only" data-tab="cs-apps" style="display:none;">Applications</div>
+        <!-- Admin-only Users tab -->
+        <div class="tab admin-only" data-tab="users" style="margin-left:auto;">👥 Users</div>
+        <!-- Password tab (both roles) -->
+        <div class="tab" data-tab="password" id="pwTab">🔑 Change Password</div>
       </div>
 
+      <!-- Admin: Pending -->
       <div class="tab-panel active" id="tab-pending">
         <div class="card">
           <div id="pendingContent" class="loading">Loading…</div>
         </div>
       </div>
+      <!-- Admin: Approved -->
       <div class="tab-panel" id="tab-approved">
         <div class="card">
           <div id="approvedContent" class="loading">Loading…</div>
         </div>
       </div>
+      <!-- Admin: Denied -->
       <div class="tab-panel" id="tab-denied">
         <div class="card">
           <div id="deniedContent" class="loading">Loading…</div>
         </div>
       </div>
+
+      <!-- CS: Read-only applications -->
+      <div class="tab-panel" id="tab-cs-apps">
+        <div class="card">
+          <div id="csAppsContent" class="loading">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Admin: Users management -->
+      <div class="tab-panel" id="tab-users">
+        <div class="card card-padded">
+          <div class="users-section">
+            <h3>Portal Users</h3>
+            <div id="usersTableWrap"><div class="loading">Loading…</div></div>
+          </div>
+          <hr style="border:none;border-top:1px solid var(--border);margin:24px 0;">
+          <div class="users-section">
+            <h3>Add New User</h3>
+            <div id="addUserMsg"></div>
+            <div class="add-user-form">
+              <div>
+                <label>Full Name</label>
+                <input type="text" id="newFullName" placeholder="Jane Smith">
+              </div>
+              <div>
+                <label>Username</label>
+                <input type="text" id="newUsername" placeholder="jsmith" autocomplete="off">
+              </div>
+              <div>
+                <label>Password</label>
+                <input type="password" id="newPassword" placeholder="At least 8 characters" autocomplete="new-password">
+              </div>
+              <div>
+                <label>Role</label>
+                <select id="newRole">
+                  <option value="admin">Admin</option>
+                  <option value="cs" selected>Read-Only CS</option>
+                </select>
+              </div>
+              <div class="form-col-full">
+                <button class="btn btn-primary" onclick="doAddUser()">Add User</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Change Password (both roles) -->
       <div class="tab-panel" id="tab-password">
-        <div class="card" style="max-width:420px;">
-          <h3 style="margin-top:0;">Change Your Password</h3>
+        <div class="card card-padded" style="max-width:420px;">
+          <h3 style="font-family:'Montserrat',sans-serif;font-size:0.95rem;font-weight:800;color:var(--navy);margin-bottom:18px;">Change Your Password</h3>
           <div id="pwChangeMsg"></div>
           <label>Current Password</label>
           <input type="password" id="pwCurrent" autocomplete="current-password">
@@ -310,20 +394,43 @@
     </div>
   </div>
 
-  <script>
-    let allApps = [];
-    let pendingLoaded = false;
-    let denyAppId = null;
+  <!-- Reset Password Modal -->
+  <div class="modal-overlay" id="resetModal">
+    <div class="modal">
+      <h3>Reset Password</h3>
+      <p>Set a new password for this user. No current password required.</p>
+      <label>New Password</label>
+      <input type="password" id="resetPwInput" placeholder="At least 8 characters" autocomplete="new-password">
+      <div id="resetPwMsg"></div>
+      <div class="modal-btns" style="margin-top:14px;">
+        <button class="btn btn-outline" onclick="closeResetModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="submitResetPw()">Set Password</button>
+      </div>
+    </div>
+  </div>
 
-    // Check for existing admin session
+  <script>
+    let allApps   = [];
+    let denyAppId = null;
+    let resetRecordId = null;
+    let currentRole   = null; // 'admin' or 'cs'
+
+    // ── Startup: check session ────────────────────────────────────────────────
     (async () => {
       const resp = await fetch('/api/admin/applications');
       if (resp.ok) {
-        showAdmin();
-        loadApplications(await resp.json());
+        const data = await resp.json();
+        // Determine role from cookie session — call login endpoint won't help here.
+        // We probe by fetching users (admin-only) — if 403/401, we're CS.
+        const usersResp = await fetch('/api/admin/users');
+        currentRole = usersResp.ok ? 'admin' : 'cs';
+        showPortal(currentRole);
+        loadApplications(data);
+        if (currentRole === 'admin') loadUsers();
       }
     })();
 
+    // ── Login ─────────────────────────────────────────────────────────────────
     async function doLogin() {
       const username = (document.getElementById('adminUsername').value || '').trim();
       const pw       = document.getElementById('adminPassword').value;
@@ -336,76 +443,87 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password: pw })
         });
+        const data = await resp.json();
         if (resp.ok) {
-          showAdmin();
+          currentRole = data.role || 'admin';
+          showPortal(currentRole);
           const appsResp = await fetch('/api/admin/applications');
           if (appsResp.ok) loadApplications(await appsResp.json());
+          if (currentRole === 'admin') loadUsers();
         } else {
-          errEl.innerHTML = '<div class="alert alert-error">Invalid username or password.</div>';
+          errEl.innerHTML = `<div class="alert alert-error">${data.error || 'Invalid username or password.'}</div>`;
         }
       } catch (e) {
         errEl.innerHTML = '<div class="alert alert-error">Network error.</div>';
       }
     }
 
-    async function doChangePassword() {
-      const current  = document.getElementById('pwCurrent').value;
-      const newPw    = document.getElementById('pwNew').value;
-      const confirm  = document.getElementById('pwConfirm').value;
-      const msgEl    = document.getElementById('pwChangeMsg');
-      msgEl.innerHTML = '';
-      if (newPw !== confirm) { msgEl.innerHTML = '<div class="alert alert-error">New passwords do not match.</div>'; return; }
-      if (newPw.length < 8)  { msgEl.innerHTML = '<div class="alert alert-error">Password must be at least 8 characters.</div>'; return; }
-      try {
-        const resp = await fetch('/api/admin/change-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ currentPassword: current, newPassword: newPw })
-        });
-        const data = await resp.json();
-        if (resp.ok) {
-          msgEl.innerHTML = '<div class="alert alert-success">Password updated successfully.</div>';
-          document.getElementById('pwCurrent').value = '';
-          document.getElementById('pwNew').value = '';
-          document.getElementById('pwConfirm').value = '';
-        } else {
-          msgEl.innerHTML = `<div class="alert alert-error">${data.error || 'Failed to update password.'}</div>`;
-        }
-      } catch (e) {
-        msgEl.innerHTML = '<div class="alert alert-error">Network error.</div>';
+    // ── Show portal after login ───────────────────────────────────────────────
+    function showPortal(role) {
+      document.getElementById('loginGate').style.display = 'none';
+      document.getElementById('adminContent').style.display = 'block';
+
+      if (role === 'admin') {
+        // Show admin-only tabs, hide cs-only
+        document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+        document.querySelectorAll('.cs-only').forEach(el => el.style.display = 'none');
+        // Make Pending the first active tab
+        activateTab('pending');
+      } else {
+        // CS role: hide admin-only tabs, show cs-only
+        document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.cs-only').forEach(el => el.style.display = '');
+        // Move password tab label adjustment
+        document.getElementById('pwTab').style.marginLeft = 'auto';
+        activateTab('cs-apps');
       }
     }
 
-    function showAdmin() {
-      document.getElementById('loginGate').style.display = 'none';
-      document.getElementById('adminContent').style.display = 'block';
-    }
-
-    function loadApplications(data) {
-      allApps = data.applications || [];
-      renderPending();
-      renderApproved();
-      renderDenied();
+    // ── Tabs ──────────────────────────────────────────────────────────────────
+    function activateTab(tabName) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      const tabEl = document.querySelector(`.tab[data-tab="${tabName}"]`);
+      if (tabEl) tabEl.classList.add('active');
+      const panelEl = document.getElementById('tab-' + tabName);
+      if (panelEl) panelEl.classList.add('active');
     }
 
     document.querySelectorAll('.tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-        tab.classList.add('active');
-        document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
-      });
+      tab.addEventListener('click', () => activateTab(tab.dataset.tab));
     });
 
-    function fmt(s) {
-      if (!s) return '—';
-      try { return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); }
-      catch { return s; }
-    }
-    function esc(s) {
-      return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    // ── Load applications ─────────────────────────────────────────────────────
+    function loadApplications(data) {
+      allApps = data.applications || [];
+      if (currentRole === 'admin') {
+        renderPending();
+        renderApproved();
+        renderDenied();
+      } else {
+        renderCsApps();
+      }
     }
 
+    // ── CS read-only applications view ────────────────────────────────────────
+    function renderCsApps() {
+      const el = document.getElementById('csAppsContent');
+      if (!allApps.length) { el.innerHTML = '<div class="empty-state">No applications found.</div>'; return; }
+      let html = '<table><thead><tr><th>Organization</th><th>Contact</th><th>Applied</th><th>Status</th></tr></thead><tbody>';
+      allApps.forEach(a => {
+        const badge = a.status === 'Approved' ? 'badge-approved' : a.status === 'Denied' ? 'badge-denied' : 'badge-pending';
+        html += `<tr>
+          <td><strong>${esc(a.company_name)}</strong></td>
+          <td>${esc(a.shipping_contact_name || '')}<br><span style="color:var(--muted);font-size:0.82rem;">${esc(a.shipping_contact_email || '')}</span></td>
+          <td>${fmt(a.applied_date)}</td>
+          <td><span class="badge ${badge}">${esc(a.status)}</span></td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+      el.innerHTML = html;
+    }
+
+    // ── Admin applications tables ─────────────────────────────────────────────
     function renderTable(apps, container, showActions) {
       if (!apps.length) {
         document.getElementById(container).innerHTML = '<div class="empty-state">No applications found.</div>';
@@ -418,7 +536,6 @@
         const badge = a.status === 'Approved' ? 'badge-approved' : a.status === 'Denied' ? 'badge-denied' : 'badge-pending';
         html += `<tr class="app-row">
           <td><strong>${esc(a.company_name)}</strong></td>
-
           <td>${fmt(a.applied_date)}</td>
           <td><span class="badge ${badge}">${esc(a.status)}</span></td>
           ${showActions ? `<td class="action-btns">
@@ -428,9 +545,8 @@
           <td><span class="detail-toggle" onclick="toggleDetail('detail-${a.id}')">Details</span></td>
         </tr>
         <tr class="detail-row" id="detail-${a.id}">
-          <td colspan="${showActions ? 8 : 7}" class="detail-cell">
+          <td colspan="${showActions ? 5 : 4}" class="detail-cell">
             <div class="detail-grid">
-              <!-- Company Info -->
               <div class="detail-section-label">Company</div>
               <div style="grid-column:1/-1; display:flex; flex-direction:column; gap:8px;">
                 <div class="kv"><span class="k">Company</span><span class="v">${esc(a.company_name)}</span></div>
@@ -439,7 +555,6 @@
                 <div class="kv"><span class="k">Tax Exempt Certificate</span><span class="v">${a.tax_cert_url ? `<a href="${esc(a.tax_cert_url)}" target="_blank" style="color:#1a6fc4;">View Certificate</a>` : '—'}</span></div>
                 <div class="kv"><span class="k">Website</span><span class="v">${esc(a.website || '—')}</span></div>
               </div>
-              <!-- Shipping + Billing side by side -->
               <div style="grid-column:1/-1; display:grid; grid-template-columns:1fr 1fr; gap:16px;">
                 <div>
                   <div class="detail-section-label" style="margin-bottom:8px;">Shipping</div>
@@ -471,23 +586,15 @@
     }
 
     function toggleDetail(id) {
-      const row = document.getElementById(id);
-      row.classList.toggle('show');
+      document.getElementById(id).classList.toggle('show');
     }
 
-    function renderPending() {
-      const pending = allApps.filter(a => a.status === 'Pending');
-      renderTable(pending, 'pendingContent', true);
-    }
-    function renderApproved() {
-      renderTable(allApps.filter(a => a.status === 'Approved'), 'approvedContent', false);
-    }
-    function renderDenied() {
-      renderTable(allApps.filter(a => a.status === 'Denied'), 'deniedContent', false);
-    }
+    function renderPending()  { renderTable(allApps.filter(a => a.status === 'Pending'),  'pendingContent',  true); }
+    function renderApproved() { renderTable(allApps.filter(a => a.status === 'Approved'), 'approvedContent', false); }
+    function renderDenied()   { renderTable(allApps.filter(a => a.status === 'Denied'),   'deniedContent',   false); }
 
     async function approveApp(appId, btn) {
-      if (!confirm('Approve this application? A Customer record and portal user will be created, and an approval email sent.')) return;
+      if (!confirm('Approve this application? A portal user will be created and an approval email sent.')) return;
       btn.disabled = true;
       btn.textContent = 'Processing…';
       try {
@@ -538,6 +645,163 @@
       } catch (e) {
         alert('Network error.');
       }
+    }
+
+    // ── Users management (admin only) ─────────────────────────────────────────
+    async function loadUsers() {
+      try {
+        const resp = await fetch('/api/admin/users');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        renderUsers(data.users || []);
+      } catch (e) {}
+    }
+
+    function renderUsers(users) {
+      const wrap = document.getElementById('usersTableWrap');
+      if (!users.length) {
+        wrap.innerHTML = '<div class="empty-state">No portal users yet.</div>';
+        return;
+      }
+      let html = `<table><thead><tr>
+        <th>Full Name</th><th>Username</th><th>Role</th><th>Email</th><th>Actions</th>
+      </tr></thead><tbody>`;
+      users.forEach(u => {
+        const roleClass = u.role === 'admin' ? 'badge-admin' : 'badge-cs';
+        const roleLabel = u.role === 'admin' ? 'Admin' : 'CS';
+        html += `<tr data-record="${u.id}">
+          <td>${esc(u.fullName || '—')}</td>
+          <td><code>${esc(u.username)}</code></td>
+          <td><span class="badge ${roleClass}">${roleLabel}</span></td>
+          <td>${esc(u.email || '—')}</td>
+          <td>
+            <div class="action-btns">
+              <button class="btn btn-outline btn-sm" onclick="openResetModal('${u.id}', '${esc(u.fullName || u.username)}')">Reset PW</button>
+              <button class="btn btn-danger btn-sm" onclick="removeUser('${u.id}', '${esc(u.fullName || u.username)}')">Remove</button>
+            </div>
+          </td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+      wrap.innerHTML = html;
+    }
+
+    function openResetModal(recordId, name) {
+      resetRecordId = recordId;
+      document.getElementById('resetPwInput').value = '';
+      document.getElementById('resetPwMsg').innerHTML = '';
+      document.querySelector('#resetModal h3').textContent = `Reset Password — ${name}`;
+      document.getElementById('resetModal').classList.add('show');
+    }
+    function closeResetModal() {
+      resetRecordId = null;
+      document.getElementById('resetModal').classList.remove('show');
+    }
+    async function submitResetPw() {
+      const pw = document.getElementById('resetPwInput').value.trim();
+      if (pw.length < 8) { document.getElementById('resetPwMsg').innerHTML = '<div class="alert alert-error" style="margin-top:10px;">Password must be at least 8 characters.</div>'; return; }
+      try {
+        const resp = await fetch(`/api/admin/users/reset-password/${resetRecordId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newPassword: pw })
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          closeResetModal();
+          alert('Password updated successfully.');
+        } else {
+          document.getElementById('resetPwMsg').innerHTML = `<div class="alert alert-error" style="margin-top:10px;">${data.error || 'Failed.'}</div>`;
+        }
+      } catch (e) {
+        document.getElementById('resetPwMsg').innerHTML = '<div class="alert alert-error" style="margin-top:10px;">Network error.</div>';
+      }
+    }
+
+    async function removeUser(recordId, name) {
+      if (!confirm(`Remove portal access for ${name}? This cannot be undone.`)) return;
+      try {
+        const resp = await fetch(`/api/admin/users/${recordId}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (resp.ok) {
+          loadUsers();
+        } else {
+          alert('Error: ' + (data.error || 'Failed to remove.'));
+        }
+      } catch (e) {
+        alert('Network error.');
+      }
+    }
+
+    async function doAddUser() {
+      const fullName = document.getElementById('newFullName').value.trim();
+      const username = document.getElementById('newUsername').value.trim().toLowerCase();
+      const password = document.getElementById('newPassword').value;
+      const role     = document.getElementById('newRole').value;
+      const msgEl    = document.getElementById('addUserMsg');
+      msgEl.innerHTML = '';
+      if (!username || !password) { msgEl.innerHTML = '<div class="alert alert-error">Username and password are required.</div>'; return; }
+      if (password.length < 8) { msgEl.innerHTML = '<div class="alert alert-error">Password must be at least 8 characters.</div>'; return; }
+      try {
+        const resp = await fetch('/api/admin/users/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, role, fullName })
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          msgEl.innerHTML = '<div class="alert alert-success">User added successfully.</div>';
+          document.getElementById('newFullName').value = '';
+          document.getElementById('newUsername').value = '';
+          document.getElementById('newPassword').value = '';
+          document.getElementById('newRole').value = 'cs';
+          loadUsers();
+        } else {
+          msgEl.innerHTML = `<div class="alert alert-error">${data.error || 'Failed to add user.'}</div>`;
+        }
+      } catch (e) {
+        msgEl.innerHTML = '<div class="alert alert-error">Network error.</div>';
+      }
+    }
+
+    // ── Change password (both roles) ──────────────────────────────────────────
+    async function doChangePassword() {
+      const current  = document.getElementById('pwCurrent').value;
+      const newPw    = document.getElementById('pwNew').value;
+      const confirm  = document.getElementById('pwConfirm').value;
+      const msgEl    = document.getElementById('pwChangeMsg');
+      msgEl.innerHTML = '';
+      if (newPw !== confirm) { msgEl.innerHTML = '<div class="alert alert-error">New passwords do not match.</div>'; return; }
+      if (newPw.length < 8)  { msgEl.innerHTML = '<div class="alert alert-error">Password must be at least 8 characters.</div>'; return; }
+      try {
+        // Use unified endpoint — works for both admin and CS
+        const resp = await fetch('/api/portal/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentPassword: current, newPassword: newPw })
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          msgEl.innerHTML = '<div class="alert alert-success">Password updated successfully.</div>';
+          document.getElementById('pwCurrent').value = '';
+          document.getElementById('pwNew').value = '';
+          document.getElementById('pwConfirm').value = '';
+        } else {
+          msgEl.innerHTML = `<div class="alert alert-error">${data.error || 'Failed to update password.'}</div>`;
+        }
+      } catch (e) {
+        msgEl.innerHTML = '<div class="alert alert-error">Network error.</div>';
+      }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function fmt(s) {
+      if (!s) return '—';
+      try { return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); }
+      catch { return s; }
+    }
+    function esc(s) {
+      return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
   </script>
 </body>

@@ -267,6 +267,30 @@ def _lookup_admin(username, password):
     except Exception:
         return None
 
+def _lookup_portal_user(username, password):
+    """Check username+password for EITHER admin OR CS role.
+    Returns (record, role) where role is 'admin' or 'cs', or (None, None)."""
+    read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    formula = f"AND({{Portal Username}}='{username}',OR({{Quote Portal Admin}}=1,{{Quote Portal CS}}=1))"
+    try:
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}",
+            headers=at_headers(read_token),
+            params={"filterByFormula": formula, "fields[]": ["Full Name", "Portal Username", "Password Hash", "Email", "Quote Portal Admin", "Quote Portal CS"]},
+            timeout=10,
+        )
+        records = r.json().get("records", [])
+        if not records:
+            return None, None
+        rec = records[0]
+        stored = rec.get("fields", {}).get("Password Hash", "")
+        if not stored or not _check_password(password, stored):
+            return None, None
+        role = 'admin' if rec.get("fields", {}).get("Quote Portal Admin") else 'cs'
+        return rec, role
+    except Exception:
+        return None, None
+
 def check_admin_session(req):
     token = req.cookies.get("ba_admin_session")
     if not token:
@@ -277,6 +301,17 @@ def check_admin_session(req):
     except Exception:
         return False
 
+def get_portal_role(req):
+    """Returns 'admin', 'cs', or None from the admin session cookie."""
+    token = req.cookies.get("ba_admin_session")
+    if not token:
+        return None
+    try:
+        data = pyjwt.decode(token, QUOTE_SECRET_KEY + "_admin", algorithms=["HS256"])
+        return data.get("role") or ('admin' if data.get("admin") else None)
+    except Exception:
+        return None
+
 def get_admin_username(req):
     """Return username from admin session, or None."""
     token = req.cookies.get("ba_admin_session")
@@ -285,6 +320,28 @@ def get_admin_username(req):
     try:
         data = pyjwt.decode(token, QUOTE_SECRET_KEY + "_admin", algorithms=["HS256"])
         return data.get("username") if data.get("admin") else None
+    except Exception:
+        return None
+
+def get_portal_username(req):
+    """Return username from portal session (admin or CS), or None."""
+    token = req.cookies.get("ba_admin_session")
+    if not token:
+        return None
+    try:
+        data = pyjwt.decode(token, QUOTE_SECRET_KEY + "_admin", algorithms=["HS256"])
+        return data.get("username") if (data.get("admin") or data.get("role") in ('admin', 'cs')) else None
+    except Exception:
+        return None
+
+def get_portal_record_id(req):
+    """Return the Employees record_id from the portal session cookie, or None."""
+    token = req.cookies.get("ba_admin_session")
+    if not token:
+        return None
+    try:
+        data = pyjwt.decode(token, QUOTE_SECRET_KEY + "_admin", algorithms=["HS256"])
+        return data.get("record_id")
     except Exception:
         return None
 
@@ -4698,14 +4755,13 @@ def admin_page():
 def cs_status_page():
     return send_from_directory("static", "cs-status.html")
 
-@app.route("/api/cs-status/applications", methods=["POST", "OPTIONS"])
+@app.route("/api/cs-status/applications", methods=["GET", "POST", "OPTIONS"])
 def cs_status_applications():
     if request.method == "OPTIONS":
-        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "GET, POST"})
     c = cors()
-    data = request.get_json() or {}
-    pw = (data.get("password") or "").strip()
-    if not QUOTE_CS_PASSWORD or pw != QUOTE_CS_PASSWORD:
+    # Accept session-based auth (admin or CS role)
+    if not get_portal_role(request):
         return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
     try:
         read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
@@ -4733,6 +4789,165 @@ def cs_status_applications():
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
 
+@app.route("/api/admin/users", methods=["GET"])
+def admin_list_users():
+    c = cors()
+    if not check_admin_session(request):
+        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+    try:
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        formula = "OR({Quote Portal Admin}=1,{Quote Portal CS}=1)"
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}",
+            headers=at_headers(read_token),
+            params={"filterByFormula": formula,
+                    "fields[]": ["Full Name", "Portal Username", "Email", "Quote Portal Admin", "Quote Portal CS"]},
+            timeout=10,
+        )
+        records = r.json().get("records", [])
+        users = []
+        for rec in records:
+            f = rec.get("fields", {})
+            users.append({
+                "id":       rec["id"],
+                "username": f.get("Portal Username", ""),
+                "fullName": f.get("Full Name", ""),
+                "email":    f.get("Email", ""),
+                "role":     "admin" if f.get("Quote Portal Admin") else "cs",
+            })
+        return Response(json.dumps({"users": users}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/admin/users/add", methods=["POST"])
+def admin_add_user():
+    c = cors()
+    if not check_admin_session(request):
+        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+    data = request.get_json() or {}
+    username  = (data.get("username") or "").strip().lower()
+    password  = (data.get("password") or "").strip()
+    role      = (data.get("role") or "cs").strip()
+    full_name = (data.get("fullName") or "").strip()
+    if not username or not password:
+        return Response(json.dumps({"error": "username and password are required"}), status=400, headers=c, mimetype="application/json")
+    if role not in ("admin", "cs"):
+        return Response(json.dumps({"error": "role must be 'admin' or 'cs'"}), status=400, headers=c, mimetype="application/json")
+    if len(password) < 8:
+        return Response(json.dumps({"error": "Password must be at least 8 characters"}), status=400, headers=c, mimetype="application/json")
+    pw_hash = _hash_password(password)
+    fields = {
+        "Portal Username": username,
+        "Password Hash":   pw_hash,
+        "Quote Portal Admin": role == "admin",
+        "Quote Portal CS":    role == "cs",
+    }
+    if full_name:
+        fields["Full Name"] = full_name
+    write_token = RETURNS_WRITE_TOKEN
+    try:
+        r = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": fields},
+            timeout=15,
+        )
+        if r.status_code not in (200, 201):
+            return Response(json.dumps({"error": f"Airtable error: {r.text}"}), status=500, headers=c, mimetype="application/json")
+        return Response(json.dumps({"ok": True, "id": r.json().get("id")}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/admin/users/reset-password/<record_id>", methods=["POST"])
+def admin_reset_user_password(record_id):
+    c = cors()
+    if not check_admin_session(request):
+        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+    data = request.get_json() or {}
+    new_pw = (data.get("newPassword") or "").strip()
+    if len(new_pw) < 8:
+        return Response(json.dumps({"error": "Password must be at least 8 characters"}), status=400, headers=c, mimetype="application/json")
+    new_hash = _hash_password(new_pw)
+    write_token = RETURNS_WRITE_TOKEN
+    try:
+        r = req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}/{record_id}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": {"Password Hash": new_hash}},
+            timeout=10,
+        )
+        if r.status_code != 200:
+            return Response(json.dumps({"error": "Failed to update password"}), status=500, headers=c, mimetype="application/json")
+        return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/admin/users/<record_id>", methods=["DELETE"])
+def admin_remove_user(record_id):
+    c = cors()
+    if not check_admin_session(request):
+        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+    write_token = RETURNS_WRITE_TOKEN
+    try:
+        r = req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}/{record_id}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": {
+                "Portal Username":    "",
+                "Password Hash":      "",
+                "Quote Portal Admin": False,
+                "Quote Portal CS":    False,
+            }},
+            timeout=10,
+        )
+        if r.status_code != 200:
+            return Response(json.dumps({"error": "Failed to remove portal access"}), status=500, headers=c, mimetype="application/json")
+        return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/portal/change-password", methods=["POST"])
+def portal_change_password():
+    """Both admin and CS users can change their own password."""
+    c = cors()
+    role = get_portal_role(request)
+    if not role:
+        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+    record_id = get_portal_record_id(request)
+    username  = get_portal_username(request)
+    if not record_id or not username:
+        return Response(json.dumps({"error": "Session missing record info — please log in again"}), status=401, headers=c, mimetype="application/json")
+    data = request.get_json() or {}
+    current_pw = (data.get("currentPassword") or "").strip()
+    new_pw     = (data.get("newPassword") or "").strip()
+    if not current_pw or not new_pw:
+        return Response(json.dumps({"error": "currentPassword and newPassword are required"}), status=400, headers=c, mimetype="application/json")
+    if len(new_pw) < 8:
+        return Response(json.dumps({"error": "New password must be at least 8 characters"}), status=400, headers=c, mimetype="application/json")
+    # Verify current password
+    rec, _ = _lookup_portal_user(username, current_pw)
+    if not rec:
+        return Response(json.dumps({"error": "Current password is incorrect"}), status=401, headers=c, mimetype="application/json")
+    new_hash = _hash_password(new_pw)
+    write_token = RETURNS_WRITE_TOKEN
+    try:
+        r = req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}/{record_id}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": {"Password Hash": new_hash}},
+            timeout=10,
+        )
+        if r.status_code != 200:
+            return Response(json.dumps({"error": "Failed to update password"}), status=500, headers=c, mimetype="application/json")
+        return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
 @app.route("/api/admin/login", methods=["POST"])
 def admin_login():
     from datetime import datetime, timezone, timedelta
@@ -4740,57 +4955,34 @@ def admin_login():
     data = request.get_json() or {}
     username = (data.get("username") or "").strip().lower()
     pw       = (data.get("password") or "").strip()
-    rec = _lookup_admin(username, pw)
+    rec, role = _lookup_portal_user(username, pw)
     if not rec:
         return Response(json.dumps({"error": "Invalid username or password"}), status=401, headers=c, mimetype="application/json")
 
     payload = {
-        "admin":    True,
+        "admin":    role == 'admin',  # backward compat: approve/deny checks use this
+        "role":     role,             # 'admin' or 'cs'
         "username": username,
         "name":     rec.get("fields", {}).get("Full Name", username),
         "record_id": rec.get("id"),
         "exp":      datetime.now(timezone.utc) + timedelta(hours=12),
     }
     token = pyjwt.encode(payload, QUOTE_SECRET_KEY + "_admin", algorithm="HS256")
-    resp = make_response(Response(json.dumps({"ok": True, "name": payload["name"]}), headers=c, mimetype="application/json"))
+    resp = make_response(Response(json.dumps({"ok": True, "name": payload["name"], "role": role}), headers=c, mimetype="application/json"))
     resp.set_cookie("ba_admin_session", token, max_age=12*3600, httponly=True, samesite="Lax", secure=True)
     return resp
 
 
 @app.route("/api/admin/change-password", methods=["POST"])
 def admin_change_password():
-    from datetime import datetime, timezone, timedelta
-    c = cors()
-    if not check_admin_session(request):
-        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
-    username = get_admin_username(request)
-    data = request.get_json() or {}
-    current_pw  = (data.get("currentPassword") or "").strip()
-    new_pw      = (data.get("newPassword") or "").strip()
-    if not current_pw or not new_pw or len(new_pw) < 8:
-        return Response(json.dumps({"error": "New password must be at least 8 characters"}), status=400, headers=c, mimetype="application/json")
-    # Verify current password
-    rec = _lookup_admin(username, current_pw)
-    if not rec:
-        return Response(json.dumps({"error": "Current password is incorrect"}), status=401, headers=c, mimetype="application/json")
-    # Write new hash
-    new_hash = _hash_password(new_pw)
-    write_token = RETURNS_WRITE_TOKEN
-    r = req_lib.patch(
-        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}/{rec['id']}",
-        headers={**at_headers(write_token), "Content-Type": "application/json"},
-        json={"fields": {"Password Hash": new_hash}},
-        timeout=10,
-    )
-    if r.status_code != 200:
-        return Response(json.dumps({"error": "Failed to update password — check write token permissions"}), status=500, headers=c, mimetype="application/json")
-    return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+    """Change password for the logged-in portal user (admin or CS). Kept for backward compat."""
+    return portal_change_password()
 
 
 @app.route("/api/admin/applications")
 def admin_applications():
     c = cors()
-    if not check_admin_session(request):
+    if not get_portal_role(request):
         return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
 
     try:
