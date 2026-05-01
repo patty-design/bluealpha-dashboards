@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blue Alpha — Quote Application Status</title>
+  <link rel="icon" href="https://www.bluealphabelts.com/wp-content/uploads/2019/05/cropped-BAG-FAV-32x32.png">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:   #1B2438;
+      --red:    #BD3333;
+      --light:  #f5f7fa;
+      --border: #dde3ea;
+      --text:   #1a2633;
+      --muted:  #6b7a8d;
+      --white:  #ffffff;
+    }
+    body { font-family: 'Lato', Arial, sans-serif; background: var(--light); color: var(--text); min-height: 100vh; }
+    header {
+      background: var(--navy); padding: 18px 24px;
+      display: flex; align-items: center; gap: 18px;
+    }
+    header img { height: 44px; filter: brightness(0) invert(1); }
+    .header-divider { width: 2px; height: 36px; background: var(--red); border-radius: 2px; }
+    .header-title {
+      font-size: 1rem; font-weight: 700; color: rgba(255,255,255,0.75);
+      text-transform: uppercase; letter-spacing: 3px;
+    }
+    .container { max-width: 860px; margin: 40px auto; padding: 0 20px; }
+    .card {
+      background: var(--white); border-radius: 10px;
+      border: 1px solid var(--border); padding: 32px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .card-title { font-size: 1.1rem; font-weight: 700; color: var(--navy); margin-bottom: 20px; }
+    .field { margin-bottom: 16px; }
+    label { display: block; font-size: 0.82rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+    input[type="password"] {
+      width: 100%; padding: 10px 14px; border: 1px solid var(--border);
+      border-radius: 6px; font-size: 0.95rem; color: var(--text);
+    }
+    input[type="password"]:focus { outline: none; border-color: var(--navy); }
+    .btn {
+      display: inline-block; padding: 11px 28px; border-radius: 6px;
+      font-size: 0.9rem; font-weight: 700; cursor: pointer; border: none;
+      background: var(--navy); color: var(--white);
+    }
+    .btn:hover { opacity: 0.9; }
+    .message { display: none; padding: 10px 14px; border-radius: 6px; font-size: 0.88rem; margin-top: 12px; }
+    .message.show { display: block; }
+    .message-error { background: #fef2f2; color: #ae0000; border: 1px solid #fca5a5; }
+
+    /* Applications table */
+    #app-view { display: none; }
+    .page-title { font-size: 1.4rem; font-weight: 800; color: var(--navy); margin-bottom: 6px; }
+    .page-subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; }
+    .filter-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .filter-btn {
+      padding: 6px 16px; border-radius: 20px; border: 1px solid var(--border);
+      background: var(--white); font-size: 0.82rem; font-weight: 600; cursor: pointer; color: var(--muted);
+    }
+    .filter-btn.active { background: var(--navy); color: var(--white); border-color: var(--navy); }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      text-align: left; font-size: 0.78rem; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.05em;
+      padding: 10px 14px; border-bottom: 2px solid var(--border);
+    }
+    td { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 0.9rem; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    .badge {
+      display: inline-block; padding: 3px 10px; border-radius: 12px;
+      font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em;
+    }
+    .badge-pending  { background: #fff8ed; color: #7a4e00; border: 1px solid #f5dca0; }
+    .badge-approved { background: #f0faf3; color: #1a5c2a; border: 1px solid #a3d4b0; }
+    .badge-denied   { background: #fef2f2; color: #ae0000; border: 1px solid #fca5a5; }
+    .empty-msg { text-align: center; color: var(--muted); padding: 32px; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="https://www.bluealphabelts.com">
+    <img src="https://www.bluealphabelts.com/wp-content/uploads/2019/05/Blue-Alpha-Logo-Horizontal-Inverse.png" alt="Blue Alpha">
+  </a>
+  <div class="header-divider"></div>
+  <span class="header-title">Quote Application Status</span>
+</header>
+
+<div class="container">
+
+  <!-- Login -->
+  <div id="login-view">
+    <div class="card" style="max-width:400px; margin: 0 auto;">
+      <div class="card-title">CS Sign In</div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="cs-pw" placeholder="Enter your CS password" autocomplete="current-password">
+      </div>
+      <button class="btn" onclick="csLogin()">Continue</button>
+      <div class="message message-error" id="msg-error">Incorrect password. Please try again.</div>
+    </div>
+  </div>
+
+  <!-- Applications -->
+  <div id="app-view">
+    <h1 class="page-title">Quote Applications</h1>
+    <p class="page-subtitle">Read-only view. Contact management to approve or deny applications.</p>
+
+    <div class="filter-row">
+      <button class="filter-btn active" onclick="setFilter('all')" id="f-all">All</button>
+      <button class="filter-btn" onclick="setFilter('Pending')" id="f-pending">Pending</button>
+      <button class="filter-btn" onclick="setFilter('Approved')" id="f-approved">Approved</button>
+      <button class="filter-btn" onclick="setFilter('Denied')" id="f-denied">Denied</button>
+    </div>
+
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <table id="apps-table">
+        <thead>
+          <tr>
+            <th>Organization</th>
+            <th>Contact</th>
+            <th>Applied</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="apps-tbody"></tbody>
+      </table>
+      <div class="empty-msg" id="empty-msg" style="display:none;">No applications found.</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let csPassword = '';
+let allApps = [];
+let activeFilter = 'all';
+
+document.getElementById('cs-pw').addEventListener('keydown', e => { if (e.key === 'Enter') csLogin(); });
+
+async function csLogin() {
+  const pw = document.getElementById('cs-pw').value.trim();
+  document.getElementById('msg-error').classList.remove('show');
+  if (!pw) return;
+  try {
+    const res = await fetch('/api/cs-status/applications', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ password: pw })
+    });
+    if (res.status === 401) { document.getElementById('msg-error').classList.add('show'); return; }
+    const data = await res.json();
+    csPassword = pw;
+    allApps = data.applications || [];
+    document.getElementById('login-view').style.display = 'none';
+    document.getElementById('app-view').style.display = 'block';
+    renderApps();
+  } catch(e) {
+    document.getElementById('msg-error').classList.add('show');
+  }
+}
+
+function setFilter(f) {
+  activeFilter = f;
+  ['all','Pending','Approved','Denied'].forEach(v => {
+    document.getElementById('f-' + v.toLowerCase()).classList.toggle('active', f === v);
+  });
+  renderApps();
+}
+
+function renderApps() {
+  const filtered = activeFilter === 'all' ? allApps : allApps.filter(a => a.status === activeFilter);
+  const tbody = document.getElementById('apps-tbody');
+  tbody.innerHTML = '';
+  document.getElementById('empty-msg').style.display = filtered.length ? 'none' : 'block';
+  filtered.forEach(app => {
+    const tr = document.createElement('tr');
+    const statusClass = app.status === 'Approved' ? 'badge-approved' : app.status === 'Denied' ? 'badge-denied' : 'badge-pending';
+    tr.innerHTML =
+      '<td><strong>' + (app.orgName || '—') + '</strong></td>' +
+      '<td>' + (app.contactName || '—') + '<br><span style="color:var(--muted);font-size:0.82rem;">' + (app.contactEmail || '') + '</span></td>' +
+      '<td style="color:var(--muted);">' + (app.appliedDate ? app.appliedDate.slice(0,10) : '—') + '</td>' +
+      '<td><span class="badge ' + statusClass + '">' + (app.status || 'Pending') + '</span></td>';
+    tbody.appendChild(tr);
+  });
+}
+</script>
+</body>
+</html>

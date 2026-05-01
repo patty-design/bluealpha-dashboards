@@ -34,6 +34,7 @@ TEST_EMAIL_OVERRIDE  = os.environ.get("TEST_EMAIL_OVERRIDE", "")
 CS_ADMIN_PASSWORD    = os.environ.get("CS_ADMIN_PASSWORD", "")
 
 QUOTE_ADMIN_PASSWORD     = os.environ.get("QUOTE_ADMIN_PASSWORD", "")
+QUOTE_CS_PASSWORD        = os.environ.get("QUOTE_CS_PASSWORD", "")
 QUOTE_SECRET_KEY         = os.environ.get("QUOTE_SECRET_KEY", "change-me-ba-portal-2024")
 
 STRIPE_SECRET_KEY        = os.environ.get("STRIPE_SECRET_KEY", "")
@@ -4692,6 +4693,44 @@ def portal_request_magic_link():
 @app.route("/admin")
 def admin_page():
     return send_from_directory("static", "admin.html")
+
+@app.route("/cs-status")
+def cs_status_page():
+    return send_from_directory("static", "cs-status.html")
+
+@app.route("/api/cs-status/applications", methods=["POST", "OPTIONS"])
+def cs_status_applications():
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    data = request.get_json() or {}
+    pw = (data.get("password") or "").strip()
+    if not QUOTE_CS_PASSWORD or pw != QUOTE_CS_PASSWORD:
+        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+    try:
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        records = at_get_all(
+            CUSTOMERS_TABLE_ID, read_token,
+            fields=["Organization Name", "Main Contact Name", "Main Contact Email",
+                    "Application Status", "Applied Date"],
+        )
+        apps = []
+        for r in records:
+            f = r.get("fields", {})
+            apps.append({
+                "id":           r["id"],
+                "orgName":      f.get("Organization Name", ""),
+                "contactName":  f.get("Main Contact Name", ""),
+                "contactEmail": f.get("Main Contact Email", ""),
+                "status":       f.get("Application Status", "Pending"),
+                "appliedDate":  f.get("Applied Date", ""),
+            })
+        # Sort: Pending first, then Approved, then Denied
+        order = {"Pending": 0, "Approved": 1, "Denied": 2}
+        apps.sort(key=lambda x: (order.get(x["status"], 9), x["appliedDate"]))
+        return Response(json.dumps({"applications": apps}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
 
 @app.route("/api/admin/login", methods=["POST"])
