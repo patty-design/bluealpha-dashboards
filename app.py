@@ -1368,7 +1368,43 @@ def cs_intl_exchange_submit():
             raise Exception("No checkout URL returned from Stripe")
 
         print(f"[cs-intl-exchange-submit] Stripe session created for order {data.get('orderNumber')}, ref={ref_id}")
-        return Response(json.dumps({"checkoutUrl": checkout_url}), headers=c, mimetype="application/json")
+
+        # Auto-email the payment link to the customer
+        customer_email = data.get("customerEmail", "")
+        customer_name  = data.get("customerName", "")
+        order_number   = data.get("orderNumber", "")
+        email_sent = False
+        if SENDGRID_API_KEY and customer_email:
+            try:
+                first_name = customer_name.split()[0] if customer_name else "there"
+                email_body = (
+                    f"Hi {first_name},\n\n"
+                    f"Our customer service team has initiated a size exchange for your order #{order_number}.\n\n"
+                    f"To complete your exchange, please pay the $10 international shipping fee using the link below:\n\n"
+                    f"{checkout_url}\n\n"
+                    f"This link expires in 24 hours. Once payment is received, we'll begin preparing your new belt(s) "
+                    f"and ship it once we see movement on your return shipment.\n\n"
+                    f"Questions? Reply to this email.\n\n"
+                    f"— Blue Alpha"
+                )
+                send_resp = req_lib.post(
+                    "https://api.sendgrid.com/v3/mail/send",
+                    headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+                    json={
+                        "personalizations": [{"to": [{"email": TEST_EMAIL_OVERRIDE or customer_email}]}],
+                        "from":    {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
+                        "reply_to": {"email": SENDGRID_FROM_EMAIL},
+                        "subject": f"Your Blue Alpha Size Exchange Payment — Order #{order_number}",
+                        "content": [{"type": "text/plain", "value": email_body}],
+                    },
+                    timeout=15,
+                )
+                email_sent = send_resp.status_code in (200, 202)
+                print(f"[cs-intl-exchange-submit] Email {'sent' if email_sent else 'failed'}: {send_resp.status_code}")
+            except Exception as email_err:
+                print(f"[cs-intl-exchange-submit] Email error: {email_err}")
+
+        return Response(json.dumps({"checkoutUrl": checkout_url, "emailSent": email_sent}), headers=c, mimetype="application/json")
 
     except Exception as e:
         import traceback

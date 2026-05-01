@@ -411,7 +411,7 @@
 
       <!-- International Exception banner -->
       <div id="banner-intl" class="info-banner banner-amber hidden">
-        🌍 <strong>CS International Exchange Exception</strong> — For international customers outside the normal eligibility window. Customer pays $10 via Stripe. You'll receive a payment link to email them manually.
+        🌍 <strong>CS International Exchange Exception</strong> — For international customers outside the normal eligibility window. Customer pays $10 via Stripe. A payment link will be emailed to the customer automatically.
       </div>
 
       <!-- Lost Order banner + action toggle -->
@@ -610,13 +610,13 @@
       <!-- Payment link result -->
       <div id="intl-payment-link-result" class="hidden" style="margin-top:20px;">
         <div class="info-banner banner-green" style="margin-bottom:12px;">
-          ✅ Payment link generated! Send this to the customer. It expires in 24 hours.
+          ✅ Payment link generated and emailed to the customer automatically.
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
           <input type="text" id="intl-payment-link-url" readonly style="flex:1;font-size:0.85rem;padding:8px 10px;border:1px solid #cdd3da;border-radius:6px;background:#f5f7fa;color:#222;">
           <button class="btn btn-primary btn-sm" onclick="copyIntlPaymentLink()">Copy Link</button>
         </div>
-        <p style="font-size:0.82rem;color:var(--muted);margin-top:8px;">Email this link to the customer. Once they pay, Airtable will be auto-updated and the exchange will be picked up by the nightly run.</p>
+        <p style="font-size:0.82rem;color:var(--muted);margin-top:8px;">The link is also shown above as a backup. Once the customer pays, Airtable updates automatically and the exchange is picked up by the nightly run.</p>
       </div>
     </div>
   </div>
@@ -698,8 +698,9 @@
       <!-- International Exception: payment link ready -->
       <div id="intl-exception-success" class="success-screen hidden">
         <div class="success-icon">🌍</div>
-        <h2>Payment Link Ready!</h2>
-        <p>Send the link below to the customer. Once they pay, Airtable updates automatically.</p>
+        <h2>Payment Link Sent!</h2>
+        <p>The customer has been emailed a $10 payment link. Once they pay, Airtable updates automatically and the exchange is queued for the nightly run.</p>
+        <p id="intl-email-warn" class="hidden" style="color:#b45309;font-size:0.85rem;margin-top:8px;">⚠️ Email failed — copy the link below and send it manually.</p>
         <div style="margin-top:16px;display:flex;gap:8px;align-items:center;">
           <input type="text" id="intl-success-url" readonly style="flex:1;font-size:0.85rem;padding:8px 10px;border:1px solid #cdd3da;border-radius:6px;background:#f5f7fa;color:#222;">
           <button class="btn btn-primary btn-sm" onclick="document.getElementById('intl-success-url').select();document.execCommand('copy');">Copy</button>
@@ -794,7 +795,7 @@ function setMode(mode) {
     document.getElementById('form-subtitle').textContent = 'Look up the original order, confirm the shipping address, and create a reshipment in ShipStation.';
   } else if (isIntl) {
     document.getElementById('form-title').textContent    = 'CS International Exchange Exception';
-    document.getElementById('form-subtitle').textContent = 'Generate a $10 Stripe payment link for an international exchange. Email the link to the customer manually.';
+    document.getElementById('form-subtitle').textContent = 'Initiate an international exchange exception. A $10 payment link will be emailed to the customer automatically.';
   } else {
     document.getElementById('form-title').textContent    = 'CS Size Exchange Exception';
     document.getElementById('form-subtitle').textContent = 'For customers outside the 30-day exchange window — exception already approved.';
@@ -1640,6 +1641,10 @@ async function csSubmitIntlExchange() {
       document.getElementById('intl-payment-link-result').classList.remove('hidden');
       // Also show on success screen
       document.getElementById('intl-success-url').value = respData.checkoutUrl;
+      // Show warning if email failed
+      if (respData.emailSent === false) {
+        document.getElementById('intl-email-warn').classList.remove('hidden');
+      }
       document.getElementById('screen-main').classList.add('hidden');
       document.getElementById('intl-info-block').classList.add('hidden');
       document.getElementById('screen-success').classList.remove('hidden');
