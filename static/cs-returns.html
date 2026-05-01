@@ -710,7 +710,7 @@ function setMode(mode) {
     document.getElementById('form-subtitle').textContent = 'Look up the original order, confirm the shipping address, and create a reshipment in ShipStation.';
   } else {
     document.getElementById('form-title').textContent    = 'CS Size Exchange Exception';
-    document.getElementById('form-subtitle').textContent = 'For customers outside the 37-day exchange window — exception already approved.';
+    document.getElementById('form-subtitle').textContent = 'For customers outside the 30-day exchange window — exception already approved.';
   }
 
   // Banners
@@ -1307,7 +1307,7 @@ async function csSubmitExchange() {
         customerEmail:       emailVal,
         customerName:        exchangeVerifyData.customerName,
         shipTo:              exchangeVerifyData.shipTo,
-        notes:               'CS exception: size exchange outside 37-day window.',
+        notes:               'CS exception: size exchange outside 30-day window.',
         nextSuffix:          exchangeVerifyData.nextSuffix || '-E',
         items:               selections,
       })
