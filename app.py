@@ -5180,12 +5180,14 @@ def international_success():
     if airtable_record_id:
         try:
             write_token = os.environ.get("AIRTABLE_WRITE_TOKEN_2", RETURNS_WRITE_TOKEN)
+            from datetime import datetime as _dt
+            today_str = _dt.utcnow().strftime("%Y-%m-%d")
             patch_resp = req_lib.patch(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}/{airtable_record_id}",
                 headers={**at_headers(write_token), "Content-Type": "application/json"},
                 json={"fields": {
                     "Payment Confirmed": True,
-                    "Date Submitted": datetime.utcnow().strftime("%Y-%m-%d"),
+                    "Date Submitted": today_str,
                 }},
                 timeout=15,
             )
