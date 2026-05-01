@@ -1107,6 +1107,277 @@ def cs_verify_exchange():
                         status=500, headers=c, mimetype="application/json")
 
 
+@app.route("/api/cs-verify-intl-exchange", methods=["POST", "OPTIONS"])
+def cs_verify_intl_exchange():
+    """CS override: look up order for international exchange exception.
+    Identical to cs-verify-exchange but skips the international/military block
+    and the date eligibility window (already skipped in cs-verify-exchange).
+    """
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    data = request.get_json() or {}
+
+    if not CS_ADMIN_PASSWORD or data.get("csPassword", "") != CS_ADMIN_PASSWORD:
+        return Response(json.dumps({"status": "unauthorized"}), status=401, headers=c, mimetype="application/json")
+
+    order_number = data.get("orderNumber", "").strip().lstrip("#")
+    if not order_number:
+        return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
+
+    try:
+        r = req_lib.get("https://ssapi.shipstation.com/orders",
+                        params={"orderNumber": order_number},
+                        headers=ss_headers(), timeout=10)
+        orders = r.json().get("orders", [])
+        if not orders:
+            return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
+
+        order = orders[0]
+        ship_to = order.get("shipTo", {})
+
+        # NOTE: International block intentionally omitted — this is the CS international exception flow
+
+        airtable_read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+
+        all_exchange_options = at_get_all(
+            PRODUCT_SKUS_TABLE_ID,
+            airtable_read_token,
+            fields=["Parent Product"],
+            formula="{Can Exchange}=TRUE()",
+        )
+        eligible_parent_ids = set()
+        for opt in all_exchange_options:
+            for pid in opt["fields"].get("Parent Product", []):
+                eligible_parent_ids.add(pid)
+
+        eligible_items = []
+        for item in order.get("items", []):
+            sku = (item.get("sku") or "").strip()
+            if not sku:
+                continue
+            at_r = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}",
+                params={"filterByFormula": f'{{SKU ID}}="{sku}"', "maxRecords": 1,
+                        "fields[]": ["Name + Variations", "SKU ID", "Parent Product"]},
+                headers=at_headers(airtable_read_token),
+                timeout=10,
+            )
+            records = at_r.json().get("records", [])
+            if not records:
+                continue
+            rec = records[0]
+            parent_products = rec["fields"].get("Parent Product", [])
+            parent_product_id = parent_products[0] if parent_products else ""
+            if not parent_product_id or parent_product_id not in eligible_parent_ids:
+                continue
+            eligible_items.append({
+                "name":            item.get("name", ""),
+                "sku":             sku,
+                "quantity":        int(item.get("quantity", 1)),
+                "airtableId":      rec["id"],
+                "parentProductId": parent_product_id,
+            })
+
+        if not eligible_items:
+            return Response(json.dumps({"status": "no_eligible_items"}), headers=c, mimetype="application/json")
+
+        # Determine next exchange order suffix
+        next_suffix = "-E"
+        try:
+            for n in range(1, 10):
+                suffix = "-E" if n == 1 else f"-E{n}"
+                ex_r = req_lib.get("https://ssapi.shipstation.com/orders",
+                                    params={"orderNumber": f"{order_number}{suffix}"},
+                                    headers=ss_headers(), timeout=10)
+                ex_orders = ex_r.json().get("orders", [])
+                if not ex_orders:
+                    next_suffix = suffix
+                    break
+        except Exception as ex_check_err:
+            print(f"[cs-verify-intl-exchange] suffix-check failed (non-fatal): {ex_check_err}")
+
+        return Response(json.dumps({
+            "status":        "eligible",
+            "orderId":       order.get("orderId"),
+            "orderNumber":   order_number,
+            "orderKey":      order.get("orderKey", ""),
+            "customerName":  ship_to.get("name", ""),
+            "customerEmail": order.get("customerEmail", ""),
+            "shipTo": {
+                "name":       ship_to.get("name", ""),
+                "street1":    ship_to.get("street1", ""),
+                "street2":    ship_to.get("street2", ""),
+                "city":       ship_to.get("city", ""),
+                "state":      ship_to.get("state", ""),
+                "postalCode": ship_to.get("postalCode", ""),
+                "country":    ship_to.get("country", "US"),
+            },
+            "eligibleItems": eligible_items,
+            "nextSuffix":    next_suffix,
+        }), headers=c, mimetype="application/json")
+
+    except Exception as e:
+        import traceback
+        print(f"[cs-verify-intl-exchange] ERROR: {e}\n{traceback.format_exc()}")
+        return Response(json.dumps({"status": "error", "error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/cs-intl-exchange-submit", methods=["POST", "OPTIONS"])
+def cs_intl_exchange_submit():
+    """CS-initiated international exchange exception.
+    Creates Airtable record + Stripe checkout session, returns a checkout URL
+    CS can email to the customer. The existing /api/international-success handler
+    takes over once the customer pays ($10 fee).
+    """
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    data = request.get_json() or {}
+
+    if not CS_ADMIN_PASSWORD or data.get("csPassword", "") != CS_ADMIN_PASSWORD:
+        return Response(json.dumps({"error": "unauthorized"}), status=401, headers=c, mimetype="application/json")
+
+    if not STRIPE_SECRET_KEY:
+        return Response(json.dumps({"error": "Stripe not configured"}),
+                        status=500, headers=c, mimetype="application/json")
+
+    import uuid
+    ref_id = str(uuid.uuid4())
+
+    _intl_pending[ref_id] = {
+        "orderId":         data.get("orderId"),
+        "orderNumber":     data.get("orderNumber", ""),
+        "customerName":    data.get("customerName", ""),
+        "customerEmail":   data.get("customerEmail", ""),
+        "items":           data.get("items", []),
+        "deliveryAddress": data.get("deliveryAddress", {}),
+        "nextSuffix":      data.get("nextSuffix", "-E"),
+        "trackingNumber":  data.get("trackingNumber", ""),
+        "carrier":         data.get("carrier", ""),
+    }
+
+    # Clean up any abandoned pending records for this order
+    try:
+        order_num_int = int(data.get("orderNumber", ""))
+        read_token  = AIRTABLE_OPS_TOKEN or AIRTABLE_BASE_TOKEN or RETURNS_WRITE_TOKEN
+        write_token = os.environ.get("AIRTABLE_WRITE_TOKEN_2", RETURNS_WRITE_TOKEN)
+        search_resp = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}",
+            params={
+                "filterByFormula": f"AND({{Order #}}={order_num_int}, NOT({{Payment Confirmed}}))",
+                "fields[]": ["Order #", "Payment Confirmed"],
+                "maxRecords": 10,
+            },
+            headers=at_headers(read_token),
+            timeout=10,
+        )
+        if search_resp.status_code == 200:
+            stale = search_resp.json().get("records", [])
+            print(f"[cs-intl-exchange-submit] Found {len(stale)} stale record(s) for order {order_num_int}")
+            for rec in stale:
+                del_resp = req_lib.delete(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}/{rec['id']}",
+                    headers=at_headers(write_token),
+                    timeout=10,
+                )
+                print(f"[cs-intl-exchange-submit] Delete stale {rec['id']}: {del_resp.status_code}")
+        else:
+            print(f"[cs-intl-exchange-submit] Stale record search failed: {search_resp.status_code}")
+    except Exception as cleanup_err:
+        print(f"[cs-intl-exchange-submit] cleanup error (non-fatal): {cleanup_err}")
+
+    # Write to Airtable immediately so success handler survives redeploys
+    try:
+        tracking_str = (f"{data.get('trackingNumber', '')} ({data.get('carrier', '')})"
+                        if data.get("carrier") else data.get("trackingNumber", ""))
+        items = data.get("items", [])
+        delivery_addr = data.get("deliveryAddress", {})
+        items_to_exchange = "\n".join(
+            f"{i.get('quantity', 1)}x {i.get('originalSku', '')} — {i.get('originalName', i.get('selectedName', ''))}"
+            for i in items
+        )
+        desired_items = "\n".join(
+            f"{i.get('quantity', 1)}x {i.get('selectedSku', '')} — {i.get('selectedName', '')}"
+            for i in items
+        )
+        delivery_str = (
+            f"{delivery_addr.get('name', '')}\n"
+            f"{delivery_addr.get('street1', '')}"
+            + (f"\n{delivery_addr['street2']}" if delivery_addr.get("street2") else "")
+            + f"\n{delivery_addr.get('city', '')}, {delivery_addr.get('state', '')} {delivery_addr.get('postalCode', '')}\n"
+            f"{delivery_addr.get('country', '')}"
+        )
+        at_fields = {
+            "Customer Name":     data.get("customerName", ""),
+            "Customer Email":    data.get("customerEmail", ""),
+            "Items to Exchange": items_to_exchange,
+            "Desired Items":     desired_items,
+            "Delivery Address":  delivery_str,
+            "Return Tracking #": tracking_str,
+            "Stripe Payment ID": ref_id,
+            "Original Order ID": str(data.get("orderId", "")) if data.get("orderId") else "",
+            "Next Suffix":       data.get("nextSuffix", "-E"),
+            "Payment Confirmed": False,
+        }
+        try:
+            at_fields["Order #"] = int(data.get("orderNumber", ""))
+        except (ValueError, TypeError):
+            pass
+        write_token = os.environ.get("AIRTABLE_WRITE_TOKEN_2", RETURNS_WRITE_TOKEN)
+        at_resp = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{INT_EXCHANGE_TABLE_ID}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": at_fields},
+            timeout=15,
+        )
+        if at_resp.status_code in (200, 201):
+            _intl_pending[ref_id]["airtableRecordId"] = at_resp.json().get("id", "")
+            print(f"[cs-intl-exchange-submit] Airtable record created: {_intl_pending[ref_id]['airtableRecordId']}")
+        else:
+            print(f"[cs-intl-exchange-submit] Airtable write failed: {at_resp.status_code} {at_resp.text}")
+    except Exception as at_err:
+        print(f"[cs-intl-exchange-submit] Airtable write error: {at_err}")
+
+    success_url = f"https://exchange.bluealphabelts.com/exchange/international?success=1&ref={ref_id}"
+    cancel_url  = "https://exchange.bluealphabelts.com/exchange/international?cancelled=1"
+
+    try:
+        stripe_resp = req_lib.post(
+            "https://api.stripe.com/v1/checkout/sessions",
+            auth=(STRIPE_SECRET_KEY, ""),
+            data={
+                "line_items[0][price_data][currency]":           "usd",
+                "line_items[0][price_data][product_data][name]": "International Belt Exchange Fee",
+                "line_items[0][price_data][unit_amount]":        "1000",
+                "line_items[0][quantity]":                       "1",
+                "mode":                                          "payment",
+                "success_url":                                   success_url,
+                "cancel_url":                                    cancel_url,
+                "client_reference_id":                           ref_id,
+            },
+            timeout=15,
+        )
+        if stripe_resp.status_code not in (200, 201):
+            raise Exception(f"Stripe error {stripe_resp.status_code}: {stripe_resp.text}")
+
+        session = stripe_resp.json()
+        checkout_url = session.get("url")
+        if not checkout_url:
+            raise Exception("No checkout URL returned from Stripe")
+
+        print(f"[cs-intl-exchange-submit] Stripe session created for order {data.get('orderNumber')}, ref={ref_id}")
+        return Response(json.dumps({"checkoutUrl": checkout_url}), headers=c, mimetype="application/json")
+
+    except Exception as e:
+        import traceback
+        print(f"[cs-intl-exchange-submit] ERROR: {e}\n{traceback.format_exc()}")
+        _intl_pending.pop(ref_id, None)
+        return Response(json.dumps({"error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
+
+
 @app.route("/api/submit-lost-refund", methods=["POST", "OPTIONS"])
 def submit_lost_refund():
     if request.method == "OPTIONS":

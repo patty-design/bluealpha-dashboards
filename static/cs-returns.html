@@ -389,6 +389,7 @@
       <button class="mode-btn" id="btn-mode-cancel" onclick="setMode('cancel')">✕ Cancellation</button>
       <button class="mode-btn" id="btn-mode-lost" onclick="setMode('lost')">📦 Lost Order</button>
       <button class="mode-btn" id="btn-mode-exchange" onclick="setMode('exchange')">↔ Size Exchange</button>
+      <button class="mode-btn" id="btn-mode-intl" onclick="setMode('intl')">🌍 Intl Exception</button>
     </div>
 
     <div class="card">
@@ -406,6 +407,11 @@
       <!-- Exchange banner -->
       <div id="banner-exchange" class="info-banner banner-amber hidden">
         ↔ <strong>CS Size Exchange override</strong> — Date eligibility check is bypassed. Only use this after the exception has been approved.
+      </div>
+
+      <!-- International Exception banner -->
+      <div id="banner-intl" class="info-banner banner-amber hidden">
+        🌍 <strong>CS International Exchange Exception</strong> — For international customers outside the normal eligibility window. Customer pays $10 via Stripe. You'll receive a payment link to email them manually.
       </div>
 
       <!-- Lost Order banner + action toggle -->
@@ -562,6 +568,59 @@
 
   </div>
 
+  <!-- International Exception info block -->
+  <div id="intl-info-block" class="hidden" style="margin-top: 24px;">
+    <div class="card">
+      <div class="order-info" id="intl-order-info-text"></div>
+
+      <div class="field">
+        <label>Items to Exchange <span class="req">*</span></label>
+        <div class="exchange-items-list" id="intl-items-list"></div>
+        <div class="validation-msg" id="msg-intl-no-selection">⚠ Please check at least one item and choose a new size/color for each selected item.</div>
+      </div>
+
+      <div class="field" style="margin-top:4px;">
+        <label>Delivery Address <span class="req">*</span></label>
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:12px;">Pre-filled from ShipStation. Edit if the customer wants it shipped somewhere different.</p>
+        <div style="display:grid;gap:10px;">
+          <input type="text" id="intl-addr-name" placeholder="Full Name" class="input-field">
+          <input type="text" id="intl-addr-street1" placeholder="Address Line 1" class="input-field">
+          <input type="text" id="intl-addr-street2" placeholder="Address Line 2 (optional)" class="input-field">
+          <div style="display:grid;grid-template-columns:1fr 1fr 120px;gap:10px;">
+            <input type="text" id="intl-addr-city" placeholder="City" class="input-field">
+            <input type="text" id="intl-addr-state" placeholder="State / Province" class="input-field">
+            <input type="text" id="intl-addr-postal" placeholder="Postal Code" class="input-field">
+          </div>
+          <input type="text" id="intl-addr-country" placeholder="Country (e.g. CA, GB, AU)" class="input-field">
+        </div>
+        <div class="validation-msg" id="msg-intl-no-address">⚠ Please fill in name, street, city, and country.</div>
+      </div>
+
+      <div class="message message-error hidden" id="msg-intl-submit-error">
+        <strong>Submission failed</strong>
+        Something went wrong. Please try again.
+      </div>
+
+      <div style="margin-top: 24px;">
+        <button class="btn btn-primary" id="btn-intl-submit" onclick="csSubmitIntlExchange()">
+          Generate Payment Link
+        </button>
+      </div>
+
+      <!-- Payment link result -->
+      <div id="intl-payment-link-result" class="hidden" style="margin-top:20px;">
+        <div class="info-banner banner-green" style="margin-bottom:12px;">
+          ✅ Payment link generated! Send this to the customer. It expires in 24 hours.
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="intl-payment-link-url" readonly style="flex:1;font-size:0.85rem;padding:8px 10px;border:1px solid #cdd3da;border-radius:6px;background:#f5f7fa;color:#222;">
+          <button class="btn btn-primary btn-sm" onclick="copyIntlPaymentLink()">Copy Link</button>
+        </div>
+        <p style="font-size:0.82rem;color:var(--muted);margin-top:8px;">Email this link to the customer. Once they pay, Airtable will be auto-updated and the exchange will be picked up by the nightly run.</p>
+      </div>
+    </div>
+  </div>
+
   <!-- SUCCESS (shared container, different inner screens) -->
   <div id="screen-success" class="hidden">
     <div class="card">
@@ -636,6 +695,27 @@
         </div>
       </div>
 
+      <!-- International Exception: payment link ready -->
+      <div id="intl-exception-success" class="success-screen hidden">
+        <div class="success-icon">🌍</div>
+        <h2>Payment Link Ready!</h2>
+        <p>Send the link below to the customer. Once they pay, Airtable updates automatically.</p>
+        <div style="margin-top:16px;display:flex;gap:8px;align-items:center;">
+          <input type="text" id="intl-success-url" readonly style="flex:1;font-size:0.85rem;padding:8px 10px;border:1px solid #cdd3da;border-radius:6px;background:#f5f7fa;color:#222;">
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('intl-success-url').select();document.execCommand('copy');">Copy</button>
+        </div>
+        <div style="margin-top:28px;">
+          <button onclick="resetForm()" class="btn btn-primary">Submit Another</button>
+        </div>
+      </div>
+
+      <!-- placeholder to keep the DOM structure intact, remove duplicate closing div -->
+      <div style="display:none" id="exchange-success-placeholder-end">
+        <div style="margin-top:28px;">
+          <button onclick="resetForm()" class="btn btn-primary">Submit Another</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -645,11 +725,13 @@
 const API_BASE = '';
 let csPassword  = '';
 let orderData   = null;
-let currentMode = 'return'; // 'return' | 'cancel' | 'lost' | 'exchange'
+let currentMode = 'return'; // 'return' | 'cancel' | 'lost' | 'exchange' | 'intl'
 let lostAction  = 'reship'; // 'reship' | 'refund'
 let orderBlocked = false;   // true when cancel mode + order already shipped
 let exchangeVerifyData = null;
 let exchangeOptionsCache = {};
+let intlVerifyData = null;
+let intlOptionsCache = {};
 
 function displayName(name) {
   return name.replace(/^DBL No Buckle Outer\b/i, 'Duty Belt Lite');
@@ -692,11 +774,13 @@ function setMode(mode) {
   const isCancel   = mode === 'cancel';
   const isLost     = mode === 'lost';
   const isExchange = mode === 'exchange';
+  const isIntl     = mode === 'intl';
 
   document.getElementById('btn-mode-return').classList.toggle('active', isReturn);
   document.getElementById('btn-mode-cancel').classList.toggle('active', isCancel);
   document.getElementById('btn-mode-lost').classList.toggle('active', isLost);
   document.getElementById('btn-mode-exchange').classList.toggle('active', isExchange);
+  document.getElementById('btn-mode-intl').classList.toggle('active', isIntl);
 
   // Titles
   if (isReturn) {
@@ -708,6 +792,9 @@ function setMode(mode) {
   } else if (isLost) {
     document.getElementById('form-title').textContent    = 'Lost Order / Reshipment';
     document.getElementById('form-subtitle').textContent = 'Look up the original order, confirm the shipping address, and create a reshipment in ShipStation.';
+  } else if (isIntl) {
+    document.getElementById('form-title').textContent    = 'CS International Exchange Exception';
+    document.getElementById('form-subtitle').textContent = 'Generate a $10 Stripe payment link for an international exchange. Email the link to the customer manually.';
   } else {
     document.getElementById('form-title').textContent    = 'CS Size Exchange Exception';
     document.getElementById('form-subtitle').textContent = 'For customers outside the 30-day exchange window — exception already approved.';
@@ -718,8 +805,9 @@ function setMode(mode) {
   document.getElementById('banner-cancel').classList.toggle('hidden', !isCancel);
   document.getElementById('banner-lost').classList.toggle('hidden', !isLost);
   document.getElementById('banner-exchange').classList.toggle('hidden', !isExchange);
+  document.getElementById('banner-intl').classList.toggle('hidden', !isIntl);
 
-  // Items label (only relevant for non-exchange modes)
+  // Items label (only relevant for non-exchange/non-intl modes)
   document.getElementById('items-label').innerHTML = (isReturn ? 'Items to Return' : isCancel ? 'Items to Cancel' : 'Items to Reship') + ' <span class="req">*</span>';
 
   // Return-only fields
@@ -733,23 +821,24 @@ function setMode(mode) {
   // Lost address section
   document.getElementById('section-lost-address').classList.toggle('hidden', !isLost);
 
-  // Notes field — hide in lost/exchange mode
-  document.getElementById('field-notes').classList.toggle('hidden', isLost || isExchange);
+  // Notes field — hide in lost/exchange/intl modes
+  document.getElementById('field-notes').classList.toggle('hidden', isLost || isExchange || isIntl);
 
   // Notes label
   document.getElementById('notes-label').textContent = isReturn ? 'Exception Notes' : 'CS Notes';
   document.getElementById('cs-notes').placeholder    = isReturn ? 'Who approved it, why, any relevant context…'
                                                                  : 'Any additional context from the customer…';
 
-  // Submit button: hide in exchange mode (exchange block has its own submit button)
-  document.getElementById('btn-cs-submit').classList.toggle('hidden', isExchange);
+  // Submit button: hide in exchange/intl mode (those blocks have their own submit buttons)
+  document.getElementById('btn-cs-submit').classList.toggle('hidden', isExchange || isIntl);
   if (isReturn)      document.getElementById('btn-cs-submit').innerHTML = 'Submit &amp; Send Label';
   else if (isCancel) document.getElementById('btn-cs-submit').innerHTML = 'Submit Cancellation Request';
   else if (isLost)   document.getElementById('btn-cs-submit').innerHTML = lostAction === 'refund' ? 'Log Refund Request' : 'Create Reshipment';
 
-  // In exchange mode, hide the shared order-info-block; show exchange-info-block only after lookup
+  // In exchange/intl mode, hide the shared order-info-block; show info blocks only after lookup
   document.getElementById('order-info-block').classList.add('hidden');
   document.getElementById('exchange-info-block').classList.toggle('hidden', !isExchange || !exchangeVerifyData);
+  document.getElementById('intl-info-block').classList.toggle('hidden', !isIntl || !intlVerifyData);
 
   // Reset state on mode switch
   orderData = null;
@@ -759,11 +848,16 @@ function setMode(mode) {
     exchangeOptionsCache = {};
     document.getElementById('exchange-info-block').classList.add('hidden');
   }
+  if (!isIntl) {
+    intlVerifyData = null;
+    intlOptionsCache = {};
+    document.getElementById('intl-info-block').classList.add('hidden');
+  }
   document.getElementById('msg-order-not-found').classList.remove('show');
   document.getElementById('msg-lookup-error').classList.remove('show');
   document.getElementById('cs-order-number').value = '';
-  // Re-show submit button in case it was hidden by block state (non-exchange modes)
-  if (!isExchange) document.getElementById('btn-cs-submit').classList.remove('hidden');
+  // Re-show submit button in case it was hidden by block state (non-exchange/intl modes)
+  if (!isExchange && !isIntl) document.getElementById('btn-cs-submit').classList.remove('hidden');
 }
 
 // ── Lost action sub-toggle ─────────────────────────────────────────────────
@@ -780,6 +874,7 @@ function setLostAction(action) {
 // ── Order lookup ───────────────────────────────────────────────────────────
 async function lookupOrder() {
   if (currentMode === 'exchange') { lookupExchangeOrder(); return; }
+  if (currentMode === 'intl')     { lookupIntlOrder(); return; }
   const btn = document.getElementById('btn-lookup');
   const orderNum = document.getElementById('cs-order-number').value.trim();
   document.getElementById('msg-order-not-found').classList.remove('show');
@@ -1336,9 +1431,239 @@ async function csSubmitExchange() {
   btn.innerHTML = 'Submit Size Exchange';
 }
 
+// ── International Exchange Exception lookup & submit ───────────────────────
+async function lookupIntlOrder() {
+  const btn = document.getElementById('btn-lookup');
+  const orderNum = document.getElementById('cs-order-number').value.trim();
+  document.getElementById('msg-order-not-found').classList.remove('show');
+  document.getElementById('msg-lookup-error').classList.remove('show');
+  document.getElementById('intl-info-block').classList.add('hidden');
+  intlVerifyData = null;
+  intlOptionsCache = {};
+  if (!orderNum) return;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    const res = await fetch(API_BASE + '/api/cs-verify-intl-exchange', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ csPassword: csPassword, orderNumber: orderNum })
+    });
+    const data = await res.json();
+    if (data.status === 'eligible') {
+      intlVerifyData = data;
+      await buildIntlExchangeBlock(data);
+      document.getElementById('intl-info-block').classList.remove('hidden');
+    } else if (data.status === 'not_found') {
+      document.getElementById('msg-order-not-found').classList.add('show');
+    } else if (data.status === 'no_eligible_items') {
+      document.getElementById('msg-order-not-found').classList.add('show');
+      document.getElementById('msg-order-not-found').textContent = 'No exchange-eligible items found in this order.';
+    } else {
+      document.getElementById('msg-lookup-error').classList.add('show');
+    }
+  } catch (e) {
+    document.getElementById('msg-lookup-error').classList.add('show');
+  }
+  btn.disabled = false;
+  btn.innerHTML = 'Look Up';
+}
+
+async function buildIntlExchangeBlock(data) {
+  const orderNum = data.orderNumber;
+  document.getElementById('intl-order-info-text').innerHTML =
+    '<strong>Order #' + orderNum + '</strong> — ' + (data.customerName || 'Unknown customer') + '<br>' +
+    (data.customerEmail ? '📧 ' + data.customerEmail : '') +
+    (data.shipTo && data.shipTo.country ? ' | 🌍 ' + data.shipTo.country : '');
+
+  // Pre-fill delivery address from ShipStation
+  const st = data.shipTo || {};
+  document.getElementById('intl-addr-name').value    = st.name || data.customerName || '';
+  document.getElementById('intl-addr-street1').value = st.street1 || '';
+  document.getElementById('intl-addr-street2').value = st.street2 || '';
+  document.getElementById('intl-addr-city').value    = st.city || '';
+  document.getElementById('intl-addr-state').value   = st.state || '';
+  document.getElementById('intl-addr-postal').value  = st.postalCode || '';
+  document.getElementById('intl-addr-country').value = st.country || '';
+
+  // Reset payment link UI
+  document.getElementById('intl-payment-link-result').classList.add('hidden');
+  document.getElementById('intl-payment-link-url').value = '';
+
+  const items = data.eligibleItems || [];
+  intlOptionsCache = {};
+
+  const uniqueParents = [...new Set(items.map(i => i.parentProductId).filter(Boolean))];
+  await Promise.all(uniqueParents.map(async pid => {
+    try {
+      const res  = await fetch(API_BASE + '/api/exchange-options', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ parentProductId: pid })
+      });
+      const resp = await res.json();
+      intlOptionsCache[pid] = resp.options || [];
+    } catch(e) {
+      intlOptionsCache[pid] = [];
+    }
+  }));
+
+  const list = document.getElementById('intl-items-list');
+  list.innerHTML = '';
+
+  items.forEach((item, idx) => {
+    const autoCheck = items.length === 1;
+    const row = document.createElement('div');
+    row.className = 'exchange-item-row' + (autoCheck ? ' checked' : '');
+    row.id = 'intl-item-row-' + idx;
+
+    const allOpts = intlOptionsCache[item.parentProductId] || [];
+    const opts = allOpts.filter(o => o.sku !== item.sku);
+    let optionsHtml = '<option value="">Select a size/color…</option>';
+    if (opts.length === 0) {
+      optionsHtml = '<option value="">No other sizes available</option>';
+    } else {
+      opts.forEach(opt => {
+        optionsHtml += '<option value=\'' + JSON.stringify({sku: opt.sku, name: opt.name}).replace(/'/g, '&#39;') + '\'>' + displayName(opt.name) + '</option>';
+      });
+    }
+
+    const itemQty = item.quantity || 1;
+    let qtyHtml = '';
+    if (itemQty > 1) {
+      let qOpts = '';
+      for (let i = 1; i <= itemQty; i++) qOpts += '<option value="' + i + '">' + i + '</option>';
+      qtyHtml = '<select id="intl-item-qty-' + idx + '" style="margin-top:8px;">' + qOpts + '</select>';
+    } else {
+      qtyHtml = '<input type="hidden" id="intl-item-qty-' + idx + '" value="1">';
+    }
+
+    row.innerHTML =
+      '<label class="ex-item-check-label" for="intl-item-check-' + idx + '">' +
+        '<input type="checkbox" id="intl-item-check-' + idx + '"' + (autoCheck ? ' checked' : '') + '>' +
+        '<div class="ex-item-check-info">' +
+          '<div class="ex-eligible-name">' + item.name + '</div>' +
+          '<div class="ex-eligible-sku">' + item.sku + '</div>' +
+        '</div>' +
+      '</label>' +
+      '<div class="ex-item-options-wrap' + (autoCheck ? '' : ' hidden') + '" id="intl-item-options-' + idx + '">' +
+        '<select id="intl-item-select-' + idx + '">' + optionsHtml + '</select>' +
+        qtyHtml +
+      '</div>';
+
+    row.querySelector('#intl-item-check-' + idx).addEventListener('change', () => {
+      const cb = document.getElementById('intl-item-check-' + idx);
+      const r  = document.getElementById('intl-item-row-' + idx);
+      const ow = document.getElementById('intl-item-options-' + idx);
+      if (cb.checked) { r.classList.add('checked'); ow.classList.remove('hidden'); }
+      else            { r.classList.remove('checked'); ow.classList.add('hidden'); }
+    });
+    list.appendChild(row);
+  });
+}
+
+async function csSubmitIntlExchange() {
+  const btn   = document.getElementById('btn-intl-submit');
+  const errEl = document.getElementById('msg-intl-submit-error');
+  const noSelEl = document.getElementById('msg-intl-no-selection');
+  const noAddrEl = document.getElementById('msg-intl-no-address');
+
+  errEl.classList.add('hidden'); errEl.classList.remove('show');
+  noSelEl.style.display = 'none';
+  noAddrEl.style.display = 'none';
+
+  // Validate address
+  const addrName   = document.getElementById('intl-addr-name').value.trim();
+  const addrStreet = document.getElementById('intl-addr-street1').value.trim();
+  const addrCity   = document.getElementById('intl-addr-city').value.trim();
+  const addrCountry = document.getElementById('intl-addr-country').value.trim();
+  if (!addrName || !addrStreet || !addrCity || !addrCountry) {
+    noAddrEl.style.display = 'block';
+    return;
+  }
+
+  const items = (intlVerifyData && intlVerifyData.eligibleItems) || [];
+  const selections = [];
+  for (let idx = 0; idx < items.length; idx++) {
+    const cb = document.getElementById('intl-item-check-' + idx);
+    if (!cb || !cb.checked) continue;
+    const sel = document.getElementById('intl-item-select-' + idx);
+    const qtyEl = document.getElementById('intl-item-qty-' + idx);
+    const qty = parseInt(qtyEl ? qtyEl.value : 1) || 1;
+    let parsed;
+    try { parsed = JSON.parse(sel.value); } catch(e) { parsed = null; }
+    if (!parsed) { noSelEl.style.display = 'block'; return; }
+    selections.push({
+      originalSku:     items[idx].sku,
+      originalName:    items[idx].name,
+      selectedSku:     parsed.sku,
+      selectedName:    parsed.name,
+      quantity:        qty,
+      parentProductId: items[idx].parentProductId,
+    });
+  }
+
+  if (selections.length === 0) { noSelEl.style.display = 'block'; return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Generating…';
+
+  try {
+    const res = await fetch(API_BASE + '/api/cs-intl-exchange-submit', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        csPassword:    csPassword,
+        orderNumber:   intlVerifyData.orderNumber,
+        orderId:       intlVerifyData.orderId,
+        customerName:  intlVerifyData.customerName,
+        customerEmail: intlVerifyData.customerEmail,
+        items:         selections,
+        deliveryAddress: {
+          name:       addrName,
+          street1:    addrStreet,
+          street2:    document.getElementById('intl-addr-street2').value.trim(),
+          city:       addrCity,
+          state:      document.getElementById('intl-addr-state').value.trim(),
+          postalCode: document.getElementById('intl-addr-postal').value.trim(),
+          country:    addrCountry,
+        },
+        nextSuffix:     intlVerifyData.nextSuffix || '-E',
+        trackingNumber: '',
+        carrier:        '',
+      })
+    });
+    const respData = await res.json();
+    if (respData.checkoutUrl) {
+      // Show inline result
+      document.getElementById('intl-payment-link-url').value = respData.checkoutUrl;
+      document.getElementById('intl-payment-link-result').classList.remove('hidden');
+      // Also show on success screen
+      document.getElementById('intl-success-url').value = respData.checkoutUrl;
+      document.getElementById('screen-main').classList.add('hidden');
+      document.getElementById('intl-info-block').classList.add('hidden');
+      document.getElementById('screen-success').classList.remove('hidden');
+      showSuccessState('intl-exception-success');
+    } else {
+      throw new Error(respData.error || 'Unknown error');
+    }
+  } catch (e) {
+    errEl.classList.remove('hidden'); errEl.classList.add('show');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = 'Generate Payment Link';
+}
+
+function copyIntlPaymentLink() {
+  const el = document.getElementById('intl-payment-link-url');
+  el.select();
+  document.execCommand('copy');
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 function showSuccessState(id) {
-  ['return-success-pending','return-success-sent','return-success-review','cancel-success','lost-success','lost-refund-success','exchange-success']
+  ['return-success-pending','return-success-sent','return-success-review','cancel-success','lost-success','lost-refund-success','exchange-success','intl-exception-success']
     .forEach(s => document.getElementById(s).classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');
 }
@@ -1376,8 +1701,21 @@ function resetForm() {
   document.getElementById('lost-zip').value          = '';
   document.getElementById('lost-country').value      = 'US';
   document.getElementById('exchange-items-list').innerHTML = '';
+  document.getElementById('intl-items-list').innerHTML = '';
+  document.getElementById('intl-addr-name').value    = '';
+  document.getElementById('intl-addr-street1').value = '';
+  document.getElementById('intl-addr-street2').value = '';
+  document.getElementById('intl-addr-city').value    = '';
+  document.getElementById('intl-addr-state').value   = '';
+  document.getElementById('intl-addr-postal').value  = '';
+  document.getElementById('intl-addr-country').value = '';
+  document.getElementById('intl-payment-link-url').value = '';
+  document.getElementById('intl-payment-link-result').classList.add('hidden');
+  intlVerifyData = null;
+  intlOptionsCache = {};
   document.getElementById('order-info-block').classList.add('hidden');
   document.getElementById('exchange-info-block').classList.add('hidden');
+  document.getElementById('intl-info-block').classList.add('hidden');
   document.getElementById('screen-success').classList.add('hidden');
   document.getElementById('screen-main').classList.remove('hidden');
   // Reset lost sub-toggle to reship
