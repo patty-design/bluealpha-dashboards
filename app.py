@@ -5578,8 +5578,7 @@ def confirm_international_movement(record_id):
             "amountPaid":     0.00,
             "taxAmount":      0.00,
             "shippingAmount": 0.00,
-            "carrierCode":    "stamps_com",
-            "serviceCode":    "stamps_globalpost_economy_intl",
+            # carrierCode/serviceCode omitted — CS selects GlobalPost Economy Intl manually in ShipStation
             "internalNotes":  f"International exchange for order #{order_number}. Customer ships belt(s) to us first.",
             "advancedOptions": {
                 "storeId":      SIZING_EXCHANGE_STORE_ID,
