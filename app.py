@@ -293,7 +293,7 @@ def generate_magic_link(portal_user_record_id, expiry_hours=0.25):
     token = secrets.token_urlsafe(32)
     expiry = datetime.now(timezone.utc) + timedelta(hours=expiry_hours)
     expiry_iso = expiry.isoformat().replace("+00:00", "Z")
-    write_token = RETURNS_WRITE_TOKEN
+    write_token = APPLY_WRITE_TOKEN or RETURNS_WRITE_TOKEN
     try:
         req_lib.patch(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{portal_user_record_id}",
