@@ -783,19 +783,24 @@ def cs_lookup_order():
                          params={"orderNumber": order_number},
                          headers=ss_headers(), timeout=10)
         shipments = sr.json().get("shipments", [])
-        ship_date_str = shipments[0].get("shipDate", "") if shipments else ""
+        active_shipments = [s for s in shipments if not s.get("voided", False)]
+        ship_date_str    = active_shipments[0].get("shipDate", "") if active_shipments else ""
+        tracking_number  = active_shipments[0].get("trackingNumber", "") if active_shipments else ""
+        carrier_code     = active_shipments[0].get("carrierCode", "") if active_shipments else ""
 
         phone = (ship_to.get("phone") or (order.get("billTo") or {}).get("phone") or "")
 
         return Response(json.dumps({
-            "status":       "found",
-            "orderId":      order.get("orderId"),
-            "orderKey":     order.get("orderKey", ""),
-            "orderStatus":  order.get("orderStatus", ""),
-            "customerName": ship_to.get("name", ""),
-            "email":        order.get("customerEmail", ""),
-            "phone":        phone,
-            "shipDate":     ship_date_str,
+            "status":          "found",
+            "orderId":         order.get("orderId"),
+            "orderKey":        order.get("orderKey", ""),
+            "orderStatus":     order.get("orderStatus", ""),
+            "customerName":    ship_to.get("name", ""),
+            "email":           order.get("customerEmail", ""),
+            "phone":           phone,
+            "shipDate":        ship_date_str,
+            "trackingNumber":  tracking_number,
+            "carrierCode":     carrier_code,
             "address": {
                 "name":       ship_to.get("name", ""),
                 "street1":    ship_to.get("street1", ""),

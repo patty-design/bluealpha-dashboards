@@ -812,10 +812,14 @@ async function lookupOrder() {
 
 function populateOrderInfo(data) {
   const orderNum = document.getElementById('cs-order-number').value.trim();
+  const trackingHtml = data.trackingNumber
+    ? '🔍 Tracking: <a href="https://www.google.com/search?q=' + encodeURIComponent(data.trackingNumber) + '" target="_blank" style="color:var(--navy);font-weight:600;">' + data.trackingNumber + '</a><br>'
+    : '';
   document.getElementById('order-info-text').innerHTML =
     '<strong>Order #' + orderNum + '</strong> — ' + (data.customerName || 'Unknown customer') + '<br>' +
     (data.email    ? '📧 ' + data.email + '<br>'                  : '') +
-    (data.shipDate ? '📦 Shipped: ' + data.shipDate.slice(0,10) + '<br>' : '');
+    (data.shipDate ? '📦 Shipped: ' + data.shipDate.slice(0,10) + '<br>' : '') +
+    trackingHtml;
 
   buildItemsList(data.items || []);
 
