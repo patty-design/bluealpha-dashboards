@@ -2746,6 +2746,20 @@ def verify_exchange():
                 timeout=10,
             )
             records = at_r.json().get("records", [])
+            # Fallback: if outer-only SKU (ends in -O) not found, try base SKU without -O suffix
+            lookup_sku = sku
+            if not records and re.search(r'-O$', sku, re.IGNORECASE):
+                base_sku = re.sub(r'-O$', '', sku, flags=re.IGNORECASE)
+                fallback_r = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}",
+                    params={"filterByFormula": f'{{SKU ID}}="{base_sku}"', "maxRecords": 1,
+                            "fields[]": ["Name + Variations", "SKU ID", "Parent Product"]},
+                    headers=at_headers(airtable_read_token),
+                    timeout=10,
+                )
+                records = fallback_r.json().get("records", [])
+                if records:
+                    lookup_sku = base_sku
             if not records:
                 continue
             rec = records[0]
@@ -2756,7 +2770,7 @@ def verify_exchange():
                 continue
             eligible_items.append({
                 "name":            item.get("name", ""),
-                "sku":             sku,
+                "sku":             sku,  # keep original SKU for duplicate-exchange detection
                 "quantity":        int(item.get("quantity", 1)),
                 "airtableId":      rec["id"],
                 "parentProductId": parent_product_id,
@@ -3038,7 +3052,9 @@ def submit_exchange():
 
             # Path 3 — Parent-based LP inner lookup (for products whose exchange options are
             # outer-only base SKUs with no Component(s), e.g. 1.75" Battle Belt, 2" MOLLE Duty Belt)
-            if not inner_added:
+            # Skip if the original order was outer-only (-O suffix) — customer only ordered the outer belt
+            original_is_outer_only = bool(re.search(r'-O$', original_sku, re.IGNORECASE))
+            if not inner_added and not original_is_outer_only:
                 item_parent_id = item_data.get("parentProductId", "")
                 if item_parent_id in _LP_INNER_REQUIRED_PARENT_IDS:
                     try:
