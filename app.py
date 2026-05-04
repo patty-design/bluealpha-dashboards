@@ -2732,11 +2732,13 @@ def verify_exchange():
             for pid in opt["fields"].get("Parent Product", []):
                 eligible_parent_ids.add(pid)
 
+        print(f"[verify-exchange] eligible_parent_ids ({len(eligible_parent_ids)}): {eligible_parent_ids}")
         eligible_items = []
         for item in order.get("items", []):
             sku = (item.get("sku") or "").strip()
             if not sku:
                 continue
+            print(f"[verify-exchange] checking item SKU: '{sku}' name: '{item.get('name','')}'")
             # Look up the SKU without Can Exchange filter
             at_r = req_lib.get(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}",
@@ -2746,6 +2748,7 @@ def verify_exchange():
                 timeout=10,
             )
             records = at_r.json().get("records", [])
+            print(f"[verify-exchange] Airtable direct lookup for '{sku}': {len(records)} record(s)")
             # Fallback: if outer-only SKU (ends in -O) not found, try base SKU without -O suffix
             lookup_sku = sku
             if not records and re.search(r'-O$', sku, re.IGNORECASE):
@@ -2758,14 +2761,17 @@ def verify_exchange():
                     timeout=10,
                 )
                 records = fallback_r.json().get("records", [])
+                print(f"[verify-exchange] Fallback lookup for '{base_sku}': {len(records)} record(s)")
                 if records:
                     lookup_sku = base_sku
             if not records:
+                print(f"[verify-exchange] No Airtable record found for SKU '{sku}' — skipping")
                 continue
             rec = records[0]
             parent_products = rec["fields"].get("Parent Product", [])
             parent_product_id = parent_products[0] if parent_products else ""
             # Only eligible if parent has exchange options available
+            print(f"[verify-exchange] SKU '{sku}' → parent '{parent_product_id}' | in eligible set: {parent_product_id in eligible_parent_ids}")
             if not parent_product_id or parent_product_id not in eligible_parent_ids:
                 continue
             eligible_items.append({
