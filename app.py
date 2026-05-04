@@ -1483,6 +1483,19 @@ def submit_reshipment():
         from datetime import datetime as _dt
         now_str = _dt.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
+        # Look up original order to get customer email
+        customer_email = ""
+        try:
+            orig_r = req_lib.get("https://ssapi.shipstation.com/orders",
+                                 params={"orderNumber": original_order_number},
+                                 headers=ss_headers(), timeout=10)
+            orig_data = orig_r.json() if orig_r.content else {}
+            orig_orders = orig_data.get("orders", [])
+            if orig_orders:
+                customer_email = orig_orders[0].get("customerEmail", "") or ""
+        except Exception:
+            pass  # Proceed without email if lookup fails
+
         # Determine reshipment order number (-L, -L2, -L3...)
         reship_number = None
         for suffix in ["-L"] + [f"-L{i}" for i in range(2, 20)]:
@@ -1525,6 +1538,7 @@ def submit_reshipment():
             "shippingAmount": 0,
             "internalNotes": f"Reshipment of order {original_order_number}",
             "customerNotes": "",
+            "customerEmail": customer_email,
             "shipTo": {
                 "name": ship_to.get("name", ""),
                 "street1": ship_to.get("street1", ""),
