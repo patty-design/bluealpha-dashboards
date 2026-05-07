@@ -848,17 +848,41 @@ def cs_lookup_order():
 
         phone = (ship_to.get("phone") or (order.get("billTo") or {}).get("phone") or "")
 
+        # Build already-returned qty map so CS portal can gray out items
+        cs_already_returned = {}
+        _cs_read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        if RETURNS_TABLE_ID and _cs_read_token:
+            try:
+                _cs_ar_formula = (f"AND({{Order Number}}='{order_number}'"
+                                  f",OR({{Status}}='New',{{Status}}='Label Sent',"
+                                  f"{{Status}}='Items Received',{{Status}}='Partial Received',"
+                                  f"{{Status}}='Refunded'),{{Type}}='Return')")
+                _cs_ar_resp = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
+                    params={"filterByFormula": _cs_ar_formula, "fields[]": ["Items to Return"], "maxRecords": 20},
+                    headers={"Authorization": f"Bearer {_cs_read_token}"},
+                    timeout=10,
+                )
+                for _rec in _cs_ar_resp.json().get("records", []):
+                    for _line in _rec.get("fields", {}).get("Items to Return", "").split("\n"):
+                        _m = re.match(r'(\d+)x\s+(\S+)\s+[—\-]', _line.strip())
+                        if _m:
+                            _sku = _m.group(2).strip()
+                            cs_already_returned[_sku] = cs_already_returned.get(_sku, 0) + int(_m.group(1))
+            except Exception:
+                pass
+
         return Response(json.dumps({
-            "status":          "found",
-            "orderId":         order.get("orderId"),
-            "orderKey":        order.get("orderKey", ""),
-            "orderStatus":     order.get("orderStatus", ""),
-            "customerName":    ship_to.get("name", ""),
-            "email":           order.get("customerEmail", ""),
-            "phone":           phone,
-            "shipDate":        ship_date_str,
-            "trackingNumber":  tracking_number,
-            "carrierCode":     carrier_code,
+            "status":               "found",
+            "orderId":              order.get("orderId"),
+            "orderKey":             order.get("orderKey", ""),
+            "orderStatus":          order.get("orderStatus", ""),
+            "customerName":         ship_to.get("name", ""),
+            "email":                order.get("customerEmail", ""),
+            "phone":                phone,
+            "shipDate":             ship_date_str,
+            "trackingNumber":       tracking_number,
+            "carrierCode":          carrier_code,
             "address": {
                 "name":       ship_to.get("name", ""),
                 "street1":    ship_to.get("street1", ""),
@@ -867,7 +891,8 @@ def cs_lookup_order():
                 "state":      ship_to.get("state", ""),
                 "postalCode": ship_to.get("postalCode", ""),
             },
-            "items": items,
+            "items":                items,
+            "alreadyReturnedQtys":  cs_already_returned,
         }), headers=c, mimetype="application/json")
 
     except Exception as e:
@@ -2056,16 +2081,65 @@ def submit_return():
     }
     fields = {k: v for k, v in fields.items() if v}
 
-    # ── Reuse existing "Needs Review" record if one exists for this order ─
-    # This prevents duplicate records when label generation fails and the
-    # customer (or CS) retries the submission.
+    import re as _re_ret
     read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+
+    # ── Server-side: filter out items already covered by an active return ─
+    # Mirrors the alreadyReturnedQtys check in verify-order so the server
+    # enforces the same rule even if the client sends stale/manipulated data.
+    # CS exceptions bypass this check (CS may legitimately override).
+    if data.get("orderNumber") and not data.get("csException") and RETURNS_TABLE_ID and read_token:
+        try:
+            _ar_formula = (f"AND({{Order Number}}='{data.get('orderNumber','')}'"
+                           f",OR({{Status}}='New',{{Status}}='Label Sent',"
+                           f"{{Status}}='Items Received',{{Status}}='Partial Received',"
+                           f"{{Status}}='Refunded'),{{Type}}='Return')")
+            _ar_resp = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
+                params={"filterByFormula": _ar_formula, "fields[]": ["Items to Return"], "maxRecords": 20},
+                headers={"Authorization": f"Bearer {read_token}"},
+                timeout=10,
+            )
+            _already = {}
+            for _rec in _ar_resp.json().get("records", []):
+                for _line in _rec.get("fields", {}).get("Items to Return", "").split("\n"):
+                    _m = _re_ret.match(r'(\d+)x\s+(\S+)\s+[—\-]', _line.strip())
+                    if _m:
+                        _sku = _m.group(2).strip()
+                        _already[_sku] = _already.get(_sku, 0) + int(_m.group(1))
+            if _already:
+                _filtered = []
+                for _line in data.get("itemsToReturn", "").strip().split("\n"):
+                    _m = _re_ret.match(r'(\d+)x\s+(\S+)\s+[—\-](.*)', _line.strip())
+                    if _m:
+                        _qty  = int(_m.group(1))
+                        _sku  = _m.group(2).strip()
+                        _rest = _m.group(3)
+                        _remaining = _qty - _already.get(_sku, 0)
+                        if _remaining > 0:
+                            _filtered.append(f"{_remaining}x {_sku} —{_rest}")
+                    else:
+                        if _line.strip():
+                            _filtered.append(_line)
+                if not _filtered:
+                    return Response(json.dumps({"success": False,
+                        "error": "A return has already been submitted for these items."}),
+                        headers=c, mimetype="application/json")
+                data = dict(data)
+                data["itemsToReturn"] = "\n".join(_filtered)
+                fields["Items to Return"] = data["itemsToReturn"]
+        except Exception as _ar_err:
+            print(f"[submit-return] Could not check already-returned items: {_ar_err}")
+
+    # ── Reuse existing "Needs Review" or in-flight "New" record ──────────
+    # Prevents duplicate records when label generation fails and the customer
+    # retries, or when two requests race in nearly simultaneously.
     existing_nr_ids = []
     record_id = None
     if data.get("orderNumber"):
         try:
             nr_formula = (f"AND({{Order Number}}='{data.get('orderNumber','')}'"
-                          f",{{Status}}='Needs Review',{{Type}}='Return')")
+                          f",OR({{Status}}='Needs Review',{{Status}}='New'),{{Type}}='Return')")
             nr_resp = req_lib.get(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
                 params={"filterByFormula": nr_formula, "fields[]": ["Status"], "maxRecords": 10},
@@ -2115,7 +2189,21 @@ def submit_return():
     def process_label(record_id, data, addr):
         try:
             # ── Create Return Items (combo-expanded checklist for CS) ─────────
-            create_return_items(record_id, data.get("itemsToReturn", ""))
+            # Guard: skip if items already exist for this record (handles retries
+            # where we reused an existing record that already had items created).
+            _has_items = False
+            try:
+                _ri_check = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
+                    params={"fields[]": ["Return Items"]},
+                    headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
+                    timeout=10,
+                )
+                _has_items = len(_ri_check.json().get("fields", {}).get("Return Items", [])) > 0
+            except Exception:
+                pass
+            if not _has_items:
+                create_return_items(record_id, data.get("itemsToReturn", ""))
 
             addr_for_label = {
                 "name":       addr.get("name", data.get("customerName", "")),

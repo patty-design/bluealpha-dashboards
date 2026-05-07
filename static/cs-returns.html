@@ -239,6 +239,9 @@
     .item-qty-selector input { width: 42px; text-align: center; border: 1.5px solid var(--navy); border-radius: 6px; padding: 3px 4px; font-size: 0.85rem; font-weight: 600; }
     .item-row.selected.multi-qty .item-qty { display: none; }
     .item-row.selected.multi-qty .item-qty-selector { display: flex; }
+    .item-row.already-returned { opacity: 0.5; cursor: not-allowed !important; background: #f5f5f5; }
+    .item-row.already-returned .item-checkbox { background: #ccc; border-color: #ccc; }
+    .returned-badge { display: inline-block; margin-left: 6px; font-size: 0.72rem; font-weight: 700; color: #7b4000; background: #fff3e0; border-radius: 4px; padding: 1px 6px; }
 
     .address-block {
       background: var(--light);
@@ -917,7 +920,7 @@ function populateOrderInfo(data) {
     (data.shipDate ? '📦 Shipped: ' + data.shipDate.slice(0,10) + '<br>' : '') +
     trackingHtml;
 
-  buildItemsList(data.items || []);
+  buildItemsList(data.items || [], data.alreadyReturnedQtys || {});
 
   // Email + address (return mode)
   document.getElementById('cs-email').value = data.email || '';
@@ -943,13 +946,21 @@ function populateOrderInfo(data) {
   document.getElementById('order-info-block').classList.remove('hidden');
 }
 
-function buildItemsList(items) {
+function buildItemsList(items, alreadyReturnedQtys) {
   const list = document.getElementById('cs-items-list');
   list.innerHTML = '';
   const lostMode = currentMode === 'lost';
+  const returnedQtys = alreadyReturnedQtys || {};
   items.forEach(function(item, idx) {
-    const isMulti = item.quantity > 1;
+    const returnedQty   = returnedQtys[item.sku] || 0;
+    const remainingQty  = item.quantity - returnedQty;
+    const fullyReturned = remainingQty <= 0;
+    const partiallyReturned = returnedQty > 0 && remainingQty > 0;
+    const isMulti = remainingQty > 1;
     const row = document.createElement('div');
+    var badge = '';
+    if (fullyReturned) badge = ' <span class="returned-badge">Return already requested</span>';
+    else if (partiallyReturned) badge = ' <span class="returned-badge">' + returnedQty + ' of ' + item.quantity + ' already requested</span>';
     if (lostMode) {
       // In lost mode, all items are always reshipped — show as read-only selected
       row.className = 'item-row selected' + (isMulti ? ' multi-qty' : '');
@@ -958,21 +969,31 @@ function buildItemsList(items) {
         '<div class="item-checkbox"></div>' +
         '<div class="item-info">' +
           '<div class="item-name">' + item.name + '</div>' +
-          '<div class="item-sku">' + item.sku + '</div>' +
+          '<div class="item-sku">' + item.sku + badge + '</div>' +
+        '</div>' +
+        '<div class="item-qty">Qty: ' + item.quantity + '</div>';
+    } else if (fullyReturned) {
+      row.className = 'item-row already-returned';
+      row.innerHTML =
+        '<div class="item-checkbox"></div>' +
+        '<div class="item-info">' +
+          '<div class="item-name">' + item.name + '</div>' +
+          '<div class="item-sku">' + item.sku + badge + '</div>' +
         '</div>' +
         '<div class="item-qty">Qty: ' + item.quantity + '</div>';
     } else {
       row.className = 'item-row' + (isMulti ? ' multi-qty' : '');
       row.dataset.idx = idx;
+      row.dataset.remainingQty = remainingQty;
       row.innerHTML =
         '<div class="item-checkbox"></div>' +
         '<div class="item-info">' +
           '<div class="item-name">' + item.name + '</div>' +
-          '<div class="item-sku">' + item.sku + '</div>' +
+          '<div class="item-sku">' + item.sku + badge + '</div>' +
         '</div>' +
-        '<div class="item-qty">Qty: ' + item.quantity + '</div>' +
+        '<div class="item-qty">Qty: ' + remainingQty + '</div>' +
         (isMulti
-          ? '<div class="item-qty-selector"><input type="number" min="1" max="' + item.quantity + '" value="' + item.quantity + '" class="cancel-qty-input" onclick="event.stopPropagation()" oninput="this.value=Math.min(' + item.quantity + ',Math.max(1,parseInt(this.value)||1))"> of ' + item.quantity + '</div>'
+          ? '<div class="item-qty-selector"><input type="number" min="1" max="' + remainingQty + '" value="' + remainingQty + '" class="cancel-qty-input" onclick="event.stopPropagation()" oninput="this.value=Math.min(' + remainingQty + ',Math.max(1,parseInt(this.value)||1))"> of ' + remainingQty + '</div>'
           : '');
       row.addEventListener('click', function() { row.classList.toggle('selected'); });
     }
