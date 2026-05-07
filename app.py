@@ -5591,7 +5591,7 @@ def portal_team_list(user):
             CUSTOMERS_TABLE_ID, read_token,
             fields=["Main Contact Name", "Organization Name", "Portal Username",
                     "Portal Role", "Parent Company", "Main Contact Email", "Password Hash"],
-            formula=f"OR(NOT({{Portal Username}}=''),NOT({{Main Contact Email}}=''))",
+            formula=f"OR({{Portal Username}}!='',{{Main Contact Email}}!='')",
         )
         # Also fetch the primary record (may not have Portal Username)
         primary_r = req_lib.get(
