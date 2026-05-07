@@ -5082,7 +5082,7 @@ def portal_setup_account():
         _rmap = {"Admin": "admin", "Full Access": "full_access",
                  "Quotes Only": "quotes_only", "Read Only": "read_only"}
         role = _rmap.get(role_raw, "admin" if not parent_ids else "read_only")
-        jwt_token = create_portal_token(rec["id"], customer_id, not bool(parent_ids))
+        jwt_token = create_portal_token(rec["id"], customer_id, not bool(parent_ids), role)
         resp = make_response(Response(json.dumps({"ok": True}), headers=c, mimetype="application/json"))
         resp.set_cookie("ba_portal_session", jwt_token, max_age=30*24*3600,
                         httponly=True, samesite="Lax", secure=True)
