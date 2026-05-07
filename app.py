@@ -5735,8 +5735,9 @@ def portal_team_add(user):
             json={"fields": fields}, timeout=15,
         )
         if not r.ok:
-            print(f"[portal_team_add] Airtable error {r.status_code}: {r.text[:300]}")
-            return Response(json.dumps({"error": "Failed to create team member. Please try again."}),
+            err_detail = r.text[:300]
+            print(f"[portal_team_add] Airtable error {r.status_code}: {err_detail}")
+            return Response(json.dumps({"error": f"[{r.status_code}] {err_detail}"}),
                             status=500, headers=c, mimetype="application/json")
         new_id = r.json().get("id", "")
 
