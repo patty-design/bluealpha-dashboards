@@ -5026,7 +5026,7 @@ def portal_setup_account():
                         status=400, headers=c, mimetype="application/json")
 
     read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-    write_token = RETURNS_WRITE_TOKEN
+    write_token = APPLY_WRITE_TOKEN or RETURNS_WRITE_TOKEN
     try:
         # Find record by invite token
         records = at_get_all(CUSTOMERS_TABLE_ID, read_token,
@@ -5709,7 +5709,7 @@ def portal_team_add(user):
         return Response(json.dumps({"error": "Role must be Full Access, Quotes Only, or Read-Only"}),
                         status=400, headers=c, mimetype="application/json")
 
-    write_token = RETURNS_WRITE_TOKEN
+    write_token = APPLY_WRITE_TOKEN or RETURNS_WRITE_TOKEN
     read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
     try:
         # Fetch company name for invite email
@@ -5761,7 +5761,7 @@ def portal_team_resend_invite(user, record_id):
                         status=403, headers=c, mimetype="application/json")
     customer_id = user.get("customer_id", "")
     read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-    write_token = RETURNS_WRITE_TOKEN
+    write_token = APPLY_WRITE_TOKEN or RETURNS_WRITE_TOKEN
     try:
         # Verify record belongs to this account and has no password yet
         r = req_lib.get(f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{record_id}",
