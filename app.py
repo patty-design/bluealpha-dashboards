@@ -3681,7 +3681,7 @@ def _build_catalog():
         [{"id": k, "name": v["name"], "category": v["category"],
           "addons": addon_parent_map.get(k, [])}
          for k, v in seen_parents.items()],
-        key=lambda x: (1 if x["name"].lower() in _SORT_LAST_PARENTS else 0, x["name"]),
+        key=lambda x: (-1 if x["name"].lower() in _SORT_FIRST_PARENTS else 1 if x["name"].lower() in _SORT_LAST_PARENTS else 0, x["name"]),
     )
     return {"parents": parents, "skus": skus, "addonSkus": addon_sku_map}
 
@@ -3782,6 +3782,11 @@ _PARENT_NAME_OVERRIDES = {
 _COLOR_NAME_OVERRIDES = {
     "mc classic": "Multicam Classic",
     "mc black":   "Multicam Black",
+}
+
+# Parents that should sort first within their category (post-clean lowercase)
+_SORT_FIRST_PARENTS = {
+    "battle belt lite",
 }
 
 # Parents that should sort last within their category (post-clean lowercase)
