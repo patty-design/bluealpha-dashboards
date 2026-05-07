@@ -774,8 +774,9 @@ function render() {
   // Render table
   renderItemsTable();
 
-  // Edit controls visibility
-  const editable = !q.isAccepted && !q.isExpired;
+  // Edit controls visibility — only users who can create quotes may edit line items
+  const canEdit = !portalUser || portalUser.canCreateQuote !== false;
+  const editable = !q.isAccepted && !q.isExpired && canEdit;
   document.getElementById('addItemSection').classList.toggle('hidden', !editable);
   document.getElementById('saveRow').classList.toggle('hidden', !editable);
   document.getElementById('thRemove').textContent = editable ? '' : '';
@@ -786,7 +787,8 @@ function render() {
 
 function renderItemsTable() {
   const q = quoteData;
-  const editable = !q.isAccepted && !q.isExpired;
+  const canEdit = !portalUser || portalUser.canCreateQuote !== false;
+  const editable = !q.isAccepted && !q.isExpired && canEdit;
 
   document.getElementById('itemCount').textContent = editItems.length;
 
@@ -855,12 +857,14 @@ function buildActions(editable) {
         bar.appendChild(updateBtn);
       }
 
-      // "Remove Quote" — hide from customer view
-      const removeBtn = document.createElement('button');
-      removeBtn.className   = 'btn btn-secondary';
-      removeBtn.textContent = 'Remove Quote';
-      removeBtn.onclick     = hideQuote;
-      bar.appendChild(removeBtn);
+      // "Remove Quote" — hide from customer view (Quotes Only+ only)
+      if (portalUser.canCreateQuote !== false) {
+        const removeBtn = document.createElement('button');
+        removeBtn.className   = 'btn btn-secondary';
+        removeBtn.textContent = 'Remove Quote';
+        removeBtn.onclick     = hideQuote;
+        bar.appendChild(removeBtn);
+      }
     }
 
   } else if (editable) {

@@ -4311,6 +4311,10 @@ def update_quote(record_id):
     if request.method == "OPTIONS":
         return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
     c = cors()
+    # If called from a portal session, enforce create_quote permission
+    _pu = get_portal_user(request)
+    if _pu is not None and not portal_can(_pu, "create_quote"):
+        return Response(json.dumps({"error": "Insufficient permissions"}), status=403, headers=c, mimetype="application/json")
     write_token = RETURNS_WRITE_TOKEN
     # Use broadest available read token for verification (write token may lack read scope)
     read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
@@ -4365,6 +4369,10 @@ def accept_quote(record_id):
     if request.method == "OPTIONS":
         return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
     c = cors()
+    # If called from a portal session, enforce accept_quote permission
+    _pu = get_portal_user(request)
+    if _pu is not None and not portal_can(_pu, "accept_quote"):
+        return Response(json.dumps({"error": "Insufficient permissions"}), status=403, headers=c, mimetype="application/json")
     from datetime import date as dt_date
     token = RETURNS_WRITE_TOKEN
 
@@ -6041,6 +6049,8 @@ def portal_duplicate_quote(user, record_id):
 def portal_hide_quote(user, record_id):
     """Mark a quote as Hidden from Customer (soft delete from customer view)."""
     c = cors()
+    if not portal_can(user, "create_quote"):
+        return Response(json.dumps({"error": "Insufficient permissions"}), status=403, headers=c, mimetype="application/json")
     customer_id = user.get("customer_id", "")
     token      = RETURNS_WRITE_TOKEN
     read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
