@@ -3884,6 +3884,105 @@ _SORT_LAST_PARENTS = {
     "1.5\" low profile inner only belt",
 }
 
+@app.route("/api/admin/retry-label/<return_record_id>", methods=["POST"])
+def admin_retry_label(return_record_id):
+    """Re-trigger label generation + email for an existing return record."""
+    read_token  = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    write_token = RETURNS_WRITE_TOKEN
+    if not read_token or not write_token or not RETURNS_TABLE_ID:
+        return Response(json.dumps({"ok": False, "error": "Not configured"}), status=500, mimetype="application/json")
+    try:
+        # Fetch the return record
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{return_record_id}",
+            headers={"Authorization": f"Bearer {read_token}"}, timeout=10,
+        )
+        fields = r.json().get("fields", {})
+        if not fields:
+            return Response(json.dumps({"ok": False, "error": "Record not found or no fields"}), status=404, mimetype="application/json")
+
+        # Address stored as "Name, Street1, City, State, PostalCode" (5-part)
+        addr_str = fields.get("Confirmed Shipping Address", "")
+        parts = [p.strip() for p in addr_str.split(",")]
+        addr = {
+            "name":       parts[0] if len(parts) > 0 else "",
+            "street1":    parts[1] if len(parts) > 1 else "",
+            "street2":    "",
+            "city":       parts[2] if len(parts) > 2 else "",
+            "state":      parts[3].strip() if len(parts) > 3 else "",
+            "postalCode": parts[4].strip() if len(parts) > 4 else "",
+        }
+        body    = request.get_json() or {}
+        # orderId not stored in Airtable — caller must supply it, or we parse from WC link
+        wc_link = fields.get("WooCommerce Order Link", "")
+        import re as _re_rl
+        wc_id_m = _re_rl.search(r'post=(\d+)', wc_link)
+        order_id = body.get("orderId") or (wc_id_m.group(1) if wc_id_m else "")
+        data = {
+            "orderNumber":    fields.get("Order Number", ""),
+            "customerName":   fields.get("Customer Name from Shipstation", ""),
+            "email":          fields.get("Email Address", ""),
+            "phone":          fields.get("Phone Number", ""),
+            "itemsToReturn":  fields.get("Items to Return", ""),
+            "reasonForReturn":fields.get("Reason for Return", ""),
+            "orderId":        order_id,
+        }
+
+        # Reset status to New so background thread can update it
+        req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{return_record_id}",
+            headers={"Authorization": f"Bearer {write_token}", "Content-Type": "application/json"},
+            json={"fields": {"Status": "New", "Status Notes": "Retrying label generation"}},
+            timeout=10,
+        )
+
+        # Re-run label generation in background
+        def _retry(rid, d, a):
+            try:
+                addr_for_label = {
+                    "name": a.get("name", d.get("customerName", "")),
+                    "street1": a.get("street1", ""), "street2": a.get("street2", ""),
+                    "city": a.get("city", ""), "state": a.get("state", ""),
+                    "postalCode": a.get("postalCode", ""), "phone": d.get("phone", ""),
+                }
+                tracking_number, label_pdf_b64 = create_return_label(
+                    d.get("orderId"), addr_for_label,
+                    customer_email=d.get("email", ""), order_number=d.get("orderNumber", ""),
+                )
+                if not label_pdf_b64:
+                    raise Exception("No PDF data returned by ShipStation")
+                import time as _t
+                label_url = f"{FLASK_BASE_URL}/api/return-label/{rid}"
+                req_lib.patch(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{rid}",
+                    headers={"Authorization": f"Bearer {write_token}", "Content-Type": "application/json"},
+                    json={"fields": {"Return Tracking #": tracking_number, "Label PDF Data": label_pdf_b64, "Return Label URL": label_url}},
+                    timeout=10,
+                )
+                status_update = {"Status": "Needs Review", "Status Notes": "No customer email on file"}
+                if d.get("email"):
+                    ok, err = send_return_label_email(d["email"], d.get("customerName", ""), d.get("orderNumber", ""), label_pdf_b64)
+                    status_update = {"Status": "Label Sent"} if ok else {"Status": "Needs Review", "Status Notes": f"Email failed: {err}"}
+                req_lib.patch(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{rid}",
+                    headers={"Authorization": f"Bearer {write_token}", "Content-Type": "application/json"},
+                    json={"fields": status_update}, timeout=10,
+                )
+                print(f"[retry-label] {rid} → {status_update.get('Status')}")
+            except Exception as ex:
+                print(f"[retry-label] failed for {rid}: {ex}")
+                req_lib.patch(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{rid}",
+                    headers={"Authorization": f"Bearer {write_token}", "Content-Type": "application/json"},
+                    json={"fields": {"Status": "Needs Review", "Status Notes": f"Retry failed: {ex}"}}, timeout=10,
+                )
+
+        threading.Thread(target=_retry, args=(return_record_id, data, addr), daemon=True).start()
+        return Response(json.dumps({"ok": True, "message": "Label generation re-triggered"}), mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"ok": False, "error": str(e)}), status=500, mimetype="application/json")
+
+
 @app.route("/api/admin/delete-return-items", methods=["POST"])
 def admin_delete_return_items():
     """Delete specific Return Item records by ID list."""
