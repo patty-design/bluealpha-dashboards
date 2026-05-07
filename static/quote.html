@@ -1077,11 +1077,23 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredA
     }
   }
 
-  // Sort add-ons: "None" always first, then alphabetically
+  // Sort add-ons: "None" always first, then by custom order if defined, then alphabetically
+  const _ADDON_ORDER = {
+    'low profile inner': 0,
+    'outer only':        1,
+    'combo':             2,
+    'ultimate combo':    3,
+  };
+  const _parentEntrySort = catalog?.parents?.find(p => p.id === parentId);
+  const _useCustomOrder  = (_parentEntrySort?.name || '').toLowerCase().includes('battle belt lite');
   const addons = Object.entries(addonMap).sort((a,b) => {
     const an = a[1].toLowerCase(), bn = b[1].toLowerCase();
     if (an === 'none') return -1;
     if (bn === 'none') return 1;
+    if (_useCustomOrder) {
+      const ao = _ADDON_ORDER[an] ?? 99, bo = _ADDON_ORDER[bn] ?? 99;
+      if (ao !== bo) return ao - bo;
+    }
     return a[1].localeCompare(b[1]);
   });
   if (addons.length === 0) { addonRow.classList.add('hidden'); return; }
