@@ -2743,6 +2743,15 @@ def return_label_pdf(record_id):
         return Response(f"Error: {e}", status=500)
 
 
+@app.route("/api/ss-tags")
+def ss_tags():
+    """Temporary: list all ShipStation tags with IDs for config setup."""
+    cors_headers = {"Access-Control-Allow-Origin": "*"}
+    r = req_lib.get("https://ssapi.shipstation.com/accounts/listtags",
+                    headers=ss_headers(), timeout=15)
+    return Response(r.text, headers=cors_headers, mimetype="application/json")
+
+
 @app.route("/api/awaiting")
 def awaiting_shipment():
     cors_headers = {"Access-Control-Allow-Origin": "*"}
