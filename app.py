@@ -3776,6 +3776,8 @@ _EXCLUDED_COLORS_BY_PARENT = {
 _PARENT_NAME_OVERRIDES = {
     "1.5\" lp inner only belt": "1.5\" Low Profile Inner Only Belt",
     "keepers": "Keepers (set of 4)",
+    "1.75\" battle belt - aluminum cobra® buckle": "1.75\" MOLLE Battle Belt - Aluminum COBRA® Buckle",
+    "1.75\" battle belt - d-ring cobra® buckle":   "1.75\" MOLLE Battle Belt - D-ring COBRA® Buckle",
 }
 
 # Color display name overrides (lowercase color name from Airtable → desired display name)
