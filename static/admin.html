@@ -334,6 +334,13 @@
           </div>
           <hr style="border:none;border-top:1px solid var(--border);margin:24px 0;">
           <div class="users-section">
+            <h3>Product Catalog</h3>
+            <p style="font-size:0.85rem;color:#666;margin-bottom:14px;">The portal catalog refreshes automatically every 30 minutes. Use this to pick up Airtable changes immediately.</p>
+            <div id="refreshCatalogMsg"></div>
+            <button class="btn btn-outline" onclick="doRefreshCatalog()">🔄 Refresh Catalog Now</button>
+          </div>
+          <hr style="border:none;border-top:1px solid var(--border);margin:24px 0;">
+          <div class="users-section">
             <h3>Add New User</h3>
             <div id="addUserMsg"></div>
             <div class="add-user-form">
@@ -735,6 +742,27 @@
       } catch (e) {
         alert('Network error.');
       }
+    }
+
+    async function doRefreshCatalog() {
+      const btn = document.querySelector('[onclick="doRefreshCatalog()"]');
+      const msg = document.getElementById('refreshCatalogMsg');
+      btn.disabled = true;
+      btn.textContent = '⏳ Refreshing…';
+      msg.innerHTML = '';
+      try {
+        const r = await fetch('/api/admin/refresh-catalog', { method: 'POST', headers: { 'Authorization': 'Bearer ' + _token } });
+        const d = await r.json();
+        if (d.ok) {
+          msg.innerHTML = `<div style="color:#1a7a3c;font-size:0.85rem;margin-bottom:10px;">✅ Catalog updated — ${d.parents} products, ${d.skus} SKUs.</div>`;
+        } else {
+          msg.innerHTML = `<div style="color:var(--red);font-size:0.85rem;margin-bottom:10px;">❌ Refresh failed: ${d.error}</div>`;
+        }
+      } catch(e) {
+        msg.innerHTML = `<div style="color:var(--red);font-size:0.85rem;margin-bottom:10px;">❌ Error: ${e.message}</div>`;
+      }
+      btn.disabled = false;
+      btn.textContent = '🔄 Refresh Catalog Now';
     }
 
     async function doAddUser() {
