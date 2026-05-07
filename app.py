@@ -5326,7 +5326,7 @@ def portal_quotes(user):
         records = at_get_all(
             MANUAL_ORDERS_TABLE_ID, read_token,
             fields=["Document ID", "Order ID", "Date", "Expiry Date", "MO Is Approved",
-                    "MO Line Items", "Customer"],
+                    "MO Line Items", "Customer", "Hidden from Customer"],
             formula=formula,
         )
         # Filter to only this customer's quotes (Customer field returns record ID array)
