@@ -269,7 +269,7 @@
     <div class="tab-panel" id="tab-our-quotes">
       <div class="card">
         <div class="card-title">Our Quotes</div>
-        <p class="card-sub">Active quotes from Blue Alpha — click View to review, edit, or accept.</p>
+        <p class="card-sub" id="quotesSubtitle">Active quotes from Blue Alpha — click View to review and download.</p>
         <div id="quotesContent"><div class="loading">Loading quotes…</div></div>
       </div>
     </div>
@@ -387,6 +387,18 @@
         // Show Team tab for admins
         if (portalMe.canManageTeam) {
           document.getElementById('teamTab').style.display = '';
+        }
+
+        // Update Our Quotes subtitle based on role
+        const qSub = document.getElementById('quotesSubtitle');
+        if (qSub) {
+          if (portalMe.canAcceptQuote) {
+            qSub.textContent = 'Active quotes from Blue Alpha — click View to review, edit, or accept.';
+          } else if (portalMe.canCreateQuote) {
+            qSub.textContent = 'Active quotes from Blue Alpha — click View to review or edit.';
+          } else {
+            qSub.textContent = 'Active quotes from Blue Alpha — click View to review and download.';
+          }
         }
 
         // Hide New Quote tab / show read-only message if no create_quote permission

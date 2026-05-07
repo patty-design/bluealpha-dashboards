@@ -4136,6 +4136,10 @@ def create_quote():
     if request.method == "OPTIONS":
         return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
     c = cors()
+    # If called from a portal session, enforce create_quote permission
+    _pu = get_portal_user(request)
+    if _pu is not None and not portal_can(_pu, "create_quote"):
+        return Response(json.dumps({"error": "Insufficient permissions"}), status=403, headers=c, mimetype="application/json")
     from datetime import date as dt_date, timedelta
     data = request.get_json() or {}
     token = RETURNS_WRITE_TOKEN
