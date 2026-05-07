@@ -3661,6 +3661,10 @@ def _build_catalog():
             continue
         addon_name_map[r["id"]] = name
         for pid in r["fields"].get("Parent Products", []):
+            parent_name_for_addon = _clean_product_name(parent_map.get(pid, "")).lower()
+            excluded_for_parent = _EXCLUDED_ADDONS_BY_PARENT.get(parent_name_for_addon, set())
+            if name.lower() in excluded_for_parent:
+                continue
             addon_parent_map.setdefault(pid, []).append({"id": r["id"], "name": name})
 
     # Build add-on SKU map: addonId → colorId → {recordId, price, name, sizeId}
@@ -3845,6 +3849,11 @@ _EXCLUDED_FEATURE_VARS_GLOBAL = {
 _EXCLUDED_ADDONS_GLOBAL = {
     "easy tape",
     "one wrap",
+}
+
+# Add-ons to exclude per parent (lowercase parent name → set of lowercase add-on names)
+_EXCLUDED_ADDONS_BY_PARENT = {
+    "1.75\" battle belt lite": {"outer only"},
 }
 
 # Colors to exclude globally (lowercase color names)
