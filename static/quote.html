@@ -1119,7 +1119,7 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredA
     const _parentEntry = catalog?.parents?.find(p => p.id === parentId);
     const _parentName  = (_parentEntry?.name || '').toLowerCase();
     const _outerEntry  = _parentName.includes('battle belt lite')
-      ? addons.find(([, name]) => name.toLowerCase() === 'outer only')
+      ? addons.find(([, name]) => name.toLowerCase() === 'low profile inner')
       : null;
     if (_outerEntry) {
       defaultVal = _outerEntry[0];
