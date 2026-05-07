@@ -254,14 +254,14 @@ def _lookup_admin(username, password):
         r = req_lib.get(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}",
             headers=at_headers(read_token),
-            params={"filterByFormula": formula, "fields[]": ["Full Name", "Portal Username", "Password Hash", "Email"]},
+            params={"filterByFormula": formula, "fields[]": ["Full Name", "Portal Username", "Portal Hash", "Email"]},
             timeout=10,
         )
         records = r.json().get("records", [])
         if not records:
             return None
         rec = records[0]
-        stored = rec.get("fields", {}).get("Password Hash", "")
+        stored = rec.get("fields", {}).get("Portal Hash", "")
         if not stored or not _check_password(password, stored):
             return None
         return rec
@@ -277,14 +277,14 @@ def _lookup_portal_user(username, password):
         r = req_lib.get(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}",
             headers=at_headers(read_token),
-            params={"filterByFormula": formula, "fields[]": ["Full Name", "Portal Username", "Password Hash", "Email", "Quote Portal Admin", "Quote Portal CS"]},
+            params={"filterByFormula": formula, "fields[]": ["Full Name", "Portal Username", "Portal Hash", "Email", "Quote Portal Admin", "Quote Portal CS"]},
             timeout=10,
         )
         records = r.json().get("records", [])
         if not records:
             return None, None
         rec = records[0]
-        stored = rec.get("fields", {}).get("Password Hash", "")
+        stored = rec.get("fields", {}).get("Portal Hash", "")
         if not stored or not _check_password(password, stored):
             return None, None
         role = 'admin' if rec.get("fields", {}).get("Quote Portal Admin") else 'cs'
@@ -302,7 +302,7 @@ def _lookup_portal_customer(username, password):
     try:
         records = at_get_all(
             CUSTOMERS_TABLE_ID, read_token,
-            fields=["Portal Username", "Password Hash", "Portal Role",
+            fields=["Portal Username", "Portal Hash", "Portal Role",
                     "Parent Company", "Application Status"],
             formula=formula,
         )
@@ -310,7 +310,7 @@ def _lookup_portal_customer(username, password):
             return None, None, None
         rec = records[0]
         f = rec.get("fields", {})
-        stored_hash = f.get("Password Hash", "")
+        stored_hash = f.get("Portal Hash", "")
         if not stored_hash or not _check_password(password, stored_hash):
             return None, None, None
         # Only approved customers can log in
@@ -5030,7 +5030,7 @@ def portal_setup_account():
     try:
         # Find record by invite token
         records = at_get_all(CUSTOMERS_TABLE_ID, read_token,
-                             fields=["Magic Token", "Token Expiry", "Password Hash",
+                             fields=["Magic Token", "Token Expiry", "Portal Hash",
                                      "Portal Role", "Parent Company", "Main Contact Email"],
                              formula=f"{{Magic Token}}='{token}'")
         if not records:
@@ -5067,7 +5067,7 @@ def portal_setup_account():
             headers={**at_headers(write_token), "Content-Type": "application/json"},
             json={"fields": {
                 "Portal Username": username,
-                "Password Hash":   pw_hash,
+                "Portal Hash":   pw_hash,
                 "Magic Token":     "",
                 "Token Expiry":    None,
                 "Last Login":      datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
@@ -5562,7 +5562,7 @@ def portal_set_password(user):
         r = req_lib.patch(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{user_id}",
             headers={**at_headers(write_token), "Content-Type": "application/json"},
-            json={"fields": {"Portal Username": username, "Password Hash": pw_hash}},
+            json={"fields": {"Portal Username": username, "Portal Hash": pw_hash}},
             timeout=10,
         )
         r.raise_for_status()
@@ -5590,7 +5590,7 @@ def portal_team_list(user):
         records = at_get_all(
             CUSTOMERS_TABLE_ID, read_token,
             fields=["Main Contact Name", "Organization Name", "Portal Username",
-                    "Portal Role", "Parent Company", "Main Contact Email", "Password Hash"],
+                    "Portal Role", "Parent Company", "Main Contact Email", "Portal Hash"],
             formula=f"OR({{Portal Username}}!='',{{Main Contact Email}}!='')",
         )
         # Also fetch the primary record (may not have Portal Username)
@@ -5632,7 +5632,7 @@ def portal_team_list(user):
                 "email":        f.get("Main Contact Email", ""),
                 "role":         srole,
                 "isOwner":      False,
-                "pendingSetup": not bool(f.get("Password Hash")),
+                "pendingSetup": not bool(f.get("Portal Hash")),
             })
             seen_ids.add(r["id"])
 
@@ -5769,7 +5769,7 @@ def portal_team_resend_invite(user, record_id):
         f = r.json().get("fields", {})
         if customer_id not in f.get("Parent Company", []):
             return Response(json.dumps({"error": "Not found"}), status=404, headers=c, mimetype="application/json")
-        if f.get("Password Hash"):
+        if f.get("Portal Hash"):
             return Response(json.dumps({"error": "User has already completed setup"}),
                             status=400, headers=c, mimetype="application/json")
 
@@ -5868,7 +5868,7 @@ def portal_team_reset_password(user, record_id):
         pr = req_lib.patch(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{record_id}",
             headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
-            json={"fields": {"Password Hash": new_hash}},
+            json={"fields": {"Portal Hash": new_hash}},
             timeout=10,
         )
         pr.raise_for_status()
@@ -6166,7 +6166,7 @@ def admin_add_user():
     pw_hash = _hash_password(password)
     fields = {
         "Portal Username":    username,
-        "Password Hash":      pw_hash,
+        "Portal Hash":      pw_hash,
         "Quote Portal Admin": role == "admin",
         "Quote Portal CS":    role == "cs",
     }
@@ -6222,7 +6222,7 @@ def admin_reset_user_password(record_id):
         r = req_lib.patch(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}/{record_id}",
             headers={**at_headers(write_token), "Content-Type": "application/json"},
-            json={"fields": {"Password Hash": new_hash}},
+            json={"fields": {"Portal Hash": new_hash}},
             timeout=10,
         )
         if r.status_code != 200:
@@ -6244,7 +6244,7 @@ def admin_remove_user(record_id):
             headers={**at_headers(write_token), "Content-Type": "application/json"},
             json={"fields": {
                 "Portal Username":    "",
-                "Password Hash":      "",
+                "Portal Hash":      "",
                 "Quote Portal Admin": False,
                 "Quote Portal CS":    False,
             }},
@@ -6285,7 +6285,7 @@ def portal_change_password():
         r = req_lib.patch(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}/{record_id}",
             headers={**at_headers(write_token), "Content-Type": "application/json"},
-            json={"fields": {"Password Hash": new_hash}},
+            json={"fields": {"Portal Hash": new_hash}},
             timeout=10,
         )
         if r.status_code != 200:
