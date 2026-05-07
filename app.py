@@ -3884,6 +3884,56 @@ _SORT_LAST_PARENTS = {
     "1.5\" low profile inner only belt",
 }
 
+@app.route("/api/admin/dedup-return-items/<return_record_id>", methods=["POST"])
+def admin_dedup_return_items(return_record_id):
+    """Delete duplicate Return Items for a given Return record, keeping first per SKU."""
+    write_token = RETURNS_WRITE_TOKEN
+    if not write_token or not RETURN_ITEMS_TABLE_ID:
+        return Response(json.dumps({"ok": False, "error": "Not configured"}), status=500, mimetype="application/json")
+    try:
+        # Fetch the Return record to get linked Return Item IDs
+        ret_r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{return_record_id}",
+            params={"fields[]": ["Return Items"]},
+            headers={"Authorization": f"Bearer {write_token}"},
+            timeout=10,
+        )
+        item_ids = ret_r.json().get("fields", {}).get("Return Items", [])
+        if not item_ids:
+            return Response(json.dumps({"ok": True, "deleted": 0, "message": "No items found"}), mimetype="application/json")
+
+        # Fetch each item, track first-seen per SKU
+        import time as _time
+        seen_skus = {}
+        to_delete = []
+        for rid in item_ids:
+            r = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURN_ITEMS_TABLE_ID}/{rid}",
+                headers={"Authorization": f"Bearer {write_token}"},
+                timeout=10,
+            )
+            sku = r.json().get("fields", {}).get("SKU", rid)
+            if sku in seen_skus:
+                to_delete.append(rid)
+            else:
+                seen_skus[sku] = rid
+            _time.sleep(0.1)
+
+        # Delete duplicates
+        for rid in to_delete:
+            req_lib.delete(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURN_ITEMS_TABLE_ID}/{rid}",
+                headers={"Authorization": f"Bearer {write_token}"},
+                timeout=10,
+            )
+            _time.sleep(0.1)
+
+        return Response(json.dumps({"ok": True, "deleted": len(to_delete), "kept": list(seen_skus.values())}),
+                        mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"ok": False, "error": str(e)}), status=500, mimetype="application/json")
+
+
 @app.route("/api/admin/refresh-catalog", methods=["POST"])
 def admin_refresh_catalog():
     """Force an immediate synchronous catalog rebuild (internal use)."""
