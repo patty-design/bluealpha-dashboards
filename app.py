@@ -1977,12 +1977,16 @@ def create_return_label(order_id, customer_addr, customer_email="", order_number
     carrier = "stamps_com"
     service = "usps_priority_mail"
     weight  = {"value": 16, "units": "ounces"}
-    if ships:
-        s = ships[0]
+    # Prefer outbound (non-return) shipments so we don't inherit zero weights
+    # from previous failed return label attempts on this order
+    outbound = [s for s in ships if not s.get("isReturnLabel", False)]
+    for s in (outbound or ships):
         carrier = s.get("carrierCode") or carrier
         service = s.get("serviceCode") or service
-        if s.get("weight"):
-            weight = s["weight"]
+        w = s.get("weight") or {}
+        if w.get("value", 0) > 0:
+            weight = w
+        break
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
