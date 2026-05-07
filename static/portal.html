@@ -339,7 +339,7 @@
               <div>
                 <label>Role</label>
                 <select id="newRole" style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:9px 12px;font-size:0.88rem;font-family:'Lato',sans-serif;color:var(--text);">
-                  <option value="Read-Only">Read-Only</option>
+                  <option value="Read Only">Read-Only</option>
                   <option value="Quotes Only">Quotes Only</option>
                   <option value="Full Access" selected>Full Access</option>
                 </select>
@@ -472,7 +472,7 @@
       admin:       'Admin',
       full_access: 'Full Access',
       quotes_only: 'Quotes Only',
-      read_only:   'Read-Only',
+      read_only:   'Read Only',
     };
 
     async function loadTeam() {
@@ -499,7 +499,7 @@
               ${!u.isOwner ? `
                 <select class="role-select" onchange="changeTeamRole('${u.id}', this)"
                         style="border:1px solid var(--border);border-radius:5px;padding:5px 8px;font-size:0.82rem;font-family:'Lato',sans-serif;">
-                  <option value="Read-Only"  ${u.role==='read_only'?'selected':''}>Read-Only</option>
+                  <option value="Read Only"  ${u.role==='read_only'?'selected':''}>Read Only</option>
                   <option value="Quotes Only" ${u.role==='quotes_only'?'selected':''}>Quotes Only</option>
                   <option value="Full Access" ${u.role==='full_access'?'selected':''}>Full Access</option>
                 </select>

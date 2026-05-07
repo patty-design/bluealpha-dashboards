@@ -322,7 +322,7 @@ def _lookup_portal_customer(username, password):
             "Admin":       "admin",
             "Full Access": "full_access",
             "Quotes Only": "quotes_only",
-            "Read-Only":   "read_only",
+            "Read Only":   "read_only",
         }
         role = role_map.get(role_raw, None)
         parent_ids = f.get("Parent Company", [])
@@ -5080,7 +5080,7 @@ def portal_setup_account():
         customer_id = parent_ids[0] if parent_ids else rec["id"]
         role_raw    = (f.get("Portal Role") or "").strip()
         _rmap = {"Admin": "admin", "Full Access": "full_access",
-                 "Quotes Only": "quotes_only", "Read-Only": "read_only"}
+                 "Quotes Only": "quotes_only", "Read Only": "read_only"}
         role = _rmap.get(role_raw, "admin" if not parent_ids else "read_only")
         jwt_token = create_portal_token(rec["id"], customer_id, not bool(parent_ids))
         resp = make_response(Response(json.dumps({"ok": True}), headers=c, mimetype="application/json"))
@@ -5138,11 +5138,11 @@ def auth_magic_link(token):
             if not role_raw:
                 # Re-fetch to get the Portal Role field if not in token fields
                 _role_map = {"Admin": "admin", "Full Access": "full_access",
-                             "Quotes Only": "quotes_only", "Read-Only": "read_only"}
+                             "Quotes Only": "quotes_only", "Read Only": "read_only"}
                 portal_role = None  # legacy → admin
             else:
                 _role_map = {"Admin": "admin", "Full Access": "full_access",
-                             "Quotes Only": "quotes_only", "Read-Only": "read_only"}
+                             "Quotes Only": "quotes_only", "Read Only": "read_only"}
                 portal_role = _role_map.get(role_raw.strip(), None)
         except Exception:
             portal_role = None
@@ -5599,7 +5599,7 @@ def portal_team_list(user):
             headers=at_headers(read_token), timeout=10,
         )
         _role_map = {"Admin": "admin", "Full Access": "full_access",
-                     "Quotes Only": "quotes_only", "Read-Only": "read_only"}
+                     "Quotes Only": "quotes_only", "Read Only": "read_only"}
         team     = []
         seen_ids = set()
 
@@ -5705,8 +5705,8 @@ def portal_team_add(user):
     if not _re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
         return Response(json.dumps({"error": "Please enter a valid email address."}),
                         status=400, headers=c, mimetype="application/json")
-    if role not in ("Full Access", "Quotes Only", "Read-Only"):
-        return Response(json.dumps({"error": "Role must be Full Access, Quotes Only, or Read-Only"}),
+    if role not in ("Full Access", "Quotes Only", "Read Only"):
+        return Response(json.dumps({"error": "Role must be Full Access, Quotes Only, or Read Only"}),
                         status=400, headers=c, mimetype="application/json")
 
     write_token = APPLY_WRITE_TOKEN or RETURNS_WRITE_TOKEN
@@ -5735,9 +5735,8 @@ def portal_team_add(user):
             json={"fields": fields}, timeout=15,
         )
         if not r.ok:
-            err_detail = r.text[:300]
-            print(f"[portal_team_add] Airtable error {r.status_code}: {err_detail}")
-            return Response(json.dumps({"error": f"[{r.status_code}] {err_detail}"}),
+            print(f"[portal_team_add] Airtable error {r.status_code}: {r.text[:300]}")
+            return Response(json.dumps({"error": "Failed to create team member. Please try again."}),
                             status=500, headers=c, mimetype="application/json")
         new_id = r.json().get("id", "")
 
@@ -5802,8 +5801,8 @@ def portal_team_change_role(user, record_id):
     customer_id = user.get("customer_id", "")
     data     = request.get_json() or {}
     new_role = (data.get("role") or "").strip()
-    if new_role not in ("Full Access", "Quotes Only", "Read-Only"):
-        return Response(json.dumps({"error": "Role must be Full Access, Quotes Only, or Read-Only"}),
+    if new_role not in ("Full Access", "Quotes Only", "Read Only"):
+        return Response(json.dumps({"error": "Role must be Full Access, Quotes Only, or Read Only"}),
                         status=400, headers=c, mimetype="application/json")
     read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
     try:
