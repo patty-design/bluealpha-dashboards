@@ -3823,6 +3823,8 @@ _EXCLUDED_PARENTS = {
     # Test / placeholder
     "test parent", "test3", "new parent", "second test parent",
     "see manager", "anklemdkt",
+    # Excluded from portal
+    "adapter",
     # Specific exclusions
     "1.75\" standard belt - both buckles",
     "misc.",
