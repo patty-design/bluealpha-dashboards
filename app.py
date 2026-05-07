@@ -2743,13 +2743,109 @@ def return_label_pdf(record_id):
         return Response(f"Error: {e}", status=500)
 
 
-@app.route("/api/ss-tags")
-def ss_tags():
-    """Temporary: list all ShipStation tags with IDs for config setup."""
+_ONTIME_CACHE = {"ts": 0, "data": None}
+
+_ONTIME_CONTRACT = 137893
+_ONTIME_RULES = [
+    ({49845},                                   3,  True),
+    ({109623, 137358, 105813},                  5,  True),
+    ({137359, 68484, 119374, 123911, 102014},  10, False),
+    ({55571},                                  14, False),
+    ({139291},                                 17, False),
+]
+
+
+def _business_days(start, end):
+    from datetime import timedelta
+    days = 0
+    d = start
+    while d < end:
+        d += timedelta(days=1)
+        if d.weekday() < 5:
+            days += 1
+    return days
+
+
+@app.route("/api/on-time-shipments")
+def on_time_shipments():
+    import time as _time
+    from datetime import datetime, timedelta, date as _date
     cors_headers = {"Access-Control-Allow-Origin": "*"}
-    r = req_lib.get("https://ssapi.shipstation.com/accounts/listtags",
-                    headers=ss_headers(), timeout=15)
-    return Response(r.text, headers=cors_headers, mimetype="application/json")
+
+    now = _time.time()
+    if _ONTIME_CACHE["data"] is not None and now - _ONTIME_CACHE["ts"] < 600:
+        return Response(json.dumps(_ONTIME_CACHE["data"]), headers=cors_headers,
+                        mimetype="application/json")
+
+    if not SHIPSTATION_KEY or not SHIPSTATION_SECRET:
+        return Response(json.dumps({"error": "ShipStation not configured"}),
+                        status=500, headers=cors_headers, mimetype="application/json")
+
+    thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
+    page = 1
+    all_orders = []
+    try:
+        while True:
+            r = req_lib.get(
+                "https://ssapi.shipstation.com/orders",
+                params={
+                    "orderStatus": "shipped",
+                    "shipDateStart": thirty_days_ago,
+                    "pageSize": 500,
+                    "page": page,
+                },
+                headers=ss_headers(),
+                timeout=30,
+            )
+            r.raise_for_status()
+            body = r.json()
+            all_orders.extend(body.get("orders", []))
+            if page >= body.get("pages", 1):
+                break
+            page += 1
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500,
+                        headers=cors_headers, mimetype="application/json")
+
+    on_time = 0
+    total = 0
+    for order in all_orders:
+        tag_ids = set(order.get("tagIds") or [])
+        if _ONTIME_CONTRACT in tag_ids:
+            continue
+
+        sla_days = None
+        use_business = False
+        for rule_tags, days, biz in _ONTIME_RULES:
+            if tag_ids & rule_tags:
+                sla_days = days
+                use_business = biz
+                break
+        if sla_days is None:
+            continue
+
+        create_str = order.get("createDate") or ""
+        ship_str = order.get("shipDate") or ""
+        try:
+            create_d = datetime.strptime(create_str[:10], "%Y-%m-%d").date()
+            ship_d = datetime.strptime(ship_str[:10], "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            continue
+
+        if use_business:
+            age = _business_days(create_d, ship_d)
+        else:
+            age = (ship_d - create_d).days
+
+        total += 1
+        if age < sla_days:
+            on_time += 1
+
+    pct = round(on_time * 100 / total) if total else 0
+    result = {"percent": pct, "onTime": on_time, "total": total, "window": "30d"}
+    _ONTIME_CACHE["ts"] = now
+    _ONTIME_CACHE["data"] = result
+    return Response(json.dumps(result), headers=cors_headers, mimetype="application/json")
 
 
 @app.route("/api/awaiting")
