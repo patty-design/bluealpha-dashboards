@@ -3891,11 +3891,12 @@ def admin_dedup_return_items(return_record_id):
     if not write_token or not RETURN_ITEMS_TABLE_ID:
         return Response(json.dumps({"ok": False, "error": "Not configured"}), status=500, mimetype="application/json")
     try:
-        # Fetch the Return record to get linked Return Item IDs
+        # Fetch the Return record to get linked Return Item IDs (use read token)
+        read_token = AIRTABLE_OPS_TOKEN or write_token
         ret_r = req_lib.get(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{return_record_id}",
             params={"fields[]": ["Return Items"]},
-            headers={"Authorization": f"Bearer {write_token}"},
+            headers={"Authorization": f"Bearer {read_token}"},
             timeout=10,
         )
         item_ids = ret_r.json().get("fields", {}).get("Return Items", [])
