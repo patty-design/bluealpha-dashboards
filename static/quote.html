@@ -673,7 +673,8 @@ function _productHtml(p) {
   const descHtml = _PRODUCT_DESCRIPTIONS[p.name.toLowerCase()]
     ? `<div class="product-desc">${_PRODUCT_DESCRIPTIONS[p.name.toLowerCase()]}</div>`
     : '';
-  const _addonOptional = !p.name.toLowerCase().includes('battle belt lite');
+  const _ADDON_NOT_OPTIONAL = ['battle belt lite', 'mini medical pouch'];
+  const _addonOptional = !_ADDON_NOT_OPTIONAL.some(n => p.name.toLowerCase().includes(n));
   const addonHtml = `<div class="sel-row hidden" id="sarow_${p.id}">
       <div class="sel-field" style="flex:1 1 100%">
         <label>Add-on${_addonOptional ? ' <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0;">(optional)</span>' : ''}</label>
@@ -1130,8 +1131,13 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredA
     // Battle Belt Lite defaults to "Outer Only" add-on
     const _parentEntry = catalog?.parents?.find(p => p.id === parentId);
     const _parentName  = (_parentEntry?.name || '').toLowerCase();
-    const _outerEntry  = _parentName.includes('battle belt lite')
-      ? addons.find(([, name]) => name.toLowerCase() === 'low profile inner')
+    const _ADDON_DEFAULTS = {
+      'battle belt lite':  'low profile inner',
+      'mini medical pouch': '(2) easy tape',
+    };
+    const _defaultAddonName = Object.entries(_ADDON_DEFAULTS).find(([k]) => _parentName.includes(k))?.[1] || null;
+    const _outerEntry = _defaultAddonName
+      ? addons.find(([, name]) => name.toLowerCase() === _defaultAddonName)
       : null;
     if (_outerEntry) {
       defaultVal = _outerEntry[0];
