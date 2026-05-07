@@ -2814,13 +2814,14 @@ def on_time_shipments():
         if _ONTIME_CONTRACT in tag_ids:
             continue
 
+        # If multiple rules match, use the longest (most lenient) SLA
         sla_days = None
         use_business = False
         for rule_tags, days, biz in _ONTIME_RULES:
             if tag_ids & rule_tags:
-                sla_days = days
-                use_business = biz
-                break
+                if sla_days is None or days > sla_days:
+                    sla_days = days
+                    use_business = biz
         if sla_days is None:
             continue
 
