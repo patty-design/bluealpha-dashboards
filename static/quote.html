@@ -1119,6 +1119,8 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredA
     addonSel.appendChild(opt);
   }
   for (const [id, name] of addons) {
+    // Skip the "None" add-on record if a base SKU already provides a None option
+    if (hasBase && name.toLowerCase() === 'none') continue;
     const opt = document.createElement('option');
     opt.value = id; opt.textContent = name;
     addonSel.appendChild(opt);
