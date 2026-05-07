@@ -328,14 +328,11 @@
                 <input type="text" id="newLastName" placeholder="Smith">
               </div>
             </div>
-            <div class="form-row">
+            <div class="form-row" style="grid-template-columns:1fr;">
               <div>
-                <label>Username</label>
-                <input type="text" id="newUsername" placeholder="jsmith.agency" autocomplete="off">
-              </div>
-              <div>
-                <label>Password</label>
-                <input type="password" id="newPassword" placeholder="Min 8 characters" autocomplete="new-password">
+                <label>Email</label>
+                <input type="email" id="newEmail" placeholder="jane@agency.com" autocomplete="off">
+                <div style="font-size:0.76rem;color:var(--muted);margin-top:3px;">They'll receive an invitation to set up their own username and password.</div>
               </div>
             </div>
             <div class="form-row" style="grid-template-columns:1fr;">
@@ -348,7 +345,7 @@
                 </select>
               </div>
             </div>
-            <button class="btn-primary" id="addTeamMemberBtn" onclick="addTeamMember()">Add Team Member</button>
+            <button class="btn-primary" id="addTeamMemberBtn" onclick="addTeamMember()">Send Invite</button>
             <div id="addTeamMsg"></div>
           </div>
         </div>
@@ -494,10 +491,11 @@
               <div class="user-name">
                 ${escHtml(u.name || u.username || '(no name)')}
                 ${u.isOwner ? '<span class="user-primary">Owner</span>' : ''}
+                ${u.pendingSetup ? '<span style="font-size:0.72rem;font-weight:700;background:#fff3cd;color:#856404;border-radius:4px;padding:1px 6px;margin-left:4px;">Invite Pending</span>' : ''}
               </div>
-              <div class="user-email">@${escHtml(u.username || '—')}</div>
+              <div class="user-email">${u.pendingSetup ? escHtml(u.email || '—') : '@' + escHtml(u.username || '—')}</div>
             </div>
-            <div style="display:flex;align-items:center;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
               ${!u.isOwner ? `
                 <select class="role-select" onchange="changeTeamRole('${u.id}', this)"
                         style="border:1px solid var(--border);border-radius:5px;padding:5px 8px;font-size:0.82rem;font-family:'Lato',sans-serif;">
@@ -505,8 +503,12 @@
                   <option value="Quotes Only" ${u.role==='quotes_only'?'selected':''}>Quotes Only</option>
                   <option value="Full Access" ${u.role==='full_access'?'selected':''}>Full Access</option>
                 </select>
-                <button class="btn-sm" style="background:transparent;color:var(--navy);border:1px solid var(--navy);"
-                        onclick="resetTeamPassword('${u.id}', '${escHtml(u.name || u.username)}')">Reset PW</button>
+                ${u.pendingSetup
+                  ? `<button class="btn-sm" style="background:transparent;color:var(--navy);border:1px solid var(--navy);"
+                       onclick="resendInvite('${u.id}', '${escHtml(u.name)}')">Resend Invite</button>`
+                  : `<button class="btn-sm" style="background:transparent;color:var(--navy);border:1px solid var(--navy);"
+                       onclick="resetTeamPassword('${u.id}', '${escHtml(u.name || u.username)}')">Reset PW</button>`
+                }
                 <button class="btn-danger" onclick="removeTeamMember('${u.id}', '${escHtml(u.name || u.username)}')">Remove</button>
               ` : `<span style="font-size:0.82rem;color:var(--muted);">${escHtml(ROLE_LABELS[u.role] || 'Admin')}</span>`}
             </div>
@@ -523,44 +525,50 @@
     async function addTeamMember() {
       const firstName = document.getElementById('newFirstName').value.trim();
       const lastName  = document.getElementById('newLastName').value.trim();
-      const username  = document.getElementById('newUsername').value.trim();
-      const password  = document.getElementById('newPassword').value;
+      const email     = document.getElementById('newEmail').value.trim();
       const role      = document.getElementById('newRole').value;
       const msgEl     = document.getElementById('addTeamMsg');
       msgEl.innerHTML = '';
-      if (!firstName || !lastName || !username || !password) {
+      if (!firstName || !lastName || !email) {
         msgEl.innerHTML = '<div class="msg msg-error">Please fill in all fields.</div>';
-        return;
-      }
-      if (password.length < 8) {
-        msgEl.innerHTML = '<div class="msg msg-error">Password must be at least 8 characters.</div>';
         return;
       }
       const btn = document.getElementById('addTeamMemberBtn');
       btn.disabled = true;
+      btn.textContent = 'Sending…';
       try {
         const resp = await fetch('/api/portal/team/add', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ firstName, lastName, username, password, role }),
+          body:    JSON.stringify({ firstName, lastName, email, role }),
         });
         const data = await resp.json();
         if (data.ok) {
-          msgEl.innerHTML = '<div class="msg msg-success">Team member added successfully.</div>';
+          msgEl.innerHTML = `<div class="msg msg-success">Invite sent to ${escHtml(email)}.</div>`;
           document.getElementById('newFirstName').value = '';
           document.getElementById('newLastName').value  = '';
-          document.getElementById('newUsername').value  = '';
-          document.getElementById('newPassword').value  = '';
+          document.getElementById('newEmail').value     = '';
           teamLoaded = false;
           loadTeam();
         } else {
-          msgEl.innerHTML = `<div class="msg msg-error">${escHtml(data.error || 'Failed to add team member.')}</div>`;
+          msgEl.innerHTML = `<div class="msg msg-error">${escHtml(data.error || 'Failed to send invite.')}</div>`;
         }
       } catch (e) {
         msgEl.innerHTML = '<div class="msg msg-error">Network error. Please try again.</div>';
       } finally {
         btn.disabled = false;
+        btn.textContent = 'Send Invite';
       }
+    }
+
+    async function resendInvite(userId, name) {
+      if (!confirm(`Resend invite to ${name}?`)) return;
+      try {
+        const resp = await fetch(`/api/portal/team/${userId}/resend-invite`, { method: 'POST' });
+        const data = await resp.json();
+        if (data.ok) { alert(`Invite resent to ${name}.`); }
+        else { alert(data.error || 'Failed to resend invite.'); }
+      } catch (e) { alert('Network error. Please try again.'); }
     }
 
     async function changeTeamRole(userId, selectEl) {

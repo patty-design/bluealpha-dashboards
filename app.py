@@ -5003,6 +5003,94 @@ def login_page():
     return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
 
 
+@app.route("/setup-account/<token>")
+def setup_account_page(token):
+    """Serves the account setup page for new sub-users (invited via email)."""
+    return send_from_directory("static", "setup-account.html")
+
+
+@app.route("/api/portal/setup-account", methods=["POST"])
+def portal_setup_account():
+    """Complete account setup: validate invite token, set username + password."""
+    from datetime import datetime, timezone
+    c = cors()
+    data     = request.get_json() or {}
+    token    = (data.get("token") or "").strip()
+    username = (data.get("username") or "").strip().lower()
+    password = (data.get("password") or "").strip()
+    if not token or not username or not password:
+        return Response(json.dumps({"error": "token, username, and password are required"}),
+                        status=400, headers=c, mimetype="application/json")
+    if len(password) < 8:
+        return Response(json.dumps({"error": "Password must be at least 8 characters"}),
+                        status=400, headers=c, mimetype="application/json")
+
+    read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    write_token = RETURNS_WRITE_TOKEN
+    try:
+        # Find record by invite token
+        records = at_get_all(CUSTOMERS_TABLE_ID, read_token,
+                             fields=["Magic Token", "Token Expiry", "Password Hash",
+                                     "Portal Role", "Parent Company", "Main Contact Email"],
+                             formula=f"{{Magic Token}}='{token}'")
+        if not records:
+            return Response(json.dumps({"error": "Invalid or expired invite link"}),
+                            status=400, headers=c, mimetype="application/json")
+        rec = records[0]
+        f   = rec["fields"]
+
+        # Check token expiry
+        expiry_str = f.get("Token Expiry", "")
+        if expiry_str:
+            try:
+                exp_dt = datetime.fromisoformat(expiry_str.replace("Z", "+00:00"))
+                if exp_dt.tzinfo is None:
+                    exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+                if datetime.now(timezone.utc) > exp_dt:
+                    return Response(json.dumps({"error": "Invite link has expired. Ask your admin to resend."}),
+                                    status=400, headers=c, mimetype="application/json")
+            except Exception:
+                pass
+
+        # Check username not already taken
+        existing = at_get_all(CUSTOMERS_TABLE_ID, read_token,
+                              fields=["Portal Username"],
+                              formula=f"LOWER({{Portal Username}})='{username}'")
+        if existing:
+            return Response(json.dumps({"error": "Username already taken — please choose another"}),
+                            status=400, headers=c, mimetype="application/json")
+
+        # Set username + password, clear invite token
+        pw_hash = _hash_password(password)
+        req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{rec['id']}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": {
+                "Portal Username": username,
+                "Password Hash":   pw_hash,
+                "Magic Token":     "",
+                "Token Expiry":    None,
+                "Last Login":      datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            }},
+            timeout=10,
+        )
+
+        # Log them in immediately
+        parent_ids  = f.get("Parent Company", [])
+        customer_id = parent_ids[0] if parent_ids else rec["id"]
+        role_raw    = (f.get("Portal Role") or "").strip()
+        _rmap = {"Admin": "admin", "Full Access": "full_access",
+                 "Quotes Only": "quotes_only", "Read-Only": "read_only"}
+        role = _rmap.get(role_raw, "admin" if not parent_ids else "read_only")
+        jwt_token = create_portal_token(rec["id"], customer_id, not bool(parent_ids))
+        resp = make_response(Response(json.dumps({"ok": True}), headers=c, mimetype="application/json"))
+        resp.set_cookie("ba_portal_session", jwt_token, max_age=30*24*3600,
+                        httponly=True, samesite="Lax", secure=True)
+        return resp
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
 @app.route("/auth/<token>")
 def auth_magic_link(token):
     from datetime import datetime, timezone
@@ -5502,8 +5590,8 @@ def portal_team_list(user):
         records = at_get_all(
             CUSTOMERS_TABLE_ID, read_token,
             fields=["Main Contact Name", "Organization Name", "Portal Username",
-                    "Portal Role", "Parent Company"],
-            formula="NOT({Portal Username}='')",
+                    "Portal Role", "Parent Company", "Main Contact Email", "Password Hash"],
+            formula=f"OR(NOT({{Portal Username}}=''),NOT({{Main Contact Email}}=''))",
         )
         # Also fetch the primary record (may not have Portal Username)
         primary_r = req_lib.get(
@@ -5538,11 +5626,13 @@ def portal_team_list(user):
                 continue
             srole = _role_map.get((f.get("Portal Role") or "").strip(), "read_only")
             team.append({
-                "id":       r["id"],
-                "name":     f.get("Main Contact Name", ""),
-                "username": f.get("Portal Username", ""),
-                "role":     srole,
-                "isOwner":  False,
+                "id":           r["id"],
+                "name":         f.get("Main Contact Name", ""),
+                "username":     f.get("Portal Username", ""),
+                "email":        f.get("Main Contact Email", ""),
+                "role":         srole,
+                "isOwner":      False,
+                "pendingSetup": not bool(f.get("Password Hash")),
             })
             seen_ids.add(r["id"])
 
@@ -5551,52 +5641,142 @@ def portal_team_list(user):
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
 
+def _send_portal_invite_email(to_email, invitee_name, inviter_company, setup_link):
+    """Send a portal account setup invitation email."""
+    if not SENDGRID_API_KEY:
+        return
+    try:
+        first = invitee_name.split()[0] if invitee_name else "there"
+        payload = {
+            "personalizations": [{"to": [{"email": to_email, "name": invitee_name}]}],
+            "from": {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
+            "subject": f"You've been invited to the Blue Alpha Portal",
+            "content": [{"type": "text/html", "value": f"""
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;padding:32px 16px;color:#1a2633;">
+  <img src="https://bluealphabelts.com/wp-content/uploads/2021/01/Blue-Alpha-Logo-White-Background.png" alt="Blue Alpha" style="height:40px;margin-bottom:24px;">
+  <h2 style="font-size:20px;font-weight:700;margin:0 0 12px;">You've been invited</h2>
+  <p style="font-size:15px;margin:0 0 16px;">Hi {first},</p>
+  <p style="font-size:15px;margin:0 0 24px;">{inviter_company} has invited you to join their Blue Alpha quote portal account. Click the button below to set up your username and password.</p>
+  <a href="{setup_link}" style="display:inline-block;background:#1B2438;color:#fff;font-family:Arial;font-size:15px;font-weight:700;text-decoration:none;padding:14px 36px;border-radius:6px;">Set Up My Account →</a>
+  <p style="font-size:12px;color:#888;margin-top:24px;">This link expires in 48 hours. If you weren't expecting this invitation, you can safely ignore this email.</p>
+</div>"""}],
+        }
+        req_lib.post("https://api.sendgrid.com/v3/mail/send",
+                     headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+                     json=payload, timeout=10)
+    except Exception as e:
+        print(f"[portal_invite_email] failed: {e}")
+
+
+def _generate_portal_invite(record_id, write_token):
+    """Generate an invite token for a sub-user and store it in Airtable. Returns setup URL."""
+    import secrets
+    from datetime import datetime, timezone, timedelta
+    token = secrets.token_urlsafe(32)
+    expiry = (datetime.now(timezone.utc) + timedelta(hours=48)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    req_lib.patch(
+        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{record_id}",
+        headers={**at_headers(write_token), "Content-Type": "application/json"},
+        json={"fields": {"Magic Token": token, "Token Expiry": expiry}},
+        timeout=10,
+    )
+    return f"{QUOTE_BASE_URL}/setup-account/{token}"
+
+
 @app.route("/api/portal/team/add", methods=["POST"])
 @portal_login_required
 def portal_team_add(user):
-    """Add a new team member (sub-user) to this customer account."""
+    """Add a new team member (sub-user). Sends invite email — sub-user sets own password."""
     c = cors()
     if not portal_can(user, "manage_team"):
         return Response(json.dumps({"error": "Insufficient permissions"}),
                         status=403, headers=c, mimetype="application/json")
     customer_id = user.get("customer_id", "")
-    data       = request.get_json() or {}
-    first_name = (data.get("firstName") or "").strip()
-    last_name  = (data.get("lastName") or "").strip()
-    username   = (data.get("username") or "").strip().lower()
-    password   = (data.get("password") or "").strip()
-    role       = (data.get("role") or "").strip()
+    data        = request.get_json() or {}
+    first_name  = (data.get("firstName") or "").strip()
+    last_name   = (data.get("lastName") or "").strip()
+    email       = (data.get("email") or "").strip().lower()
+    role        = (data.get("role") or "").strip()
 
-    if not first_name or not last_name or not username or not password:
-        return Response(json.dumps({"error": "firstName, lastName, username, and password are required"}),
+    if not first_name or not last_name or not email:
+        return Response(json.dumps({"error": "firstName, lastName, and email are required"}),
                         status=400, headers=c, mimetype="application/json")
     if role not in ("Full Access", "Quotes Only", "Read-Only"):
         return Response(json.dumps({"error": "Role must be Full Access, Quotes Only, or Read-Only"}),
                         status=400, headers=c, mimetype="application/json")
-    if len(password) < 8:
-        return Response(json.dumps({"error": "Password must be at least 8 characters"}),
-                        status=400, headers=c, mimetype="application/json")
 
-    pw_hash     = _hash_password(password)
     write_token = RETURNS_WRITE_TOKEN
+    read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
     try:
+        # Fetch company name for invite email
+        company_name = ""
+        try:
+            pr = req_lib.get(f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
+                             headers=at_headers(read_token), timeout=10)
+            company_name = pr.json().get("fields", {}).get("Organization Name", "Blue Alpha")
+        except Exception:
+            company_name = "Blue Alpha"
+
+        # Create sub-user record (no username/password yet — pending setup)
         fields = {
-            "Main Contact Name": f"{first_name} {last_name}",
-            "Portal Username":   username,
-            "Password Hash":     pw_hash,
-            "Portal Role":       role,
-            "Parent Company":    [customer_id],
+            "Main Contact Name":  f"{first_name} {last_name}",
+            "Main Contact Email": email,
+            "Portal Role":        role,
+            "Parent Company":     [customer_id],
             "Application Status": "Approved",
         }
         r = req_lib.post(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}",
             headers={**at_headers(write_token), "Content-Type": "application/json"},
-            json={"fields": fields},
-            timeout=15,
+            json={"fields": fields}, timeout=15,
         )
         r.raise_for_status()
-        return Response(json.dumps({"ok": True, "id": r.json().get("id")}),
-                        headers=c, mimetype="application/json")
+        new_id = r.json().get("id", "")
+
+        # Generate invite token and send email
+        setup_link = _generate_portal_invite(new_id, write_token)
+        _send_portal_invite_email(email, f"{first_name} {last_name}", company_name, setup_link)
+
+        return Response(json.dumps({"ok": True, "id": new_id}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/portal/team/<record_id>/resend-invite", methods=["POST"])
+@portal_login_required
+def portal_team_resend_invite(user, record_id):
+    """Resend invite email to a sub-user who hasn't completed setup (no Password Hash)."""
+    c = cors()
+    if not portal_can(user, "manage_team"):
+        return Response(json.dumps({"error": "Insufficient permissions"}),
+                        status=403, headers=c, mimetype="application/json")
+    customer_id = user.get("customer_id", "")
+    read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    write_token = RETURNS_WRITE_TOKEN
+    try:
+        # Verify record belongs to this account and has no password yet
+        r = req_lib.get(f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{record_id}",
+                        headers=at_headers(read_token), timeout=10)
+        f = r.json().get("fields", {})
+        if customer_id not in f.get("Parent Company", []):
+            return Response(json.dumps({"error": "Not found"}), status=404, headers=c, mimetype="application/json")
+        if f.get("Password Hash"):
+            return Response(json.dumps({"error": "User has already completed setup"}),
+                            status=400, headers=c, mimetype="application/json")
+
+        # Fetch company name
+        company_name = "Blue Alpha"
+        try:
+            pr = req_lib.get(f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
+                             headers=at_headers(read_token), timeout=10)
+            company_name = pr.json().get("fields", {}).get("Organization Name", "Blue Alpha")
+        except Exception:
+            pass
+
+        setup_link = _generate_portal_invite(record_id, write_token)
+        _send_portal_invite_email(f.get("Main Contact Email", ""), f.get("Main Contact Name", ""),
+                                  company_name, setup_link)
+        return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 

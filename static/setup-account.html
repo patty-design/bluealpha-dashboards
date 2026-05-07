@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Set Up Your Account — Blue Alpha</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1B2438;
+      --red:  #7B2318;
+      --border: #d8dde6;
+      --muted: #6b7280;
+      --bg: #f4f6f9;
+    }
+    body { background: var(--bg); font-family: 'Open Sans', sans-serif; min-height: 100vh;
+           display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .card { background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+            padding: 40px 36px; width: 100%; max-width: 420px; }
+    .logo { height: 36px; margin-bottom: 28px; display: block; }
+    h1 { font-family: 'Montserrat', sans-serif; font-size: 1.35rem; font-weight: 800;
+         color: var(--navy); margin-bottom: 6px; }
+    .subtitle { font-size: 0.88rem; color: var(--muted); margin-bottom: 28px; }
+    label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--navy);
+            text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 5px; margin-top: 16px; }
+    input { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border);
+            border-radius: 7px; font-size: 0.95rem; font-family: inherit;
+            transition: border-color 0.15s; }
+    input:focus { outline: none; border-color: var(--navy); }
+    .hint { font-size: 0.76rem; color: var(--muted); margin-top: 4px; }
+    .btn { display: block; width: 100%; margin-top: 24px; padding: 13px;
+           background: var(--navy); color: #fff; border: none; border-radius: 7px;
+           font-family: 'Montserrat', sans-serif; font-size: 0.95rem; font-weight: 700;
+           cursor: pointer; transition: background 0.15s; }
+    .btn:hover { background: #253352; }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .msg { margin-top: 16px; font-size: 0.875rem; padding: 10px 14px;
+           border-radius: 6px; display: none; }
+    .msg.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; display: block; }
+    .msg.success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; display: block; }
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4);
+               border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite;
+               margin-right: 8px; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img class="logo" src="https://bluealphabelts.com/wp-content/uploads/2021/01/Blue-Alpha-Logo-White-Background.png" alt="Blue Alpha">
+    <h1>Set Up Your Account</h1>
+    <p class="subtitle">Choose a username and password to access the portal.</p>
+    <div id="msg" class="msg"></div>
+    <div id="formWrap">
+      <label for="username">Username</label>
+      <input type="text" id="username" autocomplete="username" placeholder="e.g. jsmith" spellcheck="false">
+      <label for="password">Password</label>
+      <input type="password" id="password" autocomplete="new-password" placeholder="At least 8 characters">
+      <p class="hint">Minimum 8 characters.</p>
+      <label for="confirm">Confirm Password</label>
+      <input type="password" id="confirm" autocomplete="new-password" placeholder="Re-enter password">
+      <button class="btn" id="submitBtn" onclick="doSetup()">Create My Account</button>
+    </div>
+  </div>
+
+  <script>
+    // Extract token from URL path: /setup-account/<token>
+    const _token = window.location.pathname.split('/setup-account/')[1] || '';
+
+    async function doSetup() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const confirm  = document.getElementById('confirm').value;
+      const msg      = document.getElementById('msg');
+      const btn      = document.getElementById('submitBtn');
+
+      msg.className = 'msg';
+      msg.textContent = '';
+
+      if (!username) { showErr('Please enter a username.'); return; }
+      if (!/^[a-z0-9._-]{3,32}$/.test(username)) {
+        showErr('Username must be 3–32 characters (letters, numbers, . _ - only).'); return;
+      }
+      if (password.length < 8) { showErr('Password must be at least 8 characters.'); return; }
+      if (password !== confirm) { showErr('Passwords do not match.'); return; }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>Setting up…';
+
+      try {
+        const r = await fetch('/api/portal/setup-account', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: _token, username, password }),
+        });
+        const d = await r.json();
+        if (d.ok) {
+          msg.className = 'msg success';
+          msg.textContent = 'Account created! Redirecting to the portal…';
+          document.getElementById('formWrap').style.opacity = '0.4';
+          setTimeout(() => { window.location.href = '/portal'; }, 1500);
+        } else {
+          showErr(d.error || 'Something went wrong. Please try again.');
+          btn.disabled = false;
+          btn.textContent = 'Create My Account';
+        }
+      } catch (e) {
+        showErr('Network error — please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Create My Account';
+      }
+    }
+
+    function showErr(msg) {
+      const el = document.getElementById('msg');
+      el.className = 'msg error';
+      el.textContent = msg;
+    }
+
+    // Allow Enter key
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') doSetup();
+    });
+
+    // If no token in URL, show error immediately
+    if (!_token) {
+      document.getElementById('msg').className = 'msg error';
+      document.getElementById('msg').textContent = 'Invalid setup link. Please ask your admin to resend the invite.';
+      document.getElementById('formWrap').style.display = 'none';
+    }
+  </script>
+</body>
+</html>
