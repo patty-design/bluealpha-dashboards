@@ -5699,7 +5699,11 @@ def portal_team_add(user):
     role        = (data.get("role") or "").strip()
 
     if not first_name or not last_name or not email:
-        return Response(json.dumps({"error": "firstName, lastName, and email are required"}),
+        return Response(json.dumps({"error": "Please fill in all fields (first name, last name, and email)."}),
+                        status=400, headers=c, mimetype="application/json")
+    import re as _re
+    if not _re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        return Response(json.dumps({"error": "Please enter a valid email address."}),
                         status=400, headers=c, mimetype="application/json")
     if role not in ("Full Access", "Quotes Only", "Read-Only"):
         return Response(json.dumps({"error": "Role must be Full Access, Quotes Only, or Read-Only"}),
@@ -5730,7 +5734,10 @@ def portal_team_add(user):
             headers={**at_headers(write_token), "Content-Type": "application/json"},
             json={"fields": fields}, timeout=15,
         )
-        r.raise_for_status()
+        if not r.ok:
+            print(f"[portal_team_add] Airtable error {r.status_code}: {r.text[:300]}")
+            return Response(json.dumps({"error": "Failed to create team member. Please try again."}),
+                            status=500, headers=c, mimetype="application/json")
         new_id = r.json().get("id", "")
 
         # Generate invite token and send email
@@ -5739,7 +5746,9 @@ def portal_team_add(user):
 
         return Response(json.dumps({"ok": True, "id": new_id}), headers=c, mimetype="application/json")
     except Exception as e:
-        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+        print(f"[portal_team_add] exception: {e}")
+        return Response(json.dumps({"error": "Something went wrong. Please try again."}),
+                        status=500, headers=c, mimetype="application/json")
 
 
 @app.route("/api/portal/team/<record_id>/resend-invite", methods=["POST"])
