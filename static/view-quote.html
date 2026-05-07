@@ -459,10 +459,11 @@ if (window.self !== window.top) {
     <!-- Top banners -->
     <div id="bannerAccepted" class="banner banner-success hidden"></div>
     <div id="bannerExpired"  class="banner banner-error   hidden">
-      This quote has expired. Please contact us for a new quote —
+      This quote has expired. You can request an updated quote below, or contact us at
       <a href="mailto:info@bluealpha.us" style="color:inherit;font-weight:700;">info@bluealpha.us</a> or 678-961-3304.
     </div>
     <div id="bannerSuccess"  class="banner banner-success hidden"></div>
+    <div id="bannerDuplicate" class="banner banner-success hidden"></div>
 
     <!-- Info card -->
     <div class="card">
@@ -629,8 +630,9 @@ if (window.self !== window.top) {
 
 <script>
 // ─── State ───────────────────────────────────────────────────────────────────
-const recordId  = window.location.pathname.split('/').pop();
-let   quoteData = null;
+const recordId    = window.location.pathname.split('/').pop();
+let   quoteData   = null;
+let   portalUser  = null;  // fetched from /api/portal/me if a portal session exists
 let   catalog   = null;
 let   catalogLoaded = false;
 let   editItems  = [];  // working copy of line items when in edit mode
@@ -664,6 +666,14 @@ window.addEventListener('beforeunload', e => {
 
 // ─── Load ────────────────────────────────────────────────────────────────────
 (async function load() {
+  // Try to fetch portal user info (may fail if not logged in via portal — that's OK)
+  try {
+    const meResp = await fetch('/api/portal/me', { credentials: 'same-origin' });
+    if (meResp.ok) {
+      portalUser = await meResp.json();
+    }
+  } catch (_) {}
+
   try {
     const r = await fetch(`/api/get-quote/${recordId}`);
     if (!r.ok) throw new Error('not found');
@@ -831,14 +841,102 @@ function updateTotals() {
 function buildActions(editable) {
   const bar = document.getElementById('actionsBar');
   bar.innerHTML = '';
+  const q = quoteData;
 
-  if (editable) {
-    const acceptBtn = document.createElement('button');
-    acceptBtn.className = 'btn btn-danger';
-    acceptBtn.id = 'btnAccept';
-    acceptBtn.textContent = 'Accept This Quote';
-    acceptBtn.onclick = openModal;
-    bar.appendChild(acceptBtn);
+  if (q.isExpired && !q.isAccepted) {
+    // Expired: only show portal actions if user is logged in via portal session
+    if (portalUser) {
+      if (portalUser.canCreateQuote !== false) {
+        const updateBtn = document.createElement('button');
+        updateBtn.className   = 'btn btn-primary';
+        updateBtn.id          = 'btnRequestUpdate';
+        updateBtn.textContent = 'Request Updated Quote';
+        updateBtn.onclick     = requestUpdatedQuote;
+        bar.appendChild(updateBtn);
+      }
+
+      // "Remove Quote" — hide from customer view
+      const removeBtn = document.createElement('button');
+      removeBtn.className   = 'btn btn-secondary';
+      removeBtn.textContent = 'Remove Quote';
+      removeBtn.onclick     = hideQuote;
+      bar.appendChild(removeBtn);
+    }
+
+  } else if (editable) {
+    // Not expired, not accepted: show Accept button (gated by role)
+    if (portalUser) {
+      // User is logged in via portal session
+      if (portalUser.canAcceptQuote !== false) {
+        const acceptBtn = document.createElement('button');
+        acceptBtn.className   = 'btn btn-danger';
+        acceptBtn.id          = 'btnAccept';
+        acceptBtn.textContent = 'Accept This Quote';
+        acceptBtn.onclick     = openModal;
+        bar.appendChild(acceptBtn);
+      } else {
+        // Insufficient role — show informational message
+        const infoEl = document.createElement('p');
+        infoEl.style.cssText = 'color:var(--muted);font-size:0.9rem;';
+        infoEl.textContent = 'Contact your account manager to accept this quote.';
+        bar.appendChild(infoEl);
+      }
+    } else {
+      // No portal session (customer clicking emailed link) — show Accept button normally
+      const acceptBtn = document.createElement('button');
+      acceptBtn.className   = 'btn btn-danger';
+      acceptBtn.id          = 'btnAccept';
+      acceptBtn.textContent = 'Accept This Quote';
+      acceptBtn.onclick     = openModal;
+      bar.appendChild(acceptBtn);
+    }
+  }
+}
+
+async function requestUpdatedQuote() {
+  const btn = document.getElementById('btnRequestUpdate');
+  if (btn) { btn.disabled = true; btn.textContent = 'Requesting…'; }
+  try {
+    const r = await fetch(`/api/portal/duplicate-quote/${recordId}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+    });
+    const data = await r.json();
+    if (data.ok) {
+      const banner = document.getElementById('bannerDuplicate');
+      banner.textContent = `Updated quote ${data.newQuoteNumber} has been created and is now available in your portal.`;
+      banner.classList.remove('hidden');
+      if (btn) { btn.disabled = false; btn.textContent = 'Request Updated Quote'; }
+    } else {
+      alert('Error: ' + (data.error || 'Could not create updated quote. Please contact us.'));
+      if (btn) { btn.disabled = false; btn.textContent = 'Request Updated Quote'; }
+    }
+  } catch(e) {
+    alert('Network error. Please try again or contact info@bluealpha.us');
+    if (btn) { btn.disabled = false; btn.textContent = 'Request Updated Quote'; }
+  }
+}
+
+async function hideQuote() {
+  if (!confirm('Remove this quote from your portal view? This cannot be undone.')) return;
+  try {
+    const r = await fetch(`/api/portal/hide-quote/${recordId}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+    });
+    const data = await r.json();
+    if (data.ok) {
+      // Navigate back to portal
+      if (window.self !== window.top) {
+        window.parent.postMessage({ type: 'quoteSubmitted' }, '*'); // reuse to trigger reload
+      } else {
+        window.location.href = '/portal';
+      }
+    } else {
+      alert('Error: ' + (data.error || 'Could not remove quote.'));
+    }
+  } catch(e) {
+    alert('Network error. Please try again.');
   }
 }
 

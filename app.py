@@ -200,12 +200,13 @@ def at_get_all(table_id, token, fields=None, formula=None, base_id=None):
 # Portal Auth Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-def create_portal_token(user_id, customer_id, is_primary):
+def create_portal_token(user_id, customer_id, is_primary, role=None):
     from datetime import datetime, timezone, timedelta
     payload = {
-        "user_id":    user_id,
+        "user_id":     user_id,
         "customer_id": customer_id,
-        "is_primary": is_primary,
+        "is_primary":  is_primary,
+        "role":        role,   # None = legacy primary (treated as admin)
         "exp": datetime.now(timezone.utc) + timedelta(days=30),
     }
     return pyjwt.encode(payload, QUOTE_SECRET_KEY, algorithm="HS256")
@@ -290,6 +291,66 @@ def _lookup_portal_user(username, password):
         return rec, role
     except Exception:
         return None, None
+
+def _lookup_portal_customer(username, password):
+    """Look up a B2B customer by Portal Username + Password Hash.
+    Returns (record, role, customer_id) or (None, None, None).
+    role is one of: 'admin', 'full_access', 'quotes_only', 'read_only', or None (legacy = admin).
+    customer_id is Parent Company ID if set, else own record ID."""
+    read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    formula = f"{{Portal Username}}='{username}'"
+    try:
+        records = at_get_all(
+            CUSTOMERS_TABLE_ID, read_token,
+            fields=["Portal Username", "Password Hash", "Portal Role",
+                    "Parent Company", "Application Status"],
+            formula=formula,
+        )
+        if not records:
+            return None, None, None
+        rec = records[0]
+        f = rec.get("fields", {})
+        stored_hash = f.get("Password Hash", "")
+        if not stored_hash or not _check_password(password, stored_hash):
+            return None, None, None
+        # Only approved customers can log in
+        app_status = f.get("Application Status", "")
+        if app_status and app_status != "Approved":
+            return None, None, None
+        role_raw = (f.get("Portal Role") or "").strip()
+        role_map = {
+            "Admin":       "admin",
+            "Full Access": "full_access",
+            "Quotes Only": "quotes_only",
+            "Read-Only":   "read_only",
+        }
+        role = role_map.get(role_raw, None)
+        parent_ids = f.get("Parent Company", [])
+        customer_id = parent_ids[0] if parent_ids else rec["id"]
+        return rec, role, customer_id
+    except Exception as e:
+        print(f"[_lookup_portal_customer] error: {e}")
+        return None, None, None
+
+
+# Permission hierarchy (hierarchical — each role includes all below it)
+_PORTAL_PERMISSIONS = {
+    "read_only":   {"view"},
+    "quotes_only": {"view", "create_quote"},
+    "full_access": {"view", "create_quote", "accept_quote"},
+    "admin":       {"view", "create_quote", "accept_quote", "manage_team"},
+}
+
+def portal_can(user, action):
+    """Check if a portal user JWT payload can perform an action.
+    user is the decoded JWT dict. action is one of:
+    'view', 'create_quote', 'accept_quote', 'manage_team'.
+    No role set (legacy primary users) → treated as admin."""
+    role = user.get("role")
+    if role is None:
+        return True  # Legacy primary user — full admin
+    return action in _PORTAL_PERMISSIONS.get(role, set())
+
 
 def check_admin_session(req):
     token = req.cookies.get("ba_admin_session")
@@ -4949,7 +5010,7 @@ def auth_magic_link(token):
     try:
         records = at_get_all(
             CUSTOMERS_TABLE_ID, read_token,
-            fields=["Magic Token", "Token Expiry", "Application Status"],
+            fields=["Magic Token", "Token Expiry", "Application Status", "Portal Role"],
             formula=f"{{Magic Token}}='{token}'",
         )
         if not records:
@@ -4977,10 +5038,26 @@ def auth_magic_link(token):
         if datetime.now(timezone.utc) > exp_dt:
             return send_from_directory("static", "auth-error.html"), 401
 
-        # Customer record ID is both user_id and customer_id
+        # Customer record ID is both user_id and customer_id for magic-link users
         user_id     = user_rec["id"]
         customer_id = user_rec["id"]
         is_primary  = True
+
+        # Fetch Portal Role from Customer record (legacy users with no role → admin)
+        portal_role = None
+        try:
+            role_raw = uf.get("Portal Role", "")
+            if not role_raw:
+                # Re-fetch to get the Portal Role field if not in token fields
+                _role_map = {"Admin": "admin", "Full Access": "full_access",
+                             "Quotes Only": "quotes_only", "Read-Only": "read_only"}
+                portal_role = None  # legacy → admin
+            else:
+                _role_map = {"Admin": "admin", "Full Access": "full_access",
+                             "Quotes Only": "quotes_only", "Read-Only": "read_only"}
+                portal_role = _role_map.get(role_raw.strip(), None)
+        except Exception:
+            portal_role = None
 
         # Clear magic token + update last login
         try:
@@ -4998,7 +5075,7 @@ def auth_magic_link(token):
             print(f"[auth_magic_link] token clear failed: {e}")
 
         # Create JWT session cookie
-        jwt_token = create_portal_token(user_id, customer_id, is_primary)
+        jwt_token = create_portal_token(user_id, customer_id, is_primary, role=portal_role)
         resp = make_response(redirect("/portal"))
         resp.set_cookie(
             "ba_portal_session",
@@ -5049,10 +5126,19 @@ def portal_me(user):
         except Exception as e:
             print(f"[portal_me] customer fetch failed: {e}")
 
+    role = user.get("role")  # None = legacy primary (treated as admin)
+    can_manage_team   = portal_can(user, "manage_team")
+    can_create_quote  = portal_can(user, "create_quote")
+    can_accept_quote  = portal_can(user, "accept_quote")
+
     return Response(json.dumps({
-        "agencyName": agency_name,
-        "isPrimary":  is_primary,
-        "customerId": customer_id,
+        "agencyName":      agency_name,
+        "isPrimary":       is_primary,
+        "customerId":      customer_id,
+        "role":            role,
+        "canManageTeam":   can_manage_team,
+        "canCreateQuote":  can_create_quote,
+        "canAcceptQuote":  can_accept_quote,
     }), headers=c, mimetype="application/json")
 
 
@@ -5151,11 +5237,15 @@ def portal_quotes(user):
         formula = 'AND({Order Type}="Quote",NOT({MO Is Approved}))'
         records = at_get_all(
             MANUAL_ORDERS_TABLE_ID, read_token,
-            fields=["Document ID", "Order ID", "Date", "Expiry Date", "MO Is Approved", "MO Line Items", "Customer"],
+            fields=["Document ID", "Order ID", "Date", "Expiry Date", "MO Is Approved",
+                    "MO Line Items", "Customer", "Hidden from Customer"],
             formula=formula,
         )
         # Filter to only this customer's quotes (Customer field returns record ID array)
-        records = [r for r in records if customer_id in r.get("fields", {}).get("Customer", [])]
+        # Also filter out quotes hidden from the customer
+        records = [r for r in records
+                   if customer_id in r.get("fields", {}).get("Customer", [])
+                   and not r.get("fields", {}).get("Hidden from Customer", False)]
         from datetime import date as dt_date
         today = dt_date.today()
         quotes = []
@@ -5319,6 +5409,475 @@ def portal_request_magic_link():
     if email:
         threading.Thread(target=_send, args=(email,), daemon=True).start()
     return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Customer Portal — Username/Password Login
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/api/portal/login", methods=["POST", "OPTIONS"])
+def portal_login():
+    """Authenticate a B2B customer with username + password. Sets ba_portal_session cookie."""
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type",
+                                     "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    data = request.get_json() or {}
+    username = (data.get("username") or "").strip().lower()
+    password = (data.get("password") or "").strip()
+    if not username or not password:
+        return Response(json.dumps({"error": "Username and password are required"}),
+                        status=400, headers=c, mimetype="application/json")
+    rec, role, customer_id = _lookup_portal_customer(username, password)
+    if not rec:
+        return Response(json.dumps({"error": "Invalid username or password"}),
+                        status=401, headers=c, mimetype="application/json")
+    user_id    = rec["id"]
+    is_primary = not rec.get("fields", {}).get("Parent Company")
+    jwt_token  = create_portal_token(user_id, customer_id, is_primary, role=role)
+    resp = make_response(Response(json.dumps({"ok": True}), headers=c, mimetype="application/json"))
+    resp.set_cookie(
+        "ba_portal_session", jwt_token,
+        max_age=30 * 24 * 3600,
+        httponly=True,
+        samesite="Lax",
+        secure=True,
+    )
+    return resp
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Customer Portal — Set Password (migration path for magic-link-only users)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/api/portal/set-password", methods=["POST"])
+@portal_login_required
+def portal_set_password(user):
+    """Allows a logged-in customer to set Portal Username and Password Hash for the first time."""
+    c = cors()
+    data     = request.get_json() or {}
+    username = (data.get("username") or "").strip().lower()
+    password = (data.get("password") or "").strip()
+    if not username or not password:
+        return Response(json.dumps({"error": "username and password are required"}),
+                        status=400, headers=c, mimetype="application/json")
+    if len(password) < 8:
+        return Response(json.dumps({"error": "Password must be at least 8 characters"}),
+                        status=400, headers=c, mimetype="application/json")
+    user_id = user.get("user_id", "")
+    if not user_id:
+        return Response(json.dumps({"error": "Invalid session"}), status=401,
+                        headers=c, mimetype="application/json")
+    pw_hash     = _hash_password(password)
+    write_token = RETURNS_WRITE_TOKEN
+    try:
+        r = req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{user_id}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": {"Portal Username": username, "Password Hash": pw_hash}},
+            timeout=10,
+        )
+        r.raise_for_status()
+        return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Customer Portal — Team Management
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/api/portal/team", methods=["GET"])
+@portal_login_required
+def portal_team_list(user):
+    """List all team members for this customer account. Requires manage_team permission."""
+    c = cors()
+    if not portal_can(user, "manage_team"):
+        return Response(json.dumps({"error": "Insufficient permissions"}),
+                        status=403, headers=c, mimetype="application/json")
+    customer_id = user.get("customer_id", "")
+    read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    try:
+        # Fetch all customers with Portal Username set
+        records = at_get_all(
+            CUSTOMERS_TABLE_ID, read_token,
+            fields=["Main Contact Name", "Organization Name", "Portal Username",
+                    "Portal Role", "Parent Company"],
+            formula="NOT({Portal Username}='')",
+        )
+        # Also fetch the primary record (may not have Portal Username)
+        primary_r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
+            headers=at_headers(read_token), timeout=10,
+        )
+        _role_map = {"Admin": "admin", "Full Access": "full_access",
+                     "Quotes Only": "quotes_only", "Read-Only": "read_only"}
+        team     = []
+        seen_ids = set()
+
+        # Primary record first
+        if primary_r.status_code == 200:
+            pf    = primary_r.json().get("fields", {})
+            prole = _role_map.get((pf.get("Portal Role") or "").strip(), "admin")
+            team.append({
+                "id":       customer_id,
+                "name":     pf.get("Main Contact Name") or pf.get("Organization Name", ""),
+                "username": pf.get("Portal Username", ""),
+                "role":     prole,
+                "isOwner":  True,
+            })
+            seen_ids.add(customer_id)
+
+        # Sub-users
+        for r in records:
+            if r["id"] in seen_ids:
+                continue
+            f = r.get("fields", {})
+            parent_ids = f.get("Parent Company", [])
+            if customer_id not in parent_ids:
+                continue
+            srole = _role_map.get((f.get("Portal Role") or "").strip(), "read_only")
+            team.append({
+                "id":       r["id"],
+                "name":     f.get("Main Contact Name", ""),
+                "username": f.get("Portal Username", ""),
+                "role":     srole,
+                "isOwner":  False,
+            })
+            seen_ids.add(r["id"])
+
+        return Response(json.dumps({"team": team}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/portal/team/add", methods=["POST"])
+@portal_login_required
+def portal_team_add(user):
+    """Add a new team member (sub-user) to this customer account."""
+    c = cors()
+    if not portal_can(user, "manage_team"):
+        return Response(json.dumps({"error": "Insufficient permissions"}),
+                        status=403, headers=c, mimetype="application/json")
+    customer_id = user.get("customer_id", "")
+    data       = request.get_json() or {}
+    first_name = (data.get("firstName") or "").strip()
+    last_name  = (data.get("lastName") or "").strip()
+    username   = (data.get("username") or "").strip().lower()
+    password   = (data.get("password") or "").strip()
+    role       = (data.get("role") or "").strip()
+
+    if not first_name or not last_name or not username or not password:
+        return Response(json.dumps({"error": "firstName, lastName, username, and password are required"}),
+                        status=400, headers=c, mimetype="application/json")
+    if role not in ("Full Access", "Quotes Only", "Read-Only"):
+        return Response(json.dumps({"error": "Role must be Full Access, Quotes Only, or Read-Only"}),
+                        status=400, headers=c, mimetype="application/json")
+    if len(password) < 8:
+        return Response(json.dumps({"error": "Password must be at least 8 characters"}),
+                        status=400, headers=c, mimetype="application/json")
+
+    pw_hash     = _hash_password(password)
+    write_token = RETURNS_WRITE_TOKEN
+    try:
+        fields = {
+            "Main Contact Name": f"{first_name} {last_name}",
+            "Portal Username":   username,
+            "Password Hash":     pw_hash,
+            "Portal Role":       role,
+            "Parent Company":    [customer_id],
+            "Application Status": "Approved",
+        }
+        r = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": fields},
+            timeout=15,
+        )
+        r.raise_for_status()
+        return Response(json.dumps({"ok": True, "id": r.json().get("id")}),
+                        headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/portal/team/<record_id>/role", methods=["PATCH"])
+@portal_login_required
+def portal_team_change_role(user, record_id):
+    """Change a team member's role. Cannot change Admin's role."""
+    c = cors()
+    if not portal_can(user, "manage_team"):
+        return Response(json.dumps({"error": "Insufficient permissions"}),
+                        status=403, headers=c, mimetype="application/json")
+    customer_id = user.get("customer_id", "")
+    data     = request.get_json() or {}
+    new_role = (data.get("role") or "").strip()
+    if new_role not in ("Full Access", "Quotes Only", "Read-Only"):
+        return Response(json.dumps({"error": "Role must be Full Access, Quotes Only, or Read-Only"}),
+                        status=400, headers=c, mimetype="application/json")
+    read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    try:
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{record_id}",
+            headers=at_headers(read_token), timeout=10,
+        )
+        if r.status_code != 200:
+            return Response(json.dumps({"error": "User not found"}), status=404,
+                            headers=c, mimetype="application/json")
+        f = r.json().get("fields", {})
+        parent_ids = f.get("Parent Company", [])
+        if customer_id not in parent_ids:
+            return Response(json.dumps({"error": "Cannot change role of this user"}),
+                            status=403, headers=c, mimetype="application/json")
+        if (f.get("Portal Role") or "").strip() == "Admin":
+            return Response(json.dumps({"error": "Cannot change Admin's role"}),
+                            status=403, headers=c, mimetype="application/json")
+        pr = req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{record_id}",
+            headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
+            json={"fields": {"Portal Role": new_role}},
+            timeout=10,
+        )
+        pr.raise_for_status()
+        return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/portal/team/<record_id>/reset-password", methods=["POST"])
+@portal_login_required
+def portal_team_reset_password(user, record_id):
+    """Reset a team member's password. Admins can reset any sub-user's password."""
+    c = cors()
+    if not portal_can(user, "manage_team"):
+        return Response(json.dumps({"error": "Insufficient permissions"}),
+                        status=403, headers=c, mimetype="application/json")
+    customer_id  = user.get("customer_id", "")
+    data         = request.get_json() or {}
+    new_password = (data.get("newPassword") or "").strip()
+    if len(new_password) < 8:
+        return Response(json.dumps({"error": "Password must be at least 8 characters"}),
+                        status=400, headers=c, mimetype="application/json")
+    read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    try:
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{record_id}",
+            headers=at_headers(read_token), timeout=10,
+        )
+        if r.status_code != 200:
+            return Response(json.dumps({"error": "User not found"}), status=404,
+                            headers=c, mimetype="application/json")
+        f = r.json().get("fields", {})
+        parent_ids = f.get("Parent Company", [])
+        # Allow if this is the primary record or a sub-user of this customer
+        is_primary_record = (record_id == customer_id)
+        is_sub_user = (customer_id in parent_ids)
+        if not is_primary_record and not is_sub_user:
+            return Response(json.dumps({"error": "Cannot reset password for this user"}),
+                            status=403, headers=c, mimetype="application/json")
+        new_hash = _hash_password(new_password)
+        pr = req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{record_id}",
+            headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
+            json={"fields": {"Password Hash": new_hash}},
+            timeout=10,
+        )
+        pr.raise_for_status()
+        return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/portal/team/<record_id>", methods=["DELETE"])
+@portal_login_required
+def portal_team_delete(user, record_id):
+    """Delete a sub-user. Cannot delete the primary account or Admin users."""
+    c = cors()
+    if not portal_can(user, "manage_team"):
+        return Response(json.dumps({"error": "Insufficient permissions"}),
+                        status=403, headers=c, mimetype="application/json")
+    customer_id = user.get("customer_id", "")
+    if record_id == customer_id:
+        return Response(json.dumps({"error": "Cannot delete the primary account"}),
+                        status=400, headers=c, mimetype="application/json")
+    read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    try:
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{record_id}",
+            headers=at_headers(read_token), timeout=10,
+        )
+        if r.status_code != 200:
+            return Response(json.dumps({"error": "User not found"}), status=404,
+                            headers=c, mimetype="application/json")
+        f = r.json().get("fields", {})
+        parent_ids = f.get("Parent Company", [])
+        if customer_id not in parent_ids:
+            return Response(json.dumps({"error": "Cannot delete this user"}),
+                            status=403, headers=c, mimetype="application/json")
+        if (f.get("Portal Role") or "").strip() == "Admin":
+            return Response(json.dumps({"error": "Cannot delete Admin users"}),
+                            status=403, headers=c, mimetype="application/json")
+        dr = req_lib.delete(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{record_id}",
+            headers=at_headers(RETURNS_WRITE_TOKEN), timeout=10,
+        )
+        if dr.status_code not in (200, 204):
+            return Response(json.dumps({"error": "Failed to delete user"}),
+                            status=500, headers=c, mimetype="application/json")
+        return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Customer Portal — Quote Actions (duplicate, hide)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/api/portal/duplicate-quote/<record_id>", methods=["POST"])
+@portal_login_required
+def portal_duplicate_quote(user, record_id):
+    """Duplicate an expired quote with current catalog prices. Requires create_quote permission."""
+    c = cors()
+    if not portal_can(user, "create_quote"):
+        return Response(json.dumps({"error": "Insufficient permissions"}),
+                        status=403, headers=c, mimetype="application/json")
+    customer_id = user.get("customer_id", "")
+    from datetime import date as dt_date, timedelta
+    token      = RETURNS_WRITE_TOKEN
+    read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    try:
+        # Fetch original quote
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+            headers=at_headers(read_token), timeout=15,
+        )
+        if r.status_code != 200:
+            return Response(json.dumps({"error": "Quote not found"}), status=404,
+                            headers=c, mimetype="application/json")
+        mo     = r.json()
+        fields = mo.get("fields", {})
+        if fields.get("Order Type") != "Quote":
+            return Response(json.dumps({"error": "Not a quote"}), status=400,
+                            headers=c, mimetype="application/json")
+        cust_ids = fields.get("Customer", [])
+        if customer_id not in cust_ids:
+            return Response(json.dumps({"error": "Quote not found"}), status=404,
+                            headers=c, mimetype="application/json")
+
+        li_ids = fields.get("MO Line Items", [])
+
+        # Get next order ID
+        all_mos = at_get_all(MANUAL_ORDERS_TABLE_ID, read_token, fields=["Order ID"])
+        max_id  = 0
+        for mo_rec in all_mos:
+            try:
+                val = int(mo_rec["fields"].get("Order ID", "") or 0)
+                if val > max_id:
+                    max_id = val
+            except (ValueError, TypeError):
+                pass
+        next_id      = max_id + 1
+        order_id_str = str(next_id).zfill(4)
+        quote_number = f"QU-{order_id_str}"
+
+        today      = dt_date.today()
+        today_str  = today.isoformat()
+        expiry_str = (today + timedelta(days=90)).isoformat()
+
+        # Create new Manual Order
+        mo_body = {"fields": {
+            "Order Type":  "Quote",
+            "Order ID":    order_id_str,
+            "Date":        today_str,
+            "Expiry Date": expiry_str,
+            "Customer":    [customer_id],
+        }}
+        if fields.get("Notes"):
+            mo_body["fields"]["Notes"] = fields["Notes"]
+        if fields.get("Purchase Order #"):
+            mo_body["fields"]["Purchase Order #"] = fields["Purchase Order #"]
+
+        mo_r = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}",
+            headers={**at_headers(token), "Content-Type": "application/json"},
+            json=mo_body, timeout=15,
+        )
+        mo_r.raise_for_status()
+        new_mo_id = mo_r.json()["id"]
+
+        # Copy line items with current catalog prices
+        for li_id in li_ids:
+            li_r = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+                headers=at_headers(read_token), timeout=10,
+            )
+            if li_r.status_code != 200:
+                continue
+            lf      = li_r.json().get("fields", {})
+            sku_ids = lf.get("Product SKU", [])
+            qty     = lf.get("Qty.", 1)
+            if not sku_ids:
+                continue
+            sku_id        = sku_ids[0]
+            current_price = lf.get("Confirmed Unit Price", 0)
+            # Fetch current Sale Price from catalog
+            sku_r = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}/{sku_id}",
+                headers=at_headers(read_token), timeout=10,
+            )
+            if sku_r.status_code == 200:
+                sp = sku_r.json().get("fields", {}).get("Sale Price")
+                if sp:
+                    current_price = sp
+            req_lib.post(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}",
+                headers={**at_headers(token), "Content-Type": "application/json"},
+                json={"fields": {
+                    "Manual Order":         [new_mo_id],
+                    "Product SKU":          [sku_id],
+                    "Qty.":                 int(qty),
+                    "Confirmed Unit Price": float(current_price),
+                }}, timeout=15,
+            ).raise_for_status()
+
+        return Response(json.dumps({"ok": True, "newRecordId": new_mo_id,
+                                    "newQuoteNumber": quote_number}),
+                        headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/portal/hide-quote/<record_id>", methods=["POST"])
+@portal_login_required
+def portal_hide_quote(user, record_id):
+    """Mark a quote as Hidden from Customer (soft delete from customer view)."""
+    c = cors()
+    customer_id = user.get("customer_id", "")
+    token      = RETURNS_WRITE_TOKEN
+    read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    try:
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+            headers=at_headers(read_token), timeout=10,
+        )
+        if r.status_code != 200:
+            return Response(json.dumps({"error": "Quote not found"}), status=404,
+                            headers=c, mimetype="application/json")
+        f        = r.json().get("fields", {})
+        cust_ids = f.get("Customer", [])
+        if customer_id not in cust_ids:
+            return Response(json.dumps({"error": "Quote not found"}), status=404,
+                            headers=c, mimetype="application/json")
+        pr = req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+            headers={**at_headers(token), "Content-Type": "application/json"},
+            json={"fields": {"Hidden from Customer": True}},
+            timeout=10,
+        )
+        pr.raise_for_status()
+        return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

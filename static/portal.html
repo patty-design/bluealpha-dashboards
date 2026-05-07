@@ -244,17 +244,25 @@
 
   <div class="container">
     <div class="tabs" id="tabNav">
-      <div class="tab active" data-tab="new-quote">New Quote</div>
+      <div class="tab active" data-tab="new-quote" id="newQuoteTab">New Quote</div>
       <div class="tab" data-tab="our-quotes">Our Quotes</div>
       <div class="tab" data-tab="our-orders">Our Orders</div>
-      <div class="tab" data-tab="manage-users" id="manageUsersTab" style="display:none">Manage Users</div>
+      <div class="tab" data-tab="team" id="teamTab" style="display:none">Team</div>
     </div>
 
     <!-- New Quote Tab -->
     <div class="tab-panel active" id="tab-new-quote">
-      <iframe id="quoteBuilderFrame" src="/quote-builder"
-        style="width:100%;border:none;display:block;min-height:600px;"
-        scrolling="no"></iframe>
+      <!-- Shown when user has create_quote permission -->
+      <div id="quoteBuilderWrap">
+        <iframe id="quoteBuilderFrame" src="/quote-builder"
+          style="width:100%;border:none;display:block;min-height:600px;"
+          scrolling="no"></iframe>
+      </div>
+      <!-- Shown when user does NOT have create_quote permission -->
+      <div id="quoteReadOnlyMsg" class="card" style="display:none;">
+        <div class="card-title">New Quote</div>
+        <p class="card-sub">Your account is set to Read-Only. To request a new quote, please contact your account manager or email <a href="mailto:info@bluealpha.us">info@bluealpha.us</a>.</p>
+      </div>
     </div>
 
     <!-- Our Quotes Tab -->
@@ -287,30 +295,61 @@
       </div>
     </div>
 
-    <!-- Manage Users Tab -->
-    <div class="tab-panel" id="tab-manage-users">
+    <!-- Team Tab -->
+    <div class="tab-panel" id="tab-team">
       <div class="card">
-        <div class="card-title">Manage Users</div>
-        <p class="card-sub">Add additional people from your organization so they can log in and view quotes.</p>
-        <div class="users-section">
-          <div class="users-section-title">Additional Users</div>
-          <div id="usersList"><div class="loading">Loading…</div></div>
+        <div class="card-title">Team Members</div>
+        <p class="card-sub">Manage who has access to your portal account and their permission level.</p>
+
+        <!-- Role legend -->
+        <div style="margin-bottom:24px;padding:14px 16px;background:#f8f9fc;border-radius:8px;border:1px solid var(--border);font-size:0.82rem;color:var(--muted);line-height:1.7;">
+          <strong style="color:var(--text);display:block;margin-bottom:6px;">Role Permissions</strong>
+          <div><strong style="color:var(--text);">Read-Only</strong> — View and download quotes &amp; orders</div>
+          <div><strong style="color:var(--text);">Quotes Only</strong> — Read-Only + create new quotes</div>
+          <div><strong style="color:var(--text);">Full Access</strong> — Quotes Only + accept quotes</div>
+          <div><strong style="color:var(--text);">Admin</strong> — Full Access + manage team</div>
         </div>
+
         <div class="users-section">
-          <div class="users-section-title">Add a User</div>
+          <div class="users-section-title">Team</div>
+          <div id="teamList"><div class="loading">Loading…</div></div>
+        </div>
+
+        <div class="users-section" style="margin-top:24px;">
+          <div class="users-section-title">Add a Team Member</div>
           <div class="add-user-form">
             <div class="form-row">
               <div>
-                <label>Full Name</label>
-                <input type="text" id="newUserName" placeholder="Jane Smith">
+                <label>First Name</label>
+                <input type="text" id="newFirstName" placeholder="Jane">
               </div>
               <div>
-                <label>Email Address</label>
-                <input type="email" id="newUserEmail" placeholder="jsmith@agency.gov">
+                <label>Last Name</label>
+                <input type="text" id="newLastName" placeholder="Smith">
               </div>
             </div>
-            <button class="btn-primary" id="addUserBtn" onclick="addUser()">Add User</button>
-            <div id="addUserMsg"></div>
+            <div class="form-row">
+              <div>
+                <label>Username</label>
+                <input type="text" id="newUsername" placeholder="jsmith.agency" autocomplete="off">
+              </div>
+              <div>
+                <label>Password</label>
+                <input type="password" id="newPassword" placeholder="Min 8 characters" autocomplete="new-password">
+              </div>
+            </div>
+            <div class="form-row" style="grid-template-columns:1fr;">
+              <div>
+                <label>Role</label>
+                <select id="newRole" style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:9px 12px;font-size:0.88rem;font-family:'Lato',sans-serif;color:var(--text);">
+                  <option value="Read-Only">Read-Only</option>
+                  <option value="Quotes Only">Quotes Only</option>
+                  <option value="Full Access" selected>Full Access</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn-primary" id="addTeamMemberBtn" onclick="addTeamMember()">Add Team Member</button>
+            <div id="addTeamMsg"></div>
           </div>
         </div>
       </div>
@@ -319,10 +358,10 @@
   </div>
 
   <script>
-    const IS_PRIMARY = window.__IS_PRIMARY__ || false;
+    let portalMe = null;
     let quotesLoaded = false;
     let ordersLoaded = false;
-    let usersLoaded = false;
+    let teamLoaded = false;
 
     // Tab switching
     document.querySelectorAll('.tab').forEach(tab => {
@@ -335,23 +374,37 @@
         // Lazy load
         if (tab.dataset.tab === 'our-quotes' && !quotesLoaded) loadQuotes();
         if (tab.dataset.tab === 'our-orders' && !ordersLoaded) loadOrders();
-        if (tab.dataset.tab === 'manage-users' && !usersLoaded) loadUsers();
+        if (tab.dataset.tab === 'team' && !teamLoaded) loadTeam();
       });
     });
 
-    // Load agency name + determine primary status
+    // Load agency name + determine role/permissions
     (async () => {
       try {
         const resp = await fetch('/api/portal/me');
         if (!resp.ok) { window.location = '/login'; return; }
-        const data = await resp.json();
-        document.getElementById('agencyName').textContent = data.agencyName || 'Government Portal';
-        document.title = `Blue Alpha — ${data.agencyName || 'Portal'}`;
-        if (data.isPrimary) {
-          document.getElementById('manageUsersTab').style.display = '';
-          window.__IS_PRIMARY__ = true;
+        portalMe = await resp.json();
+        document.getElementById('agencyName').textContent = portalMe.agencyName || 'Government Portal';
+        document.title = `Blue Alpha — ${portalMe.agencyName || 'Portal'}`;
+
+        // Show Team tab for admins
+        if (portalMe.canManageTeam) {
+          document.getElementById('teamTab').style.display = '';
         }
-        // (quote builder link removed — now embedded as iframe)
+
+        // Hide New Quote tab / show read-only message if no create_quote permission
+        if (!portalMe.canCreateQuote) {
+          document.getElementById('quoteBuilderWrap').style.display = 'none';
+          document.getElementById('quoteReadOnlyMsg').style.display = '';
+          document.getElementById('newQuoteTab').style.display = 'none';
+          // Activate Our Quotes tab by default for read-only users
+          document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+          const quotesTab = document.querySelector('[data-tab="our-quotes"]');
+          if (quotesTab) quotesTab.classList.add('active');
+          document.getElementById('tab-our-quotes').classList.add('active');
+          loadQuotes();
+        }
       } catch (e) {
         console.error(e);
       }
@@ -418,79 +471,150 @@
       }
     }
 
-    async function loadUsers() {
-      usersLoaded = true;
-      const el = document.getElementById('usersList');
+    const ROLE_LABELS = {
+      admin:       'Admin',
+      full_access: 'Full Access',
+      quotes_only: 'Quotes Only',
+      read_only:   'Read-Only',
+    };
+
+    async function loadTeam() {
+      teamLoaded = true;
+      const el = document.getElementById('teamList');
       try {
-        const resp = await fetch('/api/portal/users');
+        const resp = await fetch('/api/portal/team');
         const data = await resp.json();
-        // Show only non-primary users (primary = the account owner, not an "additional" user)
-        const additional = (data.users || []).filter(u => !u.is_primary);
-        if (additional.length === 0) {
-          el.innerHTML = '<p style="color:var(--muted);font-size:.88rem;">No additional users yet. Add someone below to give them portal access.</p>';
+        if (!data.team || data.team.length === 0) {
+          el.innerHTML = '<p style="color:var(--muted);font-size:.88rem;">No team members found.</p>';
           return;
         }
-        el.innerHTML = additional.map(u => `
-          <div class="user-row" id="user-${u.id}">
+        el.innerHTML = data.team.map(u => `
+          <div class="user-row" id="team-${u.id}">
             <div class="user-info">
-              <div class="user-name">${escHtml(u.name || '')}</div>
-              <div class="user-email">${escHtml(u.email || '')}</div>
+              <div class="user-name">
+                ${escHtml(u.name || u.username || '(no name)')}
+                ${u.isOwner ? '<span class="user-primary">Owner</span>' : ''}
+              </div>
+              <div class="user-email">@${escHtml(u.username || '—')}</div>
             </div>
-            <button class="btn-danger" onclick="removeUser('${u.id}', '${escHtml(u.name || u.email)}')">Remove</button>
+            <div style="display:flex;align-items:center;gap:10px;">
+              ${!u.isOwner ? `
+                <select class="role-select" onchange="changeTeamRole('${u.id}', this)"
+                        style="border:1px solid var(--border);border-radius:5px;padding:5px 8px;font-size:0.82rem;font-family:'Lato',sans-serif;">
+                  <option value="Read-Only"  ${u.role==='read_only'?'selected':''}>Read-Only</option>
+                  <option value="Quotes Only" ${u.role==='quotes_only'?'selected':''}>Quotes Only</option>
+                  <option value="Full Access" ${u.role==='full_access'?'selected':''}>Full Access</option>
+                </select>
+                <button class="btn-sm" style="background:transparent;color:var(--navy);border:1px solid var(--navy);"
+                        onclick="resetTeamPassword('${u.id}', '${escHtml(u.name || u.username)}')">Reset PW</button>
+                <button class="btn-danger" onclick="removeTeamMember('${u.id}', '${escHtml(u.name || u.username)}')">Remove</button>
+              ` : `<span style="font-size:0.82rem;color:var(--muted);">${escHtml(ROLE_LABELS[u.role] || 'Admin')}</span>`}
+            </div>
           </div>`).join('');
       } catch (e) {
-        el.innerHTML = '<p style="color:var(--muted)">Failed to load users.</p>';
+        el.innerHTML = '<p style="color:var(--muted)">Failed to load team.</p>';
       }
     }
 
     function escHtml(str) {
-      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
-    async function addUser() {
-      const name = document.getElementById('newUserName').value.trim();
-      const email = document.getElementById('newUserEmail').value.trim();
-      const msgEl = document.getElementById('addUserMsg');
+    async function addTeamMember() {
+      const firstName = document.getElementById('newFirstName').value.trim();
+      const lastName  = document.getElementById('newLastName').value.trim();
+      const username  = document.getElementById('newUsername').value.trim();
+      const password  = document.getElementById('newPassword').value;
+      const role      = document.getElementById('newRole').value;
+      const msgEl     = document.getElementById('addTeamMsg');
       msgEl.innerHTML = '';
-      if (!name || !email) {
-        msgEl.innerHTML = '<div class="msg msg-error">Please enter a name and email.</div>';
+      if (!firstName || !lastName || !username || !password) {
+        msgEl.innerHTML = '<div class="msg msg-error">Please fill in all fields.</div>';
         return;
       }
+      if (password.length < 8) {
+        msgEl.innerHTML = '<div class="msg msg-error">Password must be at least 8 characters.</div>';
+        return;
+      }
+      const btn = document.getElementById('addTeamMemberBtn');
+      btn.disabled = true;
       try {
-        const resp = await fetch('/api/portal/users/add', {
-          method: 'POST',
+        const resp = await fetch('/api/portal/team/add', {
+          method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email })
+          body:    JSON.stringify({ firstName, lastName, username, password, role }),
         });
         const data = await resp.json();
-        if (data.success) {
-          msgEl.innerHTML = '<div class="msg msg-success">User added. They\'ll receive a login link by email.</div>';
-          document.getElementById('newUserName').value = '';
-          document.getElementById('newUserEmail').value = '';
-          usersLoaded = false;
-          loadUsers();
+        if (data.ok) {
+          msgEl.innerHTML = '<div class="msg msg-success">Team member added successfully.</div>';
+          document.getElementById('newFirstName').value = '';
+          document.getElementById('newLastName').value  = '';
+          document.getElementById('newUsername').value  = '';
+          document.getElementById('newPassword').value  = '';
+          teamLoaded = false;
+          loadTeam();
         } else {
-          msgEl.innerHTML = `<div class="msg msg-error">${data.error || 'Failed to add user.'}</div>`;
+          msgEl.innerHTML = `<div class="msg msg-error">${escHtml(data.error || 'Failed to add team member.')}</div>`;
         }
       } catch (e) {
         msgEl.innerHTML = '<div class="msg msg-error">Network error. Please try again.</div>';
+      } finally {
+        btn.disabled = false;
       }
     }
 
-    async function removeUser(userId, name) {
-      if (!confirm(`Remove ${name} from this portal account?`)) return;
+    async function changeTeamRole(userId, selectEl) {
+      const newRole = selectEl.value;
       try {
-        const resp = await fetch('/api/portal/users/remove', {
-          method: 'POST',
+        const resp = await fetch(`/api/portal/team/${userId}/role`, {
+          method:  'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId })
+          body:    JSON.stringify({ role: newRole }),
         });
         const data = await resp.json();
-        if (data.success) {
-          const row = document.getElementById('user-' + userId);
+        if (!data.ok) {
+          alert(data.error || 'Failed to update role.');
+          teamLoaded = false;
+          loadTeam();
+        }
+      } catch (e) {
+        alert('Network error. Please try again.');
+        teamLoaded = false;
+        loadTeam();
+      }
+    }
+
+    async function resetTeamPassword(userId, name) {
+      const newPw = prompt(`Enter new password for ${name} (min 8 characters):`);
+      if (!newPw) return;
+      if (newPw.length < 8) { alert('Password must be at least 8 characters.'); return; }
+      try {
+        const resp = await fetch(`/api/portal/team/${userId}/reset-password`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ newPassword: newPw }),
+        });
+        const data = await resp.json();
+        if (data.ok) {
+          alert(`Password updated for ${name}.`);
+        } else {
+          alert(data.error || 'Failed to reset password.');
+        }
+      } catch (e) {
+        alert('Network error. Please try again.');
+      }
+    }
+
+    async function removeTeamMember(userId, name) {
+      if (!confirm(`Remove ${name} from this portal account? This cannot be undone.`)) return;
+      try {
+        const resp = await fetch(`/api/portal/team/${userId}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (data.ok) {
+          const row = document.getElementById('team-' + userId);
           if (row) row.remove();
         } else {
-          alert(data.error || 'Failed to remove user.');
+          alert(data.error || 'Failed to remove team member.');
         }
       } catch (e) {
         alert('Network error. Please try again.');
