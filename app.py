@@ -3904,7 +3904,7 @@ def _build_catalog():
                                 fields=["SKU ID", "Name + Variations", "Sale Price",
                                         "Parent Product", "Color", "Size", "Category",
                                         "Feature Variation", "Add-ons"],
-                                formula="{Sale Price}")
+                                formula="AND({Sale Price},{Category}!='Contract')")
         fut_parents = ex.submit(at_get_all, PARENT_PRODUCTS_TABLE_ID,    token, fields=["Name"])
         fut_colors  = ex.submit(at_get_all, COLORS_TABLE_ID,             token, fields=["Name"])
         fut_sizes   = ex.submit(at_get_all, SIZES_TABLE_ID,              token, fields=["Name"])
@@ -4353,24 +4353,12 @@ def quote_catalog():
             threading.Thread(target=_refresh_catalog_bg, daemon=True).start()
         return _catalog_response(_CATALOG_CACHE["data"])
 
-    # No cache yet — if warmup thread is running, wait for it (avoids duplicate build)
-    if _CATALOG_REFRESHING:
-        import time as _t
-        deadline = _t.time() + 25
-        while _t.time() < deadline and not _CATALOG_CACHE["data"]:
-            _t.sleep(0.4)
-        if _CATALOG_CACHE["data"]:
-            return _catalog_response(_CATALOG_CACHE["data"])
-
-    # Last resort: build synchronously
-    try:
-        result = _build_catalog()
-        _CATALOG_CACHE["data"] = result
-        _CATALOG_CACHE["ts"]   = _time.time()
-        return _catalog_response(result)
-    except Exception as e:
-        return Response(json.dumps({"error": str(e)}), status=500,
-                        headers={**cors()}, mimetype="application/json")
+    # No cache yet — kick off background build if not already running, return loading state
+    if not _CATALOG_REFRESHING:
+        _CATALOG_REFRESHING = True
+        threading.Thread(target=_refresh_catalog_bg, daemon=True).start()
+    return Response(json.dumps({"loading": True}),
+                    headers={**cors()}, mimetype="application/json")
 
 
 @app.route("/api/create-quote", methods=["POST", "OPTIONS"])
