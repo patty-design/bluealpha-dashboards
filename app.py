@@ -6515,8 +6515,48 @@ def admin_remove_user(record_id):
 
 @app.route("/api/portal/change-password", methods=["POST"])
 def portal_change_password():
-    """Both admin and CS users can change their own password."""
+    """Change password for B2B customers OR admin/CS users."""
     c = cors()
+    data       = request.get_json() or {}
+    current_pw = (data.get("currentPassword") or "").strip()
+    new_pw     = (data.get("newPassword") or "").strip()
+    if not current_pw or not new_pw:
+        return Response(json.dumps({"error": "currentPassword and newPassword are required"}), status=400, headers=c, mimetype="application/json")
+    if len(new_pw) < 8:
+        return Response(json.dumps({"error": "New password must be at least 8 characters"}), status=400, headers=c, mimetype="application/json")
+
+    # ── B2B customer path (ba_portal_session) ──────────────────────────────
+    customer_user = get_portal_user(request)
+    if customer_user:
+        user_id = customer_user.get("user_id", "")
+        if not user_id:
+            return Response(json.dumps({"error": "Session missing user info — please log in again"}), status=401, headers=c, mimetype="application/json")
+        read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        write_token = APPLY_WRITE_TOKEN or RETURNS_WRITE_TOKEN
+        try:
+            # Fetch current hash from Customers table
+            cr = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{user_id}",
+                headers=at_headers(read_token), timeout=10,
+            )
+            if cr.status_code != 200:
+                return Response(json.dumps({"error": "Could not verify identity"}), status=500, headers=c, mimetype="application/json")
+            stored_hash = cr.json().get("fields", {}).get("Portal Hash", "")
+            if not stored_hash or not _check_password(current_pw, stored_hash):
+                return Response(json.dumps({"error": "Current password is incorrect"}), status=401, headers=c, mimetype="application/json")
+            new_hash = _hash_password(new_pw)
+            pr = req_lib.patch(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{user_id}",
+                headers={**at_headers(write_token), "Content-Type": "application/json"},
+                json={"fields": {"Portal Hash": new_hash}}, timeout=10,
+            )
+            if pr.status_code != 200:
+                return Response(json.dumps({"error": "Failed to update password"}), status=500, headers=c, mimetype="application/json")
+            return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+        except Exception as e:
+            return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+    # ── Admin / CS path (ba_admin_session) ────────────────────────────────
     role = get_portal_role(request)
     if not role:
         return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
@@ -6524,25 +6564,15 @@ def portal_change_password():
     username  = get_portal_username(request)
     if not record_id or not username:
         return Response(json.dumps({"error": "Session missing record info — please log in again"}), status=401, headers=c, mimetype="application/json")
-    data = request.get_json() or {}
-    current_pw = (data.get("currentPassword") or "").strip()
-    new_pw     = (data.get("newPassword") or "").strip()
-    if not current_pw or not new_pw:
-        return Response(json.dumps({"error": "currentPassword and newPassword are required"}), status=400, headers=c, mimetype="application/json")
-    if len(new_pw) < 8:
-        return Response(json.dumps({"error": "New password must be at least 8 characters"}), status=400, headers=c, mimetype="application/json")
-    # Verify current password
     rec, _ = _lookup_portal_user(username, current_pw)
     if not rec:
         return Response(json.dumps({"error": "Current password is incorrect"}), status=401, headers=c, mimetype="application/json")
     new_hash = _hash_password(new_pw)
-    write_token = RETURNS_WRITE_TOKEN
     try:
         r = req_lib.patch(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}/{record_id}",
-            headers={**at_headers(write_token), "Content-Type": "application/json"},
-            json={"fields": {"Portal Hash": new_hash}},
-            timeout=10,
+            headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
+            json={"fields": {"Portal Hash": new_hash}}, timeout=10,
         )
         if r.status_code != 200:
             return Response(json.dumps({"error": "Failed to update password"}), status=500, headers=c, mimetype="application/json")
