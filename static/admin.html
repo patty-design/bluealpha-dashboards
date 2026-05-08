@@ -768,7 +768,7 @@
       btn.textContent = '⏳ Refreshing…';
       msg.innerHTML = '';
       try {
-        const r = await fetch('/api/admin/refresh-catalog', { method: 'POST', headers: { 'Authorization': 'Bearer ' + _token } });
+        const r = await fetch('/api/admin/refresh-catalog', { method: 'POST' });
         const d = await r.json();
         if (d.ok) {
           msg.innerHTML = `<div style="color:#1a7a3c;font-size:0.85rem;margin-bottom:10px;">✅ Catalog updated — ${d.parents} products, ${d.skus} SKUs.</div>`;
