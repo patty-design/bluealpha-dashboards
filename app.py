@@ -5577,7 +5577,32 @@ def portal_quotes(user):
                    if customer_id in r.get("fields", {}).get("Customer", [])
                    and not r.get("fields", {}).get("Hidden from Customer", False)]
         from datetime import date as dt_date
+        import concurrent.futures as _cf
         today = dt_date.today()
+
+        # Collect all line item IDs across all quotes, then fetch in parallel
+        all_li_ids = []
+        for r in records:
+            all_li_ids.extend(r.get("fields", {}).get("MO Line Items", []))
+
+        def _fetch_li(li_id):
+            try:
+                li_r = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+                    headers=at_headers(read_token), timeout=10,
+                )
+                if li_r.status_code == 200:
+                    return li_id, li_r.json().get("fields", {})
+            except Exception:
+                pass
+            return li_id, {}
+
+        li_map = {}
+        if all_li_ids:
+            with _cf.ThreadPoolExecutor(max_workers=20) as ex:
+                for li_id, fields in ex.map(_fetch_li, all_li_ids):
+                    li_map[li_id] = fields
+
         quotes = []
         for r in records:
             f = r.get("fields", {})
@@ -5589,27 +5614,18 @@ def portal_quotes(user):
                     is_expired = dt_date.fromisoformat(expiry_str) < today
                 except Exception:
                     pass
-            # Compute total from line items
-            total = 0.0
-            li_ids = f.get("MO Line Items", [])
-            for li_id in li_ids:
-                try:
-                    li_r = req_lib.get(
-                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
-                        headers=at_headers(read_token), timeout=10,
-                    )
-                    if li_r.status_code == 200:
-                        lf = li_r.json().get("fields", {})
-                        total += (lf.get("Qty.", 0) or 0) * (lf.get("Confirmed Unit Price", 0) or 0)
-                except Exception:
-                    pass
+            total = sum(
+                (li_map.get(li_id, {}).get("Qty.", 0) or 0) *
+                (li_map.get(li_id, {}).get("Confirmed Unit Price", 0) or 0)
+                for li_id in f.get("MO Line Items", [])
+            )
             quotes.append({
-                "record_id":   r["id"],
+                "record_id":    r["id"],
                 "quote_number": quote_number,
-                "date":        f.get("Date", ""),
-                "expiry_date": expiry_str,
-                "is_expired":  is_expired,
-                "total":       round(total, 2),
+                "date":         f.get("Date", ""),
+                "expiry_date":  expiry_str,
+                "is_expired":   is_expired,
+                "total":        round(total, 2),
             })
         # Sort most recent first
         quotes.sort(key=lambda x: x.get("date", ""), reverse=True)
