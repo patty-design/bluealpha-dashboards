@@ -175,6 +175,12 @@
       white-space: nowrap;
     }
     .btn-sm:hover { background: #222d47; }
+    .btn-sm-secondary {
+      background: #f0f2f5;
+      color: var(--text);
+      border: 1.5px solid var(--border);
+    }
+    .btn-sm-secondary:hover { background: #e2e6eb; }
     .btn-danger {
       background: transparent;
       color: var(--red);
@@ -495,7 +501,10 @@
               <td>${fmt(q.expiry_date)}</td>
               <td>${money(q.total)}</td>
               <td>${badge}</td>
-              <td><button class="btn-sm" onclick="openViewQuote('${q.record_id}')">View →</button></td>
+              <td style="white-space:nowrap">
+                <button class="btn-sm" onclick="openViewQuote('${q.record_id}')">View →</button>
+                <button class="btn-sm btn-sm-secondary" onclick="duplicateQuote('${q.record_id}',this)" style="margin-left:6px">Duplicate</button>
+              </td>
             </tr>`;
           }).join('') +
           '</tbody></table>';
@@ -722,6 +731,32 @@
     document.querySelector('[data-tab="our-quotes"]').classList.add('active');
     document.getElementById('tab-our-quotes').classList.add('active');
     document.getElementById('viewQuoteFrame').src = '';
+  }
+
+  async function duplicateQuote(recordId, btn) {
+    btn.disabled = true;
+    btn.textContent = '…';
+    try {
+      const resp = await fetch(`/api/portal/duplicate-quote/${recordId}`, { method: 'POST' });
+      const data = await resp.json();
+      if (data.success) {
+        btn.textContent = '✓ Done';
+        btn.style.color = '#1a7a3c';
+        // Refresh the list after a moment so the new quote appears
+        setTimeout(() => {
+          quotesLoaded = false;
+          loadQuotes();
+        }, 800);
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Duplicate';
+        alert('Error: ' + (data.error || 'Unknown error'));
+      }
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = 'Duplicate';
+      alert('Network error: ' + e.message);
+    }
   }
   </script>
 

@@ -3843,31 +3843,41 @@ def _fetch_quote_data(record_id):
                 "billToOrg":    cf.get("Bill-To Org Name", "") or cf.get("Organization Name", ""),
             }
 
-    # Fetch line items — use record IDs from MO field directly (ARRAYJOIN formula
-    # returns display names, not IDs, so filter-based lookup doesn't work)
+    # Fetch line items in parallel
     li_record_ids = fields.get("MO Line Items", [])
     line_items = []
-    for li_id in li_record_ids:
-        li_r = req_lib.get(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
-            headers=at_headers(token),
-            timeout=15,
-        )
-        if li_r.status_code != 200:
-            continue
-        li = li_r.json()
-        lf = li.get("fields", {})
-        sku_ids   = lf.get("Product SKU", [])
-        sku_names = lf.get("Name + Variations (from Product SKU)", [])
-        sku_ids_f = lf.get("SKU ID (from Product SKU)", [])
-        line_items.append({
-            "lineItemId":  li["id"],
-            "skuRecordId": sku_ids[0] if sku_ids else "",
-            "skuId":       sku_ids_f[0] if sku_ids_f else "",
-            "name":        sku_names[0] if sku_names else "",
-            "qty":         lf.get("Qty.", 0),
-            "unitPrice":   lf.get("Confirmed Unit Price", 0),
-        })
+    if li_record_ids:
+        import concurrent.futures as _cf
+        def _fetch_li_full(li_id):
+            try:
+                r2 = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+                    headers=at_headers(token), timeout=15,
+                )
+                if r2.status_code == 200:
+                    return li_id, r2.json()
+            except Exception:
+                pass
+            return li_id, None
+        with _cf.ThreadPoolExecutor(max_workers=20) as _ex:
+            _results = list(_ex.map(_fetch_li_full, li_record_ids))
+        _results_map = {li_id: data for li_id, data in _results if data}
+        for li_id in li_record_ids:
+            li = _results_map.get(li_id)
+            if not li:
+                continue
+            lf = li.get("fields", {})
+            sku_ids   = lf.get("Product SKU", [])
+            sku_names = lf.get("Name + Variations (from Product SKU)", [])
+            sku_ids_f = lf.get("SKU ID (from Product SKU)", [])
+            line_items.append({
+                "lineItemId":  li["id"],
+                "skuRecordId": sku_ids[0] if sku_ids else "",
+                "skuId":       sku_ids_f[0] if sku_ids_f else "",
+                "name":        sku_names[0] if sku_names else "",
+                "qty":         lf.get("Qty.", 0),
+                "unitPrice":   lf.get("Confirmed Unit Price", 0),
+            })
 
     subtotal = sum(i["qty"] * i["unitPrice"] for i in line_items)
 
@@ -4605,6 +4615,131 @@ def update_quote(record_id):
             li_r.raise_for_status()
 
         return Response(json.dumps({"success": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/portal/duplicate-quote/<record_id>", methods=["POST", "OPTIONS"])
+@portal_login_required
+def portal_duplicate_quote(user, record_id):
+    """Duplicate a quote with today's date, new 90-day expiry, and current catalog prices."""
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type",
+                                     "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    from datetime import date as dt_date, timedelta
+    import concurrent.futures as _cf
+
+    token      = RETURNS_WRITE_TOKEN
+    read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    customer_id = user.get("customer_id", "")
+
+    try:
+        # 1. Fetch original quote
+        orig_r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+            headers=at_headers(read_token), timeout=15,
+        )
+        if orig_r.status_code != 200:
+            return Response(json.dumps({"error": "Original quote not found"}), status=404, headers=c, mimetype="application/json")
+        orig_fields = orig_r.json().get("fields", {})
+        if orig_fields.get("Order Type") != "Quote":
+            return Response(json.dumps({"error": "Not a quote"}), status=400, headers=c, mimetype="application/json")
+        # Verify ownership
+        if customer_id and customer_id not in orig_fields.get("Customer", []):
+            return Response(json.dumps({"error": "Forbidden"}), status=403, headers=c, mimetype="application/json")
+
+        # 2. Fetch original line items in parallel
+        li_ids = orig_fields.get("MO Line Items", [])
+        def _fetch_li_dup(li_id):
+            try:
+                r2 = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+                    headers=at_headers(read_token), timeout=10,
+                )
+                if r2.status_code == 200:
+                    return r2.json().get("fields", {})
+            except Exception:
+                pass
+            return {}
+        with _cf.ThreadPoolExecutor(max_workers=20) as ex:
+            li_fields_list = list(ex.map(_fetch_li_dup, li_ids))
+
+        # 3. For each line item, look up current Sale Price from Product SKUs table
+        sku_record_ids = [lf.get("Product SKU", [None])[0] for lf in li_fields_list if lf.get("Product SKU")]
+        def _fetch_sku_price(sku_id):
+            try:
+                r2 = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PRODUCT_SKUS_TABLE_ID}/{sku_id}",
+                    headers=at_headers(read_token), timeout=10,
+                )
+                if r2.status_code == 200:
+                    return sku_id, r2.json().get("fields", {}).get("Sale Price", 0)
+            except Exception:
+                pass
+            return sku_id, 0
+        sku_prices = {}
+        if sku_record_ids:
+            with _cf.ThreadPoolExecutor(max_workers=20) as ex:
+                for sku_id, price in ex.map(_fetch_sku_price, sku_record_ids):
+                    sku_prices[sku_id] = price
+
+        # 4. Get next order ID
+        all_mos = at_get_all(MANUAL_ORDERS_TABLE_ID, read_token, fields=["Order ID"])
+        max_id = max((int(m["fields"].get("Order ID", 0) or 0) for m in all_mos if str(m["fields"].get("Order ID","")).isdigit()), default=0)
+        order_id_str = str(max_id + 1).zfill(4)
+        quote_number = f"QU-{order_id_str}"
+
+        today      = dt_date.today()
+        expiry_str = (today + timedelta(days=90)).isoformat()
+
+        # 5. Create new Manual Order
+        new_mo_fields = {
+            "Order Type":  "Quote",
+            "Order ID":    order_id_str,
+            "Date":        today.isoformat(),
+            "Expiry Date": expiry_str,
+            "Customer":    orig_fields.get("Customer", [customer_id]),
+        }
+        if orig_fields.get("Purchase Order #"):
+            new_mo_fields["Purchase Order #"] = orig_fields["Purchase Order #"]
+        if orig_fields.get("Notes"):
+            new_mo_fields["Notes"] = orig_fields["Notes"]
+        mo_r = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}",
+            headers={**at_headers(token), "Content-Type": "application/json"},
+            json={"fields": new_mo_fields}, timeout=15,
+        )
+        if not mo_r.ok:
+            err = mo_r.json() if mo_r.headers.get("content-type","").startswith("application/json") else mo_r.text
+            return Response(json.dumps({"error": f"Order creation failed: {err}"}), status=500, headers=c, mimetype="application/json")
+        new_mo_id = mo_r.json()["id"]
+
+        # 6. Create line items with updated prices
+        for lf in li_fields_list:
+            sku_ids = lf.get("Product SKU", [])
+            if not sku_ids:
+                continue
+            sku_id    = sku_ids[0]
+            qty       = int(lf.get("Qty.", 1) or 1)
+            new_price = float(sku_prices.get(sku_id) or lf.get("Confirmed Unit Price", 0))
+            li_r = req_lib.post(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}",
+                headers={**at_headers(token), "Content-Type": "application/json"},
+                json={"fields": {
+                    "Manual Order":         [new_mo_id],
+                    "Product SKU":          [sku_id],
+                    "Qty.":                 qty,
+                    "Confirmed Unit Price": new_price,
+                }}, timeout=15,
+            )
+            li_r.raise_for_status()
+
+        # Invalidate quotes cache for this customer
+        _QUOTES_CACHE.pop(customer_id, None)
+
+        return Response(json.dumps({"success": True, "quoteNumber": quote_number, "recordId": new_mo_id}),
+                        headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
@@ -5562,6 +5697,9 @@ def portal_update_profile(user):
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
 
+_QUOTES_CACHE: dict = {}   # {customer_id: {"ts": float, "data": list}}
+_QUOTES_CACHE_TTL = 60    # seconds
+
 @app.route("/api/portal/quotes")
 @portal_login_required
 def portal_quotes(user):
@@ -5569,6 +5707,12 @@ def portal_quotes(user):
     customer_id = user.get("customer_id", "")
     if not customer_id:
         return Response(json.dumps({"quotes": []}), headers=c, mimetype="application/json")
+
+    # Return cached result if fresh enough
+    import time as _time_mod
+    _cached = _QUOTES_CACHE.get(customer_id)
+    if _cached and (_time_mod.time() - _cached["ts"]) < _QUOTES_CACHE_TTL:
+        return Response(json.dumps({"quotes": _cached["data"]}), headers=c, mimetype="application/json")
 
     try:
         read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
@@ -5640,6 +5784,7 @@ def portal_quotes(user):
             })
         # Sort most recent first
         quotes.sort(key=lambda x: x.get("date", ""), reverse=True)
+        _QUOTES_CACHE[customer_id] = {"ts": _time_mod.time(), "data": quotes}
         return Response(json.dumps({"quotes": quotes}), headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
