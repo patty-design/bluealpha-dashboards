@@ -276,7 +276,7 @@
       </div>
     </div>
     <div class="header-right">
-      <button class="btn-change-pw" onclick="openChangePw()">Change Password</button>
+      <button class="btn-change-pw" onclick="openChangePw()">Account Settings</button>
       <a href="/logout" class="btn-logout">Log Out</a>
     </div>
   </header>
@@ -717,10 +717,30 @@
   }
   </script>
 
-  <!-- Change Password Modal -->
+  <!-- Account Settings Modal -->
   <div class="modal-overlay" id="changePwModal">
-    <div class="modal-box">
-      <h3>Change Password</h3>
+    <div class="modal-box" style="max-width:440px;">
+      <h3>Account Settings</h3>
+
+      <!-- Profile section -->
+      <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:12px;">Profile</div>
+      <div class="modal-field">
+        <label>Contact Name</label>
+        <input type="text" id="profName" placeholder="Your name" autocomplete="name">
+      </div>
+      <div class="modal-field">
+        <label>Email Address</label>
+        <input type="email" id="profEmail" placeholder="your@email.com" autocomplete="email">
+      </div>
+      <div class="modal-msg" id="profMsg"></div>
+      <div class="modal-actions" style="margin-bottom:28px;">
+        <button class="btn-save" id="profSaveBtn" onclick="submitProfile()">Save Profile</button>
+      </div>
+
+      <div style="border-top:1px solid #eee;margin-bottom:20px;"></div>
+
+      <!-- Change password section -->
+      <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:12px;">Change Password</div>
       <div class="modal-field">
         <label>Current Password</label>
         <input type="password" id="cpCurrent" placeholder="Your current password" autocomplete="current-password">
@@ -735,24 +755,58 @@
       </div>
       <div class="modal-msg" id="cpMsg"></div>
       <div class="modal-actions">
-        <button class="btn-cancel" onclick="closeChangePw()">Cancel</button>
+        <button class="btn-cancel" onclick="closeChangePw()">Close</button>
         <button class="btn-save" id="cpSaveBtn" onclick="submitChangePw()">Update Password</button>
       </div>
     </div>
   </div>
 
   <script>
-  function openChangePw() {
+  async function openChangePw() {
+    // Reset password fields
     document.getElementById('cpCurrent').value = '';
     document.getElementById('cpNew').value     = '';
     document.getElementById('cpConfirm').value = '';
-    const msg = document.getElementById('cpMsg');
-    msg.className = 'modal-msg'; msg.textContent = '';
+    ['cpMsg','profMsg'].forEach(id => { const el = document.getElementById(id); el.className = 'modal-msg'; el.textContent = ''; });
     document.getElementById('changePwModal').classList.add('open');
-    setTimeout(() => document.getElementById('cpCurrent').focus(), 50);
+    // Load profile
+    try {
+      const res  = await fetch('/api/portal/profile');
+      const data = await res.json();
+      const p    = data.profile || {};
+      document.getElementById('profName').value  = p.contactName || '';
+      document.getElementById('profEmail').value = p.email       || '';
+    } catch (_) {}
+    setTimeout(() => document.getElementById('profName').focus(), 50);
   }
   function closeChangePw() {
     document.getElementById('changePwModal').classList.remove('open');
+  }
+  async function submitProfile() {
+    const name  = document.getElementById('profName').value.trim();
+    const email = document.getElementById('profEmail').value.trim();
+    const msg   = document.getElementById('profMsg');
+    const btn   = document.getElementById('profSaveBtn');
+    msg.className = 'modal-msg'; msg.textContent = '';
+    if (!name && !email) {
+      msg.className = 'modal-msg error'; msg.textContent = 'Please enter a name or email to update.'; return;
+    }
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const res  = await fetch('/api/portal/update-profile', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ contactName: name, email: email })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        msg.className = 'modal-msg success'; msg.textContent = 'Profile updated successfully!';
+      } else {
+        msg.className = 'modal-msg error'; msg.textContent = data.error || 'Something went wrong.';
+      }
+    } catch (e) {
+      msg.className = 'modal-msg error'; msg.textContent = 'Network error. Please try again.';
+    }
+    btn.disabled = false; btn.textContent = 'Save Profile';
   }
   async function submitChangePw() {
     const current  = document.getElementById('cpCurrent').value.trim();
@@ -762,7 +816,7 @@
     const btn      = document.getElementById('cpSaveBtn');
     msg.className  = 'modal-msg'; msg.textContent = '';
     if (!current || !newPw || !confirm) {
-      msg.className = 'modal-msg error'; msg.textContent = 'All fields are required.'; return;
+      msg.className = 'modal-msg error'; msg.textContent = 'All password fields are required.'; return;
     }
     if (newPw.length < 8) {
       msg.className = 'modal-msg error'; msg.textContent = 'New password must be at least 8 characters.'; return;
@@ -779,7 +833,9 @@
       const data = await res.json();
       if (data.ok) {
         msg.className = 'modal-msg success'; msg.textContent = 'Password updated successfully!';
-        setTimeout(closeChangePw, 1500);
+        document.getElementById('cpCurrent').value = '';
+        document.getElementById('cpNew').value     = '';
+        document.getElementById('cpConfirm').value = '';
       } else {
         msg.className = 'modal-msg error'; msg.textContent = data.error || 'Something went wrong.';
       }
