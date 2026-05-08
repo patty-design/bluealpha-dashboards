@@ -954,9 +954,11 @@ def cs_lookup_order():
             },
             "items":                items,
             "alreadyReturnedQtys":  cs_already_returned,
+            "shippingAmount":       float(order.get("shippingAmount") or 0),
         }), headers=c, mimetype="application/json")
 
     except Exception as e:
+        print(f"[cs_lookup_order] Exception: {e}")
         return Response(json.dumps({"status": "error", "error": str(e)}),
                         status=500, headers=c, mimetype="application/json")
 

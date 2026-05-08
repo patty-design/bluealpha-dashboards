@@ -408,7 +408,7 @@
       <div class="mode-toggle-col-divider"></div>
       <button class="mode-btn" id="btn-mode-lost"            onclick="setMode('lost')">📦 Lost Order</button>
       <div class="mode-toggle-divider"></div>
-      <button class="mode-btn" id="btn-mode-exchange"        onclick="setMode('exchange')">↔ Domestic<br>Size Exchange</button>
+      <button class="mode-btn" id="btn-mode-exchange"        onclick="setMode('exchange')">🇺🇸 Domestic<br>Size Exchange</button>
       <div class="mode-toggle-col-divider"></div>
       <button class="mode-btn" id="btn-mode-intl"            onclick="setMode('intl')">🌍 International<br>Size Exchange</button>
       <div class="mode-toggle-col-divider"></div>
@@ -953,14 +953,30 @@ async function lookupOrder() {
 
 function populateOrderInfo(data) {
   const orderNum = document.getElementById('cs-order-number').value.trim();
+
+  // Shipping mode: block if no shipping was charged
+  if (currentMode === 'shipping') {
+    const shippingAmt = data.shippingAmount || 0;
+    if (shippingAmt <= 0) {
+      const errEl = document.getElementById('msg-lookup-error');
+      errEl.textContent = 'This order had free shipping — no shipping fee to refund.';
+      errEl.classList.add('show');
+      return;
+    }
+  }
+
   const trackingHtml = data.trackingNumber
     ? '🔍 Tracking: <a href="https://www.google.com/search?q=' + encodeURIComponent(data.trackingNumber) + '" target="_blank" style="color:var(--navy);font-weight:600;">' + data.trackingNumber + '</a><br>'
+    : '';
+  const shippingHtml = (currentMode === 'shipping' && data.shippingAmount > 0)
+    ? '💲 Shipping paid: $' + data.shippingAmount.toFixed(2) + '<br>'
     : '';
   document.getElementById('order-info-text').innerHTML =
     '<strong>Order #' + orderNum + '</strong> — ' + (data.customerName || 'Unknown customer') + '<br>' +
     (data.email    ? '📧 ' + data.email + '<br>'                  : '') +
     (data.shipDate ? '📦 Shipped: ' + data.shipDate.slice(0,10) + '<br>' : '') +
-    trackingHtml;
+    trackingHtml +
+    shippingHtml;
 
   buildItemsList(data.items || [], data.alreadyReturnedQtys || {});
 
