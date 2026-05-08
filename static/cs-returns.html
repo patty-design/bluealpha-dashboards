@@ -93,6 +93,12 @@
       margin-bottom: 28px;
       gap: 4px;
     }
+    .mode-toggle-divider {
+      grid-column: 1 / -1;
+      height: 1px;
+      background: var(--border);
+      margin: 0 2px;
+    }
     .mode-btn {
       padding: 10px 16px;
       border: none;
@@ -391,6 +397,7 @@
       <button class="mode-btn active" id="btn-mode-return" onclick="setMode('return')">↩ Return</button>
       <button class="mode-btn" id="btn-mode-cancel" onclick="setMode('cancel')">✕ Cancellation</button>
       <button class="mode-btn" id="btn-mode-lost" onclick="setMode('lost')">📦 Lost Order</button>
+      <div class="mode-toggle-divider"></div>
       <button class="mode-btn" id="btn-mode-exchange" onclick="setMode('exchange')">↔ Size Exchange</button>
       <button class="mode-btn" id="btn-mode-intl" onclick="setMode('intl')">🌍 International Exchange Exception</button>
       <button class="mode-btn" id="btn-mode-shipping" onclick="setMode('shipping')">💲 Shipping Refund</button>
