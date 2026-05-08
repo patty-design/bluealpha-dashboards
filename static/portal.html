@@ -55,6 +55,44 @@
       transition: background 0.15s;
     }
     .btn-logout:hover { background: rgba(255,255,255,0.2); }
+    .btn-change-pw {
+      background: transparent;
+      color: rgba(255,255,255,0.6);
+      border: none;
+      font-family: 'Lato', sans-serif;
+      font-size: 0.84rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 8px 4px;
+      text-decoration: underline;
+      transition: color 0.15s;
+    }
+    .btn-change-pw:hover { color: rgba(255,255,255,0.9); }
+
+    /* Change password modal */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: #fff; border-radius: 10px;
+      padding: 32px; width: 100%; max-width: 400px; margin: 20px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+    }
+    .modal-box h3 { font-size: 1.1rem; font-weight: 700; color: var(--navy); margin-bottom: 20px; }
+    .modal-field { margin-bottom: 16px; }
+    .modal-field label { display: block; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #444; margin-bottom: 6px; }
+    .modal-field input { width: 100%; border: 1px solid #dde3ea; border-radius: 6px; padding: 10px 12px; font-size: 0.95rem; outline: none; }
+    .modal-field input:focus { border-color: var(--navy); }
+    .modal-actions { display: flex; gap: 10px; margin-top: 24px; }
+    .modal-actions .btn-save { flex: 1; background: var(--navy); color: #fff; border: none; border-radius: 6px; padding: 11px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
+    .modal-actions .btn-cancel { background: #f0f2f5; color: #444; border: none; border-radius: 6px; padding: 11px 18px; font-weight: 600; font-size: 0.9rem; cursor: pointer; }
+    .modal-msg { font-size: 0.85rem; margin-top: 12px; padding: 8px 12px; border-radius: 6px; display: none; }
+    .modal-msg.error { background: #fff0f0; color: #b00; border: 1px solid #f5c2c2; display: block; }
+    .modal-msg.success { background: #f0faf3; color: #1a5c2a; border: 1px solid #a3d4b0; display: block; }
+
     .container { max-width: 960px; margin: 0 auto; padding: 36px 20px 80px; }
     .tabs {
       display: flex;
@@ -238,6 +276,7 @@
       </div>
     </div>
     <div class="header-right">
+      <button class="btn-change-pw" onclick="openChangePw()">Change Password</button>
       <a href="/logout" class="btn-logout">Log Out</a>
     </div>
   </header>
@@ -676,6 +715,82 @@
     document.getElementById('tab-our-quotes').classList.add('active');
     document.getElementById('viewQuoteFrame').src = '';
   }
+  </script>
+
+  <!-- Change Password Modal -->
+  <div class="modal-overlay" id="changePwModal">
+    <div class="modal-box">
+      <h3>Change Password</h3>
+      <div class="modal-field">
+        <label>Current Password</label>
+        <input type="password" id="cpCurrent" placeholder="Your current password" autocomplete="current-password">
+      </div>
+      <div class="modal-field">
+        <label>New Password</label>
+        <input type="password" id="cpNew" placeholder="At least 8 characters" autocomplete="new-password">
+      </div>
+      <div class="modal-field">
+        <label>Confirm New Password</label>
+        <input type="password" id="cpConfirm" placeholder="Re-enter new password" autocomplete="new-password">
+      </div>
+      <div class="modal-msg" id="cpMsg"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeChangePw()">Cancel</button>
+        <button class="btn-save" id="cpSaveBtn" onclick="submitChangePw()">Update Password</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  function openChangePw() {
+    document.getElementById('cpCurrent').value = '';
+    document.getElementById('cpNew').value     = '';
+    document.getElementById('cpConfirm').value = '';
+    const msg = document.getElementById('cpMsg');
+    msg.className = 'modal-msg'; msg.textContent = '';
+    document.getElementById('changePwModal').classList.add('open');
+    setTimeout(() => document.getElementById('cpCurrent').focus(), 50);
+  }
+  function closeChangePw() {
+    document.getElementById('changePwModal').classList.remove('open');
+  }
+  async function submitChangePw() {
+    const current  = document.getElementById('cpCurrent').value.trim();
+    const newPw    = document.getElementById('cpNew').value.trim();
+    const confirm  = document.getElementById('cpConfirm').value.trim();
+    const msg      = document.getElementById('cpMsg');
+    const btn      = document.getElementById('cpSaveBtn');
+    msg.className  = 'modal-msg'; msg.textContent = '';
+    if (!current || !newPw || !confirm) {
+      msg.className = 'modal-msg error'; msg.textContent = 'All fields are required.'; return;
+    }
+    if (newPw.length < 8) {
+      msg.className = 'modal-msg error'; msg.textContent = 'New password must be at least 8 characters.'; return;
+    }
+    if (newPw !== confirm) {
+      msg.className = 'modal-msg error'; msg.textContent = 'New passwords do not match.'; return;
+    }
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const res  = await fetch('/api/portal/change-password', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ currentPassword: current, newPassword: newPw })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        msg.className = 'modal-msg success'; msg.textContent = 'Password updated successfully!';
+        setTimeout(closeChangePw, 1500);
+      } else {
+        msg.className = 'modal-msg error'; msg.textContent = data.error || 'Something went wrong.';
+      }
+    } catch (e) {
+      msg.className = 'modal-msg error'; msg.textContent = 'Network error. Please try again.';
+    }
+    btn.disabled = false; btn.textContent = 'Update Password';
+  }
+  document.getElementById('changePwModal').addEventListener('click', function(e) {
+    if (e.target === this) closeChangePw();
+  });
   </script>
 </body>
 </html>
