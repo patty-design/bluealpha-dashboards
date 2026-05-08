@@ -393,6 +393,7 @@
       <button class="mode-btn" id="btn-mode-lost" onclick="setMode('lost')">📦 Lost Order</button>
       <button class="mode-btn" id="btn-mode-exchange" onclick="setMode('exchange')">↔ Size Exchange</button>
       <button class="mode-btn" id="btn-mode-intl" onclick="setMode('intl')">🌍 International Exchange Exception</button>
+      <button class="mode-btn" id="btn-mode-shipping" onclick="setMode('shipping')">💲 Shipping Refund</button>
     </div>
 
     <div class="card">
@@ -415,6 +416,11 @@
       <!-- International Exception banner -->
       <div id="banner-intl" class="info-banner banner-amber hidden">
         🌍 <strong>CS International Exchange Exception</strong> — For international customers outside the normal eligibility window. Customer pays $10 via Stripe. A payment link will be emailed to the customer automatically.
+      </div>
+
+      <!-- Shipping Refund banner -->
+      <div id="banner-shipping" class="info-banner banner-green hidden">
+        💲 <strong>Shipping refund request</strong> — Use this when the shipping fee needs to be refunded. Product costs are <strong>not</strong> refunded here.
       </div>
 
       <!-- Lost Order banner + action toggle -->
@@ -497,6 +503,18 @@
             <option value="Other">Other</option>
           </select>
           <div class="validation-msg" id="msg-no-reason-cancel">⚠ Please select a reason.</div>
+        </div>
+
+        <!-- Reason (shipping refund) -->
+        <div class="field hidden" id="field-reason-shipping">
+          <label>Refund Reason <span class="req">*</span></label>
+          <select id="cs-reason-shipping">
+            <option value="">Select a reason…</option>
+            <option value="PO Box address — carrier couldn't deliver">PO Box address — carrier couldn't deliver</option>
+            <option value="Shipper error">Shipper error</option>
+            <option value="Customer changed their mind">Customer changed their mind</option>
+          </select>
+          <div class="validation-msg" id="msg-no-reason-shipping">⚠ Please select a reason.</div>
         </div>
 
         <!-- Lost Order: address review -->
@@ -713,6 +731,16 @@
         </div>
       </div>
 
+      <!-- Shipping Refund: logged -->
+      <div id="shipping-refund-success" class="success-screen hidden">
+        <div class="success-icon">💲</div>
+        <h2>Shipping Refund Logged</h2>
+        <p>The shipping refund request has been recorded. The manager will see it in the refund queue.</p>
+        <div style="margin-top:28px;">
+          <button onclick="resetForm()" class="btn btn-primary">Submit Another</button>
+        </div>
+      </div>
+
       <!-- placeholder to keep the DOM structure intact, remove duplicate closing div -->
       <div style="display:none" id="exchange-success-placeholder-end">
         <div style="margin-top:28px;">
@@ -729,7 +757,7 @@
 const API_BASE = '';
 let csPassword  = '';
 let orderData   = null;
-let currentMode = 'return'; // 'return' | 'cancel' | 'lost' | 'exchange' | 'intl'
+let currentMode = 'return'; // 'return' | 'cancel' | 'lost' | 'exchange' | 'intl' | 'shipping'
 let lostAction  = 'reship'; // 'reship' | 'refund'
 let orderBlocked = false;   // true when cancel mode + order already shipped
 let exchangeVerifyData = null;
@@ -779,12 +807,14 @@ function setMode(mode) {
   const isLost     = mode === 'lost';
   const isExchange = mode === 'exchange';
   const isIntl     = mode === 'intl';
+  const isShipping = mode === 'shipping';
 
   document.getElementById('btn-mode-return').classList.toggle('active', isReturn);
   document.getElementById('btn-mode-cancel').classList.toggle('active', isCancel);
   document.getElementById('btn-mode-lost').classList.toggle('active', isLost);
   document.getElementById('btn-mode-exchange').classList.toggle('active', isExchange);
   document.getElementById('btn-mode-intl').classList.toggle('active', isIntl);
+  document.getElementById('btn-mode-shipping').classList.toggle('active', isShipping);
 
   // Titles
   if (isReturn) {
@@ -799,6 +829,9 @@ function setMode(mode) {
   } else if (isIntl) {
     document.getElementById('form-title').textContent    = 'CS International Exchange Exception';
     document.getElementById('form-subtitle').textContent = 'Initiate an international exchange exception. A $10 payment link will be emailed to the customer automatically.';
+  } else if (isShipping) {
+    document.getElementById('form-title').textContent    = 'Shipping Refund Request';
+    document.getElementById('form-subtitle').textContent = 'Refund the shipping fee only. Product cost is not refunded — the customer already received their order.';
   } else {
     document.getElementById('form-title').textContent    = 'CS Size Exchange Exception';
     document.getElementById('form-subtitle').textContent = 'For customers outside the 30-day exchange window — exception already approved.';
@@ -810,8 +843,9 @@ function setMode(mode) {
   document.getElementById('banner-lost').classList.toggle('hidden', !isLost);
   document.getElementById('banner-exchange').classList.toggle('hidden', !isExchange);
   document.getElementById('banner-intl').classList.toggle('hidden', !isIntl);
+  document.getElementById('banner-shipping').classList.toggle('hidden', !isShipping);
 
-  // Items label (only relevant for non-exchange/non-intl modes)
+  // Items label (only relevant for non-exchange/non-intl/non-shipping modes)
   document.getElementById('items-label').innerHTML = (isReturn ? 'Items to Return' : isCancel ? 'Items to Cancel' : 'Items to Reship') + ' <span class="req">*</span>';
 
   // Return-only fields
@@ -821,6 +855,7 @@ function setMode(mode) {
   // Reason fields
   document.getElementById('field-reason-return').classList.toggle('hidden', !isReturn);
   document.getElementById('field-reason-cancel').classList.toggle('hidden', !isCancel);
+  document.getElementById('field-reason-shipping').classList.toggle('hidden', !isShipping);
 
   // Lost address section
   document.getElementById('section-lost-address').classList.toggle('hidden', !isLost);
@@ -835,9 +870,10 @@ function setMode(mode) {
 
   // Submit button: hide in exchange/intl mode (those blocks have their own submit buttons)
   document.getElementById('btn-cs-submit').classList.toggle('hidden', isExchange || isIntl);
-  if (isReturn)      document.getElementById('btn-cs-submit').innerHTML = 'Submit &amp; Send Label';
-  else if (isCancel) document.getElementById('btn-cs-submit').innerHTML = 'Submit Cancellation Request';
-  else if (isLost)   document.getElementById('btn-cs-submit').innerHTML = lostAction === 'refund' ? 'Log Refund Request' : 'Create Reshipment';
+  if (isReturn)        document.getElementById('btn-cs-submit').innerHTML = 'Submit &amp; Send Label';
+  else if (isCancel)   document.getElementById('btn-cs-submit').innerHTML = 'Submit Cancellation Request';
+  else if (isLost)     document.getElementById('btn-cs-submit').innerHTML = lostAction === 'refund' ? 'Log Refund Request' : 'Create Reshipment';
+  else if (isShipping) document.getElementById('btn-cs-submit').innerHTML = 'Log Shipping Refund';
 
   // In exchange/intl mode, hide the shared order-info-block; show info blocks only after lookup
   document.getElementById('order-info-block').classList.add('hidden');
@@ -1015,11 +1051,12 @@ function getSelectedItems() {
 
 // ── Block state helper ─────────────────────────────────────────────────────
 function _applyBlockState() {
+  const isShipping = currentMode === 'shipping';
   const blocked = orderBlocked && currentMode === 'cancel';
   document.getElementById('already-shipped-warning').classList.toggle('hidden', !blocked);
-  // Hide actionable fields when blocked so CS can't proceed
+  // Hide items for cancelled orders or shipping refund mode (no items needed)
   const itemsField = document.getElementById('cs-items-list').closest('.field');
-  if (itemsField) itemsField.classList.toggle('hidden', blocked);
+  if (itemsField) itemsField.classList.toggle('hidden', blocked || isShipping);
   document.getElementById('field-reason-cancel').classList.toggle('hidden', currentMode !== 'cancel' || blocked);
   document.getElementById('btn-cs-submit').classList.toggle('hidden', blocked);
 }
@@ -1030,6 +1067,8 @@ function handleSubmit() {
     csSubmitReturn();
   } else if (currentMode === 'cancel') {
     csSubmitCancellation();
+  } else if (currentMode === 'shipping') {
+    csSubmitShippingRefund();
   } else {
     csSubmitReshipment();
   }
@@ -1256,6 +1295,52 @@ async function csSubmitReshipment() {
 
   btn.disabled = false;
   btn.innerHTML = 'Create Reshipment';
+}
+
+// ── Submit: Shipping Refund ────────────────────────────────────────────────
+async function csSubmitShippingRefund() {
+  const btn   = document.getElementById('btn-cs-submit');
+  const errEl = document.getElementById('msg-submit-error');
+  errEl.classList.remove('show');
+
+  const reason   = document.getElementById('cs-reason-shipping').value;
+  const orderNum = document.getElementById('cs-order-number').value.trim();
+
+  if (!reason) {
+    document.getElementById('msg-no-reason-shipping').style.display = 'block';
+    return;
+  }
+  document.getElementById('msg-no-reason-shipping').style.display = 'none';
+
+  const csNotes = document.getElementById('cs-notes').value.trim();
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Logging…';
+  try {
+    const res = await fetch(API_BASE + '/api/submit-shipping-refund', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        csPassword:   csPassword,
+        orderNumber:  orderNum,
+        customerName: orderData ? orderData.customerName : '',
+        reason:       reason,
+        csNotes:      csNotes,
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById('screen-main').classList.add('hidden');
+      document.getElementById('screen-success').classList.remove('hidden');
+      showSuccessState('shipping-refund-success');
+    } else {
+      throw new Error(data.error || 'Unknown error');
+    }
+  } catch (e) {
+    errEl.classList.add('show');
+  }
+  btn.disabled = false;
+  btn.innerHTML = 'Log Shipping Refund';
 }
 
 // ── Exchange lookup & submit ────────────────────────────────────────────────
@@ -1689,7 +1774,7 @@ function copyIntlPaymentLink() {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function showSuccessState(id) {
-  ['return-success-pending','return-success-sent','return-success-review','cancel-success','lost-success','lost-refund-success','exchange-success','intl-exception-success']
+  ['return-success-pending','return-success-sent','return-success-review','cancel-success','lost-success','lost-refund-success','exchange-success','intl-exception-success','shipping-refund-success']
     .forEach(s => document.getElementById(s).classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');
 }
@@ -1717,7 +1802,8 @@ function resetForm() {
   document.getElementById('cs-items-list').innerHTML = '';
   document.getElementById('cs-email').value          = '';
   document.getElementById('cs-reason-return').value  = '';
-  document.getElementById('cs-reason-cancel').value  = '';
+  document.getElementById('cs-reason-cancel').value    = '';
+  document.getElementById('cs-reason-shipping').value  = '';
   document.getElementById('cs-notes').value          = '';
   document.getElementById('lost-name').value         = '';
   document.getElementById('lost-street1').value      = '';

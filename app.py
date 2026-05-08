@@ -1547,6 +1547,62 @@ def submit_lost_refund():
     except Exception as e:
         return Response(json.dumps({"status": "error", "message": str(e)}), status=500, headers=c, mimetype="application/json")
 
+@app.route("/api/submit-shipping-refund", methods=["POST", "OPTIONS"])
+def submit_shipping_refund():
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    data = request.get_json() or {}
+
+    if not CS_ADMIN_PASSWORD or data.get("csPassword", "") != CS_ADMIN_PASSWORD:
+        return Response(json.dumps({"success": False, "error": "Unauthorized"}),
+                        status=401, headers=c, mimetype="application/json")
+
+    if not RETURNS_TABLE_ID or not RETURNS_WRITE_TOKEN:
+        return Response(json.dumps({"success": False, "error": "Airtable not configured"}),
+                        status=500, headers=c, mimetype="application/json")
+
+    from datetime import datetime, timezone
+
+    order_number  = data.get("orderNumber", "").strip()
+    customer_name = data.get("customerName", "").strip()
+    reason        = data.get("reason", "").strip()
+    cs_notes      = data.get("csNotes", "").strip()
+
+    if not order_number or not reason:
+        return Response(json.dumps({"success": False, "error": "Missing required fields"}),
+                        status=400, headers=c, mimetype="application/json")
+
+    reason_str = f"[SHIPPING REFUND] {reason}" + (f" — {cs_notes}" if cs_notes else "")
+    wc_link    = f"https://www.bluealphabelts.com/wp-admin/post.php?post={order_number}&action=edit"
+
+    fields = {
+        "Order Number":                   order_number,
+        "Customer Name from Shipstation": customer_name,
+        "Reason for Return":              reason_str,
+        "Submission Date":                datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "Status":                         "Shipping Needs Refund",
+        "Type":                           "Shipping Refund",
+        "WooCommerce Order Link":         wc_link,
+    }
+    fields = {k: v for k, v in fields.items() if v}
+
+    try:
+        r = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
+            headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}", "Content-Type": "application/json"},
+            json={"fields": fields},
+            timeout=10,
+        )
+        if r.status_code not in (200, 201):
+            return Response(json.dumps({"success": False, "error": r.text}),
+                            status=500, headers=c, mimetype="application/json")
+        return Response(json.dumps({"success": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"success": False, "error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
+
+
 @app.route("/api/submit-reshipment", methods=["POST", "OPTIONS"])
 def submit_reshipment():
     if request.method == "OPTIONS":
