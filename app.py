@@ -2872,13 +2872,20 @@ def _refresh_ontime_cache():
             tag_ids = set(order.get("tagIds") or [])
             if _ONTIME_CONTRACT in tag_ids:
                 continue
-            sla_days = None
-            use_business = False
-            for rule_tags, days, biz in _ONTIME_RULES:
-                if tag_ids & rule_tags:
-                    if sla_days is None or days > sla_days:
-                        sla_days = days
-                        use_business = biz
+
+            # Sizing exchange store: 3 business days
+            store_id = (order.get("advancedOptions") or {}).get("storeId")
+            if store_id == SIZING_EXCHANGE_STORE_ID:
+                sla_days = 3
+                use_business = True
+            else:
+                sla_days = None
+                use_business = False
+                for rule_tags, days, biz in _ONTIME_RULES:
+                    if tag_ids & rule_tags:
+                        if sla_days is None or days > sla_days:
+                            sla_days = days
+                            use_business = biz
             if sla_days is None:
                 continue
             create_str = order.get("createDate") or ""
