@@ -85,21 +85,30 @@
     /* Mode toggle */
     .mode-toggle {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: 1fr 1px 1fr 1px 1fr;
       background: #eef1f5;
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 4px;
       margin-bottom: 28px;
-      gap: 4px;
+      column-gap: 0;
+      row-gap: 4px;
     }
     .mode-toggle-divider {
       grid-column: 1 / -1;
       height: 1px;
       background: var(--border);
-      margin: 0 2px;
+    }
+    .mode-toggle-col-divider {
+      background: var(--border);
+      width: 1px;
+      align-self: stretch;
     }
     .mode-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
       padding: 10px 16px;
       border: none;
       border-radius: 6px;
@@ -394,13 +403,17 @@
 
     <!-- Mode Toggle -->
     <div class="mode-toggle">
-      <button class="mode-btn active" id="btn-mode-return" onclick="setMode('return')">↩ Return</button>
-      <button class="mode-btn" id="btn-mode-cancel" onclick="setMode('cancel')">✕ Cancellation</button>
-      <button class="mode-btn" id="btn-mode-lost" onclick="setMode('lost')">📦 Lost Order</button>
+      <button class="mode-btn active" id="btn-mode-return"   onclick="setMode('return')">↩ Return</button>
+      <div class="mode-toggle-col-divider"></div>
+      <button class="mode-btn" id="btn-mode-cancel"          onclick="setMode('cancel')">✕ Cancellation</button>
+      <div class="mode-toggle-col-divider"></div>
+      <button class="mode-btn" id="btn-mode-lost"            onclick="setMode('lost')">📦 Lost Order</button>
       <div class="mode-toggle-divider"></div>
-      <button class="mode-btn" id="btn-mode-exchange" onclick="setMode('exchange')">↔ Size Exchange</button>
-      <button class="mode-btn" id="btn-mode-intl" onclick="setMode('intl')">🌍 International Exchange Exception</button>
-      <button class="mode-btn" id="btn-mode-shipping" onclick="setMode('shipping')">💲 Shipping Refund</button>
+      <button class="mode-btn" id="btn-mode-exchange"        onclick="setMode('exchange')">↔ Size Exchange</button>
+      <div class="mode-toggle-col-divider"></div>
+      <button class="mode-btn" id="btn-mode-intl"            onclick="setMode('intl')">🌍 Intl Exchange Exception</button>
+      <div class="mode-toggle-col-divider"></div>
+      <button class="mode-btn" id="btn-mode-shipping"        onclick="setMode('shipping')">💲 UPS Shipping Refund</button>
     </div>
 
     <div class="card">
@@ -804,6 +817,12 @@ async function csLogin() {
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cs-password').addEventListener('keydown', e => { if (e.key === 'Enter') csLogin(); });
   document.getElementById('cs-order-number').addEventListener('keydown', e => { if (e.key === 'Enter') lookupOrder(); });
+
+  // Equalize mode toggle row heights
+  const toggleBtns = document.querySelectorAll('.mode-toggle .mode-btn');
+  let maxH = 0;
+  toggleBtns.forEach(b => { b.style.height = ''; maxH = Math.max(maxH, b.offsetHeight); });
+  toggleBtns.forEach(b => b.style.height = maxH + 'px');
 });
 
 // ── Mode toggle ────────────────────────────────────────────────────────────
