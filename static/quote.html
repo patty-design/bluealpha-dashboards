@@ -1098,12 +1098,24 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredA
     'combo':             2,
     'ultimate combo':    3,
   };
-  const _parentEntrySort = catalog?.parents?.find(p => p.id === parentId);
-  const _useCustomOrder  = (_parentEntrySort?.name || '').toLowerCase().includes('battle belt lite');
+  const _MINI_MED_ADDON_ORDER = {
+    '(2) easy tape':                              0,
+    '(2) #2 molle straps':                        1,
+    'mini med components + (2) easy tape':        2,
+    'mini med components + (2) #2 molle straps':  3,
+  };
+  const _parentEntrySort  = catalog?.parents?.find(p => p.id === parentId);
+  const _parentNameLower  = (_parentEntrySort?.name || '').toLowerCase();
+  const _useCustomOrder   = _parentNameLower.includes('battle belt lite');
+  const _useMiniMedOrder  = _parentNameLower.includes('mini medical pouch');
   const addons = Object.entries(addonMap).sort((a,b) => {
     const an = a[1].toLowerCase(), bn = b[1].toLowerCase();
     if (an === 'none') return -1;
     if (bn === 'none') return 1;
+    if (_useMiniMedOrder) {
+      const ao = _MINI_MED_ADDON_ORDER[an] ?? 99, bo = _MINI_MED_ADDON_ORDER[bn] ?? 99;
+      if (ao !== bo) return ao - bo;
+    }
     if (_useCustomOrder) {
       const ao = _ADDON_ORDER[an] ?? 99, bo = _ADDON_ORDER[bn] ?? 99;
       if (ao !== bo) return ao - bo;
