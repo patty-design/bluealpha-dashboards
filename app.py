@@ -168,6 +168,27 @@ def cors():
 def at_headers(token):
     return {"Authorization": f"Bearer {token}"}
 
+def _next_order_id(read_token):
+    """Return the next Manual Order ID string (zero-padded 4 digits) by fetching only the top record."""
+    try:
+        params = {"pageSize": 1, "fields[]": "Order ID",
+                  "sort[0][field]": "Order ID", "sort[0][direction]": "desc"}
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}",
+            headers=at_headers(read_token), params=params, timeout=10,
+        )
+        records = r.json().get("records", [])
+        if records:
+            oid = records[0].get("fields", {}).get("Order ID", "0")
+            try:
+                return str(int(str(oid)) + 1).zfill(4)
+            except (ValueError, TypeError):
+                pass
+    except Exception:
+        pass
+    import time as _t
+    return str(int(_t.time()))[-6:]   # fallback: last 6 digits of timestamp
+
 def at_get_all(table_id, token, fields=None, formula=None, base_id=None):
     """Paginate through all records in an Airtable table."""
     records = []
@@ -4451,18 +4472,7 @@ def create_quote():
 
         # 2. Get next order ID — use read token (write token may lack read scope)
         read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-        all_mos = at_get_all(MANUAL_ORDERS_TABLE_ID, read_token, fields=["Order ID"])
-        max_id = 0
-        for mo in all_mos:
-            oid_str = mo["fields"].get("Order ID", "")
-            try:
-                val = int(oid_str)
-                if val > max_id:
-                    max_id = val
-            except (ValueError, TypeError):
-                pass
-        next_id = max_id + 1
-        order_id_str = str(next_id).zfill(4)
+        order_id_str = _next_order_id(read_token)
         quote_number = f"QU-{order_id_str}"
 
         today       = dt_date.today()
@@ -4685,9 +4695,7 @@ def portal_duplicate_quote(user, record_id):
                     sku_prices[sku_id] = price
 
         # 4. Get next order ID
-        all_mos = at_get_all(MANUAL_ORDERS_TABLE_ID, read_token, fields=["Order ID"])
-        max_id = max((int(m["fields"].get("Order ID", 0) or 0) for m in all_mos if str(m["fields"].get("Order ID","")).isdigit()), default=0)
-        order_id_str = str(max_id + 1).zfill(4)
+        order_id_str = _next_order_id(read_token)
         quote_number = f"QU-{order_id_str}"
 
         today      = dt_date.today()
@@ -6370,17 +6378,7 @@ def portal_duplicate_quote(user, record_id):
         li_ids = fields.get("MO Line Items", [])
 
         # Get next order ID
-        all_mos = at_get_all(MANUAL_ORDERS_TABLE_ID, read_token, fields=["Order ID"])
-        max_id  = 0
-        for mo_rec in all_mos:
-            try:
-                val = int(mo_rec["fields"].get("Order ID", "") or 0)
-                if val > max_id:
-                    max_id = val
-            except (ValueError, TypeError):
-                pass
-        next_id      = max_id + 1
-        order_id_str = str(next_id).zfill(4)
+        order_id_str = _next_order_id(read_token)
         quote_number = f"QU-{order_id_str}"
 
         today      = dt_date.today()
