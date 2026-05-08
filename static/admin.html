@@ -63,6 +63,14 @@
     #adminContent { display: none; }
     .container { max-width: 1000px; margin: 0 auto; padding: 36px 20px 80px; }
     label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; }
+    .pw-wrap { position: relative; }
+    .pw-wrap input { padding-right: 40px !important; }
+    .pw-eye {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; padding: 0;
+      color: #999; font-size: 1rem; line-height: 1;
+    }
+    .pw-eye:hover { color: #555; }
     input[type="password"], input[type="text"], input[type="email"] {
       width: 100%;
       border: 1.5px solid var(--border);
@@ -277,7 +285,10 @@
       <label>Username</label>
       <input type="text" id="adminUsername" placeholder="Enter username" autocomplete="username" onkeydown="if(event.key==='Enter') doLogin()">
       <label style="margin-top:12px;">Password</label>
-      <input type="password" id="adminPassword" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()">
+      <div class="pw-wrap">
+        <input type="password" id="adminPassword" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()">
+        <button type="button" class="pw-eye" onclick="togglePw('adminPassword',this)" tabindex="-1">👁</button>
+      </div>
       <button class="btn btn-primary btn-full" style="margin-top:16px;" onclick="doLogin()">Sign In</button>
     </div>
   </div>
@@ -442,6 +453,12 @@
     })();
 
     // ── Login ─────────────────────────────────────────────────────────────────
+    function togglePw(id, btn) {
+      const el = document.getElementById(id);
+      const show = el.type === 'password';
+      el.type = show ? 'text' : 'password';
+      btn.textContent = show ? '🙈' : '👁';
+    }
     async function doLogin() {
       const username = (document.getElementById('adminUsername').value || '').trim();
       const pw       = document.getElementById('adminPassword').value;
