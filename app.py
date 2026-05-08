@@ -4320,34 +4320,57 @@ def admin_refresh_catalog():
         return Response(json.dumps({"ok": False, "error": str(e)}), status=500, mimetype="application/json")
 
 
+def _catalog_response(data, extra_headers=None):
+    """Return a gzip-compressed JSON response for the catalog."""
+    import gzip as _gzip
+    c = cors()
+    body = json.dumps(data).encode("utf-8")
+    accept = request.headers.get("Accept-Encoding", "")
+    if "gzip" in accept:
+        body = _gzip.compress(body, compresslevel=6)
+        c["Content-Encoding"] = "gzip"
+    if extra_headers:
+        c.update(extra_headers)
+    return Response(body, headers=c, mimetype="application/json")
+
+
 @app.route("/api/quote-catalog", methods=["GET", "OPTIONS"])
 def quote_catalog():
     if request.method == "OPTIONS":
         return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "GET"})
-    c = cors()
     global _CATALOG_REFRESHING
     import time as _time
     now = _time.time()
 
     # Fresh cache — serve immediately
     if _CATALOG_CACHE["data"] and (now - _CATALOG_CACHE["ts"]) < _CATALOG_TTL:
-        return Response(json.dumps(_CATALOG_CACHE["data"]), headers=c, mimetype="application/json")
+        return _catalog_response(_CATALOG_CACHE["data"])
 
     # Stale cache — serve instantly and kick off a background refresh
     if _CATALOG_CACHE["data"]:
         if not _CATALOG_REFRESHING:
             _CATALOG_REFRESHING = True
             threading.Thread(target=_refresh_catalog_bg, daemon=True).start()
-        return Response(json.dumps(_CATALOG_CACHE["data"]), headers=c, mimetype="application/json")
+        return _catalog_response(_CATALOG_CACHE["data"])
 
-    # No cache at all (startup warming should cover this, but handle it gracefully)
+    # No cache yet — if warmup thread is running, wait for it (avoids duplicate build)
+    if _CATALOG_REFRESHING:
+        import time as _t
+        deadline = _t.time() + 25
+        while _t.time() < deadline and not _CATALOG_CACHE["data"]:
+            _t.sleep(0.4)
+        if _CATALOG_CACHE["data"]:
+            return _catalog_response(_CATALOG_CACHE["data"])
+
+    # Last resort: build synchronously
     try:
         result = _build_catalog()
         _CATALOG_CACHE["data"] = result
         _CATALOG_CACHE["ts"]   = _time.time()
-        return Response(json.dumps(result), headers=c, mimetype="application/json")
+        return _catalog_response(result)
     except Exception as e:
-        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+        return Response(json.dumps({"error": str(e)}), status=500,
+                        headers={**cors()}, mimetype="application/json")
 
 
 @app.route("/api/create-quote", methods=["POST", "OPTIONS"])
