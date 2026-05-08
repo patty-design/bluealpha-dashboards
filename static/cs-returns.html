@@ -974,7 +974,7 @@ function populateOrderInfo(data) {
   document.getElementById('order-info-text').innerHTML =
     '<strong>Order #' + orderNum + '</strong> — ' + (data.customerName || 'Unknown customer') + '<br>' +
     (data.email    ? '📧 ' + data.email + '<br>'                  : '') +
-    (data.shipDate ? '📦 Shipped: ' + data.shipDate.slice(0,10) + '<br>' : '') +
+    (data.shipDate ? '📦 Shipped: ' + (function(d){ const p=d.slice(0,10).split('-'); return p[1]+'-'+p[2]+'-'+p[0]; })(data.shipDate) + '<br>' : '') +
     trackingHtml +
     shippingHtml;
 
