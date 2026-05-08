@@ -84,7 +84,8 @@
 
     /* Mode toggle */
     .mode-toggle {
-      display: flex;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
       background: #eef1f5;
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -93,7 +94,6 @@
       gap: 4px;
     }
     .mode-btn {
-      flex: 1;
       padding: 10px 16px;
       border: none;
       border-radius: 6px;
