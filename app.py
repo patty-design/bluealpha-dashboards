@@ -1581,8 +1581,8 @@ def submit_shipping_refund():
         "Customer Name from Shipstation": customer_name,
         "Reason for Return":              reason_str,
         "Submission Date":                datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        "Status":                         "Shipping Needs Refund",
-        "Type":                           "Shipping Refund",
+        "Status":                         "UPS Shipping Needs Refund",
+        "Type":                           "UPS Shipping Refund",
         "WooCommerce Order Link":         wc_link,
     }
     fields = {k: v for k, v in fields.items() if v}
