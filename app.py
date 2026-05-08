@@ -254,14 +254,14 @@ def _lookup_admin(username, password):
         r = req_lib.get(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}",
             headers=at_headers(read_token),
-            params={"filterByFormula": formula, "fields[]": ["Full Name", "Portal Username", "Portal Hash", "Email"]},
+            params={"filterByFormula": formula, "fields[]": ["Full Name", "Portal Username", "Password Hash", "Email"]},
             timeout=10,
         )
         records = r.json().get("records", [])
         if not records:
             return None
         rec = records[0]
-        stored = rec.get("fields", {}).get("Portal Hash", "")
+        stored = rec.get("fields", {}).get("Password Hash", "")
         if not stored or not _check_password(password, stored):
             return None
         return rec
@@ -277,14 +277,14 @@ def _lookup_portal_user(username, password):
         r = req_lib.get(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}",
             headers=at_headers(read_token),
-            params={"filterByFormula": formula, "fields[]": ["Full Name", "Portal Username", "Portal Hash", "Email", "Quote Portal Admin", "Quote Portal CS"]},
+            params={"filterByFormula": formula, "fields[]": ["Full Name", "Portal Username", "Password Hash", "Email", "Quote Portal Admin", "Quote Portal CS"]},
             timeout=10,
         )
         records = r.json().get("records", [])
         if not records:
             return None, None
         rec = records[0]
-        stored = rec.get("fields", {}).get("Portal Hash", "")
+        stored = rec.get("fields", {}).get("Password Hash", "")
         if not stored or not _check_password(password, stored):
             return None, None
         role = 'admin' if rec.get("fields", {}).get("Quote Portal Admin") else 'cs'
@@ -6576,7 +6576,7 @@ def portal_change_password():
         r = req_lib.patch(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}/{record_id}",
             headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
-            json={"fields": {"Portal Hash": new_hash}}, timeout=10,
+            json={"fields": {"Password Hash": new_hash}}, timeout=10,
         )
         if r.status_code != 200:
             return Response(json.dumps({"error": "Failed to update password"}), status=500, headers=c, mimetype="application/json")
