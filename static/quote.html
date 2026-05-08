@@ -682,7 +682,7 @@ const _PRODUCT_DESCRIPTIONS = {
 
 function _productHtml(p) {
   const descHtml = _PRODUCT_DESCRIPTIONS[p.name.toLowerCase()]
-    ? `<div class="product-desc">${_PRODUCT_DESCRIPTIONS[p.name.toLowerCase()]}</div>`
+    ? `<div class="product-desc hidden" id="pdesc_${p.id}">${_PRODUCT_DESCRIPTIONS[p.name.toLowerCase()]}</div>`
     : '';
   const _ADDON_NOT_OPTIONAL = ['battle belt lite', 'mini medical pouch'];
   const _addonOptional = !_ADDON_NOT_OPTIONAL.some(n => p.name.toLowerCase().includes(n));
@@ -702,7 +702,6 @@ function _productHtml(p) {
         <span class="p-arrow">▶</span>
       </div>
       <div class="product-selector" id="ps_${p.id}">
-        ${descHtml}
         <div class="sel-row">
           <div class="sel-field">
             <label>Color</label>
@@ -727,6 +726,7 @@ function _productHtml(p) {
           </div>
         </div>
         ${addonHtml}
+        ${descHtml}
         <div class="sku-price-row hidden" id="spricerow_${p.id}">
           Unit price: <span class="sku-price-val" id="sprice_${p.id}"></span>
         </div>
@@ -991,6 +991,8 @@ function _resetFeature(parentId) {
   if (featSel)  { featSel.innerHTML = '<option value="">Select a style…</option>'; featSel.value = ''; }
   if (addonRow) addonRow.classList.add('hidden');
   if (addonSel) { addonSel.innerHTML = '<option value="">None</option>'; addonSel.value = ''; }
+  const descEl = document.getElementById('pdesc_' + parentId);
+  if (descEl) descEl.classList.add('hidden');
 }
 
 function populateFeatures(parentId, preferredFvarId = '', preferredAddonId = '') {
@@ -1164,6 +1166,8 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredA
   }
   addonSel.value = defaultVal;
   addonRow.classList.remove('hidden');
+  const _descEl = document.getElementById('pdesc_' + parentId);
+  if (_descEl) _descEl.classList.remove('hidden');
   // Trigger price update now that add-on value is set
   _updatePrice(parentId);
 }
