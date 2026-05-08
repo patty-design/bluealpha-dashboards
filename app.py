@@ -2818,6 +2818,7 @@ def return_label_pdf(record_id):
 
 
 _ONTIME_CACHE = {"ts": 0, "data": None}
+_ONTIME_REFRESHING = False
 
 _ONTIME_CONTRACT = 137893
 _ONTIME_RULES = [
@@ -2840,36 +2841,23 @@ def _business_days(start, end):
     return days
 
 
-@app.route("/api/on-time-shipments")
-def on_time_shipments():
+def _refresh_ontime_cache():
+    """Run in a background thread — fetches ShipStation data and populates _ONTIME_CACHE."""
+    global _ONTIME_REFRESHING
     import time as _time
-    from datetime import datetime, timedelta, date as _date
-    cors_headers = {"Access-Control-Allow-Origin": "*"}
-
-    now = _time.time()
-    if _ONTIME_CACHE["data"] is not None and now - _ONTIME_CACHE["ts"] < 600:
-        return Response(json.dumps(_ONTIME_CACHE["data"]), headers=cors_headers,
-                        mimetype="application/json")
-
-    if not SHIPSTATION_KEY or not SHIPSTATION_SECRET:
-        return Response(json.dumps({"error": "ShipStation not configured"}),
-                        status=500, headers=cors_headers, mimetype="application/json")
-
-    thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
-    page = 1
-    all_orders = []
+    from datetime import datetime, timedelta
     try:
+        if not SHIPSTATION_KEY or not SHIPSTATION_SECRET:
+            return
+        thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
+        page = 1
+        all_orders = []
         while True:
             r = req_lib.get(
                 "https://ssapi.shipstation.com/orders",
-                params={
-                    "orderStatus": "shipped",
-                    "shipDateStart": thirty_days_ago,
-                    "pageSize": 500,
-                    "page": page,
-                },
-                headers=ss_headers(),
-                timeout=30,
+                params={"orderStatus": "shipped", "shipDateStart": thirty_days_ago,
+                        "pageSize": 500, "page": page},
+                headers=ss_headers(), timeout=30,
             )
             r.raise_for_status()
             body = r.json()
@@ -2877,50 +2865,69 @@ def on_time_shipments():
             if page >= body.get("pages", 1):
                 break
             page += 1
+
+        on_time = 0
+        total = 0
+        for order in all_orders:
+            tag_ids = set(order.get("tagIds") or [])
+            if _ONTIME_CONTRACT in tag_ids:
+                continue
+            sla_days = None
+            use_business = False
+            for rule_tags, days, biz in _ONTIME_RULES:
+                if tag_ids & rule_tags:
+                    if sla_days is None or days > sla_days:
+                        sla_days = days
+                        use_business = biz
+            if sla_days is None:
+                continue
+            create_str = order.get("createDate") or ""
+            ship_str   = order.get("shipDate") or ""
+            try:
+                create_d = datetime.strptime(create_str[:10], "%Y-%m-%d").date()
+                ship_d   = datetime.strptime(ship_str[:10],   "%Y-%m-%d").date()
+            except (ValueError, TypeError):
+                continue
+            age = _business_days(create_d, ship_d) if use_business else (ship_d - create_d).days
+            total += 1
+            if age < sla_days:
+                on_time += 1
+
+        pct = round(on_time * 100 / total) if total else 0
+        _ONTIME_CACHE["data"] = {"percent": pct, "onTime": on_time, "total": total, "window": "30d"}
+        _ONTIME_CACHE["ts"]   = _time.time()
+        print(f"[on-time] cache refreshed — {pct}% on-time ({on_time}/{total})")
     except Exception as e:
-        return Response(json.dumps({"error": str(e)}), status=500,
+        print(f"[on-time] background refresh failed: {e}")
+    finally:
+        _ONTIME_REFRESHING = False
+
+
+@app.route("/api/on-time-shipments")
+def on_time_shipments():
+    import time as _time
+    import threading
+    global _ONTIME_REFRESHING
+    cors_headers = {"Access-Control-Allow-Origin": "*"}
+
+    now = _time.time()
+    cache_fresh = _ONTIME_CACHE["data"] is not None and now - _ONTIME_CACHE["ts"] < 600
+
+    if cache_fresh:
+        return Response(json.dumps(_ONTIME_CACHE["data"]), headers=cors_headers,
+                        mimetype="application/json")
+
+    # Kick off background refresh if not already running
+    if not _ONTIME_REFRESHING:
+        _ONTIME_REFRESHING = True
+        threading.Thread(target=_refresh_ontime_cache, daemon=True).start()
+
+    # Return stale data while refreshing, or pending indicator on cold start
+    if _ONTIME_CACHE["data"] is not None:
+        return Response(json.dumps({**_ONTIME_CACHE["data"], "stale": True}),
                         headers=cors_headers, mimetype="application/json")
-
-    on_time = 0
-    total = 0
-    for order in all_orders:
-        tag_ids = set(order.get("tagIds") or [])
-        if _ONTIME_CONTRACT in tag_ids:
-            continue
-
-        # If multiple rules match, use the longest (most lenient) SLA
-        sla_days = None
-        use_business = False
-        for rule_tags, days, biz in _ONTIME_RULES:
-            if tag_ids & rule_tags:
-                if sla_days is None or days > sla_days:
-                    sla_days = days
-                    use_business = biz
-        if sla_days is None:
-            continue
-
-        create_str = order.get("createDate") or ""
-        ship_str = order.get("shipDate") or ""
-        try:
-            create_d = datetime.strptime(create_str[:10], "%Y-%m-%d").date()
-            ship_d = datetime.strptime(ship_str[:10], "%Y-%m-%d").date()
-        except (ValueError, TypeError):
-            continue
-
-        if use_business:
-            age = _business_days(create_d, ship_d)
-        else:
-            age = (ship_d - create_d).days
-
-        total += 1
-        if age < sla_days:
-            on_time += 1
-
-    pct = round(on_time * 100 / total) if total else 0
-    result = {"percent": pct, "onTime": on_time, "total": total, "window": "30d"}
-    _ONTIME_CACHE["ts"] = now
-    _ONTIME_CACHE["data"] = result
-    return Response(json.dumps(result), headers=cors_headers, mimetype="application/json")
+    return Response(json.dumps({"pending": True}),
+                    headers=cors_headers, mimetype="application/json")
 
 
 @app.route("/api/awaiting")
