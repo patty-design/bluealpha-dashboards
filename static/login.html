@@ -218,6 +218,7 @@
         <div class="form-group">
           <label for="emailInput">Email Address</label>
           <input type="email" id="emailInput" name="email" placeholder="you@agency.gov" required autocomplete="email">
+          <div id="emailError" style="display:none;color:#c0392b;font-size:0.85rem;margin-top:6px;">Please enter your email address.</div>
         </div>
         <button type="submit" class="btn" id="submitBtn">Send Login Link</button>
       </form>
@@ -279,7 +280,13 @@
       const btn     = document.getElementById('submitBtn');
       const resultMsg = document.getElementById('resultMsg');
 
-      if (!email) return;
+      const emailError = document.getElementById('emailError');
+      if (!email) {
+        emailError.style.display = 'block';
+        document.getElementById('emailInput').focus();
+        return;
+      }
+      emailError.style.display = 'none';
 
       btn.disabled   = true;
       btn.textContent = 'Sending…';
