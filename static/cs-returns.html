@@ -399,7 +399,6 @@
   <!-- MAIN FORM -->
   <div id="screen-main" class="hidden">
     <h1 class="page-title">Customer Service Operations</h1>
-    <p class="page-subtitle" id="form-subtitle"></p>
 
     <!-- Mode Toggle -->
     <div class="mode-toggle">
@@ -842,20 +841,7 @@ function setMode(mode) {
   document.getElementById('btn-mode-intl').classList.toggle('active', isIntl);
   document.getElementById('btn-mode-shipping').classList.toggle('active', isShipping);
 
-  // Subtitles (title is static — "Customer Service Operations")
-  if (isReturn) {
-    document.getElementById('form-subtitle').textContent = '';
-  } else if (isCancel) {
-    document.getElementById('form-subtitle').textContent = 'For unshipped orders the customer wants cancelled. Select items to cancel and submit.';
-  } else if (isLost) {
-    document.getElementById('form-subtitle').textContent = 'Look up the original order, confirm the shipping address, and create a reshipment in ShipStation.';
-  } else if (isIntl) {
-    document.getElementById('form-subtitle').textContent = 'Initiate an international size exchange. A $10 payment link will be emailed to the customer automatically.';
-  } else if (isShipping) {
-    document.getElementById('form-subtitle').textContent = 'Refund the shipping fee only. Product cost is not refunded — the customer already received their order.';
-  } else {
-    document.getElementById('form-subtitle').textContent = 'For customers outside the 30-day exchange window — exception already approved.';
-  }
+
 
   // Banners
   document.getElementById('banner-return').classList.toggle('hidden', !isReturn);
