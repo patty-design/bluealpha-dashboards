@@ -933,6 +933,21 @@ def cs_lookup_order():
             except Exception:
                 pass
 
+        # Check for existing UPS Shipping Refund request for this order
+        existing_shipping_refund = False
+        try:
+            _sr_r = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
+                params={"filterByFormula": f"AND({{Order Number}}='{order_number}',{{Type}}='UPS Shipping Refund')",
+                        "maxRecords": 1, "fields[]": ["Order Number"]},
+                headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
+                timeout=10,
+            )
+            if _sr_r.status_code == 200 and _sr_r.json().get("records"):
+                existing_shipping_refund = True
+        except Exception:
+            pass
+
         return Response(json.dumps({
             "status":               "found",
             "orderId":              order.get("orderId"),
@@ -955,6 +970,7 @@ def cs_lookup_order():
             "items":                items,
             "alreadyReturnedQtys":  cs_already_returned,
             "shippingAmount":       float(order.get("shippingAmount") or 0),
+            "existingShippingRefund": existing_shipping_refund,
         }), headers=c, mimetype="application/json")
 
     except Exception as e:

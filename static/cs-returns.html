@@ -954,12 +954,18 @@ async function lookupOrder() {
 function populateOrderInfo(data) {
   const orderNum = document.getElementById('cs-order-number').value.trim();
 
-  // Shipping mode: block if no shipping was charged
+  // Shipping mode: block if no shipping was charged or refund already requested
   if (currentMode === 'shipping') {
     const shippingAmt = data.shippingAmount || 0;
     if (shippingAmt <= 0) {
       const errEl = document.getElementById('msg-lookup-error');
       errEl.textContent = 'This order had free shipping — no shipping fee to refund.';
+      errEl.classList.add('show');
+      return;
+    }
+    if (data.existingShippingRefund) {
+      const errEl = document.getElementById('msg-lookup-error');
+      errEl.textContent = 'A shipping refund request has already been submitted for this order.';
       errEl.classList.add('show');
       return;
     }
