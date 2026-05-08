@@ -86,6 +86,14 @@
     .modal-field label { display: block; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #444; margin-bottom: 6px; }
     .modal-field input { width: 100%; border: 1px solid #dde3ea; border-radius: 6px; padding: 10px 12px; font-size: 0.95rem; outline: none; }
     .modal-field input:focus { border-color: var(--navy); }
+    .pw-wrap { position: relative; }
+    .pw-wrap input { padding-right: 40px; }
+    .pw-eye {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; padding: 0; color: #999;
+      font-size: 1rem; line-height: 1; display: flex; align-items: center;
+    }
+    .pw-eye:hover { color: #555; }
     .modal-actions { display: flex; gap: 10px; margin-top: 24px; }
     .modal-actions .btn-save { flex: 1; background: var(--navy); color: #fff; border: none; border-radius: 6px; padding: 11px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
     .modal-actions .btn-cancel { background: #f0f2f5; color: #444; border: none; border-radius: 6px; padding: 11px 18px; font-weight: 600; font-size: 0.9rem; cursor: pointer; }
@@ -743,15 +751,24 @@
       <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:12px;">Change Password</div>
       <div class="modal-field">
         <label>Current Password</label>
-        <input type="password" id="cpCurrent" placeholder="Your current password" autocomplete="current-password">
+        <div class="pw-wrap">
+          <input type="password" id="cpCurrent" placeholder="Your current password" autocomplete="current-password">
+          <button type="button" class="pw-eye" onclick="togglePw('cpCurrent',this)" tabindex="-1">👁</button>
+        </div>
       </div>
       <div class="modal-field">
         <label>New Password</label>
-        <input type="password" id="cpNew" placeholder="At least 8 characters" autocomplete="new-password">
+        <div class="pw-wrap">
+          <input type="password" id="cpNew" placeholder="At least 8 characters" autocomplete="new-password">
+          <button type="button" class="pw-eye" onclick="togglePw('cpNew',this)" tabindex="-1">👁</button>
+        </div>
       </div>
       <div class="modal-field">
         <label>Confirm New Password</label>
-        <input type="password" id="cpConfirm" placeholder="Re-enter new password" autocomplete="new-password">
+        <div class="pw-wrap">
+          <input type="password" id="cpConfirm" placeholder="Re-enter new password" autocomplete="new-password">
+          <button type="button" class="pw-eye" onclick="togglePw('cpConfirm',this)" tabindex="-1">👁</button>
+        </div>
       </div>
       <div class="modal-msg" id="cpMsg"></div>
       <div class="modal-actions">
@@ -762,6 +779,12 @@
   </div>
 
   <script>
+  function togglePw(inputId, btn) {
+    const inp = document.getElementById(inputId);
+    const show = inp.type === 'password';
+    inp.type = show ? 'text' : 'password';
+    btn.textContent = show ? '🙈' : '👁';
+  }
   async function openChangePw() {
     // Reset password fields
     document.getElementById('cpCurrent').value = '';
