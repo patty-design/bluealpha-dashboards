@@ -766,9 +766,10 @@
       <div class="modal-field">
         <label>Confirm New Password</label>
         <div class="pw-wrap">
-          <input type="password" id="cpConfirm" placeholder="Re-enter new password" autocomplete="new-password">
+          <input type="password" id="cpConfirm" placeholder="Re-enter new password" autocomplete="new-password" oninput="checkPwMatch()">
           <button type="button" class="pw-eye" onclick="togglePw('cpConfirm',this)" tabindex="-1">👁</button>
         </div>
+        <div id="pwMatchMsg" style="font-size:0.82rem;margin-top:5px;display:none;"></div>
       </div>
       <div class="modal-msg" id="cpMsg"></div>
       <div class="modal-actions">
@@ -779,6 +780,21 @@
   </div>
 
   <script>
+  function checkPwMatch() {
+    const newPw   = document.getElementById('cpNew').value;
+    const confirm = document.getElementById('cpConfirm').value;
+    const msg     = document.getElementById('pwMatchMsg');
+    if (!confirm) { msg.style.display = 'none'; return; }
+    if (newPw === confirm) {
+      msg.style.display = 'block';
+      msg.style.color   = '#1a5c2a';
+      msg.textContent   = '✓ Passwords match';
+    } else {
+      msg.style.display = 'block';
+      msg.style.color   = '#c0392b';
+      msg.textContent   = '✗ Passwords don\'t match';
+    }
+  }
   function togglePw(inputId, btn) {
     const inp = document.getElementById(inputId);
     const show = inp.type === 'password';
@@ -791,6 +807,7 @@
     document.getElementById('cpNew').value     = '';
     document.getElementById('cpConfirm').value = '';
     ['cpMsg','profMsg'].forEach(id => { const el = document.getElementById(id); el.className = 'modal-msg'; el.textContent = ''; });
+    document.getElementById('pwMatchMsg').style.display = 'none';
     document.getElementById('changePwModal').classList.add('open');
     // Load profile
     try {
