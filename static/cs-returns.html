@@ -409,9 +409,9 @@
       <div class="mode-toggle-col-divider"></div>
       <button class="mode-btn" id="btn-mode-lost"            onclick="setMode('lost')">📦 Lost Order</button>
       <div class="mode-toggle-divider"></div>
-      <button class="mode-btn" id="btn-mode-exchange"        onclick="setMode('exchange')">↔ Size Exchange</button>
+      <button class="mode-btn" id="btn-mode-exchange"        onclick="setMode('exchange')">↔ Domestic Size Exchange</button>
       <div class="mode-toggle-col-divider"></div>
-      <button class="mode-btn" id="btn-mode-intl"            onclick="setMode('intl')">🌍 Intl Exchange Exception</button>
+      <button class="mode-btn" id="btn-mode-intl"            onclick="setMode('intl')">🌍 International Size Exchange</button>
       <div class="mode-toggle-col-divider"></div>
       <button class="mode-btn" id="btn-mode-shipping"        onclick="setMode('shipping')">💲 UPS Shipping Refund</button>
     </div>
@@ -430,12 +430,12 @@
 
       <!-- Exchange banner -->
       <div id="banner-exchange" class="info-banner banner-amber hidden">
-        ↔ <strong>CS Size Exchange override</strong> — Date eligibility check is bypassed. Only use this after the exception has been approved.
+        ↔ <strong>CS Domestic Size Exchange override</strong> — Date eligibility check is bypassed. Only use this after the exception has been approved.
       </div>
 
       <!-- International Exception banner -->
       <div id="banner-intl" class="info-banner banner-amber hidden">
-        🌍 <strong>CS International Exchange Exception</strong> — For international customers outside the normal eligibility window. Customer pays $10 via Stripe. A payment link will be emailed to the customer automatically.
+        🌍 <strong>CS International Size Exchange</strong> — For international customers outside the normal eligibility window. Customer pays $10 via Stripe. A payment link will be emailed to the customer automatically.
       </div>
 
       <!-- Shipping Refund banner -->
@@ -853,13 +853,13 @@ function setMode(mode) {
     document.getElementById('form-title').textContent    = 'Lost Order / Reshipment';
     document.getElementById('form-subtitle').textContent = 'Look up the original order, confirm the shipping address, and create a reshipment in ShipStation.';
   } else if (isIntl) {
-    document.getElementById('form-title').textContent    = 'CS International Exchange Exception';
-    document.getElementById('form-subtitle').textContent = 'Initiate an international exchange exception. A $10 payment link will be emailed to the customer automatically.';
+    document.getElementById('form-title').textContent    = 'CS International Size Exchange';
+    document.getElementById('form-subtitle').textContent = 'Initiate an international size exchange. A $10 payment link will be emailed to the customer automatically.';
   } else if (isShipping) {
     document.getElementById('form-title').textContent    = 'Shipping Refund Request';
     document.getElementById('form-subtitle').textContent = 'Refund the shipping fee only. Product cost is not refunded — the customer already received their order.';
   } else {
-    document.getElementById('form-title').textContent    = 'CS Size Exchange Exception';
+    document.getElementById('form-title').textContent    = 'CS Domestic Size Exchange';
     document.getElementById('form-subtitle').textContent = 'For customers outside the 30-day exchange window — exception already approved.';
   }
 
