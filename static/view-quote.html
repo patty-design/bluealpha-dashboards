@@ -922,6 +922,11 @@ async function duplicateThisQuote() {
     });
     const data = await r.json();
     if (data.success || data.ok) {
+      const newId = data.recordId || data.newRecordId;
+      if (newId) {
+        window.location.href = '/view-quote/' + newId;
+        return;
+      }
       btn.textContent = 'Duplicate Quote';
       btn.disabled = false;
       conf.textContent = `✓ ${data.quoteNumber || data.newQuoteNumber} created`;
