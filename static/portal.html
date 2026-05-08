@@ -501,10 +501,7 @@
               <td>${fmt(q.expiry_date)}</td>
               <td>${money(q.total)}</td>
               <td>${badge}</td>
-              <td style="white-space:nowrap">
-                <button class="btn-sm" onclick="openViewQuote('${q.record_id}')">View →</button>
-                <button class="btn-sm btn-sm-secondary" onclick="duplicateQuote('${q.record_id}',this)" style="margin-left:6px">Duplicate</button>
-              </td>
+              <td><button class="btn-sm" onclick="openViewQuote('${q.record_id}')">View →</button></td>
             </tr>`;
           }).join('') +
           '</tbody></table>';

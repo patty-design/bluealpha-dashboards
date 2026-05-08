@@ -567,6 +567,11 @@ if (window.self !== window.top) {
         <button class="btn btn-secondary" id="btnRevert" onclick="revertChanges()" style="display:none;">Revert</button>
         <span class="save-confirm" id="saveConfirm">✓ Changes saved</span>
       </div>
+      <!-- Duplicate button — visible to portal users with create-quote permission -->
+      <div id="duplicateRow" style="display:none;margin-top:12px;">
+        <button class="btn btn-secondary" id="btnDuplicate" onclick="duplicateThisQuote()">Duplicate Quote</button>
+        <span id="duplicateConfirm" style="display:none;margin-left:12px;color:#1a7a3c;font-size:0.88rem;">✓ Duplicate created</span>
+      </div>
     </div>
 
     <!-- Notes card -->
@@ -671,6 +676,9 @@ window.addEventListener('beforeunload', e => {
     const meResp = await fetch('/api/portal/me', { credentials: 'same-origin' });
     if (meResp.ok) {
       portalUser = await meResp.json();
+      if (portalUser && portalUser.canCreateQuote !== false) {
+        document.getElementById('duplicateRow').style.display = '';
+      }
     }
   } catch (_) {}
 
@@ -894,6 +902,34 @@ function buildActions(editable) {
       acceptBtn.onclick     = openModal;
       bar.appendChild(acceptBtn);
     }
+  }
+}
+
+async function duplicateThisQuote() {
+  const btn  = document.getElementById('btnDuplicate');
+  const conf = document.getElementById('duplicateConfirm');
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const r = await fetch(`/api/portal/duplicate-quote/${recordId}`, {
+      method: 'POST', credentials: 'same-origin',
+    });
+    const data = await r.json();
+    if (data.success || data.ok) {
+      btn.textContent = 'Duplicate Quote';
+      btn.disabled = false;
+      conf.textContent = `✓ ${data.quoteNumber || data.newQuoteNumber} created`;
+      conf.style.display = 'inline';
+      setTimeout(() => { conf.style.display = 'none'; }, 5000);
+    } else {
+      btn.disabled = false;
+      btn.textContent = 'Duplicate Quote';
+      alert('Error: ' + (data.error || 'Could not duplicate quote.'));
+    }
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Duplicate Quote';
+    alert('Network error: ' + e.message);
   }
 }
 
