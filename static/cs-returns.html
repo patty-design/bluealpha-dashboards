@@ -879,7 +879,7 @@ function setMode(mode) {
   if (isReturn)        document.getElementById('btn-cs-submit').innerHTML = 'Submit &amp; Send Label';
   else if (isCancel)   document.getElementById('btn-cs-submit').innerHTML = 'Submit Cancellation Request';
   else if (isLost)     document.getElementById('btn-cs-submit').innerHTML = lostAction === 'refund' ? 'Log Refund Request' : 'Create Reshipment';
-  else if (isShipping) document.getElementById('btn-cs-submit').innerHTML = 'Log Shipping Refund';
+  else if (isShipping) document.getElementById('btn-cs-submit').innerHTML = 'Submit Refund Request';
 
   // In exchange/intl mode, hide the shared order-info-block; show info blocks only after lookup
   document.getElementById('order-info-block').classList.add('hidden');
@@ -1362,7 +1362,7 @@ async function csSubmitShippingRefund() {
     errEl.classList.add('show');
   }
   btn.disabled = false;
-  btn.innerHTML = 'Log Shipping Refund';
+  btn.innerHTML = 'Submit Refund Request';
 }
 
 // ── Exchange lookup & submit ────────────────────────────────────────────────
