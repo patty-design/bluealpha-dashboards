@@ -4492,7 +4492,13 @@ def create_quote():
             json=mo_body,
             timeout=15,
         )
-        mo_r.raise_for_status()
+        if not mo_r.ok:
+            err_detail = ""
+            try: err_detail = mo_r.json()
+            except Exception: err_detail = mo_r.text
+            print(f"[create_quote] MO creation failed {mo_r.status_code}: {err_detail}")
+            return Response(json.dumps({"error": f"Order creation failed ({mo_r.status_code}): {err_detail}"}),
+                            status=500, headers=c, mimetype="application/json")
         mo_record_id = mo_r.json()["id"]
 
         # 4. Create line items
@@ -4508,6 +4514,11 @@ def create_quote():
                 }},
                 timeout=15,
             )
+            if not li_r.ok:
+                err_detail = ""
+                try: err_detail = li_r.json()
+                except Exception: err_detail = li_r.text
+                print(f"[create_quote] line item creation failed {li_r.status_code}: {err_detail} | item={item}")
             li_r.raise_for_status()
 
         # 5. Send email with PDF attachment

@@ -583,7 +583,7 @@ if (window.self !== window.top) {
 
       <div class="btn-row">
         <button class="btn btn-secondary" onclick="goStep1()">← Back</button>
-        <button class="btn btn-primary" id="btnSubmit" onclick="submitQuote()">Submit Quote Request</button>
+        <button class="btn btn-primary" id="btnSubmit" onclick="submitQuote()">Create Quote</button>
       </div>
     </div>
   </div>
@@ -1453,7 +1453,7 @@ async function submitQuote() {
   } catch (e) {
     showError(e.message || 'An error occurred. Please try again.');
     btnEl.disabled = false;
-    btnEl.textContent = 'Submit Quote Request';
+    btnEl.textContent = 'Create Quote';
   }
 }
 
