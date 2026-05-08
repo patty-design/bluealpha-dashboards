@@ -2949,8 +2949,11 @@ def on_time_shipments():
                     headers=cors_headers, mimetype="application/json")
 
 
+_AWAITING_CACHE = {"ts": 0, "data": None}
+
 @app.route("/api/awaiting")
 def awaiting_shipment():
+    import time as _time
     cors_headers = {"Access-Control-Allow-Origin": "*"}
     if not SHIPSTATION_KEY or not SHIPSTATION_SECRET:
         return Response(json.dumps({"error": "ShipStation not configured"}),
@@ -2967,7 +2970,7 @@ def awaiting_shipment():
     tomorrow = (now_eastern + timedelta(days=1)).strftime("%Y-%m-%d")
 
     # Fetch awaiting shipment count
-    count = 0
+    count = None
     try:
         r = req_lib.get(
             "https://ssapi.shipstation.com/orders",
@@ -2996,9 +2999,19 @@ def awaiting_shipment():
         placed_error = str(e)
         print(f"[awaiting] placedToday fetch error: {e}")
 
+    # If both calls failed, return stale cache rather than zeroes
+    if count is None and placed_today == 0 and _AWAITING_CACHE["data"] is not None:
+        return Response(json.dumps({**_AWAITING_CACHE["data"], "stale": True}),
+                        headers=cors_headers, mimetype="application/json")
+
     result = {"count": count, "placedToday": placed_today}
     if placed_error:
         result["placedTodayError"] = placed_error
+
+    # Cache only successful responses
+    if count is not None:
+        _AWAITING_CACHE["data"] = result
+        _AWAITING_CACHE["ts"]   = _time.time()
 
     return Response(json.dumps(result), headers=cors_headers, mimetype="application/json")
 
