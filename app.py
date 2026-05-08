@@ -2819,6 +2819,7 @@ def return_label_pdf(record_id):
 
 _ONTIME_CACHE = {"ts": 0, "data": None}
 _ONTIME_REFRESHING = False
+_ONTIME_LAST_ERROR = {"msg": None, "ts": 0}
 
 _ONTIME_CONTRACT = 137893
 _ONTIME_RULES = [
@@ -2905,6 +2906,9 @@ def _refresh_ontime_cache():
         _ONTIME_CACHE["ts"]   = _time.time()
         print(f"[on-time] cache refreshed — {pct}% on-time ({on_time}/{total})")
     except Exception as e:
+        import time as _time
+        _ONTIME_LAST_ERROR["msg"] = str(e)
+        _ONTIME_LAST_ERROR["ts"]  = _time.time()
         print(f"[on-time] background refresh failed: {e}")
     finally:
         _ONTIME_REFRESHING = False
@@ -2924,14 +2928,22 @@ def on_time_shipments():
         return Response(json.dumps(_ONTIME_CACHE["data"]), headers=cors_headers,
                         mimetype="application/json")
 
-    # Kick off background refresh if not already running
-    if not _ONTIME_REFRESHING:
+    # If last error was recent (within 2 min), back off — don't hammer ShipStation
+    error_recent = now - _ONTIME_LAST_ERROR["ts"] < 120
+
+    # Kick off background refresh if not already running and not in backoff
+    if not _ONTIME_REFRESHING and not error_recent:
         _ONTIME_REFRESHING = True
         threading.Thread(target=_refresh_ontime_cache, daemon=True).start()
 
-    # Return stale data while refreshing, or pending indicator on cold start
+    # Return stale data while refreshing
     if _ONTIME_CACHE["data"] is not None:
         return Response(json.dumps({**_ONTIME_CACHE["data"], "stale": True}),
+                        headers=cors_headers, mimetype="application/json")
+
+    # No data yet — report error or pending
+    if error_recent and _ONTIME_LAST_ERROR["msg"]:
+        return Response(json.dumps({"error": _ONTIME_LAST_ERROR["msg"]}),
                         headers=cors_headers, mimetype="application/json")
     return Response(json.dumps({"pending": True}),
                     headers=cors_headers, mimetype="application/json")
