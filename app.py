@@ -9,6 +9,17 @@ import secrets
 import requests as req_lib
 import jwt as pyjwt
 
+# Per-record lock registry — prevents race condition where two background threads
+# both pass the _has_items check before either creates Return Items records.
+_return_items_locks: dict = {}
+_return_items_locks_mutex = threading.Lock()
+
+def _get_return_items_lock(record_id: str) -> threading.Lock:
+    with _return_items_locks_mutex:
+        if record_id not in _return_items_locks:
+            _return_items_locks[record_id] = threading.Lock()
+        return _return_items_locks[record_id]
+
 _BUILD_VERSION = "catalog-live"
 
 AIRTABLE_OPS_TOKEN      = os.environ.get("AIRTABLE_OPS_TOKEN", "")
@@ -2349,21 +2360,22 @@ def submit_return():
     def process_label(record_id, data, addr):
         try:
             # ── Create Return Items (combo-expanded checklist for CS) ─────────
-            # Guard: skip if items already exist for this record (handles retries
-            # where we reused an existing record that already had items created).
-            _has_items = False
-            try:
-                _ri_check = req_lib.get(
-                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
-                    params={"fields[]": ["Return Items"]},
-                    headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
-                    timeout=10,
-                )
-                _has_items = len(_ri_check.json().get("fields", {}).get("Return Items", [])) > 0
-            except Exception:
-                pass
-            if not _has_items:
-                create_return_items(record_id, data.get("itemsToReturn", ""))
+            # Use a per-record lock to prevent the race condition where two retry
+            # threads both pass the _has_items check before either creates records.
+            with _get_return_items_lock(record_id):
+                _has_items = False
+                try:
+                    _ri_check = req_lib.get(
+                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
+                        params={"fields[]": ["Return Items"]},
+                        headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
+                        timeout=10,
+                    )
+                    _has_items = len(_ri_check.json().get("fields", {}).get("Return Items", [])) > 0
+                except Exception:
+                    pass
+                if not _has_items:
+                    create_return_items(record_id, data.get("itemsToReturn", ""))
 
             addr_for_label = {
                 "name":       addr.get("name", data.get("customerName", "")),
