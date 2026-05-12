@@ -2886,9 +2886,10 @@ def _refresh_ontime_cache():
         thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
         page = 1
         all_orders = []
-        while True:
+        MAX_PAGES = 40   # 20K orders — more than enough for a statistically reliable on-time %
+        while page <= MAX_PAGES:
             if page > 1:
-                _time.sleep(1.6)   # stay under ShipStation's 40 req/min rate limit
+                _time.sleep(1.5)   # stay under ShipStation's 40 req/min rate limit
             retries = 3
             r = None
             while retries > 0:
@@ -2910,7 +2911,9 @@ def _refresh_ontime_cache():
                 raise RuntimeError(f"ShipStation rate limit: exhausted retries on page {page}")
             body = r.json()
             all_orders.extend(body.get("orders", []))
-            if page >= body.get("pages", 1):
+            total_pages = body.get("pages", 1)
+            print(f"[on-time] fetched page {page}/{total_pages} ({len(all_orders)} orders so far)")
+            if page >= total_pages:
                 break
             page += 1
 
@@ -2969,7 +2972,7 @@ def on_time_shipments():
     cors_headers = {"Access-Control-Allow-Origin": "*"}
 
     now = _time.time()
-    cache_fresh = _ONTIME_CACHE["data"] is not None and now - _ONTIME_CACHE["ts"] < 600
+    cache_fresh = _ONTIME_CACHE["data"] is not None and now - _ONTIME_CACHE["ts"] < 3600
 
     if cache_fresh:
         return Response(json.dumps(_ONTIME_CACHE["data"]), headers=cors_headers,
@@ -7822,7 +7825,7 @@ def _ontime_bg_worker():
             _refresh_ontime_cache()
         except Exception as exc:
             print(f'[ontime-bg] error: {exc}')
-        _t.sleep(600)    # 10 minutes
+        _t.sleep(3600)   # 1 hour
 
 threading.Thread(target=_ontime_bg_worker, daemon=True).start()
 
