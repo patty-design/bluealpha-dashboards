@@ -2887,13 +2887,24 @@ def _refresh_ontime_cache():
         page = 1
         all_orders = []
         while True:
-            r = req_lib.get(
-                "https://ssapi.shipstation.com/orders",
-                params={"orderStatus": "shipped", "shipDateStart": thirty_days_ago,
-                        "pageSize": 500, "page": page},
-                headers=ss_headers(), timeout=30,
-            )
-            r.raise_for_status()
+            if page > 1:
+                _time.sleep(1.6)   # stay under ShipStation's 40 req/min rate limit
+            retries = 3
+            while retries:
+                r = req_lib.get(
+                    "https://ssapi.shipstation.com/orders",
+                    params={"orderStatus": "shipped", "shipDateStart": thirty_days_ago,
+                            "pageSize": 500, "page": page},
+                    headers=ss_headers(), timeout=30,
+                )
+                if r.status_code == 429:
+                    retry_after = int(r.headers.get("Retry-After", 60))
+                    print(f"[on-time] 429 rate limit on page {page}, sleeping {retry_after}s")
+                    _time.sleep(retry_after)
+                    retries -= 1
+                    continue
+                r.raise_for_status()
+                break
             body = r.json()
             all_orders.extend(body.get("orders", []))
             if page >= body.get("pages", 1):
