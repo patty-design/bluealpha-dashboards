@@ -2972,7 +2972,7 @@ def on_time_shipments():
     cors_headers = {"Access-Control-Allow-Origin": "*"}
 
     now = _time.time()
-    cache_fresh = _ONTIME_CACHE["data"] is not None and now - _ONTIME_CACHE["ts"] < 3600
+    cache_fresh = _ONTIME_CACHE["data"] is not None and now - _ONTIME_CACHE["ts"] < 90000
 
     if cache_fresh:
         return Response(json.dumps(_ONTIME_CACHE["data"]), headers=cors_headers,
@@ -7817,15 +7817,31 @@ def cron_intl_exchange():
 
 
 def _ontime_bg_worker():
-    """Keep the on-time cache fresh: refresh immediately on startup, then every 10 minutes."""
+    """Refresh on-time cache on startup (if no data), then daily at 9 PM ET."""
     import time as _t
-    _t.sleep(5)          # brief delay so app finishes starting up
-    while True:
+    from zoneinfo import ZoneInfo
+    from datetime import timedelta
+    _t.sleep(5)  # brief delay so app finishes starting up
+    # Refresh on startup if we have no data yet
+    if _ONTIME_CACHE["data"] is None:
         try:
             _refresh_ontime_cache()
         except Exception as exc:
+            print(f'[ontime-bg] startup refresh error: {exc}')
+    while True:
+        try:
+            et_tz  = ZoneInfo('America/New_York')
+            now_et = datetime.now(et_tz)
+            next_run = now_et.replace(hour=21, minute=0, second=0, microsecond=0)
+            if now_et >= next_run:
+                next_run += timedelta(days=1)
+            sleep_secs = (next_run - now_et).total_seconds()
+            print(f'[ontime-bg] sleeping {sleep_secs/3600:.1f}h until {next_run.strftime("%Y-%m-%d %H:%M ET")}')
+            _t.sleep(sleep_secs)
+            _refresh_ontime_cache()
+        except Exception as exc:
             print(f'[ontime-bg] error: {exc}')
-        _t.sleep(3600)   # 1 hour
+            _t.sleep(300)  # back off 5 min on error
 
 threading.Thread(target=_ontime_bg_worker, daemon=True).start()
 
