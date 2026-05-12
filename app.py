@@ -7784,6 +7784,19 @@ def cron_intl_exchange():
                     mimetype="application/json")
 
 
+def _ontime_bg_worker():
+    """Keep the on-time cache fresh: refresh immediately on startup, then every 10 minutes."""
+    import time as _t
+    _t.sleep(5)          # brief delay so app finishes starting up
+    while True:
+        try:
+            _refresh_ontime_cache()
+        except Exception as exc:
+            print(f'[ontime-bg] error: {exc}')
+        _t.sleep(600)    # 10 minutes
+
+threading.Thread(target=_ontime_bg_worker, daemon=True).start()
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
