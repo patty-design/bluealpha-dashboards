@@ -2882,7 +2882,7 @@ def _refresh_ontime_cache():
     from datetime import datetime, timedelta
     try:
         if not SHIPSTATION_KEY or not SHIPSTATION_SECRET:
-            return
+            raise RuntimeError("SHIPSTATION_KEY or SHIPSTATION_SECRET not configured")
         thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
         page = 1
         all_orders = []
@@ -2890,7 +2890,8 @@ def _refresh_ontime_cache():
             if page > 1:
                 _time.sleep(1.6)   # stay under ShipStation's 40 req/min rate limit
             retries = 3
-            while retries:
+            r = None
+            while retries > 0:
                 r = req_lib.get(
                     "https://ssapi.shipstation.com/orders",
                     params={"orderStatus": "shipped", "shipDateStart": thirty_days_ago,
@@ -2905,6 +2906,8 @@ def _refresh_ontime_cache():
                     continue
                 r.raise_for_status()
                 break
+            if retries == 0:
+                raise RuntimeError(f"ShipStation rate limit: exhausted retries on page {page}")
             body = r.json()
             all_orders.extend(body.get("orders", []))
             if page >= body.get("pages", 1):
@@ -2991,6 +2994,21 @@ def on_time_shipments():
                         headers=cors_headers, mimetype="application/json")
     return Response(json.dumps({"pending": True}),
                     headers=cors_headers, mimetype="application/json")
+
+
+@app.route("/api/on-time-shipments/debug")
+def on_time_debug():
+    import time as _t
+    cors_headers = {"Access-Control-Allow-Origin": "*"}
+    return Response(json.dumps({
+        "cache_data":      _ONTIME_CACHE["data"],
+        "cache_age_secs":  round(_t.time() - _ONTIME_CACHE["ts"], 1),
+        "refreshing":      _ONTIME_REFRESHING,
+        "last_error":      _ONTIME_LAST_ERROR["msg"],
+        "error_age_secs":  round(_t.time() - _ONTIME_LAST_ERROR["ts"], 1),
+        "ss_key_set":      bool(SHIPSTATION_KEY),
+        "ss_secret_set":   bool(SHIPSTATION_SECRET),
+    }), headers=cors_headers, mimetype="application/json")
 
 
 _AWAITING_CACHE = {"ts": 0, "data": None}
