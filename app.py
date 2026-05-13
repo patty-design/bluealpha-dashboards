@@ -5066,11 +5066,7 @@ def _build_quote_pdf_bytes(quote):
     pdf.set_y(max(y_after_details, pdf.get_y()) + 3)
 
     # Validity note
-    pdf.set_font("Helvetica", "I", 8)
-    pdf.set_text_color(*MUTED)
-    pdf.cell(W, 5, "This quote is valid for 90 days from the date of issue.",
-             border=0, new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(4)
+    pdf.ln(2)
 
     # ── Line items table ──────────────────────────────────────────────
     sku_w  = 36
