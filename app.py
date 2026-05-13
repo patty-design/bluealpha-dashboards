@@ -4705,7 +4705,9 @@ def accept_quote(record_id):
     if _pu is not None and not portal_can(_pu, "accept_quote"):
         return Response(json.dumps({"error": "Insufficient permissions"}), status=403, headers=c, mimetype="application/json")
     from datetime import date as dt_date
-    token = RETURNS_WRITE_TOKEN
+    write_token = RETURNS_WRITE_TOKEN
+    read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or write_token
+    token       = write_token  # used for all write operations below
 
     data = request.get_json() or {}
     billing      = data.get("billing") or {}
@@ -4715,10 +4717,13 @@ def accept_quote(record_id):
         # Fetch MO record
         r = req_lib.get(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
-            headers=at_headers(token), timeout=15,
+            headers=at_headers(read_token), timeout=15,
         )
         if r.status_code != 200:
-            return Response(json.dumps({"error": "Quote not found"}), status=404, headers=c, mimetype="application/json")
+            err_body = ""
+            try: err_body = r.json()
+            except Exception: err_body = r.text[:200]
+            return Response(json.dumps({"error": f"Quote not found (AT {r.status_code}: {err_body})"}), status=404, headers=c, mimetype="application/json")
         mo_fields = r.json().get("fields", {})
 
         if mo_fields.get("Order Type") != "Quote":
