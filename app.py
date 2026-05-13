@@ -129,6 +129,8 @@ def version():
         "v": _BUILD_VERSION,
         "base_token_set": bool(AIRTABLE_BASE_TOKEN),
         "token_prefix": tok[:12] if tok else "(empty)",
+        "write_token_set": bool(RETURNS_WRITE_TOKEN),
+        "write_token_prefix": RETURNS_WRITE_TOKEN[:12] if RETURNS_WRITE_TOKEN else "(empty)",
     }), mimetype="application/json")
 
 @app.route("/static/<path:filename>")
