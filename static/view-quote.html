@@ -953,6 +953,14 @@ function buildActions(editable) {
         conf.style.cssText = 'display:none;margin-left:12px;color:#1a7a3c;font-size:0.88rem;';
         bar.appendChild(conf);
       }
+      // Remove Quote — available on all open quotes
+      if (portalUser.canCreateQuote !== false) {
+        const removeBtn = document.createElement('button');
+        removeBtn.className   = 'btn btn-secondary';
+        removeBtn.textContent = 'Remove Quote';
+        removeBtn.onclick     = hideQuote;
+        bar.appendChild(removeBtn);
+      }
     } else {
       // No portal session (customer clicking emailed link) — show Accept button normally
       const acceptBtn = document.createElement('button');
