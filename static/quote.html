@@ -453,11 +453,20 @@
 if (window.self !== window.top) {
   document.getElementById('quoteHeader').style.display = 'none';
   // Send height updates to parent for iframe sizing
+  // Debounced + RAF to ensure layout is fully painted before measuring
+  let _heightTimer = null;
   function _notifyHeight() {
-    window.parent.postMessage({ type: 'quoteBuilderHeight', height: document.body.scrollHeight }, '*');
+    clearTimeout(_heightTimer);
+    _heightTimer = setTimeout(function() {
+      requestAnimationFrame(function() {
+        const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight,
+                           document.body.offsetHeight, document.documentElement.offsetHeight);
+        window.parent.postMessage({ type: 'quoteBuilderHeight', height: h }, '*');
+      });
+    }, 80);
   }
   window.addEventListener('load', _notifyHeight);
-  new MutationObserver(_notifyHeight).observe(document.body, { childList: true, subtree: true, attributes: true });
+  new MutationObserver(_notifyHeight).observe(document.body, { childList: true, subtree: true, attributes: true, characterData: true });
 }
 </script>
 

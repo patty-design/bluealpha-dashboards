@@ -873,7 +873,7 @@
   window.addEventListener('message', function(e) {
     if (e.data && e.data.type === 'quoteBuilderHeight') {
       const frame = document.getElementById('quoteBuilderFrame');
-      if (frame) frame.style.height = (e.data.height + 32) + 'px';
+      if (frame) frame.style.height = (e.data.height + 60) + 'px';
     }
     if (e.data && e.data.type === 'viewQuoteHeight') {
       const frame = document.getElementById('viewQuoteFrame');
