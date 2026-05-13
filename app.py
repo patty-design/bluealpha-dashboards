@@ -6385,84 +6385,68 @@ def portal_team_delete(user, record_id):
 # Customer Portal — Quote Actions (duplicate, hide)
 # ─────────────────────────────────────────────────────────────────────────────
 
-@app.route("/api/portal/account-info", methods=["GET"])
+@app.route("/api/portal/account-info", methods=["GET", "PATCH"])
 @portal_login_required
-def portal_account_info_get(user):
+def portal_account_info(user):
     c = cors()
     customer_id = user.get("customer_id", "")
     if not customer_id:
         return Response(json.dumps({"error": "No customer"}), status=400, headers=c, mimetype="application/json")
-    try:
-        token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-        r = req_lib.get(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
-            headers=at_headers(token),
-            params={"fields[]": [
-                "Organization Name", "Main Contact Name", "Main Contact Email", "Main Contact Phone #",
-                "Customer Address (Line 1)", "Customer Address (Line 2)",
-                "Bill-To Org Name", "Bill-To Contact Name", "Bill-To Contact Email", "Bill-To Phone #",
-                "Bill-To Address (Line 1)", "Bill-To Address (Line 2)",
-            ]},
-            timeout=10,
-        )
-        if r.status_code != 200:
-            return Response(json.dumps({"error": "Customer not found"}), status=404, headers=c, mimetype="application/json")
-        f = r.json().get("fields", {})
-        return Response(json.dumps({"info": {
-            "shipOrg":     f.get("Organization Name", ""),
-            "shipName":    f.get("Main Contact Name", ""),
-            "shipEmail":   f.get("Main Contact Email", ""),
-            "shipPhone":   f.get("Main Contact Phone #", ""),
-            "shipAddr1":   f.get("Customer Address (Line 1)", ""),
-            "shipAddr2":   f.get("Customer Address (Line 2)", ""),
-            "billOrg":     f.get("Bill-To Org Name", ""),
-            "billName":    f.get("Bill-To Contact Name", ""),
-            "billEmail":   f.get("Bill-To Contact Email", ""),
-            "billPhone":   f.get("Bill-To Phone #", ""),
-            "billAddr1":   f.get("Bill-To Address (Line 1)", ""),
-            "billAddr2":   f.get("Bill-To Address (Line 2)", ""),
-        }}), headers=c, mimetype="application/json")
-    except Exception as e:
-        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
+    if request.method == "GET":
+        try:
+            token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+            r = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
+                headers=at_headers(token),
+                params={"fields[]": [
+                    "Organization Name", "Main Contact Name", "Main Contact Email", "Main Contact Phone #",
+                    "Customer Address (Line 1)", "Customer Address (Line 2)",
+                    "Bill-To Org Name", "Bill-To Contact Name", "Bill-To Contact Email", "Bill-To Phone #",
+                    "Bill-To Address (Line 1)", "Bill-To Address (Line 2)",
+                ]},
+                timeout=10,
+            )
+            if r.status_code != 200:
+                return Response(json.dumps({"error": "Customer not found"}), status=404, headers=c, mimetype="application/json")
+            f = r.json().get("fields", {})
+            return Response(json.dumps({"info": {
+                "shipOrg":   f.get("Organization Name", ""),
+                "shipName":  f.get("Main Contact Name", ""),
+                "shipEmail": f.get("Main Contact Email", ""),
+                "shipPhone": f.get("Main Contact Phone #", ""),
+                "shipAddr1": f.get("Customer Address (Line 1)", ""),
+                "shipAddr2": f.get("Customer Address (Line 2)", ""),
+                "billOrg":   f.get("Bill-To Org Name", ""),
+                "billName":  f.get("Bill-To Contact Name", ""),
+                "billEmail": f.get("Bill-To Contact Email", ""),
+                "billPhone": f.get("Bill-To Phone #", ""),
+                "billAddr1": f.get("Bill-To Address (Line 1)", ""),
+                "billAddr2": f.get("Bill-To Address (Line 2)", ""),
+            }}), headers=c, mimetype="application/json")
+        except Exception as e:
+            return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
-@app.route("/api/portal/account-info", methods=["PATCH"])
-@portal_login_required
-def portal_account_info_update(user):
-    c = cors()
+    # PATCH
     if not portal_can(user, "manage_team"):
         return Response(json.dumps({"error": "Admin access required"}), status=403, headers=c, mimetype="application/json")
-    customer_id = user.get("customer_id", "")
-    if not customer_id:
-        return Response(json.dumps({"error": "No customer"}), status=400, headers=c, mimetype="application/json")
     data = request.get_json() or {}
-    fields = {}
     _MAP = {
-        "shipOrg":   "Organization Name",
-        "shipName":  "Main Contact Name",
-        "shipEmail": "Main Contact Email",
-        "shipPhone": "Main Contact Phone #",
-        "shipAddr1": "Customer Address (Line 1)",
-        "shipAddr2": "Customer Address (Line 2)",
-        "billOrg":   "Bill-To Org Name",
-        "billName":  "Bill-To Contact Name",
-        "billEmail": "Bill-To Contact Email",
-        "billPhone": "Bill-To Phone #",
-        "billAddr1": "Bill-To Address (Line 1)",
-        "billAddr2": "Bill-To Address (Line 2)",
+        "shipOrg":   "Organization Name",      "shipName":  "Main Contact Name",
+        "shipEmail": "Main Contact Email",      "shipPhone": "Main Contact Phone #",
+        "shipAddr1": "Customer Address (Line 1)", "shipAddr2": "Customer Address (Line 2)",
+        "billOrg":   "Bill-To Org Name",        "billName":  "Bill-To Contact Name",
+        "billEmail": "Bill-To Contact Email",   "billPhone": "Bill-To Phone #",
+        "billAddr1": "Bill-To Address (Line 1)", "billAddr2": "Bill-To Address (Line 2)",
     }
-    for key, at_field in _MAP.items():
-        if key in data:
-            fields[at_field] = data[key]
+    fields = {at_f: data[k] for k, at_f in _MAP.items() if k in data}
     if not fields:
         return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
     try:
-        token = RETURNS_WRITE_TOKEN
         r = req_lib.patch(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
-            headers={**at_headers(token), "Content-Type": "application/json"},
-            json={"fields": fields},
-            timeout=15,
+            headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
+            json={"fields": fields}, timeout=15,
         )
         r.raise_for_status()
         return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
