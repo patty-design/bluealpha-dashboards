@@ -4473,8 +4473,35 @@ def create_quote():
     try:
         read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
         # 1. Use provided customer ID if available, otherwise find/create by email
+        # Build address lines (shared by both paths)
+        _line1 = address1
+        if address2:
+            _line1 = f"{address1}, {address2}"
+        _line2 = ""
+        if city and state and zip_code:
+            _line2 = f"{city}, {state} {zip_code}"
+        elif city or state or zip_code:
+            _line2 = " ".join(filter(None, [city, state, zip_code]))
+
         if provided_cust_id:
             cust_id = provided_cust_id
+            # Update customer record with any form changes
+            _cust_update = {}
+            if org_name:     _cust_update["Organization Name"]             = org_name
+            if contact_name: _cust_update["Main Contact Name"]             = contact_name
+            if phone:        _cust_update["Main Contact Phone #"]          = phone
+            if _line1:       _cust_update["Customer Address (Line 1)"]     = _line1
+            if _line2:       _cust_update["Customer Address (Line 2)"]     = _line2
+            if _cust_update:
+                try:
+                    req_lib.patch(
+                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{cust_id}",
+                        headers={**at_headers(token), "Content-Type": "application/json"},
+                        json={"fields": _cust_update},
+                        timeout=15,
+                    )
+                except Exception as _ue:
+                    print(f"[create_quote] customer update failed: {_ue}")
         else:
           existing = at_get_all(
             CUSTOMERS_TABLE_ID, read_token,
@@ -4484,26 +4511,14 @@ def create_quote():
           if existing:
             cust_id = existing[0]["id"]
           else:
-            # Build address lines in the format the Airtable formulas expect:
-            # Line 1 = street (+ suite/unit if provided)
-            # Line 2 = "City, State ZIP"  ← parsed by Customer City/State/Zip formulas
-            line1 = address1
-            if address2:
-                line1 = f"{address1}, {address2}"
-            line2 = ""
-            if city and state and zip_code:
-                line2 = f"{city}, {state} {zip_code}"
-            elif city or state or zip_code:
-                line2 = " ".join(filter(None, [city, state, zip_code]))
-
             new_cust = {
                 "Organization Name":      org_name,
                 "Main Contact Name":      contact_name,
                 "Main Contact Email":     email,
             }
-            if phone:   new_cust["Main Contact Phone #"]        = phone
-            if line1:   new_cust["Customer Address (Line 1)"]   = line1
-            if line2:   new_cust["Customer Address (Line 2)"]   = line2
+            if phone:    new_cust["Main Contact Phone #"]        = phone
+            if _line1:   new_cust["Customer Address (Line 1)"]   = _line1
+            if _line2:   new_cust["Customer Address (Line 2)"]   = _line2
 
             cr = req_lib.post(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}",
@@ -4986,7 +5001,8 @@ def _build_quote_pdf_bytes(quote):
     pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(*MUTED)
     pdf.cell(right_col_w, 5.5, "Bill To", border=0, new_x="LEFT", new_y="NEXT")
-    for ln in [bill_org, bill_name]:
+    bill_addr_line = ", ".join(filter(None, [city, f"{state_v} {zip_v}".strip()]))
+    for ln in [bill_org, bill_name, addr1, bill_addr_line]:
         if ln:
             pdf.set_x(bill_x)
             pdf.set_font("Helvetica", "B" if ln == bill_org else "", 8)
