@@ -27,6 +27,11 @@ AIRTABLE_BASE_TOKEN     = os.environ.get("AIRTABLE_BASE_TOKEN", "")
 AIRTABLE_WRITE_TOKEN    = os.environ.get("AIRTABLE_WRITE_TOKEN", "")
 RETURNS_WRITE_TOKEN     = os.environ.get("AIRTABLE_WRITE_TOKEN_2", AIRTABLE_WRITE_TOKEN)
 APPLY_WRITE_TOKEN       = os.environ.get("APPLY_WRITE_TOKEN", "")
+
+def _today_utc():
+    """Return today's date in UTC (avoids Railway timezone drift)."""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).date()
 FLASK_BASE_URL          = os.environ.get("FLASK_BASE_URL", "https://bluealpha-dashboards-production.up.railway.app")
 AIRTABLE_BASE_ID        = "appA13jo4b3TIn4yT"
 RETURNS_TABLE_ID        = os.environ.get("RETURNS_TABLE_ID", "tblxwbeaVHBzXcAen")
@@ -689,7 +694,7 @@ def capture_raw_material_cost():
 
     from datetime import date as dt_date
     body = request.get_json() or {}
-    snap_date = body.get("date", dt_date.today().isoformat())
+    snap_date = body.get("date", _today_utc().isoformat())
     notes = body.get("notes", "Auto-captured snapshot")
 
     try:
@@ -3875,7 +3880,7 @@ def _fetch_quote_data(record_id):
     po_number    = fields.get("Purchase Order #", "")
     notes        = fields.get("Notes from Customer", "")
 
-    today = dt_date.today()
+    today = _today_utc()
     is_expired = False
     if expiry_str:
         try:
@@ -4538,7 +4543,7 @@ def create_quote():
         order_id_str = _next_order_id(read_token)
         quote_number = f"QU-{order_id_str}"
 
-        today       = dt_date.today()
+        today       = _today_utc()
         expiry_date = today + timedelta(days=90)
         today_str   = today.isoformat()
         expiry_str  = expiry_date.isoformat()
@@ -4734,7 +4739,7 @@ def accept_quote(record_id):
         expiry_str = mo_fields.get("Expiry Date", "")
         if expiry_str:
             try:
-                if dt_date.fromisoformat(expiry_str) < dt_date.today():
+                if dt_date.fromisoformat(expiry_str) < _today_utc():
                     return Response(json.dumps({"error": "Quote has expired"}), status=400, headers=c, mimetype="application/json")
             except Exception:
                 pass
@@ -4746,7 +4751,7 @@ def accept_quote(record_id):
         customer_id  = customer_ids[0] if customer_ids else None
         po_number    = mo_fields.get("Purchase Order #", "")
         notes        = mo_fields.get("Notes from Customer", "")
-        date_str     = mo_fields.get("Date", dt_date.today().isoformat())
+        date_str     = mo_fields.get("Date", _today_utc().isoformat())
 
         # Create SO record
         # Note: Document ID, MO Is Approved, Ready for ShipStation (SOs), Origin Quote are all
@@ -5802,7 +5807,7 @@ def portal_quotes(user):
                    and not r.get("fields", {}).get("Hidden from Customer", False)]
         from datetime import date as dt_date
         import concurrent.futures as _cf
-        today = dt_date.today()
+        today = _today_utc()
 
         # Collect all line item IDs across all quotes, then fetch in parallel
         all_li_ids = []
@@ -6561,7 +6566,7 @@ def portal_duplicate_quote(user, record_id):
         order_id_str = _next_order_id(read_token)
         quote_number = f"QU-{order_id_str}"
 
-        today      = dt_date.today()
+        today      = _today_utc()
         today_str  = today.isoformat()
         expiry_str = (today + timedelta(days=90)).isoformat()
 
