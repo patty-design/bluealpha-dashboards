@@ -451,6 +451,7 @@
     let quotesLoaded = false;
     let ordersLoaded = false;
     let teamLoaded = false;
+    let quoteBuilderDirty = false; // true after a quote is submitted — reload iframe on next visit
 
     // Tab switching
     document.querySelectorAll('.tab').forEach(tab => {
@@ -460,14 +461,17 @@
         tab.classList.add('active');
         const panel = document.getElementById('tab-' + tab.dataset.tab);
         if (panel) panel.classList.add('active');
-        // Lazy load
-        if (tab.dataset.tab === 'our-quotes' && !quotesLoaded) loadQuotes();
-        if (tab.dataset.tab === 'our-orders' && !ordersLoaded) loadOrders();
+        // Always re-fetch quotes/orders on tab switch (backend cache keeps it fast)
+        if (tab.dataset.tab === 'our-quotes') loadQuotes();
+        if (tab.dataset.tab === 'our-orders') loadOrders();
         if (tab.dataset.tab === 'team' && !teamLoaded) { loadTeam(); loadAccountInfo(); }
-        // Always reload the quote builder so it's fresh (clears any stuck Submitting... state)
+        // Only reload quote builder if it was previously submitted (dirty), not on every click
         if (tab.dataset.tab === 'new-quote') {
           const qf = document.getElementById('quoteBuilderFrame');
-          if (qf) { qf.src = ''; qf.src = '/quote-builder'; }
+          if (qf && quoteBuilderDirty) {
+            qf.src = ''; qf.src = '/quote-builder';
+            quoteBuilderDirty = false;
+          }
         }
       });
     });
@@ -510,6 +514,9 @@
           if (quotesTab) quotesTab.classList.add('active');
           document.getElementById('tab-our-quotes').classList.add('active');
           loadQuotes();
+        } else {
+          // Prewarm catalog in background so "Select Your Items" loads faster
+          fetch('/api/quote-catalog', { credentials: 'same-origin' }).catch(() => {});
         }
       } catch (e) {
         console.error(e);
@@ -846,6 +853,7 @@
       if (frame) frame.style.height = (e.data.height + 32) + 'px';
     }
     if (e.data && e.data.type === 'quoteSubmitted') {
+      quoteBuilderDirty = true;
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.querySelector('[data-tab="our-quotes"]').classList.add('active');

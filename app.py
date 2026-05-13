@@ -4610,6 +4610,9 @@ def create_quote():
         except Exception as email_err:
             print(f"[create_quote] email failed: {email_err}")
 
+        # Bust quotes cache for this customer
+        _QUOTES_CACHE.pop(cust_id, None)
+
         return Response(
             json.dumps({"success": True, "quoteNumber": quote_number, "recordId": mo_record_id}),
             headers=c, mimetype="application/json",
@@ -4865,6 +4868,10 @@ def accept_quote(record_id):
                 send_quote_accepted_email(to_email, to_name, org_name, quote_number, so_number)
             except Exception as email_err:
                 print(f"[accept_quote] email failed: {email_err}")
+
+        # Bust quotes cache
+        if customer_id:
+            _QUOTES_CACHE.pop(customer_id, None)
 
         return Response(json.dumps({"success": True, "soNumber": so_number}), headers=c, mimetype="application/json")
     except Exception as e:
@@ -6605,6 +6612,7 @@ def portal_hide_quote(user, record_id):
             timeout=10,
         )
         pr.raise_for_status()
+        _QUOTES_CACHE.pop(customer_id, None)
         return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
