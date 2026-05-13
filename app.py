@@ -4907,7 +4907,7 @@ def accept_quote(record_id):
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
 
-def _build_quote_pdf_bytes(quote):
+def _build_quote_pdf_bytes(quote, doc_type="quote"):
     """Generate PDF bytes for a quote dict. Returns bytes."""
     import os, tempfile
     from fpdf import FPDF
@@ -5028,7 +5028,8 @@ def _build_quote_pdf_bytes(quote):
     pdf.set_xy(right_x, LOGO_TOP)
     pdf.set_font("Helvetica", "B", 28)
     pdf.set_text_color(*NAVY)
-    pdf.cell(right_w, 12, "QUOTE", align="R", new_x="LMARGIN", new_y="NEXT")
+    _doc_label = "SALES ORDER" if doc_type == "order" else "QUOTE"
+    pdf.cell(right_w, 12, _doc_label, align="R", new_x="LMARGIN", new_y="NEXT")
 
     for cline, bold, size in [
         ("Blue Alpha",           True,  8),
@@ -5064,12 +5065,19 @@ def _build_quote_pdf_bytes(quote):
         pdf.set_text_color(*TEXT)
         pdf.cell(col_w - 34, 5.5, str(value), border=0, new_x="LMARGIN", new_y="NEXT")
 
-    kv("Quote Number:", q_number)
-    kv("Quote Date:",   q_date)
-    kv("Expiry Date:",  q_expiry)
-    kv("Terms:",        "Net 30")
-    if q_po:
-        kv("PO #:", q_po)
+    if doc_type == "order":
+        kv("Order Number:", q_number)
+        kv("Order Date:",   q_date)
+        kv("Terms:",        "Net 30")
+        if q_po:
+            kv("PO #:", q_po)
+    else:
+        kv("Quote Number:", q_number)
+        kv("Quote Date:",   q_date)
+        kv("Expiry Date:",  q_expiry)
+        kv("Terms:",        "Net 30")
+        if q_po:
+            kv("PO #:", q_po)
 
     y_after_details = pdf.get_y()
 
@@ -5198,15 +5206,26 @@ def _build_quote_pdf_bytes(quote):
     pdf.set_font("Helvetica", "", 7.5)
     pdf.set_text_color(*MUTED)
 
-    # Line 1: payment terms + accept link
-    pdf.write(4.5, "Payment terms are Net 30 upon acceptance.  ")
-    pdf.write(4.5, "To accept this quote, ")
-    pdf.set_text_color(91, 127, 160)   # Steel Blue
-    pdf.set_font("Helvetica", "U", 7.5)
-    pdf.write(4.5, "click here to view it in your Blue Alpha Quote Portal", link=portal_link)
-    pdf.set_font("Helvetica", "", 7.5)
-    pdf.set_text_color(*MUTED)
-    pdf.write(4.5, ".")
+    # Line 1: payment terms / order confirmation
+    if doc_type == "order":
+        pdf.write(4.5, "Thank you for your order. Payment terms are Net 30 from date of invoice.  ")
+        if portal_link:
+            pdf.write(4.5, "View your order at ")
+            pdf.set_text_color(91, 127, 160)
+            pdf.set_font("Helvetica", "U", 7.5)
+            pdf.write(4.5, "your Blue Alpha Portal", link=portal_link)
+            pdf.set_font("Helvetica", "", 7.5)
+            pdf.set_text_color(*MUTED)
+            pdf.write(4.5, ".")
+    else:
+        pdf.write(4.5, "Payment terms are Net 30 upon acceptance.  ")
+        pdf.write(4.5, "To accept this quote, ")
+        pdf.set_text_color(91, 127, 160)   # Steel Blue
+        pdf.set_font("Helvetica", "U", 7.5)
+        pdf.write(4.5, "click here to view it in your Blue Alpha Quote Portal", link=portal_link)
+        pdf.set_font("Helvetica", "", 7.5)
+        pdf.set_text_color(*MUTED)
+        pdf.write(4.5, ".")
     pdf.ln(5)
 
     # Line 2: questions
@@ -5234,6 +5253,29 @@ def quote_pdf(record_id):
             headers={
                 **cors(),
                 "Content-Disposition": f'attachment; filename="{q_number}.pdf"',
+                "Content-Type": "application/pdf",
+            },
+        )
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return Response(json.dumps({"error": str(e)}), status=500, headers=cors(), mimetype="application/json")
+
+
+@app.route("/order-pdf/<record_id>", methods=["GET"])
+def order_pdf(record_id):
+    c = cors()
+    try:
+        order = _fetch_quote_data(record_id)
+        if not order:
+            return Response(json.dumps({"error": "Order not found"}), status=404,
+                            headers=c, mimetype="application/json")
+        pdf_bytes = _build_quote_pdf_bytes(order, doc_type="order")
+        so_number = order.get("quoteNumber", record_id)
+        return Response(
+            pdf_bytes,
+            headers={
+                **cors(),
+                "Content-Disposition": f'attachment; filename="{so_number}.pdf"',
                 "Content-Type": "application/pdf",
             },
         )
