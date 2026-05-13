@@ -611,7 +611,7 @@
             <td>${fmt(o.date)}</td>
             <td>${money(o.total)}</td>
             <td><span class="badge badge-active">Confirmed</span></td>
-            <td><a href="/view-quote/${o.record_id}?from=orders" class="btn btn-secondary" style="padding:4px 12px;font-size:0.8rem;">View</a></td>
+            <td><a href="/view-quote/${o.record_id}?from=orders" class="btn-sm">View →</a></td>
           </tr>`).join('') +
           '</tbody></table>';
       } catch (e) {
