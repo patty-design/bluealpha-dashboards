@@ -527,7 +527,9 @@
         }
 
         // Handle ?tab= redirect (e.g. after quote acceptance)
-        const urlTab = new URLSearchParams(window.location.search).get('tab');
+        const _urlParams = new URLSearchParams(window.location.search);
+        const urlTab   = _urlParams.get('tab');
+        const urlOrder = _urlParams.get('order');
         if (urlTab) {
           const targetTab = document.querySelector(`[data-tab="${urlTab}"]`);
           if (targetTab) {
@@ -536,8 +538,11 @@
             targetTab.classList.add('active');
             const panel = document.getElementById('tab-' + urlTab);
             if (panel) panel.classList.add('active');
-            if (urlTab === 'our-orders') loadOrders();
-            else if (urlTab === 'our-quotes') loadQuotes();
+            if (urlTab === 'our-orders') {
+              loadOrders().then(() => {
+                if (urlOrder) openViewOrder(urlOrder);
+              });
+            } else if (urlTab === 'our-quotes') loadQuotes();
             // Clean URL without reloading
             history.replaceState(null, '', '/portal');
           }
