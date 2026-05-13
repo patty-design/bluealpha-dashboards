@@ -351,6 +351,44 @@
 
     <!-- Team Tab -->
     <div class="tab-panel" id="tab-team">
+
+      <!-- Account Info card -->
+      <div class="card" id="accountInfoCard">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <div class="card-title" style="margin-bottom:0;">Account Info</div>
+          <button id="editAccountBtn" class="btn-sm" onclick="startEditAccount()" style="display:none;">Edit</button>
+        </div>
+        <p class="card-sub">Default billing and shipping information used on quotes.</p>
+        <div id="accountInfoView"><div class="loading">Loading…</div></div>
+        <div id="accountInfoEdit" style="display:none;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:8px;">
+            <div>
+              <div style="font-weight:600;font-size:0.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Bill To</div>
+              <label>Organization</label><input type="text" id="ai_billOrg" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+              <label>Contact Name</label><input type="text" id="ai_billName" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+              <label>Email</label><input type="email" id="ai_billEmail" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+              <label>Phone</label><input type="text" id="ai_billPhone" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+              <label>Address Line 1</label><input type="text" id="ai_billAddr1" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+              <label>Address Line 2</label><input type="text" id="ai_billAddr2" style="width:100%;box-sizing:border-box;">
+            </div>
+            <div>
+              <div style="font-weight:600;font-size:0.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Ship To</div>
+              <label>Organization</label><input type="text" id="ai_shipOrg" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+              <label>Contact Name</label><input type="text" id="ai_shipName" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+              <label>Email</label><input type="email" id="ai_shipEmail" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+              <label>Phone</label><input type="text" id="ai_shipPhone" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+              <label>Address Line 1</label><input type="text" id="ai_shipAddr1" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+              <label>Address Line 2</label><input type="text" id="ai_shipAddr2" style="width:100%;box-sizing:border-box;">
+            </div>
+          </div>
+          <div style="margin-top:16px;display:flex;gap:10px;">
+            <button class="btn-primary" id="saveAccountBtn" onclick="saveAccountInfo()">Save Changes</button>
+            <button class="btn-secondary" onclick="cancelEditAccount()">Cancel</button>
+            <span id="accountSaveMsg" style="font-size:0.85rem;color:var(--muted);align-self:center;"></span>
+          </div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-title">Team Members</div>
         <p class="card-sub">Manage who has access to your portal account and their permission level.</p>
@@ -425,7 +463,7 @@
         // Lazy load
         if (tab.dataset.tab === 'our-quotes' && !quotesLoaded) loadQuotes();
         if (tab.dataset.tab === 'our-orders' && !ordersLoaded) loadOrders();
-        if (tab.dataset.tab === 'team' && !teamLoaded) loadTeam();
+        if (tab.dataset.tab === 'team' && !teamLoaded) { loadTeam(); loadAccountInfo(); }
         // Always reload the quote builder so it's fresh (clears any stuck Submitting... state)
         if (tab.dataset.tab === 'new-quote') {
           const qf = document.getElementById('quoteBuilderFrame');
@@ -548,6 +586,100 @@
       quotes_only: 'Quotes Only',
       read_only:   'Read Only',
     };
+
+    let _accountInfo = {};
+
+    async function loadAccountInfo() {
+      const viewEl = document.getElementById('accountInfoView');
+      try {
+        const resp = await fetch('/api/portal/account-info');
+        const data = await resp.json();
+        if (!data.info) throw new Error(data.error || 'Failed');
+        _accountInfo = data.info;
+        renderAccountInfoView(data.info);
+        // Show Edit button for admins only
+        if (portalMe?.canManageTeam) {
+          document.getElementById('editAccountBtn').style.display = '';
+        }
+      } catch(e) {
+        viewEl.innerHTML = '<p style="color:var(--muted);font-size:.88rem;">Failed to load account info.</p>';
+      }
+    }
+
+    function _addrBlock(org, name, email, phone, addr1, addr2) {
+      const lines = [
+        org   ? `<div style="font-weight:600;font-size:.88rem;">${escHtml(org)}</div>` : '',
+        name  ? `<div style="font-size:.88rem;">${escHtml(name)}</div>` : '',
+        email ? `<div style="font-size:.88rem;"><a href="mailto:${escHtml(email)}" style="color:var(--navy)">${escHtml(email)}</a></div>` : '',
+        phone ? `<div style="font-size:.88rem;">${escHtml(phone)}</div>` : '',
+        addr1 ? `<div style="font-size:.88rem;margin-top:4px;">${escHtml(addr1)}</div>` : '',
+        addr2 ? `<div style="font-size:.88rem;">${escHtml(addr2)}</div>` : '',
+      ].filter(Boolean).join('');
+      return lines || '<div style="font-size:.88rem;color:var(--muted);">—</div>';
+    }
+
+    function renderAccountInfoView(info) {
+      const viewEl = document.getElementById('accountInfoView');
+      viewEl.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:8px;">
+          <div>
+            <div style="font-weight:600;font-size:0.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Bill To</div>
+            ${_addrBlock(info.billOrg, info.billName, info.billEmail, info.billPhone, info.billAddr1, info.billAddr2)}
+          </div>
+          <div>
+            <div style="font-weight:600;font-size:0.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Ship To</div>
+            ${_addrBlock(info.shipOrg, info.shipName, info.shipEmail, info.shipPhone, info.shipAddr1, info.shipAddr2)}
+          </div>
+        </div>`;
+    }
+
+    function startEditAccount() {
+      const info = _accountInfo;
+      ['billOrg','billName','billEmail','billPhone','billAddr1','billAddr2',
+       'shipOrg','shipName','shipEmail','shipPhone','shipAddr1','shipAddr2'].forEach(k => {
+        const el = document.getElementById('ai_' + k);
+        if (el) el.value = info[k] || '';
+      });
+      document.getElementById('accountInfoView').style.display = 'none';
+      document.getElementById('editAccountBtn').style.display = 'none';
+      document.getElementById('accountInfoEdit').style.display = '';
+      document.getElementById('accountSaveMsg').textContent = '';
+    }
+
+    function cancelEditAccount() {
+      document.getElementById('accountInfoEdit').style.display = 'none';
+      document.getElementById('accountInfoView').style.display = '';
+      document.getElementById('editAccountBtn').style.display = portalMe?.canManageTeam ? '' : 'none';
+    }
+
+    async function saveAccountInfo() {
+      const btn = document.getElementById('saveAccountBtn');
+      const msg = document.getElementById('accountSaveMsg');
+      btn.disabled = true; btn.textContent = 'Saving…';
+      const payload = {};
+      ['billOrg','billName','billEmail','billPhone','billAddr1','billAddr2',
+       'shipOrg','shipName','shipEmail','shipPhone','shipAddr1','shipAddr2'].forEach(k => {
+        const el = document.getElementById('ai_' + k);
+        if (el) payload[k] = el.value.trim();
+      });
+      try {
+        const resp = await fetch('/api/portal/account-info', {
+          method: 'PATCH',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload),
+        });
+        const data = await resp.json();
+        if (!data.ok) throw new Error(data.error || 'Failed');
+        _accountInfo = { ..._accountInfo, ...payload };
+        renderAccountInfoView(_accountInfo);
+        cancelEditAccount();
+        msg.textContent = '';
+      } catch(e) {
+        msg.textContent = 'Error: ' + (e.message || 'Could not save.');
+        msg.style.color = 'var(--red)';
+        btn.disabled = false; btn.textContent = 'Save Changes';
+      }
+    }
 
     async function loadTeam() {
       teamLoaded = true;
