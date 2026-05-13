@@ -740,20 +740,50 @@ function render() {
   const c = quoteData.customer || {};
   const custEl = document.getElementById('custInfo');
   if (custEl) {
-    let html = '';
-    if (c.orgName)     html += `<div style="font-weight:700;font-size:1rem;margin-bottom:4px;">${escHtml(c.orgName)}</div>`;
-    if (c.contactName) html += `<div style="color:var(--muted);font-size:0.88rem;">${escHtml(c.contactName)}</div>`;
-    if (c.email)       html += `<div style="font-size:0.88rem;margin-top:6px;"><a href="mailto:${escHtml(c.email)}" style="color:var(--navy)">${escHtml(c.email)}</a></div>`;
-    if (c.phone)       html += `<div style="font-size:0.88rem;">${escHtml(c.phone)}</div>`;
-    if (c.address1) {
-      html += `<div style="font-size:0.88rem;margin-top:6px;">${escHtml(c.address1)}</div>`;
-      const parts = [];
-      if (c.city) parts.push(c.city);
-      const stateZip = [c.state ? c.state.toUpperCase() : '', c.zip].filter(Boolean).join(' ');
-      if (stateZip) parts.push(stateZip);
-      if (parts.length) html += `<div style="font-size:0.88rem;">${escHtml(parts.join(', '))}</div>`;
-    }
-    custEl.innerHTML = html;
+    const s = 'font-size:0.88rem;';
+    const muted = 'color:var(--muted);';
+
+    // Contact block (spans full width)
+    let contact = '';
+    if (c.orgName)     contact += `<div style="font-weight:700;font-size:1rem;margin-bottom:2px;">${escHtml(c.orgName)}</div>`;
+    if (c.contactName) contact += `<div style="${s}${muted}">${escHtml(c.contactName)}</div>`;
+    if (c.email)       contact += `<div style="${s}margin-top:4px;"><a href="mailto:${escHtml(c.email)}" style="color:var(--navy)">${escHtml(c.email)}</a></div>`;
+    if (c.phone)       contact += `<div style="${s}">${escHtml(c.phone)}</div>`;
+
+    // Bill To block
+    const billLines = [
+      c.billToOrg  || c.orgName,
+      c.billToName || c.contactName,
+      c.billToAddr1,
+      c.billToAddr2,
+    ].filter(Boolean);
+    let billHtml = `<div style="font-weight:600;font-size:0.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Bill To</div>`;
+    billLines.forEach((ln, i) => {
+      billHtml += `<div style="${s}${i===0?'font-weight:600;':''}">${escHtml(ln)}</div>`;
+    });
+
+    // Ship To block
+    const shipCity  = c.city  || '';
+    const shipState = c.state ? c.state.toUpperCase() : '';
+    const shipZip   = c.zip   || '';
+    const shipLine2 = [shipCity, [shipState, shipZip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+    const shipLines = [
+      c.orgName,
+      c.contactName,
+      c.address1,
+      shipLine2,
+    ].filter(Boolean);
+    let shipHtml = `<div style="font-weight:600;font-size:0.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Ship To</div>`;
+    shipLines.forEach((ln, i) => {
+      shipHtml += `<div style="${s}${i===0?'font-weight:600;':''}">${escHtml(ln)}</div>`;
+    });
+
+    custEl.innerHTML = `
+      ${contact}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+        <div>${billHtml}</div>
+        <div>${shipHtml}</div>
+      </div>`;
   }
 
   // Status banners

@@ -3906,6 +3906,8 @@ def _fetch_quote_data(record_id):
                 "billToName":   cf.get("Bill-To Contact Name", "") or cf.get("Main Contact Name", ""),
                 "billToEmail":  cf.get("Bill-To Contact Email", "") or cf.get("Main Contact Email", ""),
                 "billToOrg":    cf.get("Bill-To Org Name", "") or cf.get("Organization Name", ""),
+                "billToAddr1":  cf.get("Bill-To Address (Line 1)", ""),
+                "billToAddr2":  cf.get("Bill-To Address (Line 2)", ""),
             }
 
     # Fetch line items in parallel
