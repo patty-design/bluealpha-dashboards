@@ -5885,7 +5885,7 @@ def portal_orders(user):
         # Fetch all SOs then filter in Python (ARRAYJOIN formula returns display names not record IDs)
         records = at_get_all(
             MANUAL_ORDERS_TABLE_ID, read_token,
-            fields=["Document ID", "Order ID", "Date", "MO Line Items", "Customer", "Sales Order Status"],
+            fields=["Document ID", "Order ID", "Date", "MO Line Items", "Customer", "Sales Order Status", "Go-to PDF"],
             formula='{Order Type}="Sales Order"',
         )
         records = [r for r in records
@@ -5912,11 +5912,14 @@ def portal_orders(user):
             f = r.get("fields", {})
             so_number = f.get("Document ID", f'SO-{f.get("Order ID","")}')
             total = sum(li_total_map.get(lid, 0) for lid in f.get("MO Line Items", []))
+            go_to_pdf_field = f.get("Go-to PDF") or {}
+            go_to_pdf_url   = go_to_pdf_field.get("url", "") if isinstance(go_to_pdf_field, dict) else ""
             orders.append({
-                "record_id": r["id"],
-                "so_number": so_number,
-                "date":      f.get("Date", ""),
-                "total":     round(total, 2),
+                "record_id":  r["id"],
+                "so_number":  so_number,
+                "date":       f.get("Date", ""),
+                "total":      round(total, 2),
+                "go_to_pdf":  go_to_pdf_url,
             })
         orders.sort(key=lambda x: x.get("date", ""), reverse=True)
         _ORDERS_CACHE[customer_id] = {"ts": _time_mod.time(), "data": orders}
