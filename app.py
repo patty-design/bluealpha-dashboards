@@ -6465,12 +6465,6 @@ def portal_account_info(user):
             r = req_lib.get(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
                 headers=at_headers(token),
-                params={"fields[]": [
-                    "Organization Name", "Main Contact Name", "Main Contact Email", "Main Contact Phone #",
-                    "Customer Address (Line 1)", "Customer Address (Line 2)",
-                    "Bill-To Org Name", "Bill-To Contact Name", "Bill-To Contact Email", "Bill-To Phone #",
-                    "Bill-To Address (Line 1)", "Bill-To Address (Line 2)",
-                ]},
                 timeout=10,
             )
             f = {}
