@@ -622,41 +622,14 @@ if (window.self !== window.top) {
 
 <!-- Accept modal -->
 <div class="modal-overlay hidden" id="acceptModal">
-  <div class="modal" style="max-width:520px;width:95%;">
+  <div class="modal" style="max-width:460px;width:95%;">
     <h2>Confirm Your Order</h2>
-    <p style="color:var(--muted);font-size:0.88rem;margin-bottom:16px;">
-      Please confirm your billing address. Payment terms are Net 30.
-    </p>
 
-    <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">
-      Billing Address <span style="color:var(--red)">*</span>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
-      <div style="grid-column:1/-1;"><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">Company</label><input type="text" id="billOrg" placeholder="Company name" style="width:100%;box-sizing:border-box;"></div>
-      <div style="grid-column:1/-1;"><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">Contact Name</label><input type="text" id="billName" placeholder="Full name" style="width:100%;box-sizing:border-box;"></div>
-      <div style="grid-column:1/-1;"><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">Address</label><input type="text" id="billAddr1" placeholder="Street address" style="width:100%;box-sizing:border-box;"></div>
-      <div style="grid-column:1/-1;"><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">Suite / Apt</label><input type="text" id="billAddr2" placeholder="Optional" style="width:100%;box-sizing:border-box;"></div>
-      <div><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">City</label><input type="text" id="billCity" style="width:100%;box-sizing:border-box;"></div>
-      <div><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">State</label><input type="text" id="billState" maxlength="2" style="width:100%;box-sizing:border-box;text-transform:uppercase;"></div>
-      <div><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">ZIP</label><input type="text" id="billZip" style="width:100%;box-sizing:border-box;"></div>
+    <!-- Quote summary -->
+    <div id="modalSummary" style="background:var(--light);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:0.88rem;">
     </div>
 
-    <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">
-      Shipping Address
-    </div>
-    <label style="display:flex;align-items:center;gap:6px;font-size:0.88rem;color:var(--muted);cursor:pointer;margin-bottom:8px;">
-      <input type="checkbox" id="shipSame" onchange="toggleShipSame()" checked> Same as billing address
-    </label>
-    <div id="shipFields" class="hidden" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
-      <div style="grid-column:1/-1;"><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">Company</label><input type="text" id="shipOrg" style="width:100%;box-sizing:border-box;"></div>
-      <div style="grid-column:1/-1;"><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">Contact Name</label><input type="text" id="shipName" style="width:100%;box-sizing:border-box;"></div>
-      <div style="grid-column:1/-1;"><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">Address</label><input type="text" id="shipAddr1" style="width:100%;box-sizing:border-box;"></div>
-      <div style="grid-column:1/-1;"><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">Suite / Apt</label><input type="text" id="shipAddr2" style="width:100%;box-sizing:border-box;"></div>
-      <div><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">City</label><input type="text" id="shipCity" style="width:100%;box-sizing:border-box;"></div>
-      <div><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">State</label><input type="text" id="shipState" maxlength="2" style="width:100%;box-sizing:border-box;text-transform:uppercase;"></div>
-      <div><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">ZIP</label><input type="text" id="shipZip" style="width:100%;box-sizing:border-box;"></div>
-    </div>
-
+    <!-- Terms checkbox -->
     <div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:16px;background:#f9f9f7;">
       <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
         <input type="checkbox" id="termsCheckbox" onchange="document.getElementById('btnConfirmOrder').disabled = !this.checked;"
@@ -1432,66 +1405,44 @@ function openModal() {
     alert('You have unsaved changes. Please click "Save Changes" before accepting the quote.');
     return;
   }
-  const c = quoteData.customer || {};
-  document.getElementById('billOrg').value   = c.billToOrg  || c.orgName     || '';
-  document.getElementById('billName').value  = c.billToName || c.contactName || '';
-  document.getElementById('billAddr1').value = c.address1   || '';
-  document.getElementById('billAddr2').value = c.address2   || '';
-  document.getElementById('billCity').value  = c.city       || '';
-  document.getElementById('billState').value = (c.state     || '').toUpperCase();
-  document.getElementById('billZip').value   = c.zip        || '';
-  document.getElementById('shipSame').checked = true;
-  document.getElementById('shipFields').classList.add('hidden');
-  // Reset terms checkbox and disable Place Order button each time modal opens
+  // Build quote summary
+  const q = quoteData;
+  const c = q.customer || {};
+  const items = q.lineItems || [];
+  const totalQty = items.reduce((s, i) => s + (parseInt(i.qty) || 0), 0);
+  const totalAmt = items.reduce((s, i) => s + ((parseFloat(i.unitPrice) || 0) * (parseInt(i.qty) || 0)), 0);
+  function fmtMoney(n) { return '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+  let rows = items.map(i => {
+    const amt = (parseFloat(i.unitPrice) || 0) * (parseInt(i.qty) || 0);
+    return `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border);">
+      <span style="color:var(--text);">${escHtml(i.name || '')} <span style="color:var(--muted);">×${i.qty}</span></span>
+      <span style="font-weight:600;">${fmtMoney(amt)}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('modalSummary').innerHTML = `
+    <div style="font-weight:700;margin-bottom:8px;">Quote ${escHtml(q.quoteNumber || '')}</div>
+    ${rows}
+    <div style="display:flex;justify-content:space-between;padding-top:8px;margin-top:4px;font-weight:700;">
+      <span>${totalQty} item${totalQty !== 1 ? 's' : ''}</span>
+      <span>${fmtMoney(totalAmt)}</span>
+    </div>`;
+  // Reset terms checkbox
   const cb = document.getElementById('termsCheckbox');
   if (cb) { cb.checked = false; document.getElementById('btnConfirmOrder').disabled = true; }
   document.getElementById('acceptModal').classList.remove('hidden');
-}
-
-function toggleShipSame() {
-  document.getElementById('shipFields').classList.toggle('hidden', document.getElementById('shipSame').checked);
 }
 
 function closeModal() { document.getElementById('acceptModal').classList.add('hidden'); }
 
 async function confirmOrder() {
   const btn = document.getElementById('btnConfirmOrder');
-  const billAddr1 = document.getElementById('billAddr1').value.trim();
-  const billCity  = document.getElementById('billCity').value.trim();
-  const billState = document.getElementById('billState').value.trim();
-  const billZip   = document.getElementById('billZip').value.trim();
-  if (!billAddr1 || !billCity || !billState || !billZip) {
-    alert('Please complete the required billing address fields.');
-    return;
-  }
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner-sm"></span>Placing Order\u2026';
-
-  const billing = {
-    org:   document.getElementById('billOrg').value.trim(),
-    name:  document.getElementById('billName').value.trim(),
-    addr1: billAddr1,
-    addr2: document.getElementById('billAddr2').value.trim(),
-    city:  billCity,
-    state: billState.toUpperCase(),
-    zip:   billZip,
-  };
-  const shipSame = document.getElementById('shipSame').checked;
-  const shippingAddr = shipSame ? null : {
-    org:   document.getElementById('shipOrg').value.trim(),
-    name:  document.getElementById('shipName').value.trim(),
-    addr1: document.getElementById('shipAddr1').value.trim(),
-    addr2: document.getElementById('shipAddr2').value.trim(),
-    city:  document.getElementById('shipCity').value.trim(),
-    state: document.getElementById('shipState').value.trim().toUpperCase(),
-    zip:   document.getElementById('shipZip').value.trim(),
-  };
-
   try {
     const r = await fetch(`/api/accept-quote/${recordId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ billing, shipping: shippingAddr }),
+      body: JSON.stringify({}),
     });
     const data = await r.json();
     if (!r.ok || !data.success) throw new Error(data.error || 'Failed to accept');
