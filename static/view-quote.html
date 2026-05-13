@@ -846,7 +846,31 @@ function buildActions(editable) {
   bar.innerHTML = '';
   const q = quoteData;
 
-  if (q.isExpired && !q.isAccepted) {
+  if (q.isAccepted) {
+    // Accepted: allow duplicate (reorder) and remove — but no accept button
+    if (portalUser) {
+      if (portalUser.canCreateQuote !== false) {
+        const dupBtn = document.createElement('button');
+        dupBtn.className   = 'btn btn-primary';
+        dupBtn.id          = 'btnDuplicate';
+        dupBtn.textContent = 'Duplicate Quote';
+        dupBtn.onclick     = duplicateThisQuote;
+        bar.appendChild(dupBtn);
+        const conf = document.createElement('span');
+        conf.id = 'duplicateConfirm';
+        conf.style.cssText = 'display:none;margin-left:12px;color:#1a7a3c;font-size:0.88rem;';
+        bar.appendChild(conf);
+      }
+      if (portalUser.canCreateQuote !== false) {
+        const removeBtn = document.createElement('button');
+        removeBtn.className   = 'btn btn-secondary';
+        removeBtn.textContent = 'Remove Quote';
+        removeBtn.onclick     = hideQuote;
+        bar.appendChild(removeBtn);
+      }
+    }
+
+  } else if (q.isExpired && !q.isAccepted) {
     // Expired: only show portal actions if user is logged in via portal session
     if (portalUser) {
       if (portalUser.canCreateQuote !== false) {
