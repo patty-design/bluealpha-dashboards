@@ -684,7 +684,7 @@ function _productHtml(p) {
   const descHtml = _PRODUCT_DESCRIPTIONS[p.name.toLowerCase()]
     ? `<div class="product-desc hidden" id="pdesc_${p.id}">${_PRODUCT_DESCRIPTIONS[p.name.toLowerCase()]}</div>`
     : '';
-  const _ADDON_NOT_OPTIONAL = ['battle belt lite', 'mini medical pouch'];
+  const _ADDON_NOT_OPTIONAL = ['battle belt lite', 'mini medical pouch', 'non molle adapters'];
   const _addonOptional = !_ADDON_NOT_OPTIONAL.some(n => p.name.toLowerCase().includes(n));
   const addonHtml = `<div class="sel-row hidden" id="sarow_${p.id}">
       <div class="sel-field" style="flex:1 1 100%">
@@ -1123,6 +1123,27 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredA
     return a[1].localeCompare(b[1]);
   });
   if (addons.length === 0) { addonRow.classList.add('hidden'); return; }
+
+  // Parents that require a selection (no "None" option, custom placeholder)
+  const _ADDON_PLACEHOLDERS = { 'non molle adapters': 'Select a pack\u2026' };
+  const _addonPlaceholder = Object.entries(_ADDON_PLACEHOLDERS)
+    .find(([k]) => _parentNameLower.includes(k))?.[1] || null;
+  if (_addonPlaceholder) {
+    addonSel.innerHTML = '';
+    const phOpt = document.createElement('option');
+    phOpt.value = ''; phOpt.textContent = _addonPlaceholder; phOpt.disabled = true;
+    addonSel.appendChild(phOpt);
+    for (const [id, name] of addons) {
+      if (name.toLowerCase() === 'none') continue;
+      const opt = document.createElement('option');
+      opt.value = id; opt.textContent = name;
+      addonSel.appendChild(opt);
+    }
+    addonSel.value = '';
+    addonRow.classList.remove('hidden');
+    _updatePrice(parentId);
+    return;
+  }
 
   // Find the "None" add-on id if present
   const noneAddonEntry = addons.find(([,name]) => name.toLowerCase() === 'none');
