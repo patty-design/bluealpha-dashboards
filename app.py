@@ -5820,6 +5820,21 @@ def portal_quotes(user):
         from datetime import date as dt_date
         today = _today_utc()
 
+        # Batch-fetch all line items in one AT query using OR(RECORD_ID()=...)
+        all_li_ids = []
+        for r in records:
+            all_li_ids.extend(r.get("fields", {}).get("MO Line Items", []))
+        li_total_map = {}  # li_id -> Dynamic Line Item Total
+        if all_li_ids:
+            chunks = [all_li_ids[i:i+30] for i in range(0, len(all_li_ids), 30)]
+            for chunk in chunks:
+                formula = "OR(" + ",".join(f'RECORD_ID()="{lid}"' for lid in chunk) + ")"
+                li_recs = at_get_all(MO_LINE_ITEMS_TABLE_ID, read_token,
+                                     fields=["Dynamic Line Item Total"],
+                                     formula=formula)
+                for lr in li_recs:
+                    li_total_map[lr["id"]] = float(lr.get("fields", {}).get("Dynamic Line Item Total") or 0)
+
         quotes = []
         for r in records:
             f = r.get("fields", {})
@@ -5831,6 +5846,7 @@ def portal_quotes(user):
                     is_expired = dt_date.fromisoformat(expiry_str) < today
                 except Exception:
                     pass
+            total = sum(li_total_map.get(lid, 0) for lid in f.get("MO Line Items", []))
             quotes.append({
                 "record_id":    r["id"],
                 "quote_number": quote_number,
@@ -5838,7 +5854,7 @@ def portal_quotes(user):
                 "expiry_date":  expiry_str,
                 "is_expired":   is_expired,
                 "is_accepted":  bool(f.get("MO Is Approved")),
-                "total":        round(float(f.get("Total Gross") or 0), 2),
+                "total":        round(total, 2),
             })
         # Sort most recent first
         quotes.sort(key=lambda x: x.get("date", ""), reverse=True)
@@ -5869,22 +5885,38 @@ def portal_orders(user):
         # Fetch all SOs then filter in Python (ARRAYJOIN formula returns display names not record IDs)
         records = at_get_all(
             MANUAL_ORDERS_TABLE_ID, read_token,
-            fields=["Document ID", "Order ID", "Date", "Total Gross", "Customer", "Sales Order Status"],
+            fields=["Document ID", "Order ID", "Date", "MO Line Items", "Customer", "Sales Order Status"],
             formula='{Order Type}="Sales Order"',
         )
         records = [r for r in records
                    if customer_id in r.get("fields", {}).get("Customer", [])
                    and r.get("fields", {}).get("Sales Order Status") == "Approved"]
 
+        # Batch-fetch all line items in one AT query
+        all_li_ids = []
+        for r in records:
+            all_li_ids.extend(r.get("fields", {}).get("MO Line Items", []))
+        li_total_map = {}
+        if all_li_ids:
+            chunks = [all_li_ids[i:i+30] for i in range(0, len(all_li_ids), 30)]
+            for chunk in chunks:
+                formula = "OR(" + ",".join(f'RECORD_ID()="{lid}"' for lid in chunk) + ")"
+                li_recs = at_get_all(MO_LINE_ITEMS_TABLE_ID, read_token,
+                                     fields=["Dynamic Line Item Total"],
+                                     formula=formula)
+                for lr in li_recs:
+                    li_total_map[lr["id"]] = float(lr.get("fields", {}).get("Dynamic Line Item Total") or 0)
+
         orders = []
         for r in records:
             f = r.get("fields", {})
-            so_number = f.get("Document ID", f"SO-{f.get('Order ID','')}")
+            so_number = f.get("Document ID", f'SO-{f.get("Order ID","")}')
+            total = sum(li_total_map.get(lid, 0) for lid in f.get("MO Line Items", []))
             orders.append({
                 "record_id": r["id"],
                 "so_number": so_number,
                 "date":      f.get("Date", ""),
-                "total":     round(float(f.get("Total Gross") or 0), 2),
+                "total":     round(total, 2),
             })
         orders.sort(key=lambda x: x.get("date", ""), reverse=True)
         _ORDERS_CACHE[customer_id] = {"ts": _time_mod.time(), "data": orders}
