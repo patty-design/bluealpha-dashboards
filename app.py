@@ -4773,7 +4773,13 @@ def accept_quote(record_id):
             json=so_body,
             timeout=15,
         )
-        so_r.raise_for_status()
+        if not so_r.ok:
+            try:
+                at_err = so_r.json()
+            except Exception:
+                at_err = so_r.text[:500]
+            return Response(json.dumps({"error": f"SO create failed ({so_r.status_code}): {at_err}"}),
+                            status=500, headers=c, mimetype="application/json")
         so_record_id = so_r.json()["id"]
 
         # Update customer billing address if provided
