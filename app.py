@@ -5125,10 +5125,10 @@ def _build_quote_pdf_bytes(quote):
     clean_notes = clean_notes if clean_notes.lower() not in ("no notes", "none", "n/a", "") else ""
 
     # Pin footer to bottom of current page; disable auto page break so it never overflows
-    PAGE_H   = 279.4   # letter height in mm
-    BOT_MARGIN = 12    # mm from bottom for footer start
-    footer_h = 26 + (14 if clean_notes else 0)
-    footer_y = PAGE_H - BOT_MARGIN - footer_h
+    PAGE_H     = 279.4   # letter height in mm
+    BOT_MARGIN = 6       # mm from bottom for footer start
+    footer_h   = 20 + (10 if clean_notes else 0)
+    footer_y   = PAGE_H - BOT_MARGIN - footer_h
     # Only jump down if we're above the footer zone (never jump backward past content)
     if pdf.get_y() < footer_y:
         pdf.set_y(footer_y)
@@ -5138,20 +5138,20 @@ def _build_quote_pdf_bytes(quote):
         pdf.set_draw_color(*BD)
         pdf.set_line_width(0.3)
         pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
-        pdf.ln(4)
+        pdf.ln(2)
         pdf.set_font("Helvetica", "B", 8)
         pdf.set_text_color(*MUTED)
-        pdf.cell(W, 5, "NOTES", border=0, new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(W, 4, "NOTES", border=0, new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("Helvetica", "", 8)
         pdf.set_text_color(*TEXT)
-        pdf.multi_cell(W, 5, clean_notes, border=0)
-        pdf.ln(3)
+        pdf.multi_cell(W, 4, clean_notes, border=0)
+        pdf.ln(2)
 
     # Footer divider
     pdf.set_draw_color(*BD)
     pdf.set_line_width(0.3)
     pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
-    pdf.ln(4)
+    pdf.ln(3)
     pdf.set_font("Helvetica", "", 7.5)
     pdf.set_text_color(*MUTED)
 
