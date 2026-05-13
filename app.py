@@ -4748,16 +4748,15 @@ def accept_quote(record_id):
         notes        = mo_fields.get("Notes from Customer", "")
         date_str     = mo_fields.get("Date", dt_date.today().isoformat())
 
-        # Create SO record
+        # Create SO record (Document ID is computed by Airtable from Order Type + Order ID)
         so_body = {
             "fields": {
-                "Order Type":                "Sales Order",
-                "Document ID":               so_number,
-                "Order ID":                  order_id_str,
-                "Date":                      date_str,
-                "MO Is Approved":            True,
+                "Order Type":                  "Sales Order",
+                "Order ID":                    order_id_str,
+                "Date":                        date_str,
+                "MO Is Approved":              True,
                 "Ready for ShipStation (SOs)": True,
-                "Origin Quote":              quote_number,
+                "Origin Quote":                quote_number,
             }
         }
         if customer_ids:
