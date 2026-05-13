@@ -519,8 +519,11 @@
           document.getElementById('tab-our-quotes').classList.add('active');
           loadQuotes();
         } else {
-          // Prewarm catalog in background so "Select Your Items" loads faster
-          fetch('/api/quote-catalog', { credentials: 'same-origin' }).catch(() => {});
+          // Pre-fetch everything in parallel so tabs load instantly
+          fetch('/api/quote-catalog',      { credentials: 'same-origin' }).catch(() => {});
+          fetch('/api/portal/quotes',      { credentials: 'same-origin' }).catch(() => {});
+          fetch('/api/portal/orders',      { credentials: 'same-origin' }).catch(() => {});
+          fetch('/api/portal/account-info',{ credentials: 'same-origin' }).catch(() => {});
         }
 
         // Handle ?tab= redirect (e.g. after quote acceptance)

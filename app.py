@@ -4619,6 +4619,7 @@ def create_quote():
 
         # Bust quotes cache for this customer
         _QUOTES_CACHE.pop(cust_id, None)
+        _ORDERS_CACHE.pop(cust_id, None)
 
         return Response(
             json.dumps({"success": True, "quoteNumber": quote_number, "recordId": mo_record_id}),
@@ -4898,6 +4899,7 @@ def accept_quote(record_id):
         # Bust quotes cache
         if customer_id:
             _QUOTES_CACHE.pop(customer_id, None)
+        _ORDERS_CACHE.pop(customer_id, None)
 
         return Response(json.dumps({"success": True, "soNumber": so_number}), headers=c, mimetype="application/json")
     except Exception as e:
@@ -5659,27 +5661,34 @@ def portal_page(user):
 @portal_login_required
 def portal_me(user):
     c = cors()
+    import time as _time_mod
     customer_id = user.get("customer_id", "")
     is_primary  = user.get("is_primary", False)
-    agency_name = ""
+    role = user.get("role")
+    can_manage_team  = portal_can(user, "manage_team")
+    can_create_quote = portal_can(user, "create_quote")
+    can_accept_quote = portal_can(user, "accept_quote")
 
-    if customer_id:
-        try:
-            read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-            cr = req_lib.get(
-                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
-                headers=at_headers(read_token),
-                timeout=10,
-            )
-            if cr.status_code == 200:
-                agency_name = cr.json().get("fields", {}).get("Organization Name", "")
-        except Exception as e:
-            print(f"[portal_me] customer fetch failed: {e}")
-
-    role = user.get("role")  # None = legacy primary (treated as admin)
-    can_manage_team   = portal_can(user, "manage_team")
-    can_create_quote  = portal_can(user, "create_quote")
-    can_accept_quote  = portal_can(user, "accept_quote")
+    # Use cached agency name if fresh
+    _me_cached = _ME_CACHE.get(customer_id)
+    if _me_cached and (_time_mod.time() - _me_cached["ts"]) < _ME_CACHE_TTL:
+        agency_name = _me_cached["data"]
+    else:
+        agency_name = ""
+        if customer_id:
+            try:
+                read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+                cr = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
+                    headers=at_headers(read_token),
+                    params={"fields[]": ["Organization Name"]},
+                    timeout=10,
+                )
+                if cr.status_code == 200:
+                    agency_name = cr.json().get("fields", {}).get("Organization Name", "")
+            except Exception as e:
+                print(f"[portal_me] customer fetch failed: {e}")
+        _ME_CACHE[customer_id] = {"ts": _time_mod.time(), "data": agency_name}
 
     return Response(json.dumps({
         "agencyName":      agency_name,
@@ -5773,6 +5782,10 @@ def portal_update_profile(user):
 
 _QUOTES_CACHE: dict = {}   # {customer_id: {"ts": float, "data": list}}
 _QUOTES_CACHE_TTL = 60    # seconds
+_ORDERS_CACHE: dict = {}  # {customer_id: {"ts": float, "data": list}}
+_ORDERS_CACHE_TTL = 60    # seconds
+_ME_CACHE: dict = {}      # {customer_id: {"ts": float, "data": dict}}
+_ME_CACHE_TTL = 300       # seconds (5 min — agency name rarely changes)
 
 @app.route("/api/portal/quotes")
 @portal_login_required
@@ -5873,33 +5886,59 @@ def portal_orders(user):
     if not customer_id:
         return Response(json.dumps({"orders": []}), headers=c, mimetype="application/json")
 
+    import time as _time_mod
+    import concurrent.futures as _cf
+
+    # Return cached result if fresh
+    _cached = _ORDERS_CACHE.get(customer_id)
+    if _cached and (_time_mod.time() - _cached["ts"]) < _ORDERS_CACHE_TTL:
+        return Response(json.dumps({"orders": _cached["data"]}), headers=c, mimetype="application/json")
+
     try:
         read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-        formula = (f"AND(FIND(\"{customer_id}\",ARRAYJOIN({{Customer}})),"
-                   f"{{Order Type}}=\"Sales Order\","
-                   f"{{MO Is Approved}}=TRUE())")
+        # Fetch all SOs then filter in Python (ARRAYJOIN formula returns display names not record IDs)
         records = at_get_all(
             MANUAL_ORDERS_TABLE_ID, read_token,
-            fields=["Document ID", "Order ID", "Date", "MO Line Items"],
-            formula=formula,
+            fields=["Document ID", "Order ID", "Date", "MO Line Items", "Customer", "Sales Order Status"],
+            formula='{Order Type}="Sales Order"',
         )
+        records = [r for r in records
+                   if customer_id in r.get("fields", {}).get("Customer", [])
+                   and r.get("fields", {}).get("Sales Order Status") == "Approved"]
+
+        # Collect all line item IDs, fetch in parallel
+        all_li_ids = []
+        for r in records:
+            all_li_ids.extend(r.get("fields", {}).get("MO Line Items", []))
+
+        def _fetch_li(li_id):
+            try:
+                li_r = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+                    headers=at_headers(read_token), timeout=10,
+                )
+                if li_r.status_code == 200:
+                    return li_id, li_r.json().get("fields", {})
+            except Exception:
+                pass
+            return li_id, {}
+
+        li_map = {}
+        if all_li_ids:
+            with _cf.ThreadPoolExecutor(max_workers=20) as ex:
+                for li_id, fields in ex.map(_fetch_li, all_li_ids):
+                    li_map[li_id] = fields
+
         orders = []
         for r in records:
             f = r.get("fields", {})
             so_number = f.get("Document ID", f"SO-{f.get('Order ID','')}")
-            total = 0.0
-            li_ids = f.get("MO Line Items", [])
-            for li_id in li_ids:
-                try:
-                    li_r = req_lib.get(
-                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
-                        headers=at_headers(read_token), timeout=10,
-                    )
-                    if li_r.status_code == 200:
-                        lf = li_r.json().get("fields", {})
-                        total += (lf.get("Qty.", 0) or 0) * (lf.get("Adj. Unit Price", 0) or lf.get("Confirmed Unit Price", 0) or 0)
-                except Exception:
-                    pass
+            total = sum(
+                (li_map.get(li_id, {}).get("Qty.", 0) or 0) *
+                (li_map.get(li_id, {}).get("Confirmed Unit Price", 0) or
+                 li_map.get(li_id, {}).get("Adj. Unit Price", 0) or 0)
+                for li_id in f.get("MO Line Items", [])
+            )
             orders.append({
                 "record_id": r["id"],
                 "so_number": so_number,
@@ -5907,6 +5946,7 @@ def portal_orders(user):
                 "total":     round(total, 2),
             })
         orders.sort(key=lambda x: x.get("date", ""), reverse=True)
+        _ORDERS_CACHE[customer_id] = {"ts": _time_mod.time(), "data": orders}
         return Response(json.dumps({"orders": orders}), headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
@@ -6634,6 +6674,7 @@ def portal_duplicate_quote(user, record_id):
 
         # Bust per-customer quotes cache
         _QUOTES_CACHE.pop(customer_id, None)
+        _ORDERS_CACHE.pop(customer_id, None)
 
         return Response(json.dumps({"success": True, "quoteNumber": quote_number, "recordId": new_mo_id}),
                         headers=c, mimetype="application/json")
@@ -6672,6 +6713,7 @@ def portal_hide_quote(user, record_id):
         )
         pr.raise_for_status()
         _QUOTES_CACHE.pop(customer_id, None)
+        _ORDERS_CACHE.pop(customer_id, None)
         return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
