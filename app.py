@@ -4932,8 +4932,7 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
     q_po       = quote.get("poNumber", "")
     q_notes    = quote.get("notes", "")
     q_record   = quote.get("recordId", "")
-    portal_link = (f"{QUOTE_BASE_URL}/portal" if doc_type == "order"
-                   else f"{QUOTE_BASE_URL}/view-quote/{q_record}") if q_record else ""
+    portal_link = f"{QUOTE_BASE_URL}/portal" if q_record else ""
 
     bill_org   = cust.get("billToOrg")  or cust.get("orgName", "")
     bill_name  = cust.get("billToName") or cust.get("contactName", "")
