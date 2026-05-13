@@ -592,7 +592,8 @@
     async function loadAccountInfo() {
       const viewEl = document.getElementById('accountInfoView');
       try {
-        const resp = await fetch('/api/portal/account-info');
+        const resp = await fetch('/api/portal/account-info', { credentials: 'same-origin' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
         if (!data.info) throw new Error(data.error || 'Failed');
         _accountInfo = data.info;
@@ -602,7 +603,7 @@
           document.getElementById('editAccountBtn').style.display = '';
         }
       } catch(e) {
-        viewEl.innerHTML = '<p style="color:var(--muted);font-size:.88rem;">Failed to load account info.</p>';
+        viewEl.innerHTML = `<p style="color:var(--muted);font-size:.88rem;">Failed to load account info: ${e.message}</p>`;
       }
     }
 
