@@ -4859,16 +4859,27 @@ def _build_quote_pdf_bytes(quote):
     import os, tempfile
     from fpdf import FPDF
 
+    def _fmt_date(iso_str):
+        """Convert YYYY-MM-DD to M-D-YYYY."""
+        try:
+            from datetime import date as _d
+            d = _d.fromisoformat(iso_str)
+            return f"{d.month}-{d.day}-{d.year}"
+        except Exception:
+            return iso_str
+
     cust       = quote.get("customer", {})
     line_items = quote.get("lineItems", [])
     subtotal   = quote.get("subtotal", 0.0)
     shipping   = quote.get("shipping", 0.0)
     total      = quote.get("total",    0.0)
     q_number   = quote.get("quoteNumber", "")
-    q_date     = quote.get("date", "")
-    q_expiry   = quote.get("expiryDate", "")
+    q_date     = _fmt_date(quote.get("date", ""))
+    q_expiry   = _fmt_date(quote.get("expiryDate", ""))
     q_po       = quote.get("poNumber", "")
     q_notes    = quote.get("notes", "")
+    q_record   = quote.get("recordId", "")
+    portal_link = f"{QUOTE_BASE_URL}/view-quote/{q_record}" if q_record else ""
 
     bill_org  = cust.get("billToOrg")  or cust.get("orgName", "")
     bill_name = cust.get("billToName") or cust.get("contactName", "")
@@ -4895,6 +4906,9 @@ def _build_quote_pdf_bytes(quote):
     logo_local = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "ba-logo.jpg")
     logo_url   = "https://www.bluealphabelts.com/wp-content/uploads/2024/04/logo-1.png"
     logo_tmp   = None
+    # White background behind logo to prevent gray artifact
+    pdf.set_fill_color(255, 255, 255)
+    pdf.rect(19, LOGO_TOP, LOGO_W, LOGO_W * 0.45, style="F")
     try:
         if os.path.exists(logo_local):
             pdf.image(logo_local, x=19, y=LOGO_TOP, w=LOGO_W)
@@ -4944,9 +4958,10 @@ def _build_quote_pdf_bytes(quote):
     pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
     pdf.ln(5)
 
-    # ── Quote details (left) + Bill To (right) ────────────────────────
+    # ── Quote details (left) + Bill To / Ship To (right) ─────────────
     y_info = pdf.get_y()
     col_w  = W / 2
+    right_col_w = col_w / 2  # split right half for Bill To | Ship To
 
     def kv(label, value):
         pdf.set_font("Helvetica", "B", 8)
@@ -4965,18 +4980,37 @@ def _build_quote_pdf_bytes(quote):
 
     y_after_details = pdf.get_y()
 
-    # Right: Bill To
-    pdf.set_xy(19 + col_w, y_info)
+    # Right: Bill To (left half of right column)
+    bill_x = 19 + col_w
+    pdf.set_xy(bill_x, y_info)
     pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(*MUTED)
-    pdf.cell(col_w, 5.5, "Bill To", border=0, new_x="LEFT", new_y="NEXT")
-    for ln in [bill_org, bill_name, addr1,
-               ", ".join(filter(None, [city, f"{state_v} {zip_v}".strip()]))]:
+    pdf.cell(right_col_w, 5.5, "Bill To", border=0, new_x="LEFT", new_y="NEXT")
+    for ln in [bill_org, bill_name]:
         if ln:
-            pdf.set_x(19 + col_w)
+            pdf.set_x(bill_x)
             pdf.set_font("Helvetica", "B" if ln == bill_org else "", 8)
             pdf.set_text_color(*TEXT)
-            pdf.cell(col_w, 5, ln, border=0, new_x="LEFT", new_y="NEXT")
+            pdf.cell(right_col_w, 5, ln, border=0, new_x="LEFT", new_y="NEXT")
+
+    # Right: Ship To (right half of right column)
+    ship_x = 19 + col_w + right_col_w
+    pdf.set_xy(ship_x, y_info)
+    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_text_color(*MUTED)
+    pdf.cell(right_col_w, 5.5, "Ship To", border=0, new_x="LEFT", new_y="NEXT")
+    ship_lines = [
+        cust.get("orgName", ""),
+        cust.get("contactName", ""),
+        addr1,
+        ", ".join(filter(None, [city, f"{state_v} {zip_v}".strip()])),
+    ]
+    for ln in ship_lines:
+        if ln:
+            pdf.set_x(ship_x)
+            pdf.set_font("Helvetica", "B" if ln == cust.get("orgName", "") else "", 8)
+            pdf.set_text_color(*TEXT)
+            pdf.cell(right_col_w, 5, ln, border=0, new_x="LEFT", new_y="NEXT")
 
     pdf.set_y(max(y_after_details, pdf.get_y()) + 3)
 
@@ -5040,9 +5074,15 @@ def _build_quote_pdf_bytes(quote):
     totals_row("Total", f"${total:.2f}", bold=True)
     pdf.ln(5)
 
-    # ── Notes ────────────────────────────────────────────────────────
+    # ── Notes + Footer pinned to bottom ──────────────────────────────
     clean_notes = (q_notes or "").strip()
-    if clean_notes and clean_notes.lower() not in ("no notes", "none", "n/a"):
+    clean_notes = clean_notes if clean_notes.lower() not in ("no notes", "none", "n/a", "") else ""
+
+    # Reserve space at bottom: notes block (if any) + footer (~28mm)
+    footer_h = 28 + (14 if clean_notes else 0)
+    pdf.set_y(-footer_h)
+
+    if clean_notes:
         pdf.set_draw_color(*BD)
         pdf.set_line_width(0.3)
         pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
@@ -5055,18 +5095,27 @@ def _build_quote_pdf_bytes(quote):
         pdf.multi_cell(W, 5, clean_notes, border=0)
         pdf.ln(3)
 
-    # ── Footer ───────────────────────────────────────────────────────
+    # Footer divider
     pdf.set_draw_color(*BD)
     pdf.set_line_width(0.3)
     pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
     pdf.ln(4)
     pdf.set_font("Helvetica", "", 7.5)
     pdf.set_text_color(*MUTED)
-    pdf.multi_cell(W, 4.5,
-        "Payment terms are Net 30 upon acceptance. "
-        "To accept this quote, visit the link provided in your email. "
+
+    # Line 1: payment terms + accept link
+    pdf.write(4.5, "Payment terms are Net 30 upon acceptance.  ")
+    pdf.write(4.5, "To accept this quote, click here to view it in your Blue Alpha Quote Portal",
+              link=portal_link)
+    pdf.write(4.5, ".")
+    pdf.ln(5)
+
+    # Line 2: questions
+    pdf.set_font("Helvetica", "", 7.5)
+    pdf.set_text_color(*MUTED)
+    pdf.cell(W, 4.5,
         "Questions? Contact us at info@bluealpha.us or 678-961-3304.",
-        border=0)
+        border=0, new_x="LMARGIN", new_y="NEXT")
 
     return bytes(pdf.output())
 
