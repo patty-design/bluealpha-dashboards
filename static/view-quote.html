@@ -657,9 +657,19 @@ if (window.self !== window.top) {
       <div><label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:3px;">ZIP</label><input type="text" id="shipZip" style="width:100%;box-sizing:border-box;"></div>
     </div>
 
+    <div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:16px;background:#f9f9f7;">
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+        <input type="checkbox" id="termsCheckbox" onchange="document.getElementById('btnConfirmOrder').disabled = !this.checked;"
+               style="margin-top:3px;flex-shrink:0;width:16px;height:16px;cursor:pointer;">
+        <span style="font-size:0.84rem;color:var(--muted);line-height:1.5;">
+          By accepting this quote, I agree to Blue Alpha's purchase terms: payment is due Net 30 from date of invoice. Overdue balances accrue a 1.5% monthly late fee. Non-payment may result in credit hold, referral to collections, and recovery of collection costs including attorney's fees. Accepted quotes are binding purchase orders. Products are eligible for return or exchange within 30 days of delivery.
+        </span>
+      </label>
+    </div>
+
     <div class="modal-btns">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-danger" id="btnConfirmOrder" onclick="confirmOrder()">Place Order</button>
+      <button class="btn btn-danger" id="btnConfirmOrder" onclick="confirmOrder()" disabled>Place Order</button>
     </div>
   </div>
 </div>
@@ -1432,6 +1442,9 @@ function openModal() {
   document.getElementById('billZip').value   = c.zip        || '';
   document.getElementById('shipSame').checked = true;
   document.getElementById('shipFields').classList.add('hidden');
+  // Reset terms checkbox and disable Place Order button each time modal opens
+  const cb = document.getElementById('termsCheckbox');
+  if (cb) { cb.checked = false; document.getElementById('btnConfirmOrder').disabled = true; }
   document.getElementById('acceptModal').classList.remove('hidden');
 }
 
