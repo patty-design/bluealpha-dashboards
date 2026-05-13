@@ -4898,12 +4898,14 @@ def _build_quote_pdf_bytes(quote):
     q_record   = quote.get("recordId", "")
     portal_link = f"{QUOTE_BASE_URL}/view-quote/{q_record}" if q_record else ""
 
-    bill_org  = cust.get("billToOrg")  or cust.get("orgName", "")
-    bill_name = cust.get("billToName") or cust.get("contactName", "")
-    addr1     = cust.get("address1", "")
-    city      = cust.get("city", "")
-    state_v   = cust.get("state", "")
-    zip_v     = cust.get("zip", "")
+    bill_org   = cust.get("billToOrg")  or cust.get("orgName", "")
+    bill_name  = cust.get("billToName") or cust.get("contactName", "")
+    bill_addr1 = cust.get("billToAddr1", "")
+    bill_addr2 = cust.get("billToAddr2", "")
+    addr1      = cust.get("address1", "")
+    city       = cust.get("city", "")
+    state_v    = cust.get("state", "")
+    zip_v      = cust.get("zip", "")
 
     pdf = FPDF(orientation="P", unit="mm", format="letter")
     pdf.set_margins(19, 19, 19)
@@ -5003,8 +5005,7 @@ def _build_quote_pdf_bytes(quote):
     pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(*MUTED)
     pdf.cell(right_col_w, 5.5, "Bill To", border=0, new_x="LEFT", new_y="NEXT")
-    bill_addr_line = ", ".join(filter(None, [city, f"{state_v} {zip_v}".strip()]))
-    for ln in [bill_org, bill_name, addr1, bill_addr_line]:
+    for ln in [bill_org, bill_name, bill_addr1, bill_addr2]:
         if ln:
             pdf.set_x(bill_x)
             pdf.set_font("Helvetica", "B" if ln == bill_org else "", 8)
