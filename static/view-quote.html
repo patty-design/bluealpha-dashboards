@@ -434,14 +434,22 @@
   const headerTitle = document.getElementById('headerTitle');
   if (from === 'orders') {
     window.viewingAsOrder = true;
-    backLink.href = '/portal?tab=our-orders';
     backLink.textContent = '← Back to Orders';
     backLink.style.display = '';
     headerTitle.textContent = 'Order Details';
+    backLink.onclick = function(e) {
+      e.preventDefault();
+      if (window.self !== window.top) { window.parent.postMessage({ type: 'closeViewQuote' }, '*'); }
+      else { window.location.href = '/portal?tab=our-orders'; }
+    };
   } else if (from === 'quotes') {
-    backLink.href = '/portal?tab=our-quotes';
     backLink.textContent = '← Back to Quotes';
     backLink.style.display = '';
+    backLink.onclick = function(e) {
+      e.preventDefault();
+      if (window.self !== window.top) { window.parent.postMessage({ type: 'closeViewQuote' }, '*'); }
+      else { window.location.href = '/portal?tab=our-quotes'; }
+    };
   }
 })();
 </script>
