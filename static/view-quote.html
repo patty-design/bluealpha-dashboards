@@ -437,8 +437,10 @@
     backLink.textContent = '← Back to Orders';
     backLink.style.display = '';
     headerTitle.textContent = 'Order Details';
-    const lt = document.getElementById('loadingText');
-    if (lt) lt.textContent = 'Loading your order…';
+    document.addEventListener('DOMContentLoaded', function() {
+      const lt = document.getElementById('loadingText');
+      if (lt) lt.textContent = 'Loading your order…';
+    });
     backLink.onclick = function(e) {
       e.preventDefault();
       if (window.self !== window.top) { window.parent.postMessage({ type: 'closeViewQuote' }, '*'); }
