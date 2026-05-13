@@ -3869,7 +3869,8 @@ def _fetch_quote_data(record_id):
         return None
     mo = r.json()
     fields = mo.get("fields", {})
-    if fields.get("Order Type") != "Quote":
+    order_type = fields.get("Order Type", "")
+    if order_type not in ("Quote", "Sales Order"):
         return None
 
     order_id     = fields.get("Order ID", "")
