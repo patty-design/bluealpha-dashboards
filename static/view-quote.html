@@ -433,6 +433,7 @@
   const backLink = document.getElementById('backLink');
   const headerTitle = document.getElementById('headerTitle');
   if (from === 'orders') {
+    window.viewingAsOrder = true;
     backLink.href = '/portal?tab=our-orders';
     backLink.textContent = '← Back to Orders';
     backLink.style.display = '';
@@ -501,8 +502,16 @@ if (window.self !== window.top) {
 
     <!-- PDF button pinned below summary card -->
     <div id="pdfBtnRow" style="margin-bottom:12px;">
-      <button class="btn btn-secondary" onclick="window.open('/quote-pdf/'+recordId)">Download PDF</button>
+      <button class="btn btn-secondary" id="pdfBtn" onclick="window.open('/quote-pdf/'+recordId)">Download PDF</button>
     </div>
+    <script>
+    if (window.viewingAsOrder) {
+      document.addEventListener('DOMContentLoaded', function() {
+        const btn = document.getElementById('pdfBtn');
+        if (btn) btn.textContent = 'Download Invoice';
+      });
+    }
+    </script>
 
     <!-- Customer card -->
     <div class="card" id="customerCard">
@@ -750,7 +759,7 @@ function render() {
   const dateEl = makeMetaItem(`Date: <strong>${fmtDate(q.date)}</strong>`);
   metaRow.appendChild(dateEl);
 
-  if (q.expiryDate) {
+  if (q.expiryDate && !window.viewingAsOrder) {
     const daysLeft = daysBetween(new Date(), new Date(q.expiryDate));
     let expEl;
     if (q.isExpired) {
@@ -859,8 +868,8 @@ function renderQuoteDetails() {
   document.getElementById('saveRow').classList.toggle('hidden', !editable);
   document.getElementById('thRemove').textContent = editable ? '' : '';
 
-  // Show Edit Addresses button for users with create_quote permission
-  if (portalUser && portalUser.canCreateQuote !== false) {
+  // Show Edit Addresses button for users with create_quote permission (not on order view)
+  if (portalUser && portalUser.canCreateQuote !== false && !window.viewingAsOrder) {
     document.getElementById('editAddressBtn').style.display = '';
   }
 
@@ -994,8 +1003,22 @@ function buildActions(editable) {
   const q = quoteData;
 
   if (q.isAccepted) {
-    // Accepted: allow duplicate (reorder) and remove — but no accept button
-    if (portalUser) {
+    if (window.viewingAsOrder) {
+      // Order view: show Reorder button only
+      if (portalUser && portalUser.canCreateQuote !== false) {
+        const reorderBtn = document.createElement('button');
+        reorderBtn.className   = 'btn btn-primary';
+        reorderBtn.id          = 'btnDuplicate';
+        reorderBtn.textContent = 'Reorder';
+        reorderBtn.onclick     = duplicateThisQuote;
+        bar.appendChild(reorderBtn);
+        const conf = document.createElement('span');
+        conf.id = 'duplicateConfirm';
+        conf.style.cssText = 'display:none;margin-left:12px;color:#1a7a3c;font-size:0.88rem;';
+        bar.appendChild(conf);
+      }
+    } else if (portalUser) {
+      // Accepted: allow duplicate (reorder) and remove — but no accept button
       if (portalUser.canCreateQuote !== false) {
         const dupBtn = document.createElement('button');
         dupBtn.className   = 'btn btn-primary';
