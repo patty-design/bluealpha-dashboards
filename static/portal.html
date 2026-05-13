@@ -426,6 +426,11 @@
         if (tab.dataset.tab === 'our-quotes' && !quotesLoaded) loadQuotes();
         if (tab.dataset.tab === 'our-orders' && !ordersLoaded) loadOrders();
         if (tab.dataset.tab === 'team' && !teamLoaded) loadTeam();
+        // Always reload the quote builder so it's fresh (clears any stuck Submitting... state)
+        if (tab.dataset.tab === 'new-quote') {
+          const qf = document.getElementById('quoteBuilderFrame');
+          if (qf) { qf.src = ''; qf.src = '/quote-builder'; }
+        }
       });
     });
 
