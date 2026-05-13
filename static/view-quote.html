@@ -510,9 +510,13 @@ if (window.self !== window.top) {
 
     <!-- PDF button pinned below summary card -->
     <div id="pdfBtnRow" style="margin-bottom:12px;">
-      <button class="btn btn-secondary" id="pdfBtn" onclick="window.open('/quote-pdf/'+recordId)">Download PDF</button>
+      <button class="btn btn-secondary" id="pdfBtn" onclick="downloadDoc()">Download PDF</button>
     </div>
     <script>
+    function downloadDoc() {
+      const url = window.viewingAsOrder ? '/order-pdf/' + recordId : '/quote-pdf/' + recordId;
+      window.open(url);
+    }
     if (window.viewingAsOrder) {
       document.addEventListener('DOMContentLoaded', function() {
         const btn = document.getElementById('pdfBtn');

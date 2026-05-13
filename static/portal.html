@@ -611,7 +611,7 @@
             <td>${fmt(o.date)}</td>
             <td>${money(o.total)}</td>
             <td><span class="badge badge-active">Confirmed</span></td>
-            <td><a class="btn-sm" href="/order-pdf/${o.record_id}" target="_blank" rel="noopener">View →</a></td>
+            <td><button class="btn-sm" onclick="openViewOrder('${o.record_id}')">View →</button></td>
           </tr>`).join('') +
           '</tbody></table>';
       } catch (e) {
