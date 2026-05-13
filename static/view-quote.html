@@ -1448,7 +1448,7 @@ async function confirmOrder() {
     if (!r.ok || !data.success) throw new Error(data.error || 'Failed to accept');
     closeModal();
     // Redirect to portal Orders tab after a brief moment
-    setTimeout(() => { window.location.href = '/portal?tab=orders'; }, 800);
+    setTimeout(() => { window.location.href = '/portal?tab=our-orders'; }, 800);
   } catch(e) {
     closeModal();
     alert('Error: ' + e.message);
