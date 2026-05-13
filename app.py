@@ -4908,7 +4908,10 @@ def _build_quote_pdf_bytes(quote):
     zip_v      = cust.get("zip", "")
 
     # Subclass for small header on pages 2+
-    logo_local_ref = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "ba-logo.jpg")
+    _static_dir    = os.path.dirname(os.path.abspath(__file__))
+    _logo_png      = os.path.join(_static_dir, "static", "ba-logo.png")
+    _logo_jpg      = os.path.join(_static_dir, "static", "ba-logo.jpg")
+    logo_local_ref = _logo_png if os.path.exists(_logo_png) else _logo_jpg
     _qnum_ref = q_number
 
     class QuotePDF(FPDF):
@@ -4949,20 +4952,20 @@ def _build_quote_pdf_bytes(quote):
     # ── Logo (top-left) ───────────────────────────────────────────────
     LOGO_W   = 58.0   # mm width to render logo
     LOGO_TOP = 13.0   # mm from top of page
-    logo_local = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "ba-logo.jpg")
+    # Prefer transparent PNG; fall back to JPG, then URL download, then text
+    _static = os.path.dirname(os.path.abspath(__file__))
+    logo_png   = os.path.join(_static, "static", "ba-logo.png")
+    logo_jpg   = os.path.join(_static, "static", "ba-logo.jpg")
     logo_url   = "https://www.bluealphabelts.com/wp-content/uploads/2024/04/logo-1.png"
     logo_tmp   = None
-    # White background behind logo to prevent gray artifact
-    pdf.set_fill_color(255, 255, 255)
-    pdf.rect(19, LOGO_TOP, LOGO_W, LOGO_W * 0.45, style="F")
+    logo_file  = logo_png if os.path.exists(logo_png) else (logo_jpg if os.path.exists(logo_jpg) else None)
     try:
-        if os.path.exists(logo_local):
-            pdf.image(logo_local, x=19, y=LOGO_TOP, w=LOGO_W)
-        else:
+        if not logo_file:
             import urllib.request
             logo_tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
             urllib.request.urlretrieve(logo_url, logo_tmp.name)
-            pdf.image(logo_tmp.name, x=19, y=LOGO_TOP, w=LOGO_W)
+            logo_file = logo_tmp.name
+        pdf.image(logo_file, x=19, y=LOGO_TOP, w=LOGO_W)
     except Exception:
         # Fallback: text logo
         pdf.set_xy(19, LOGO_TOP)
