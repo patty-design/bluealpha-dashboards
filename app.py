@@ -4909,10 +4909,12 @@ def _build_quote_pdf_bytes(quote):
 
     # Subclass for small header on pages 2+
     _static_dir    = os.path.dirname(os.path.abspath(__file__))
-    _logo_dark     = os.path.join(_static_dir, "static", "ba-logo-dark.png")
-    _logo_png      = os.path.join(_static_dir, "static", "ba-logo.png")
-    _logo_jpg      = os.path.join(_static_dir, "static", "ba-logo.jpg")
-    logo_local_ref = _logo_dark if os.path.exists(_logo_dark) else (_logo_png if os.path.exists(_logo_png) else _logo_jpg)
+    logo_local_ref = None
+    for _c in ["ba-logo-white-bg.jpg", "ba-logo-dark.png", "ba-logo.jpg"]:
+        _p = os.path.join(_static_dir, "static", _c)
+        if os.path.exists(_p):
+            logo_local_ref = _p
+            break
     _qnum_ref = q_number
 
     class QuotePDF(FPDF):
@@ -4955,12 +4957,16 @@ def _build_quote_pdf_bytes(quote):
     LOGO_TOP = 13.0   # mm from top of page
     # Prefer transparent PNG; fall back to JPG, then URL download, then text
     _static    = os.path.dirname(os.path.abspath(__file__))
-    logo_dark  = os.path.join(_static, "static", "ba-logo-dark.png")
-    logo_png   = os.path.join(_static, "static", "ba-logo.png")
-    logo_jpg   = os.path.join(_static, "static", "ba-logo.jpg")
     logo_url   = "https://www.bluealphabelts.com/wp-content/uploads/2024/04/logo-1.png"
     logo_tmp   = None
-    logo_file  = logo_dark if os.path.exists(logo_dark) else (logo_png if os.path.exists(logo_png) else (logo_jpg if os.path.exists(logo_jpg) else None))
+    # Prefer white-bg jpg (clean navy logo), then fallbacks
+    for _candidate in ["ba-logo-white-bg.jpg", "ba-logo-dark.png", "ba-logo.jpg"]:
+        _path = os.path.join(_static, "static", _candidate)
+        if os.path.exists(_path):
+            logo_file = _path
+            break
+    else:
+        logo_file = None
     try:
         if not logo_file:
             import urllib.request
