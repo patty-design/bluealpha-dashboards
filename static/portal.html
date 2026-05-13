@@ -451,6 +451,7 @@
     let quotesLoaded = false;
     let ordersLoaded = false;
     let teamLoaded = false;
+    let accountInfoLoaded = false;
     let quoteBuilderDirty = false; // true after a quote is submitted — reload iframe on next visit
 
     // Tab switching
@@ -464,7 +465,10 @@
         // Always re-fetch quotes/orders on tab switch (backend cache keeps it fast)
         if (tab.dataset.tab === 'our-quotes') loadQuotes();
         if (tab.dataset.tab === 'our-orders') loadOrders();
-        if (tab.dataset.tab === 'team' && !teamLoaded) { loadTeam(); loadAccountInfo(); }
+        if (tab.dataset.tab === 'team') {
+          if (!teamLoaded) loadTeam();
+          if (!accountInfoLoaded) loadAccountInfo();
+        }
         // Only reload quote builder if it was previously submitted (dirty), not on every click
         if (tab.dataset.tab === 'new-quote') {
           const qf = document.getElementById('quoteBuilderFrame');
@@ -604,12 +608,14 @@
         const data = await resp.json();
         if (!data.info) throw new Error(data.error || 'Failed');
         _accountInfo = data.info;
+        accountInfoLoaded = true;
         renderAccountInfoView(data.info);
         // Show Edit button for admins only
         if (portalMe?.canManageTeam) {
           document.getElementById('editAccountBtn').style.display = '';
         }
       } catch(e) {
+        accountInfoLoaded = false; // allow retry on next tab click
         viewEl.innerHTML = `<p style="color:var(--muted);font-size:.88rem;">Failed to load account info: ${e.message}</p>`;
       }
     }
