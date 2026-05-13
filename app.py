@@ -4907,9 +4907,36 @@ def _build_quote_pdf_bytes(quote):
     state_v    = cust.get("state", "")
     zip_v      = cust.get("zip", "")
 
-    pdf = FPDF(orientation="P", unit="mm", format="letter")
+    # Subclass for small header on pages 2+
+    logo_local_ref = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "ba-logo.jpg")
+    _qnum_ref = q_number
+
+    class QuotePDF(FPDF):
+        def header(self):
+            if self.page_no() <= 1:
+                return
+            # Small logo + quote # for continuation pages
+            self.set_fill_color(255, 255, 255)
+            self.rect(19, 6, 28, 10, style="F")
+            try:
+                self.image(logo_local_ref, x=19, y=6, w=28)
+            except Exception:
+                self.set_xy(19, 8)
+                self.set_font("Helvetica", "B", 9)
+                self.set_text_color(27, 36, 56)
+                self.cell(28, 5, "BLUE ALPHA", border=0)
+            self.set_xy(49, 9)
+            self.set_font("Helvetica", "B", 8)
+            self.set_text_color(27, 36, 56)
+            self.cell(0, 5, _qnum_ref, border=0)
+            self.set_draw_color(27, 36, 56)
+            self.set_line_width(0.4)
+            self.line(19, 18, 19 + 177, 18)
+            self.ln(4)
+
+    pdf = QuotePDF(orientation="P", unit="mm", format="letter")
     pdf.set_margins(19, 19, 19)
-    pdf.set_auto_page_break(auto=True, margin=19)
+    pdf.set_auto_page_break(auto=True, margin=25)
     pdf.add_page()
 
     W     = 177.0   # usable width (215.9mm - 2×19mm margins)
@@ -5097,9 +5124,15 @@ def _build_quote_pdf_bytes(quote):
     clean_notes = (q_notes or "").strip()
     clean_notes = clean_notes if clean_notes.lower() not in ("no notes", "none", "n/a", "") else ""
 
-    # Reserve space at bottom: notes block (if any) + footer (~28mm)
-    footer_h = 28 + (14 if clean_notes else 0)
-    pdf.set_y(-footer_h)
+    # Pin footer to bottom of current page; disable auto page break so it never overflows
+    PAGE_H   = 279.4   # letter height in mm
+    BOT_MARGIN = 12    # mm from bottom for footer start
+    footer_h = 26 + (14 if clean_notes else 0)
+    footer_y = PAGE_H - BOT_MARGIN - footer_h
+    # Only jump down if we're above the footer zone (never jump backward past content)
+    if pdf.get_y() < footer_y:
+        pdf.set_y(footer_y)
+    pdf.set_auto_page_break(auto=False)
 
     if clean_notes:
         pdf.set_draw_color(*BD)
