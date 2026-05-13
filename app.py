@@ -5810,40 +5810,14 @@ def portal_quotes(user):
         records = at_get_all(
             MANUAL_ORDERS_TABLE_ID, read_token,
             fields=["Document ID", "Order ID", "Date", "Expiry Date", "MO Is Approved",
-                    "MO Line Items", "Customer", "Hidden from Customer"],
+                    "Customer", "Hidden from Customer", "Total Gross"],
             formula=formula,
         )
-        # Filter to only this customer's quotes (Customer field returns record ID array)
-        # Also filter out quotes hidden from the customer
         records = [r for r in records
                    if customer_id in r.get("fields", {}).get("Customer", [])
                    and not r.get("fields", {}).get("Hidden from Customer", False)]
         from datetime import date as dt_date
-        import concurrent.futures as _cf
         today = _today_utc()
-
-        # Collect all line item IDs across all quotes, then fetch in parallel
-        all_li_ids = []
-        for r in records:
-            all_li_ids.extend(r.get("fields", {}).get("MO Line Items", []))
-
-        def _fetch_li(li_id):
-            try:
-                li_r = req_lib.get(
-                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
-                    headers=at_headers(read_token), timeout=10,
-                )
-                if li_r.status_code == 200:
-                    return li_id, li_r.json().get("fields", {})
-            except Exception:
-                pass
-            return li_id, {}
-
-        li_map = {}
-        if all_li_ids:
-            with _cf.ThreadPoolExecutor(max_workers=20) as ex:
-                for li_id, fields in ex.map(_fetch_li, all_li_ids):
-                    li_map[li_id] = fields
 
         quotes = []
         for r in records:
@@ -5856,11 +5830,6 @@ def portal_quotes(user):
                     is_expired = dt_date.fromisoformat(expiry_str) < today
                 except Exception:
                     pass
-            total = sum(
-                (li_map.get(li_id, {}).get("Qty.", 0) or 0) *
-                (li_map.get(li_id, {}).get("Confirmed Unit Price", 0) or 0)
-                for li_id in f.get("MO Line Items", [])
-            )
             quotes.append({
                 "record_id":    r["id"],
                 "quote_number": quote_number,
@@ -5868,7 +5837,7 @@ def portal_quotes(user):
                 "expiry_date":  expiry_str,
                 "is_expired":   is_expired,
                 "is_accepted":  bool(f.get("MO Is Approved")),
-                "total":        round(total, 2),
+                "total":        round(float(f.get("Total Gross") or 0), 2),
             })
         # Sort most recent first
         quotes.sort(key=lambda x: x.get("date", ""), reverse=True)
@@ -5899,51 +5868,22 @@ def portal_orders(user):
         # Fetch all SOs then filter in Python (ARRAYJOIN formula returns display names not record IDs)
         records = at_get_all(
             MANUAL_ORDERS_TABLE_ID, read_token,
-            fields=["Document ID", "Order ID", "Date", "MO Line Items", "Customer", "Sales Order Status"],
+            fields=["Document ID", "Order ID", "Date", "Total Gross", "Customer", "Sales Order Status"],
             formula='{Order Type}="Sales Order"',
         )
         records = [r for r in records
                    if customer_id in r.get("fields", {}).get("Customer", [])
                    and r.get("fields", {}).get("Sales Order Status") == "Approved"]
 
-        # Collect all line item IDs, fetch in parallel
-        all_li_ids = []
-        for r in records:
-            all_li_ids.extend(r.get("fields", {}).get("MO Line Items", []))
-
-        def _fetch_li(li_id):
-            try:
-                li_r = req_lib.get(
-                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
-                    headers=at_headers(read_token), timeout=10,
-                )
-                if li_r.status_code == 200:
-                    return li_id, li_r.json().get("fields", {})
-            except Exception:
-                pass
-            return li_id, {}
-
-        li_map = {}
-        if all_li_ids:
-            with _cf.ThreadPoolExecutor(max_workers=20) as ex:
-                for li_id, fields in ex.map(_fetch_li, all_li_ids):
-                    li_map[li_id] = fields
-
         orders = []
         for r in records:
             f = r.get("fields", {})
             so_number = f.get("Document ID", f"SO-{f.get('Order ID','')}")
-            total = sum(
-                (li_map.get(li_id, {}).get("Qty.", 0) or 0) *
-                (li_map.get(li_id, {}).get("Confirmed Unit Price", 0) or
-                 li_map.get(li_id, {}).get("Adj. Unit Price", 0) or 0)
-                for li_id in f.get("MO Line Items", [])
-            )
             orders.append({
                 "record_id": r["id"],
                 "so_number": so_number,
                 "date":      f.get("Date", ""),
-                "total":     round(total, 2),
+                "total":     round(float(f.get("Total Gross") or 0), 2),
             })
         orders.sort(key=lambda x: x.get("date", ""), reverse=True)
         _ORDERS_CACHE[customer_id] = {"ts": _time_mod.time(), "data": orders}
