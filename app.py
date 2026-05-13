@@ -5648,7 +5648,7 @@ def portal_quotes(user):
         # Note: ARRAYJOIN({Customer}) in Airtable formulas returns the linked record's
         # primary field (name), not its record ID — so we can't filter by customer_id
         # in the formula. Fetch all open quotes and filter in Python instead.
-        formula = 'AND({Order Type}="Quote",NOT({MO Is Approved}))'
+        formula = '{Order Type}="Quote"'
         records = at_get_all(
             MANUAL_ORDERS_TABLE_ID, read_token,
             fields=["Document ID", "Order ID", "Date", "Expiry Date", "MO Is Approved",
@@ -5709,6 +5709,7 @@ def portal_quotes(user):
                 "date":         f.get("Date", ""),
                 "expiry_date":  expiry_str,
                 "is_expired":   is_expired,
+                "is_accepted":  bool(f.get("MO Is Approved")),
                 "total":        round(total, 2),
             })
         # Sort most recent first

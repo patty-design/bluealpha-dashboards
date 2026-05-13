@@ -219,8 +219,9 @@
       text-transform: uppercase;
     }
     .badge-pending { background: #fff3cd; color: #856404; }
-    .badge-active  { background: #d4edda; color: #155724; }
-    .badge-expired { background: #f8d7da; color: #721c24; }
+    .badge-active   { background: #d4edda; color: #155724; }
+    .badge-accepted { background: #d4edda; color: #155724; }
+    .badge-expired  { background: #f8d7da; color: #721c24; }
     .empty-state {
       text-align: center;
       padding: 48px 20px;
@@ -493,8 +494,11 @@
         }
         el.innerHTML = '<table><thead><tr><th>Quote #</th><th>Date</th><th>Expiry</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>' +
           data.quotes.map(q => {
-            const expired = q.is_expired;
-            const badge = expired ? '<span class="badge badge-expired">Expired</span>' : '<span class="badge badge-pending">Open</span>';
+            const expired  = q.is_expired;
+            const accepted = q.is_accepted;
+            const badge = accepted ? '<span class="badge badge-accepted">Accepted</span>'
+                        : expired  ? '<span class="badge badge-expired">Expired</span>'
+                        :            '<span class="badge badge-pending">Open</span>';
             return `<tr>
               <td><strong>${q.quote_number || '—'}</strong></td>
               <td>${fmt(q.date)}</td>
