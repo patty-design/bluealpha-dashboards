@@ -5143,20 +5143,20 @@ def _build_quote_pdf_bytes(quote):
         pdf.set_draw_color(*BD)
         pdf.set_line_width(0.3)
         pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
-        pdf.ln(2)
+        pdf.ln(1)
         pdf.set_font("Helvetica", "B", 8)
         pdf.set_text_color(*MUTED)
         pdf.cell(W, 4, "NOTES", border=0, new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("Helvetica", "", 8)
         pdf.set_text_color(*TEXT)
         pdf.multi_cell(W, 4, clean_notes, border=0)
-        pdf.ln(2)
+        pdf.ln(1)
 
     # Footer divider
     pdf.set_draw_color(*BD)
     pdf.set_line_width(0.3)
     pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
-    pdf.ln(3)
+    pdf.ln(2)
     pdf.set_font("Helvetica", "", 7.5)
     pdf.set_text_color(*MUTED)
 
