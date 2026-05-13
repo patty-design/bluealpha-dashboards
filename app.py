@@ -3871,7 +3871,7 @@ def _fetch_quote_data(record_id):
     expiry_str   = fields.get("Expiry Date", "")
     is_accepted  = bool(fields.get("MO Is Approved", False))
     po_number    = fields.get("Purchase Order #", "")
-    notes        = fields.get("Notes", "")
+    notes        = fields.get("Notes from Customer", "")
 
     today = dt_date.today()
     is_expired = False
@@ -4548,7 +4548,7 @@ def create_quote():
         if po_number:
             mo_body["fields"]["Purchase Order #"] = po_number
         if notes:
-            mo_body["fields"]["Notes"] = notes
+            mo_body["fields"]["Notes from Customer"] = notes
 
         mo_r = req_lib.post(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}",
@@ -4718,7 +4718,7 @@ def accept_quote(record_id):
         customer_ids = mo_fields.get("Customer", [])
         customer_id  = customer_ids[0] if customer_ids else None
         po_number    = mo_fields.get("Purchase Order #", "")
-        notes        = mo_fields.get("Notes", "")
+        notes        = mo_fields.get("Notes from Customer", "")
         date_str     = mo_fields.get("Date", dt_date.today().isoformat())
 
         # Create SO record
@@ -4738,7 +4738,7 @@ def accept_quote(record_id):
         if po_number:
             so_body["fields"]["Purchase Order #"] = po_number
         if notes:
-            so_body["fields"]["Notes"] = notes
+            so_body["fields"]["Notes from Customer"] = notes
 
         so_r = req_lib.post(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}",
@@ -4791,7 +4791,7 @@ def accept_quote(record_id):
                 req_lib.patch(
                     f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{so_record_id}",
                     headers={**at_headers(token), "Content-Type": "application/json"},
-                    json={"fields": {"Notes": ship_note}},
+                    json={"fields": {"Notes from Customer": ship_note}},
                     timeout=15,
                 )
             except Exception:
@@ -6315,8 +6315,8 @@ def portal_duplicate_quote(user, record_id):
             "Expiry Date": expiry_str,
             "Customer":    [customer_id],
         }}
-        if fields.get("Notes"):
-            mo_body["fields"]["Notes"] = fields["Notes"]
+        if fields.get("Notes from Customer"):
+            mo_body["fields"]["Notes from Customer"] = fields["Notes from Customer"]
         if fields.get("Purchase Order #"):
             mo_body["fields"]["Purchase Order #"] = fields["Purchase Order #"]
 
