@@ -4748,15 +4748,16 @@ def accept_quote(record_id):
         notes        = mo_fields.get("Notes from Customer", "")
         date_str     = mo_fields.get("Date", dt_date.today().isoformat())
 
-        # Create SO record (Document ID is computed by Airtable from Order Type + Order ID)
+        # Create SO record
+        # Note: Document ID, MO Is Approved, Ready for ShipStation (SOs), Origin Quote are all
+        # formula fields — Airtable computes them automatically. Do NOT write them.
+        # Sales Order Status = "Approved" drives both MO Is Approved and Ready for ShipStation.
         so_body = {
             "fields": {
-                "Order Type":                  "Sales Order",
-                "Order ID":                    order_id_str,
-                "Date":                        date_str,
-                "MO Is Approved":              True,
-                "Ready for ShipStation (SOs)": True,
-                "Origin Quote":                quote_number,
+                "Order Type":         "Sales Order",
+                "Order ID":           order_id_str,
+                "Date":               date_str,
+                "Sales Order Status": "Approved",
             }
         }
         if customer_ids:
@@ -4850,11 +4851,11 @@ def accept_quote(record_id):
                 timeout=15,
             )
 
-        # PATCH QU: set MO Is Approved = true
+        # PATCH QU: set Quote Status = "Approved" (drives MO Is Approved formula)
         req_lib.patch(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
             headers={**at_headers(token), "Content-Type": "application/json"},
-            json={"fields": {"MO Is Approved": True}},
+            json={"fields": {"Quote Status": "Approved"}},
             timeout=15,
         )
 
