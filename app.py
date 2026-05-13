@@ -5854,7 +5854,7 @@ def portal_quotes(user):
         records = at_get_all(
             MANUAL_ORDERS_TABLE_ID, read_token,
             fields=["Document ID", "Order ID", "Date", "Expiry Date", "MO Is Approved",
-                    "Customer", "Hidden from Customer", "Total Gross"],
+                    "Customer", "Hidden from Customer", "MO Line Items"],
             formula=formula,
         )
         records = [r for r in records
