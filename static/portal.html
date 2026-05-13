@@ -331,7 +331,7 @@
     <!-- View Quote Panel (not a nav tab — shown when View → is clicked) -->
     <div class="tab-panel" id="tab-view-quote">
       <div style="margin-bottom:12px;">
-        <button onclick="closeViewQuote()" style="background:none;border:none;cursor:pointer;color:var(--navy);font-size:0.9rem;font-weight:600;display:flex;align-items:center;gap:6px;padding:0;">
+        <button id="viewBackBtn" onclick="closeViewQuote()" style="background:none;border:none;cursor:pointer;color:var(--navy);font-size:0.9rem;font-weight:600;display:flex;align-items:center;gap:6px;padding:0;">
           ← Back to Quotes
         </button>
       </div>
@@ -902,6 +902,7 @@
 
   function openViewQuote(recordId) {
     _viewReturnTab = 'our-quotes';
+    document.getElementById('viewBackBtn').textContent = '← Back to Quotes';
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     const frame = document.getElementById('viewQuoteFrame');
@@ -913,6 +914,7 @@
 
   function openViewOrder(recordId) {
     _viewReturnTab = 'our-orders';
+    document.getElementById('viewBackBtn').textContent = '← Back to Orders';
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     const frame = document.getElementById('viewQuoteFrame');

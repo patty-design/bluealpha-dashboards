@@ -437,6 +437,8 @@
     backLink.textContent = '← Back to Orders';
     backLink.style.display = '';
     headerTitle.textContent = 'Order Details';
+    const lt = document.getElementById('loadingText');
+    if (lt) lt.textContent = 'Loading your order…';
     backLink.onclick = function(e) {
       e.preventDefault();
       if (window.self !== window.top) { window.parent.postMessage({ type: 'closeViewQuote' }, '*'); }
@@ -470,7 +472,7 @@ if (window.self !== window.top) {
   <!-- Loading -->
   <div id="stateLoading" class="loading-state">
     <div class="spin-lg"></div>
-    <div>Loading your quote…</div>
+    <div id="loadingText">Loading your quote…</div>
   </div>
 
   <!-- Error -->
