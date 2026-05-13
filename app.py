@@ -4831,25 +4831,33 @@ def accept_quote(record_id):
                 pass
 
         # Copy line items from QU to SO
-        li_formula = f'FIND("{record_id}", ARRAYJOIN({{Manual Order}}))'
-        li_records = at_get_all(
-            MO_LINE_ITEMS_TABLE_ID, token,
-            fields=["Product SKU", "Qty.", "Adj. Unit Price"],
-            formula=li_formula,
-        )
-        for li in li_records:
-            lf = li["fields"]
-            req_lib.post(
+        # Use the MO Line Items IDs already on the quote record (formula query doesn't work
+        # because ARRAYJOIN on linked records returns display names, not record IDs)
+        li_ids = mo_fields.get("MO Line Items", [])
+        for li_id in li_ids:
+            li_r = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+                headers=at_headers(read_token), timeout=10,
+            )
+            if li_r.status_code != 200:
+                print(f"[accept_quote] could not fetch line item {li_id}: {li_r.status_code}")
+                continue
+            lf = li_r.json().get("fields", {})
+            # Adj. Unit Price is a formula — use Confirmed Unit Price if set, else Unit Price lookup
+            price = lf.get("Confirmed Unit Price") or (lf.get("Unit Price") or [None])[0] or 0
+            new_li = req_lib.post(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}",
                 headers={**at_headers(token), "Content-Type": "application/json"},
                 json={"fields": {
-                    "Manual Order": [so_record_id],
-                    "Product SKU":  lf.get("Product SKU", []),
-                    "Qty.":         lf.get("Qty.", 0),
-                    "Adj. Unit Price": lf.get("Adj. Unit Price", 0),
+                    "Manual Order":         [so_record_id],
+                    "Product SKU":          lf.get("Product SKU", []),
+                    "Qty.":                 lf.get("Qty.", 0),
+                    "Confirmed Unit Price": float(price),
                 }},
                 timeout=15,
             )
+            if not new_li.ok:
+                print(f"[accept_quote] line item copy failed {new_li.status_code}: {new_li.text[:200]}")
 
         # PATCH QU: set Quote Status = "Approved" (drives MO Is Approved formula)
         req_lib.patch(
