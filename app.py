@@ -6473,9 +6473,11 @@ def portal_account_info(user):
                 ]},
                 timeout=10,
             )
-            if r.status_code != 200:
-                return Response(json.dumps({"error": "Customer not found"}), status=404, headers=c, mimetype="application/json")
-            f = r.json().get("fields", {})
+            f = {}
+            if r.status_code == 200:
+                f = r.json().get("fields", {})
+            else:
+                print(f"[account_info] AT fetch failed: id={customer_id} status={r.status_code} body={r.text[:300]}")
             return Response(json.dumps({"info": {
                 "shipOrg":   f.get("Organization Name", ""),
                 "shipName":  f.get("Main Contact Name", ""),
