@@ -422,8 +422,28 @@
        alt="Blue Alpha"
        onerror="this.onerror=null;this.src='/static/ba-logo.jpg'">
   <div class="header-divider"></div>
-  <div class="header-title">Quote Portal</div>
+  <div class="header-title" id="headerTitle">Quote Portal</div>
+  <div style="flex:1;"></div>
+  <a id="backLink" href="/portal" style="display:none;color:#fff;text-decoration:none;font-size:0.88rem;opacity:0.85;">← Back to Portal</a>
 </header>
+<script>
+(function(){
+  const params = new URLSearchParams(window.location.search);
+  const from = params.get('from');
+  const backLink = document.getElementById('backLink');
+  const headerTitle = document.getElementById('headerTitle');
+  if (from === 'orders') {
+    backLink.href = '/portal?tab=our-orders';
+    backLink.textContent = '← Back to Orders';
+    backLink.style.display = '';
+    headerTitle.textContent = 'Order Details';
+  } else if (from === 'quotes') {
+    backLink.href = '/portal?tab=our-quotes';
+    backLink.textContent = '← Back to Quotes';
+    backLink.style.display = '';
+  }
+})();
+</script>
 
 <script>
 if (window.self !== window.top) {
