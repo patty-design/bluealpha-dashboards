@@ -1447,20 +1447,8 @@ async function confirmOrder() {
     const data = await r.json();
     if (!r.ok || !data.success) throw new Error(data.error || 'Failed to accept');
     closeModal();
-    const soNumber = data.soNumber || '';
-    const successBanner = document.getElementById('bannerSuccess');
-    successBanner.textContent = `Order ${soNumber} created! Our team will be in touch about shipping and invoicing.`;
-    successBanner.classList.remove('hidden');
-    quoteData.isAccepted = true;
-    quoteData.soNumber   = soNumber;
-    document.getElementById('addItemSection').classList.add('hidden');
-    document.getElementById('saveRow').classList.add('hidden');
-    const badges = document.getElementById('badges');
-    badges.innerHTML = '';
-    const label = soNumber ? `\u2713 Order Accepted \u2014 ${soNumber}` : '\u2713 Order Accepted';
-    badges.insertAdjacentHTML('beforeend', `<span class="badge badge-success">${escHtml(label)}</span>`);
-    buildActions(false);
-    renderItemsTable();
+    // Redirect to portal Orders tab after a brief moment
+    setTimeout(() => { window.location.href = '/portal?tab=orders'; }, 800);
   } catch(e) {
     closeModal();
     alert('Error: ' + e.message);
