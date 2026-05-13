@@ -6470,6 +6470,55 @@ def portal_account_info_update(user):
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
 
+@app.route("/api/portal/update-quote-addresses/<record_id>", methods=["POST"])
+@portal_login_required
+def portal_update_quote_addresses(user, record_id):
+    """Update billing/shipping addresses on a quote's customer record without touching expiry or prices."""
+    c = cors()
+    if not portal_can(user, "create_quote"):
+        return Response(json.dumps({"error": "Insufficient permissions"}), status=403, headers=c, mimetype="application/json")
+    customer_id = user.get("customer_id", "")
+    data = request.get_json() or {}
+    try:
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        # Verify quote belongs to this customer
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+            headers=at_headers(read_token), timeout=10,
+        )
+        if r.status_code != 200:
+            return Response(json.dumps({"error": "Quote not found"}), status=404, headers=c, mimetype="application/json")
+        mo_fields   = r.json().get("fields", {})
+        cust_ids    = mo_fields.get("Customer", [])
+        if customer_id not in cust_ids:
+            return Response(json.dumps({"error": "Not authorized"}), status=403, headers=c, mimetype="application/json")
+        cust_id = cust_ids[0]
+
+        # Build update fields — bill-to and ship-to address only; no expiry/price changes
+        fields = {}
+        if data.get("billOrg"):   fields["Bill-To Org Name"]            = data["billOrg"]
+        if data.get("billName"):  fields["Bill-To Contact Name"]         = data["billName"]
+        if "billAddr1" in data:   fields["Bill-To Address (Line 1)"]     = data["billAddr1"]
+        if "billAddr2" in data:   fields["Bill-To Address (Line 2)"]     = data["billAddr2"]
+        if data.get("shipOrg"):   fields["Organization Name"]            = data["shipOrg"]
+        if data.get("shipName"):  fields["Main Contact Name"]            = data["shipName"]
+        if "shipAddr1" in data:   fields["Customer Address (Line 1)"]    = data["shipAddr1"]
+        if "shipLine2" in data:   fields["Customer Address (Line 2)"]    = data["shipLine2"]
+
+        if fields:
+            wr = req_lib.patch(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{cust_id}",
+                headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
+                json={"fields": fields},
+                timeout=15,
+            )
+            wr.raise_for_status()
+
+        return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
 @app.route("/api/portal/duplicate-quote/<record_id>", methods=["POST"])
 @portal_login_required
 def portal_duplicate_quote(user, record_id):

@@ -486,8 +486,43 @@ if (window.self !== window.top) {
 
     <!-- Customer card -->
     <div class="card" id="customerCard">
-      <div class="section-title">Customer</div>
-      <div id="custInfo"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="section-title" style="margin-bottom:0;">Customer</div>
+        <button id="editAddressBtn" class="btn btn-secondary" style="display:none;padding:5px 12px;font-size:0.8rem;" onclick="openAddressEdit()">Edit Addresses</button>
+      </div>
+      <div id="custInfo" style="margin-top:10px;"></div>
+      <!-- Inline address edit form -->
+      <div id="addressEditForm" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+          <div>
+            <div style="font-weight:600;font-size:0.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Bill To</div>
+            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:2px;">Organization</label>
+            <input type="text" id="ae_billOrg" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:2px;">Contact Name</label>
+            <input type="text" id="ae_billName" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:2px;">Address Line 1</label>
+            <input type="text" id="ae_billAddr1" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:2px;">Address Line 2</label>
+            <input type="text" id="ae_billAddr2" style="width:100%;box-sizing:border-box;">
+          </div>
+          <div>
+            <div style="font-weight:600;font-size:0.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Ship To</div>
+            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:2px;">Organization</label>
+            <input type="text" id="ae_shipOrg" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:2px;">Contact Name</label>
+            <input type="text" id="ae_shipName" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:2px;">Address Line 1</label>
+            <input type="text" id="ae_shipAddr1" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:2px;">City, State ZIP</label>
+            <input type="text" id="ae_shipLine2" placeholder="e.g. Atlanta, GA 30301" style="width:100%;box-sizing:border-box;">
+          </div>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:10px;align-items:center;">
+          <button class="btn btn-primary" onclick="saveAddressEdit()" id="saveAddrBtn">Save</button>
+          <button class="btn btn-secondary" onclick="cancelAddressEdit()">Cancel</button>
+          <span id="addrSaveMsg" style="font-size:0.84rem;color:var(--muted);"></span>
+        </div>
+      </div>
     </div>
 
     <!-- Items card -->
@@ -737,6 +772,11 @@ function render() {
   }
 
   // Customer info
+  renderCustomer();
+  renderQuoteDetails();
+}
+
+function renderCustomer() {
   const c = quoteData.customer || {};
   const custEl = document.getElementById('custInfo');
   if (custEl) {
@@ -785,6 +825,10 @@ function render() {
         <div>${shipHtml}</div>
       </div>`;
   }
+}
+
+function renderQuoteDetails() {
+  const q = quoteData;
 
   // Status banners
   if (q.isAccepted) {
@@ -811,6 +855,11 @@ function render() {
   document.getElementById('addItemSection').classList.toggle('hidden', !editable);
   document.getElementById('saveRow').classList.toggle('hidden', !editable);
   document.getElementById('thRemove').textContent = editable ? '' : '';
+
+  // Show Edit Addresses button for users with create_quote permission
+  if (portalUser && portalUser.canCreateQuote !== false) {
+    document.getElementById('editAddressBtn').style.display = '';
+  }
 
   // Actions bar
   buildActions(editable);
@@ -868,6 +917,71 @@ function updateTotals() {
   if (shipping > 0) {
     document.getElementById('vShipping').textContent = '$' + shipping.toFixed(2);
     document.getElementById('vRowShipping').classList.remove('hidden');
+  }
+}
+
+function openAddressEdit() {
+  const c = quoteData.customer || {};
+  document.getElementById('ae_billOrg').value   = c.billToOrg   || c.orgName     || '';
+  document.getElementById('ae_billName').value  = c.billToName  || c.contactName || '';
+  document.getElementById('ae_billAddr1').value = c.billToAddr1 || '';
+  document.getElementById('ae_billAddr2').value = c.billToAddr2 || '';
+  document.getElementById('ae_shipOrg').value   = c.orgName     || '';
+  document.getElementById('ae_shipName').value  = c.contactName || '';
+  document.getElementById('ae_shipAddr1').value = c.address1    || '';
+  const city = c.city || '', state = (c.state || '').toUpperCase(), zip = c.zip || '';
+  const line2 = [city, [state, zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  document.getElementById('ae_shipLine2').value = line2;
+  document.getElementById('addrSaveMsg').textContent = '';
+  document.getElementById('addressEditForm').style.display = '';
+  document.getElementById('editAddressBtn').style.display = 'none';
+}
+
+function cancelAddressEdit() {
+  document.getElementById('addressEditForm').style.display = 'none';
+  document.getElementById('editAddressBtn').style.display = '';
+}
+
+async function saveAddressEdit() {
+  const btn = document.getElementById('saveAddrBtn');
+  const msg = document.getElementById('addrSaveMsg');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const payload = {
+    billOrg:   document.getElementById('ae_billOrg').value.trim(),
+    billName:  document.getElementById('ae_billName').value.trim(),
+    billAddr1: document.getElementById('ae_billAddr1').value.trim(),
+    billAddr2: document.getElementById('ae_billAddr2').value.trim(),
+    shipOrg:   document.getElementById('ae_shipOrg').value.trim(),
+    shipName:  document.getElementById('ae_shipName').value.trim(),
+    shipAddr1: document.getElementById('ae_shipAddr1').value.trim(),
+    shipLine2: document.getElementById('ae_shipLine2').value.trim(),
+  };
+  try {
+    const r = await fetch(`/api/portal/update-quote-addresses/${recordId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(payload),
+    });
+    const data = await r.json();
+    if (!data.ok) throw new Error(data.error || 'Failed');
+    // Update local quoteData so display refreshes
+    const c = quoteData.customer;
+    c.billToOrg = payload.billOrg; c.billToName = payload.billName;
+    c.billToAddr1 = payload.billAddr1; c.billToAddr2 = payload.billAddr2;
+    c.orgName = payload.shipOrg; c.contactName = payload.shipName;
+    c.address1 = payload.shipAddr1;
+    // Parse city/state/zip from line2
+    const parts = payload.shipLine2.split(',').map(s => s.trim());
+    c.city = parts[0] || '';
+    const stateZip = (parts[1] || '').trim().split(/\s+/);
+    c.state = stateZip[0] || ''; c.zip = stateZip[1] || '';
+    renderCustomer();
+    cancelAddressEdit();
+  } catch(e) {
+    msg.textContent = 'Error: ' + (e.message || 'Could not save.');
+    msg.style.color = '#c0392b';
+    btn.disabled = false; btn.textContent = 'Save';
   }
 }
 
