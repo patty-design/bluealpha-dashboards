@@ -8626,8 +8626,7 @@ def admin_shipped_orders():
         read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
         records = at_get_all(
             MANUAL_ORDERS_TABLE_ID, read_token,
-            fields=["Document ID", "Order ID", "Date", "Bill-To Org Name (from Customer)",
-                    "MO Line Items", "Adj. Unit Price (from MO Line Items)"],
+            fields=["Document ID", "Order ID", "Date", "Bill-To Org Name (from Customer)", "MO Line Items"],
             formula='AND({Order Type}="Sales Order",{Sales Order Status}="Approved",IS_AFTER({Date},"2026-04-30"))',
         )
         # Existing invoices: order_id → inv_number
@@ -8641,6 +8640,18 @@ def admin_shipped_orders():
                                     fields=["Order #", "Tracking #"], base_id=_SO_TRACKING_BASE)
         tracking_map = {r["fields"].get("Order #", ""): r["fields"].get("Tracking #", "")
                         for r in tracking_recs if r.get("fields", {}).get("Order #")}
+        # Batch-fetch line item totals (same as portal_orders)
+        all_li_ids = []
+        for rec in records:
+            all_li_ids.extend(rec.get("fields", {}).get("MO Line Items", []))
+        li_total_map = {}
+        if all_li_ids:
+            for chunk in [all_li_ids[i:i+30] for i in range(0, len(all_li_ids), 30)]:
+                formula_li = "OR(" + ",".join(f'RECORD_ID()="{lid}"' for lid in chunk) + ")"
+                li_recs = at_get_all(MO_LINE_ITEMS_TABLE_ID, read_token,
+                                     fields=["Dynamic Line Item Total"], formula=formula_li)
+                for lr in li_recs:
+                    li_total_map[lr["id"]] = float(lr.get("fields", {}).get("Dynamic Line Item Total") or 0)
         orders = []
         for rec in records:
             f = rec.get("fields", {})
@@ -8651,8 +8662,7 @@ def admin_shipped_orders():
             order_id = f.get("Order ID", "")
             org_list = f.get("Bill-To Org Name (from Customer)", [])
             org_name = org_list[0] if isinstance(org_list, list) and org_list else (org_list or "")
-            prices   = f.get("Adj. Unit Price (from MO Line Items)", []) or []
-            total    = round(sum(prices), 2)
+            total    = round(sum(li_total_map.get(lid, 0) for lid in f.get("MO Line Items", [])), 2)
             orders.append({
                 "record_id":  rec["id"],
                 "so_number":  so_number,
