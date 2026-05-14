@@ -5928,9 +5928,17 @@ def portal_orders(user):
         # Fetch all SOs then filter in Python (ARRAYJOIN formula returns display names not record IDs)
         records = at_get_all(
             MANUAL_ORDERS_TABLE_ID, read_token,
-            fields=["Document ID", "Order ID", "Date", "MO Line Items", "Customer", "Sales Order Status", "Go-to PDF", "Tracking"],
+            fields=["Document ID", "Order ID", "Date", "MO Line Items", "Customer", "Sales Order Status", "Go-to PDF"],
             formula='{Order Type}="Sales Order"',
         )
+        # Fetch tracking from Sales Order Tracking table (Automated Data base)
+        tracking_recs = at_get_all(
+            _SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
+            fields=["Document ID", "Tracking"],
+            base_id=_SO_TRACKING_BASE,
+        )
+        tracking_map = {r["fields"].get("Document ID", "").strip(): (r["fields"].get("Tracking") or "")
+                        for r in tracking_recs if r.get("fields", {}).get("Document ID")}
         records = [r for r in records
                    if customer_id in r.get("fields", {}).get("Customer", [])
                    and r.get("fields", {}).get("Sales Order Status") == "Approved"]
@@ -5963,7 +5971,7 @@ def portal_orders(user):
                 "date":       f.get("Date", ""),
                 "total":      round(total, 2),
                 "go_to_pdf":  go_to_pdf_url,
-                "tracking":   f.get("Tracking", "") or "",
+                "tracking":   tracking_map.get(so_number, ""),
             })
         orders.sort(key=lambda x: x.get("date", ""), reverse=True)
         _ORDERS_CACHE[customer_id] = {"ts": _time_mod.time(), "data": orders}
@@ -8170,60 +8178,79 @@ threading.Thread(target=_ontime_bg_worker, daemon=True).start()
 
 # ── Nightly tracking sync ─────────────────────────────────────────────────────
 
-def _sync_tracking_for_order(rec_id, doc_id, order_id, write_token):
-    """Query ShipStation for a single SO and write tracking back to Airtable.
-    Tries Document ID (e.g. 'SO-0326') first, then bare Order ID ('0326')."""
-    try:
-        ss_hdrs = ss_headers()
-        tracking_parts = []
-        # ShipStation order numbers use Document ID format: "SO-0301"
-        r = req_lib.get("https://ssapi.shipstation.com/shipments",
-                         params={"orderNumber": doc_id, "pageSize": 50},
-                         headers=ss_hdrs, timeout=15)
-        if r.ok:
-            for s in r.json().get("shipments", []):
-                if s.get("voided"):
-                    continue
-                tn = (s.get("trackingNumber") or "").strip()
-                carrier = (s.get("carrierCode") or "").strip()
-                if tn and tn not in tracking_parts:
-                    tracking_parts.append(f"{carrier}: {tn}" if carrier else tn)
-
-        tracking_str = " | ".join(tracking_parts) if tracking_parts else ""
-        # Always write back (even empty string clears stale data)
-        req_lib.patch(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{rec_id}",
-            headers={**at_headers(write_token), "Content-Type": "application/json"},
-            json={"fields": {"Tracking": tracking_str}},
-            timeout=15,
-        )
-        if tracking_str:
-            print(f"[tracking-sync] {doc_id}: {tracking_str}")
-    except Exception as exc:
-        print(f"[tracking-sync] error for {doc_id}: {exc}")
+_SO_TRACKING_BASE  = "app3xt0dghBWnHxdN"
+_SO_TRACKING_TABLE = "tblZZ2QwIyNFDEy5H"
+_SO_TRACKING_TOKEN = os.environ.get("SO_TRACKING_WRITE_TOKEN", "")
 
 
 def _run_tracking_sync():
-    """Fetch all approved SOs and sync tracking from ShipStation → Airtable."""
+    """Fetch all approved SOs, pull tracking from ShipStation, upsert into Sales Order Tracking table."""
     try:
-        write_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
         records = at_get_all(
-            MANUAL_ORDERS_TABLE_ID, write_token,
-            fields=["Document ID", "Order ID", "Sales Order Status"],
+            MANUAL_ORDERS_TABLE_ID, read_token,
+            fields=["Document ID", "Order ID", "Date", "Sales Order Status"],
             formula='AND({Order Type}="Sales Order",{Sales Order Status}="Approved")',
         )
         print(f"[tracking-sync] syncing {len(records)} approved SOs")
+
+        # Fetch existing tracking records indexed by Document ID
+        existing = at_get_all(_SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
+                               fields=["Document ID"],
+                               base_id=_SO_TRACKING_BASE)
+        existing_by_doc = {r["fields"].get("Document ID", "").strip(): r["id"]
+                           for r in existing if r.get("fields", {}).get("Document ID")}
+
+        dest_headers = {**at_headers(_SO_TRACKING_TOKEN), "Content-Type": "application/json"}
+        ss_hdrs = ss_headers()
+        synced = 0
+
         for rec in records:
             f = rec.get("fields", {})
-            _sync_tracking_for_order(
-                rec["id"],
-                f.get("Document ID", ""),
-                f.get("Order ID", ""),
-                write_token,
-            )
-        # Clear orders cache so next fetch picks up fresh tracking
+            doc_id = (f.get("Document ID") or "").strip()
+            if not doc_id:
+                continue
+            try:
+                # Get tracking from ShipStation
+                r = req_lib.get("https://ssapi.shipstation.com/shipments",
+                                 params={"orderNumber": doc_id, "pageSize": 50},
+                                 headers=ss_hdrs, timeout=15)
+                tracking_parts = []
+                if r.ok:
+                    for s in r.json().get("shipments", []):
+                        if s.get("voided"):
+                            continue
+                        tn = (s.get("trackingNumber") or "").strip()
+                        carrier = (s.get("carrierCode") or "").strip()
+                        if tn and tn not in tracking_parts:
+                            tracking_parts.append(f"{carrier}: {tn}" if carrier else tn)
+
+                tracking_str = " | ".join(tracking_parts)
+                fields = {
+                    "Document ID": doc_id,
+                    "Order ID":    f.get("Order ID", ""),
+                    "Date":        f.get("Date", ""),
+                    "Tracking":    tracking_str,
+                }
+
+                if doc_id in existing_by_doc:
+                    req_lib.patch(
+                        f"https://api.airtable.com/v0/{_SO_TRACKING_BASE}/{_SO_TRACKING_TABLE}/{existing_by_doc[doc_id]}",
+                        headers=dest_headers, json={"fields": fields}, timeout=15,
+                    )
+                else:
+                    req_lib.post(
+                        f"https://api.airtable.com/v0/{_SO_TRACKING_BASE}/{_SO_TRACKING_TABLE}",
+                        headers=dest_headers, json={"records": [{"fields": fields}]}, timeout=15,
+                    )
+                if tracking_str:
+                    print(f"[tracking-sync] {doc_id}: {tracking_str}")
+                    synced += 1
+            except Exception as exc:
+                print(f"[tracking-sync] error for {doc_id}: {exc}")
+
         _ORDERS_CACHE.clear()
-        print("[tracking-sync] done")
+        print(f"[tracking-sync] done — {synced} orders with tracking")
     except Exception as exc:
         print(f"[tracking-sync] run failed: {exc}")
 
@@ -8294,11 +8321,12 @@ def admin_sync_tracking_debug():
                                 headers=ss_headers(), timeout=15)
             entry["ss_status"] = ss_r.status_code
             entry["ss_total"] = ss_r.json().get("total", 0) if ss_r.ok else "error"
-            # Try write
-            patch_r = req_lib.patch(
-                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{rec['id']}",
-                headers={**at_headers(write_token), "Content-Type": "application/json"},
-                json={"fields": {"Tracking": ""}},
+            # Try write to Sales Order Tracking table
+            dest_hdrs = {**at_headers(_SO_TRACKING_TOKEN), "Content-Type": "application/json"}
+            patch_r = req_lib.post(
+                f"https://api.airtable.com/v0/{_SO_TRACKING_BASE}/{_SO_TRACKING_TABLE}",
+                headers=dest_hdrs,
+                json={"records": [{"fields": {"Document ID": doc_id, "Tracking": "TEST"}}]},
                 timeout=15,
             )
             entry["at_write_status"] = patch_r.status_code
