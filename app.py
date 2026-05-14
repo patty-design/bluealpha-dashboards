@@ -5934,11 +5934,11 @@ def portal_orders(user):
         # Fetch tracking from Sales Order Tracking table (Automated Data base)
         tracking_recs = at_get_all(
             _SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
-            fields=["Document ID", "Tracking"],
+            fields=["Order #", "Tracking #"],
             base_id=_SO_TRACKING_BASE,
         )
-        tracking_map = {r["fields"].get("Document ID", "").strip(): (r["fields"].get("Tracking") or "")
-                        for r in tracking_recs if r.get("fields", {}).get("Document ID")}
+        tracking_map = {r["fields"].get("Order #", "").strip(): (r["fields"].get("Tracking #") or "")
+                        for r in tracking_recs if r.get("fields", {}).get("Order #")}
         records = [r for r in records
                    if customer_id in r.get("fields", {}).get("Customer", [])
                    and r.get("fields", {}).get("Sales Order Status") == "Approved"]
@@ -8179,7 +8179,7 @@ threading.Thread(target=_ontime_bg_worker, daemon=True).start()
 # ── Nightly tracking sync ─────────────────────────────────────────────────────
 
 _SO_TRACKING_BASE  = "app3xt0dghBWnHxdN"
-_SO_TRACKING_TABLE = "tblZZ2QwIyNFDEy5H"
+_SO_TRACKING_TABLE = "tblvgBZZvxwRPZpMx"   # SO Tracking Link (writable)
 _SO_TRACKING_TOKEN = os.environ.get("SO_TRACKING_WRITE_TOKEN", "")
 
 
@@ -8194,12 +8194,12 @@ def _run_tracking_sync():
         )
         print(f"[tracking-sync] syncing {len(records)} approved SOs")
 
-        # Fetch existing tracking records indexed by Document ID
+        # Fetch existing tracking records indexed by Order #
         existing = at_get_all(_SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
-                               fields=["Document ID"],
+                               fields=["Order #"],
                                base_id=_SO_TRACKING_BASE)
-        existing_by_doc = {r["fields"].get("Document ID", "").strip(): r["id"]
-                           for r in existing if r.get("fields", {}).get("Document ID")}
+        existing_by_doc = {r["fields"].get("Order #", "").strip(): r["id"]
+                           for r in existing if r.get("fields", {}).get("Order #")}
 
         dest_headers = {**at_headers(_SO_TRACKING_TOKEN), "Content-Type": "application/json"}
         ss_hdrs = ss_headers()
@@ -8227,10 +8227,9 @@ def _run_tracking_sync():
 
                 tracking_str = " | ".join(tracking_parts)
                 fields = {
-                    "Document ID": doc_id,
-                    "Order ID":    f.get("Order ID", ""),
-                    "Date":        f.get("Date", ""),
-                    "Tracking":    tracking_str,
+                    "Order #":    doc_id,
+                    "Date":       f.get("Date", ""),
+                    "Tracking #": tracking_str,
                 }
 
                 if doc_id in existing_by_doc:
