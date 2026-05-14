@@ -8223,7 +8223,7 @@ def _run_tracking_sync():
                         tn = (s.get("trackingNumber") or "").strip()
                         carrier = (s.get("carrierCode") or "").strip()
                         if tn and tn not in tracking_parts:
-                            tracking_parts.append(f"{carrier}: {tn}" if carrier else tn)
+                            tracking_parts.append(tn)
 
                 tracking_str = " | ".join(tracking_parts)
                 fields = {
