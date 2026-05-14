@@ -222,7 +222,7 @@
     .badge-active   { background: #d4edda; color: #155724; }
     .badge-accepted { background: #d4edda; color: #155724; }
     .badge-expired  { background: #f8d7da; color: #721c24; }
-    .tracking-info { font-family: monospace; font-size: 0.82rem; color: #1a5276; word-break: break-all; }
+    .tracking-info { font-family: monospace; font-size: 0.82rem; color: #1a5276; word-break: break-all; text-decoration: underline; }
     .empty-state {
       text-align: center;
       padding: 48px 20px;
@@ -553,6 +553,17 @@
       }
     })();
 
+    function trackingUrl(tn) {
+      if (!tn) return '#';
+      const t = tn.replace(/\s/g, '');
+      if (/^1Z/i.test(t)) return `https://www.ups.com/track?tracknum=${t}`;
+      if (/^\d{22}$/.test(t) || /^9[2-4]\d{20}$/.test(t) || /^9[0-9]{15,21}$/.test(t))
+        return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${t}`;
+      if (/^[0-9]{12,15}$/.test(t)) return `https://www.fedex.com/fedextrack/?tracknumbers=${t}`;
+      // Default to USPS for long numeric strings
+      return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${t}`;
+    }
+
     function fmt(dateStr) {
       if (!dateStr) return '—';
       try { return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); }
@@ -616,7 +627,7 @@
             <td><strong>${o.so_number || '—'}</strong></td>
             <td>${fmt(o.date)}</td>
             <td>${money(o.total)}</td>
-            <td>${o.tracking ? `<span class="tracking-info">${o.tracking}</span>` : '<span style="color:var(--text-muted)">—</span>'}</td>
+            <td>${o.tracking ? `<a class="tracking-info" href="${trackingUrl(o.tracking)}" target="_blank" rel="noopener">${o.tracking}</a>` : '<span style="color:var(--text-muted)">—</span>'}</td>
             <td><span class="badge badge-active">Confirmed</span></td>
             <td><button class="btn-sm" onclick="openViewOrder('${o.record_id}')">View →</button></td>
           </tr>`).join('') +
