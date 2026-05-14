@@ -930,7 +930,7 @@
     // ── Helpers ───────────────────────────────────────────────────────────────
     function fmt(s) {
       if (!s) return '—';
-      try { return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); }
+      try { return new Date(s + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); }
       catch { return s; }
     }
     function esc(s) {
