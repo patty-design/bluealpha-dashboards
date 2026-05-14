@@ -8190,7 +8190,7 @@ def _run_tracking_sync():
         records = at_get_all(
             MANUAL_ORDERS_TABLE_ID, read_token,
             fields=["Document ID", "Order ID", "Date", "Sales Order Status"],
-            formula='AND({Order Type}="Sales Order",{Sales Order Status}="Approved")',
+            formula='AND({Order Type}="Sales Order",{Sales Order Status}="Approved",IS_AFTER({Date},"2026-04-30"))',
         )
         print(f"[tracking-sync] syncing {len(records)} approved SOs")
 
