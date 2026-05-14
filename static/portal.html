@@ -222,6 +222,7 @@
     .badge-active   { background: #d4edda; color: #155724; }
     .badge-accepted { background: #d4edda; color: #155724; }
     .badge-expired  { background: #f8d7da; color: #721c24; }
+    .tracking-info { font-family: monospace; font-size: 0.82rem; color: #1a5276; word-break: break-all; }
     .empty-state {
       text-align: center;
       padding: 48px 20px;
@@ -610,11 +611,12 @@
           el.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.07-.44.18-.88.18-1.36C18 2.54 15.46 0 12 0 9.24 0 6.8 1.64 5.73 4H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8-4c1.66 0 3 1.34 3 3H9c0-1.66 1.34-3 3-3z"/></svg><p>No orders yet</p></div>';
           return;
         }
-        el.innerHTML = '<table><thead><tr><th>Sales Order #</th><th>Date</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>' +
+        el.innerHTML = '<table><thead><tr><th>Sales Order #</th><th>Date</th><th>Total</th><th>Tracking</th><th>Status</th><th></th></tr></thead><tbody>' +
           data.orders.map(o => `<tr>
             <td><strong>${o.so_number || '—'}</strong></td>
             <td>${fmt(o.date)}</td>
             <td>${money(o.total)}</td>
+            <td>${o.tracking ? `<span class="tracking-info">${o.tracking}</span>` : '<span style="color:var(--text-muted)">—</span>'}</td>
             <td><span class="badge badge-active">Confirmed</span></td>
             <td><button class="btn-sm" onclick="openViewOrder('${o.record_id}')">View →</button></td>
           </tr>`).join('') +
