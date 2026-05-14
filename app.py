@@ -8206,7 +8206,7 @@ def _sync_tracking_for_order(rec_id, doc_id, order_id, write_token):
 def _run_tracking_sync():
     """Fetch all approved SOs and sync tracking from ShipStation → Airtable."""
     try:
-        write_token = RETURNS_WRITE_TOKEN or AIRTABLE_OPS_TOKEN or AIRTABLE_BASE_TOKEN
+        write_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
         records = at_get_all(
             MANUAL_ORDERS_TABLE_ID, write_token,
             fields=["Document ID", "Order ID", "Sales Order Status"],
