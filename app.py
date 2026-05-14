@@ -8263,6 +8263,52 @@ def admin_sync_tracking():
     threading.Thread(target=_run_tracking_sync, daemon=True).start()
     return Response(json.dumps({"ok": True, "message": "Tracking sync started"}), headers=c, mimetype="application/json")
 
+
+@app.route("/api/admin/sync-tracking-debug", methods=["POST"])
+def admin_sync_tracking_debug():
+    """Run tracking sync for first 5 SOs synchronously and return detailed results."""
+    c = cors()
+    auth = request.headers.get("Authorization", "")
+    admin_pw = os.environ.get("CS_ADMIN_PASSWORD", "")
+    if not admin_pw or auth != f"Bearer {admin_pw}":
+        return Response(json.dumps({"error": "unauthorized"}), status=401, headers=c, mimetype="application/json")
+    try:
+        write_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        results = {
+            "write_token_set": bool(write_token),
+            "ss_key_set": bool(SHIPSTATION_KEY),
+            "orders": []
+        }
+        records = at_get_all(
+            MANUAL_ORDERS_TABLE_ID, write_token,
+            fields=["Document ID", "Order ID", "Sales Order Status"],
+            formula='AND({Order Type}="Sales Order",{Sales Order Status}="Approved")',
+        )
+        for rec in records[:5]:
+            f = rec.get("fields", {})
+            doc_id = f.get("Document ID", "")
+            entry = {"record_id": rec["id"], "doc_id": doc_id}
+            # Query ShipStation
+            ss_r = req_lib.get("https://ssapi.shipstation.com/shipments",
+                                params={"orderNumber": doc_id, "pageSize": 10},
+                                headers=ss_headers(), timeout=15)
+            entry["ss_status"] = ss_r.status_code
+            entry["ss_total"] = ss_r.json().get("total", 0) if ss_r.ok else "error"
+            # Try write
+            patch_r = req_lib.patch(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{rec['id']}",
+                headers={**at_headers(write_token), "Content-Type": "application/json"},
+                json={"fields": {"Tracking": ""}},
+                timeout=15,
+            )
+            entry["at_write_status"] = patch_r.status_code
+            if not patch_r.ok:
+                entry["at_write_error"] = patch_r.text[:200]
+            results["orders"].append(entry)
+        return Response(json.dumps(results, indent=2), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
 # ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
