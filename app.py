@@ -8176,24 +8176,18 @@ def _sync_tracking_for_order(rec_id, doc_id, order_id, write_token):
     try:
         ss_hdrs = ss_headers()
         tracking_parts = []
-        for num in [doc_id, order_id]:
-            if not num:
-                continue
-            r = req_lib.get("https://ssapi.shipstation.com/shipments",
-                             params={"orderNumber": num, "pageSize": 50},
-                             headers=ss_hdrs, timeout=15)
-            if not r.ok:
-                continue
-            shipments = r.json().get("shipments", [])
-            for s in shipments:
+        # ShipStation order numbers use Document ID format: "SO-0301"
+        r = req_lib.get("https://ssapi.shipstation.com/shipments",
+                         params={"orderNumber": doc_id, "pageSize": 50},
+                         headers=ss_hdrs, timeout=15)
+        if r.ok:
+            for s in r.json().get("shipments", []):
                 if s.get("voided"):
                     continue
                 tn = (s.get("trackingNumber") or "").strip()
                 carrier = (s.get("carrierCode") or "").strip()
-                if tn and tn not in [p.split(" | ")[-1] for p in tracking_parts]:
+                if tn and tn not in tracking_parts:
                     tracking_parts.append(f"{carrier}: {tn}" if carrier else tn)
-            if tracking_parts:
-                break  # found with this format — no need to try next
 
         tracking_str = " | ".join(tracking_parts) if tracking_parts else ""
         # Always write back (even empty string clears stale data)
