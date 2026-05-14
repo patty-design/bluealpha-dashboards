@@ -3853,6 +3853,132 @@ def send_quote_accepted_email(to_email, to_name, org_name, qu_number, so_number)
         print(f"[send_quote_accepted_email] failed: {e}")
 
 
+def send_invoice_email(to_email, to_name, org_name, so_number, inv_number, line_items, total, tracking):
+    """Send invoice email after SO is converted to invoice."""
+    if not SENDGRID_API_KEY:
+        return
+    actual_to = TEST_EMAIL_OVERRIDE or to_email
+    first_name = to_name.split()[0] if to_name else "there"
+    subject = f"Blue Alpha {so_number} \u2014 Invoice {inv_number}"
+    from datetime import timedelta
+    due_date = (_today_utc() + timedelta(days=30)).strftime("%B %d, %Y")
+    today_str = _today_utc().strftime("%B %d, %Y")
+
+    # Build line items rows
+    li_rows = ""
+    for li in line_items:
+        name       = li.get("name", "")
+        qty        = li.get("qty", 0)
+        unit_price = float(li.get("unit_price") or 0)
+        line_total = qty * unit_price
+        li_rows += f"""
+            <tr>
+              <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#1a2633;font-size:13px;">{name}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#1a2633;font-size:13px;text-align:center;">{qty}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#1a2633;font-size:13px;text-align:right;">${unit_price:,.2f}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#1a2633;font-size:13px;text-align:right;">${line_total:,.2f}</td>
+            </tr>"""
+
+    tracking_display = tracking if tracking else "—"
+
+    html_body = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7fa;padding:32px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background:#1B2438;padding:28px 40px;">
+          <span style="font-family:Arial,Helvetica,sans-serif;font-size:22px;font-weight:800;color:#ffffff;letter-spacing:2px;">BLUE ALPHA</span>
+        </td></tr>
+        <tr><td style="padding:36px 40px;">
+          <p style="color:#1a2633;font-size:16px;margin:0 0 8px;">Hi {first_name},</p>
+          <p style="color:#6b7a8d;font-size:15px;line-height:1.6;margin:0 0 24px;">
+            Your order has shipped and your invoice is ready. Please review the details below.
+          </p>
+          <!-- Info box -->
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7fa;border:1px solid #dde3ea;border-radius:8px;margin-bottom:28px;">
+            <tr><td style="padding:20px 24px;">
+              <table cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="padding:4px 0;color:#6b7a8d;font-size:13px;width:130px;">Organization</td>
+                  <td style="padding:4px 0;color:#1a2633;font-size:13px;">{org_name}</td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Sales Order</td>
+                  <td style="padding:4px 0;color:#1a2633;font-size:13px;font-weight:700;">{so_number}</td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Invoice #</td>
+                  <td style="padding:4px 0;color:#1a2633;font-size:13px;font-weight:700;">{inv_number}</td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Tracking #</td>
+                  <td style="padding:4px 0;color:#1a2633;font-size:13px;">{tracking_display}</td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Terms</td>
+                  <td style="padding:4px 0;color:#1a2633;font-size:13px;">Net 30</td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Invoice Date</td>
+                  <td style="padding:4px 0;color:#1a2633;font-size:13px;">{today_str}</td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Due Date</td>
+                  <td style="padding:4px 0;color:#1a2633;font-size:13px;font-weight:700;">{due_date}</td>
+                </tr>
+              </table>
+            </td></tr>
+          </table>
+          <!-- Line items table -->
+          <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #dde3ea;border-radius:8px;overflow:hidden;margin-bottom:20px;">
+            <thead>
+              <tr style="background:#1B2438;">
+                <th style="padding:10px 12px;color:#ffffff;font-size:12px;text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Description</th>
+                <th style="padding:10px 12px;color:#ffffff;font-size:12px;text-align:center;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Qty</th>
+                <th style="padding:10px 12px;color:#ffffff;font-size:12px;text-align:right;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Unit Price</th>
+                <th style="padding:10px 12px;color:#ffffff;font-size:12px;text-align:right;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Total</th>
+              </tr>
+            </thead>
+            <tbody>{li_rows}
+              <tr style="background:#f5f7fa;">
+                <td colspan="3" style="padding:10px 12px;color:#1a2633;font-size:14px;font-weight:700;text-align:right;">Grand Total</td>
+                <td style="padding:10px 12px;color:#1B2438;font-size:14px;font-weight:800;text-align:right;">${total:,.2f}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p style="color:#BD3333;font-size:12px;margin:0 0 20px;line-height:1.6;">
+            A 1.5% monthly late fee applies to balances unpaid after 30 days.
+          </p>
+          <p style="color:#6b7a8d;font-size:13px;margin:0 0 0;line-height:1.6;">
+            Questions? Contact us at <a href="mailto:info@bluealpha.us" style="color:#1B2438;">info@bluealpha.us</a> or 678-961-3304.
+          </p>
+        </td></tr>
+        <tr><td style="background:#f5f7fa;border-top:1px solid #dde3ea;padding:20px 40px;text-align:center;">
+          <p style="color:#6b7a8d;font-size:12px;margin:0;">Blue Alpha &bull; bluealphabelts.com &bull; info@bluealpha.us &bull; 678-961-3304</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+    try:
+        req_lib.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "personalizations": [{"to": [{"email": actual_to, "name": to_name}]}],
+                "from": {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
+                "subject": subject,
+                "content": [{"type": "text/html", "value": html_body}],
+            },
+            timeout=15,
+        )
+    except Exception as e:
+        print(f"[send_invoice_email] failed: {e}")
+
+
 def _fetch_quote_data(record_id):
     """Shared logic: fetch full quote data dict from Airtable. Returns dict or raises."""
     from datetime import date as dt_date
@@ -8173,6 +8299,318 @@ def _ontime_bg_worker():
         except Exception as exc:
             print(f'[ontime-bg] error: {exc}')
             _t.sleep(300)  # back off 5 min on error
+
+_INVOICES_CACHE: dict = {}  # {customer_id: {"ts": float, "data": list}}
+_INVOICES_CACHE_TTL = 60   # seconds
+
+
+@app.route("/api/portal/admin/shipped-orders")
+@portal_login_required
+def portal_admin_shipped_orders(user):
+    """List shipped (tracking available) approved SOs with invoiced status. Admin only."""
+    c = cors()
+    if not portal_can(user, "manage_team"):
+        return Response(json.dumps({"error": "Insufficient permissions"}), status=403, headers=c, mimetype="application/json")
+    try:
+        import time as _time_mod
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+
+        # Fetch approved SOs (after 2026-04-30)
+        so_records = at_get_all(
+            MANUAL_ORDERS_TABLE_ID, read_token,
+            fields=["Document ID", "Order ID", "Date", "Bill-To Org Name (from Customer)",
+                    "MO Line Items", "Adj. Unit Price (from MO Line Items)"],
+            formula='AND({Order Type}="Sales Order",{Sales Order Status}="Approved",IS_AFTER({Date},"2026-04-30"))',
+        )
+
+        # Fetch all existing invoices to know which SOs are already invoiced
+        inv_records = at_get_all(
+            MANUAL_ORDERS_TABLE_ID, read_token,
+            fields=["Order ID", "Document ID"],
+            formula='{Order Type}="Invoice"',
+        )
+        # Build dict: order_id -> inv_number (Document ID of the invoice)
+        invoiced_ids = {}
+        for ir in inv_records:
+            f = ir.get("fields", {})
+            oid = str(f.get("Order ID", "")).strip()
+            doc = f.get("Document ID", "")
+            if oid:
+                invoiced_ids[oid] = doc
+
+        # Fetch tracking from SO Tracking Link
+        tracking_recs = at_get_all(
+            _SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
+            fields=["Order #", "Tracking #"],
+            base_id=_SO_TRACKING_BASE,
+        )
+        tracking_map = {r["fields"].get("Order #", "").strip(): (r["fields"].get("Tracking #") or "")
+                        for r in tracking_recs if r.get("fields", {}).get("Order #")}
+
+        orders = []
+        for rec in so_records:
+            f = rec.get("fields", {})
+            so_number  = f.get("Document ID", "")
+            order_id   = str(f.get("Order ID", "")).strip()
+            tracking   = tracking_map.get(so_number, "")
+            if not tracking:
+                continue  # skip unshipped
+            org_name_list = f.get("Bill-To Org Name (from Customer)", [])
+            org_name = org_name_list[0] if org_name_list else ""
+            adj_prices = f.get("Adj. Unit Price (from MO Line Items)", [])
+            total = round(sum(float(p or 0) for p in adj_prices), 2)
+            invoiced   = order_id in invoiced_ids
+            inv_number = invoiced_ids.get(order_id)
+            orders.append({
+                "record_id":  rec["id"],
+                "so_number":  so_number,
+                "order_id":   order_id,
+                "date":       f.get("Date", ""),
+                "org_name":   org_name,
+                "total":      total,
+                "tracking":   tracking,
+                "invoiced":   invoiced,
+                "inv_number": inv_number,
+            })
+
+        orders.sort(key=lambda x: x.get("date", ""), reverse=True)
+        return Response(json.dumps({"orders": orders}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/portal/admin/convert-to-invoice/<record_id>", methods=["POST", "OPTIONS"])
+@portal_login_required
+def portal_admin_convert_to_invoice(user, record_id):
+    """Convert an approved SO into an Invoice record and send invoice email. Admin only."""
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type",
+                                     "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    if not portal_can(user, "manage_team"):
+        return Response(json.dumps({"error": "Insufficient permissions"}), status=403, headers=c, mimetype="application/json")
+    try:
+        write_token = RETURNS_WRITE_TOKEN
+        read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or write_token
+
+        # Fetch the SO record
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+            headers=at_headers(read_token), timeout=15,
+        )
+        if r.status_code != 200:
+            return Response(json.dumps({"error": f"SO not found (AT {r.status_code})"}),
+                            status=404, headers=c, mimetype="application/json")
+        so_fields = r.json().get("fields", {})
+
+        if so_fields.get("Order Type") != "Sales Order":
+            return Response(json.dumps({"error": "Not a Sales Order"}), status=400, headers=c, mimetype="application/json")
+
+        order_id_str = str(so_fields.get("Order ID", "")).strip()
+        so_number    = so_fields.get("Document ID", f"SO-{order_id_str}")
+        customer_ids = so_fields.get("Customer", [])
+        po_number    = so_fields.get("Purchase Order #", "")
+
+        # Check not already invoiced
+        existing_inv = at_get_all(
+            MANUAL_ORDERS_TABLE_ID, read_token,
+            fields=["Document ID"],
+            formula=f'AND({{Order Type}}="Invoice",{{Order ID}}="{order_id_str}")',
+        )
+        if existing_inv:
+            inv_num = existing_inv[0].get("fields", {}).get("Document ID", "")
+            return Response(json.dumps({"error": f"Already invoiced as {inv_num}"}),
+                            status=400, headers=c, mimetype="application/json")
+
+        # Get tracking
+        tracking_recs = at_get_all(
+            _SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
+            fields=["Order #", "Tracking #"],
+            base_id=_SO_TRACKING_BASE,
+        )
+        tracking = ""
+        for tr in tracking_recs:
+            if tr.get("fields", {}).get("Order #", "").strip() == so_number:
+                tracking = tr["fields"].get("Tracking #") or ""
+                break
+
+        # Fetch line items
+        li_ids = so_fields.get("MO Line Items", [])
+        email_line_items = []
+        for li_id in li_ids:
+            li_r = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+                headers=at_headers(read_token), timeout=10,
+            )
+            if li_r.status_code != 200:
+                print(f"[convert-to-invoice] could not fetch line item {li_id}: {li_r.status_code}")
+                continue
+            lf = li_r.json().get("fields", {})
+            product_name_list = lf.get("Product Name (from Product SKU)", [])
+            product_name = product_name_list[0] if product_name_list else ""
+            qty = lf.get("Qty.", 0)
+            confirmed_price = lf.get("Confirmed Unit Price")
+            adj_list = lf.get("Adj. Unit Price (from MO Line Items)", [])
+            price = confirmed_price if confirmed_price is not None else (float(adj_list[0]) if adj_list else 0)
+            email_line_items.append({"name": product_name, "qty": qty, "unit_price": price})
+
+        # Create Invoice record
+        inv_body = {
+            "fields": {
+                "Order Type":         "Invoice",
+                "Order ID":           order_id_str,
+                "Date":               _today_utc().isoformat(),
+                "Sales Order Status": "Approved",
+            }
+        }
+        if customer_ids:
+            inv_body["fields"]["Customer"] = customer_ids
+        if po_number:
+            inv_body["fields"]["Purchase Order #"] = po_number
+
+        inv_r = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json=inv_body,
+            timeout=15,
+        )
+        if not inv_r.ok:
+            try:
+                at_err = inv_r.json()
+            except Exception:
+                at_err = inv_r.text[:500]
+            return Response(json.dumps({"error": f"Invoice create failed ({inv_r.status_code}): {at_err}"}),
+                            status=500, headers=c, mimetype="application/json")
+        inv_record = inv_r.json()
+        inv_record_id = inv_record["id"]
+
+        # Copy line items from SO to Invoice
+        for li_id in li_ids:
+            li_r = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+                headers=at_headers(read_token), timeout=10,
+            )
+            if li_r.status_code != 200:
+                continue
+            lf = li_r.json().get("fields", {})
+            confirmed_price = lf.get("Confirmed Unit Price")
+            adj_list = lf.get("Adj. Unit Price (from MO Line Items)", [])
+            price = confirmed_price if confirmed_price is not None else (float(adj_list[0]) if adj_list else 0)
+            new_li = req_lib.post(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}",
+                headers={**at_headers(write_token), "Content-Type": "application/json"},
+                json={"fields": {
+                    "Manual Order":         [inv_record_id],
+                    "Product SKU":          lf.get("Product SKU", []),
+                    "Qty.":                 lf.get("Qty.", 0),
+                    "Confirmed Unit Price": float(price),
+                }},
+                timeout=15,
+            )
+            if not new_li.ok:
+                print(f"[convert-to-invoice] line item copy failed {new_li.status_code}: {new_li.text[:200]}")
+
+        # Fetch the created invoice to get its Document ID (formula field)
+        inv_fetch = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{inv_record_id}",
+            headers=at_headers(read_token), timeout=15,
+        )
+        inv_number = f"IN-{order_id_str}"
+        if inv_fetch.ok:
+            inv_number = inv_fetch.json().get("fields", {}).get("Document ID", inv_number)
+
+        # Get billing info from SO fields
+        email_list = so_fields.get("Bill-To Contact Email (from Customer)", [])
+        name_list  = so_fields.get("Bill-To Contact Name (from Customer)", [])
+        org_list   = so_fields.get("Bill-To Org Name (from Customer)", [])
+        to_email   = email_list[0] if email_list else ""
+        to_name    = name_list[0] if name_list else ""
+        org_name   = org_list[0] if org_list else ""
+
+        total = round(sum(li["qty"] * float(li["unit_price"] or 0) for li in email_line_items), 2)
+
+        if to_email:
+            try:
+                send_invoice_email(to_email, to_name, org_name, so_number, inv_number,
+                                   email_line_items, total, tracking)
+            except Exception as email_err:
+                print(f"[convert-to-invoice] email failed: {email_err}")
+
+        # Clear orders cache
+        _ORDERS_CACHE.clear()
+        _INVOICES_CACHE.clear()
+
+        return Response(json.dumps({"success": True, "invNumber": inv_number}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/portal/invoices")
+@portal_login_required
+def portal_invoices(user):
+    """Return all invoices for the authenticated portal customer."""
+    c = cors()
+    customer_id = user.get("customer_id", "")
+    if not customer_id:
+        return Response(json.dumps({"invoices": []}), headers=c, mimetype="application/json")
+
+    import time as _time_mod
+
+    # Return cached result if fresh
+    _cached = _INVOICES_CACHE.get(customer_id)
+    if _cached and (_time_mod.time() - _cached["ts"]) < _INVOICES_CACHE_TTL:
+        return Response(json.dumps({"invoices": _cached["data"]}), headers=c, mimetype="application/json")
+
+    try:
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+
+        # Fetch all invoices and filter in Python (linked field formula trick)
+        inv_records = at_get_all(
+            MANUAL_ORDERS_TABLE_ID, read_token,
+            fields=["Document ID", "Order ID", "Date", "Adj. Unit Price (from MO Line Items)",
+                    "Sales Order Status", "Go-to PDF", "Customer"],
+            formula='{Order Type}="Invoice"',
+        )
+        # Filter to this customer
+        inv_records = [r for r in inv_records
+                       if customer_id in r.get("fields", {}).get("Customer", [])]
+
+        # Fetch tracking from SO Tracking Link (keyed by SO-{order_id})
+        tracking_recs = at_get_all(
+            _SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
+            fields=["Order #", "Tracking #"],
+            base_id=_SO_TRACKING_BASE,
+        )
+        tracking_map = {r["fields"].get("Order #", "").strip(): (r["fields"].get("Tracking #") or "")
+                        for r in tracking_recs if r.get("fields", {}).get("Order #")}
+
+        invoices = []
+        for rec in inv_records:
+            f = rec.get("fields", {})
+            order_id   = str(f.get("Order ID", "")).strip()
+            so_number  = f"SO-{order_id}" if order_id else ""
+            inv_number = f.get("Document ID", f"IN-{order_id}")
+            adj_prices = f.get("Adj. Unit Price (from MO Line Items)", [])
+            total      = round(sum(float(p or 0) for p in adj_prices), 2)
+            tracking   = tracking_map.get(so_number, "")
+            go_to_pdf_field = f.get("Go-to PDF") or {}
+            go_to_pdf_url   = go_to_pdf_field.get("url", "") if isinstance(go_to_pdf_field, dict) else ""
+            invoices.append({
+                "record_id":  rec["id"],
+                "inv_number": inv_number,
+                "so_number":  so_number,
+                "date":       f.get("Date", ""),
+                "total":      total,
+                "tracking":   tracking,
+                "go_to_pdf":  go_to_pdf_url,
+            })
+
+        invoices.sort(key=lambda x: x.get("date", ""), reverse=True)
+        _INVOICES_CACHE[customer_id] = {"ts": _time_mod.time(), "data": invoices}
+        return Response(json.dumps({"invoices": invoices}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
 
 threading.Thread(target=_ontime_bg_worker, daemon=True).start()
 

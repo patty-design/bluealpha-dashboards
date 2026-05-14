@@ -302,7 +302,9 @@
       <div class="tab active" data-tab="new-quote" id="newQuoteTab">New Quote</div>
       <div class="tab" data-tab="our-quotes">Our Quotes</div>
       <div class="tab" data-tab="our-orders">Our Orders</div>
+      <div class="tab" data-tab="invoices">Invoices</div>
       <div class="tab" data-tab="team" id="teamTab" style="display:none">Team</div>
+      <div class="tab" id="shippedTab" data-tab="shipped" style="display:none">Shipped Orders</div>
     </div>
 
     <!-- New Quote Tab -->
@@ -347,6 +349,24 @@
         <div class="card-title">Our Orders</div>
         <p class="card-sub">Accepted quotes converted to sales orders.</p>
         <div id="ordersContent"><div class="loading">Loading orders…</div></div>
+      </div>
+    </div>
+
+    <!-- Invoices Tab -->
+    <div class="tab-panel" id="tab-invoices">
+      <div class="card">
+        <div class="card-title">Invoices</div>
+        <p class="card-sub">Your Blue Alpha invoices.</p>
+        <div id="invoicesList"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- Shipped Orders Tab (admin only) -->
+    <div class="tab-panel" id="tab-shipped">
+      <div class="card">
+        <div class="card-title">Shipped Orders</div>
+        <p class="card-sub">Shipped sales orders ready to invoice.</p>
+        <div id="shippedList"><div class="loading">Loading…</div></div>
       </div>
     </div>
 
@@ -466,6 +486,8 @@
         // Always re-fetch quotes/orders on tab switch (backend cache keeps it fast)
         if (tab.dataset.tab === 'our-quotes') loadQuotes();
         if (tab.dataset.tab === 'our-orders') loadOrders();
+        if (tab.dataset.tab === 'invoices') loadInvoices();
+        if (tab.dataset.tab === 'shipped') loadShippedOrders();
         if (tab.dataset.tab === 'team') {
           if (!teamLoaded) loadTeam();
           if (!accountInfoLoaded) loadAccountInfo();
@@ -493,6 +515,7 @@
         // Show Team tab for admins
         if (portalMe.canManageTeam) {
           document.getElementById('teamTab').style.display = '';
+          document.getElementById('shippedTab').style.display = '';
         }
 
         // Update Our Quotes subtitle based on role
@@ -634,6 +657,87 @@
           '</tbody></table>';
       } catch (e) {
         el.innerHTML = '<div class="empty-state"><p>Failed to load orders. Please refresh.</p></div>';
+      }
+    }
+
+    async function loadInvoices() {
+      const el = document.getElementById('invoicesList');
+      try {
+        const resp = await fetch('/api/portal/invoices', { credentials: 'include' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (!data.invoices || data.invoices.length === 0) {
+          el.innerHTML = '<div class="empty-state"><p>No invoices yet.</p></div>';
+          return;
+        }
+        el.innerHTML = '<table><thead><tr><th>Invoice #</th><th>Sales Order</th><th>Date</th><th>Total</th><th>Tracking</th><th>PDF</th></tr></thead><tbody>' +
+          data.invoices.map(inv => `<tr>
+            <td><strong>${inv.inv_number || '—'}</strong></td>
+            <td>${inv.so_number || '—'}</td>
+            <td>${fmt(inv.date)}</td>
+            <td>${money(inv.total)}</td>
+            <td>${inv.tracking ? `<a class="tracking-info" href="${trackingUrl(inv.tracking)}" target="_blank" rel="noopener">${inv.tracking}</a>` : '<span style="color:var(--text-muted)">—</span>'}</td>
+            <td>${inv.go_to_pdf ? `<a class="btn-sm" href="${inv.go_to_pdf}" target="_blank" rel="noopener">PDF</a>` : '—'}</td>
+          </tr>`).join('') +
+          '</tbody></table>';
+      } catch (e) {
+        el.innerHTML = '<div class="empty-state"><p>Failed to load invoices. Please refresh.</p></div>';
+      }
+    }
+
+    async function loadShippedOrders() {
+      const el = document.getElementById('shippedList');
+      try {
+        const resp = await fetch('/api/portal/admin/shipped-orders', { credentials: 'include' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (!data.orders || data.orders.length === 0) {
+          el.innerHTML = '<div class="empty-state"><p>No shipped orders found.</p></div>';
+          return;
+        }
+        const tbody = data.orders.map(o => {
+          const actionCell = o.invoiced
+            ? `<span style="color:#2d7a2d;font-weight:600;font-size:0.85rem;">Invoiced ✓ ${o.inv_number || ''}</span>`
+            : `<button class="btn-sm" id="inv-btn-${o.record_id}" onclick="convertToInvoice('${o.record_id}','${o.so_number}',this)">Convert to Invoice</button>`;
+          return `<tr id="shipped-row-${o.record_id}">
+            <td><strong>${o.so_number || '—'}</strong></td>
+            <td>${fmt(o.date)}</td>
+            <td>${o.org_name || '—'}</td>
+            <td>${money(o.total)}</td>
+            <td>${o.tracking ? `<a class="tracking-info" href="${trackingUrl(o.tracking)}" target="_blank" rel="noopener">${o.tracking}</a>` : '—'}</td>
+            <td>${actionCell}</td>
+          </tr>`;
+        }).join('');
+        el.innerHTML = '<table><thead><tr><th>Sales Order #</th><th>Date</th><th>Organization</th><th>Total</th><th>Tracking</th><th>Action</th></tr></thead><tbody>' + tbody + '</tbody></table>';
+      } catch (e) {
+        el.innerHTML = '<div class="empty-state"><p>Failed to load shipped orders. Please refresh.</p></div>';
+      }
+    }
+
+    async function convertToInvoice(recordId, soNumber, btn) {
+      if (!confirm(`Convert ${soNumber} to invoice? An invoice will be emailed to the billing contact.`)) return;
+      btn.disabled = true;
+      btn.textContent = 'Converting…';
+      try {
+        const resp = await fetch(`/api/portal/admin/convert-to-invoice/${recordId}`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+          alert('Error: ' + (data.error || 'Unknown error'));
+          btn.disabled = false;
+          btn.textContent = 'Convert to Invoice';
+          return;
+        }
+        // Replace button with invoiced badge
+        const cell = btn.parentElement;
+        cell.innerHTML = `<span style="color:#2d7a2d;font-weight:600;font-size:0.85rem;">Invoiced ✓ ${data.invNumber || ''}</span>`;
+      } catch (e) {
+        alert('Error: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = 'Convert to Invoice';
       }
     }
 
