@@ -8614,6 +8614,184 @@ def portal_invoices(user):
 
 threading.Thread(target=_ontime_bg_worker, daemon=True).start()
 
+# ── Admin portal: Shipped Orders & Invoice Conversion ────────────────────────
+
+@app.route("/api/admin/shipped-orders", methods=["GET"])
+def admin_shipped_orders():
+    """Return all shipped (tracked) approved SOs for the admin portal."""
+    c = cors()
+    if not check_admin_session(request):
+        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+    try:
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        records = at_get_all(
+            MANUAL_ORDERS_TABLE_ID, read_token,
+            fields=["Document ID", "Order ID", "Date", "Bill-To Org Name (from Customer)",
+                    "MO Line Items", "Adj. Unit Price (from MO Line Items)"],
+            formula='AND({Order Type}="Sales Order",{Sales Order Status}="Approved",IS_AFTER({Date},"2026-04-30"))',
+        )
+        # Existing invoices: order_id → inv_number
+        inv_recs = at_get_all(MANUAL_ORDERS_TABLE_ID, read_token,
+                               fields=["Order ID", "Document ID"],
+                               formula='{Order Type}="Invoice"')
+        invoiced = {r["fields"].get("Order ID", ""): r["fields"].get("Document ID", "")
+                    for r in inv_recs if r.get("fields", {}).get("Order ID")}
+        # Tracking map: SO number → tracking #
+        tracking_recs = at_get_all(_SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
+                                    fields=["Order #", "Tracking #"], base_id=_SO_TRACKING_BASE)
+        tracking_map = {r["fields"].get("Order #", ""): r["fields"].get("Tracking #", "")
+                        for r in tracking_recs if r.get("fields", {}).get("Order #")}
+        orders = []
+        for rec in records:
+            f = rec.get("fields", {})
+            so_number = f.get("Document ID", f'SO-{f.get("Order ID","")}')
+            tracking  = tracking_map.get(so_number, "")
+            if not tracking:
+                continue  # only shipped orders
+            order_id = f.get("Order ID", "")
+            org_list = f.get("Bill-To Org Name (from Customer)", [])
+            org_name = org_list[0] if isinstance(org_list, list) and org_list else (org_list or "")
+            prices   = f.get("Adj. Unit Price (from MO Line Items)", []) or []
+            total    = round(sum(prices), 2)
+            orders.append({
+                "record_id":  rec["id"],
+                "so_number":  so_number,
+                "order_id":   order_id,
+                "date":       f.get("Date", ""),
+                "org_name":   org_name,
+                "total":      total,
+                "tracking":   tracking,
+                "invoiced":   order_id in invoiced,
+                "inv_number": invoiced.get(order_id),
+            })
+        orders.sort(key=lambda x: x["date"], reverse=True)
+        return Response(json.dumps({"orders": orders}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/admin/convert-to-invoice/<record_id>", methods=["POST", "OPTIONS"])
+def admin_convert_to_invoice(record_id):
+    """Convert an approved SO to an Invoice (admin portal)."""
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type",
+                                     "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    if not check_admin_session(request):
+        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+    try:
+        read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        write_token = RETURNS_WRITE_TOKEN
+
+        # Fetch SO record
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+            headers=at_headers(read_token), timeout=15,
+        )
+        if not r.ok:
+            return Response(json.dumps({"error": "SO not found"}), status=404, headers=c, mimetype="application/json")
+        so_fields = r.json().get("fields", {})
+        if so_fields.get("Order Type") != "Sales Order":
+            return Response(json.dumps({"error": "Not a Sales Order"}), status=400, headers=c, mimetype="application/json")
+
+        order_id_str = so_fields.get("Order ID", "")
+        so_number    = so_fields.get("Document ID", f"SO-{order_id_str}")
+
+        # Check not already invoiced
+        existing = at_get_all(MANUAL_ORDERS_TABLE_ID, read_token,
+                               fields=["Order ID"],
+                               formula=f'AND({{Order Type}}="Invoice",{{Order ID}}="{order_id_str}")')
+        if existing:
+            inv_doc = existing[0]["fields"].get("Document ID", f"IN-{order_id_str}")
+            return Response(json.dumps({"error": f"Already invoiced as {inv_doc}"}), status=400, headers=c, mimetype="application/json")
+
+        # Get tracking
+        tracking_recs = at_get_all(_SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
+                                    fields=["Order #", "Tracking #"], base_id=_SO_TRACKING_BASE)
+        tracking = next((r["fields"].get("Tracking #", "") for r in tracking_recs
+                         if r["fields"].get("Order #") == so_number), "")
+
+        # Get billing info from SO
+        def _first(lst):
+            return lst[0] if isinstance(lst, list) and lst else (lst or "")
+        bill_email = _first(so_fields.get("Bill-To Contact Email (from Customer)", []))
+        bill_name  = _first(so_fields.get("Bill-To Contact Name (from Customer)", []))
+        org_name   = _first(so_fields.get("Bill-To Org Name (from Customer)", []))
+        customer_ids = so_fields.get("Customer", [])
+        po_number    = so_fields.get("Purchase Order #", "")
+
+        # Create Invoice record
+        inv_body = {
+            "fields": {
+                "Order Type":         "Invoice",
+                "Order ID":           order_id_str,
+                "Date":               _today_utc().isoformat(),
+                "Sales Order Status": "Approved",
+            }
+        }
+        if customer_ids:
+            inv_body["fields"]["Customer"] = customer_ids
+        if po_number:
+            inv_body["fields"]["Purchase Order #"] = po_number
+        inv_r = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json=inv_body, timeout=15,
+        )
+        if not inv_r.ok:
+            return Response(json.dumps({"error": f"Invoice create failed: {inv_r.text[:200]}"}),
+                            status=500, headers=c, mimetype="application/json")
+        inv_record_id = inv_r.json()["id"]
+        # Fetch computed Document ID (formula field)
+        inv_fetch = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{inv_record_id}",
+            headers=at_headers(read_token), timeout=10,
+        )
+        inv_number = inv_fetch.json().get("fields", {}).get("Document ID", f"IN-{order_id_str}") if inv_fetch.ok else f"IN-{order_id_str}"
+
+        # Copy line items
+        li_items_for_email = []
+        for li_id in so_fields.get("MO Line Items", []):
+            li_r = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+                headers=at_headers(read_token), timeout=10,
+            )
+            if not li_r.ok:
+                continue
+            lf = li_r.json().get("fields", {})
+            price = lf.get("Confirmed Unit Price") or (_first(lf.get("Adj. Unit Price (from MO Line Items)", [])) or 0)
+            qty   = lf.get("Qty.", 0)
+            pname_list = lf.get("Product Name (from Product SKU)", [])
+            pname = _first(pname_list) if pname_list else "Item"
+            req_lib.post(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}",
+                headers={**at_headers(write_token), "Content-Type": "application/json"},
+                json={"fields": {
+                    "Manual Order": [inv_record_id],
+                    "Product SKU":  lf.get("Product SKU", []),
+                    "Qty.":         qty,
+                    "Confirmed Unit Price": float(price),
+                }}, timeout=15,
+            )
+            li_items_for_email.append({"name": pname, "qty": qty, "unit_price": float(price)})
+
+        total = round(sum(i["qty"] * i["unit_price"] for i in li_items_for_email), 2)
+
+        # Send invoice email
+        if bill_email:
+            try:
+                send_invoice_email(bill_email, bill_name, org_name, so_number, inv_number,
+                                   li_items_for_email, total, tracking)
+            except Exception as email_err:
+                print(f"[convert-to-invoice] email failed: {email_err}")
+
+        _ORDERS_CACHE.clear()
+        _INVOICES_CACHE.clear()
+        return Response(json.dumps({"success": True, "invNumber": inv_number}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
 # ── Nightly tracking sync ─────────────────────────────────────────────────────
 
 _SO_TRACKING_BASE  = "app3xt0dghBWnHxdN"
