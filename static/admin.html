@@ -955,13 +955,16 @@
       const bodyEl   = document.getElementById('invoiceModalBody');
       const submitEl = document.getElementById('invoiceModalSubmit');
 
-      titleEl.textContent = `Convert ${soNumber} to Invoice`;
+      const isSplitTitle = splitSuffix || /^SO-\d+-\d+$/.test(soNumber);
+      titleEl.textContent = `Convert ${soNumber} to Invoice${isSplitTitle ? ' (Split)' : ''}`;
       bodyEl.innerHTML = '<div style="text-align:center;padding:24px;color:#555;">Loading items…</div>';
       submitEl.disabled = true;
       modal.style.display = 'flex';
 
       try {
-        const splitParam = splitSuffix ? `?split=${encodeURIComponent(soNumber)}` : '';
+        // Use ShipStation matching if: explicitly a split row, OR order number has -N suffix (e.g. SO-0342-1)
+        const isSplit = splitSuffix || /^SO-\d+-\d+$/.test(soNumber);
+        const splitParam = isSplit ? `?split=${encodeURIComponent(soNumber)}` : '';
         const resp = await fetch(`/api/admin/so-line-items/${recordId}${splitParam}`);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
@@ -1066,7 +1069,10 @@
 
       try {
         const body = { lineItems: selected };
-        if (_invoiceModalSplitSuffix) body.splitSuffix = _invoiceModalSplitSuffix;
+        // Derive split suffix from explicit flag or from the SO number pattern (e.g. SO-0342-1 → "1")
+        const effectiveSuffix = _invoiceModalSplitSuffix ||
+          (/^SO-\d+-(\d+)$/.exec(_invoiceModalSoNumber)||[])[1] || '';
+        if (effectiveSuffix) body.splitSuffix = effectiveSuffix;
         const resp = await fetch(`/api/admin/convert-to-invoice/${_invoiceModalRecordId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
