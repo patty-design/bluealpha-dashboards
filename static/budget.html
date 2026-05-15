@@ -827,7 +827,7 @@ let data = loadData();
 // ── Helpers ───────────────────────────────────────────────────────────────
 function fmt(n) {
   if (n == null || isNaN(n)) n = 0;
-  return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function fmtDec(n) {
@@ -1031,6 +1031,7 @@ function startInlineEdit(field) {
     if (e.key === 'Enter') { e.preventDefault(); saveInlineEdit(field); }
     if (e.key === 'Escape') { closeAllInlineEdits(); renderIncome(); }
   });
+  input.addEventListener('blur', () => saveInlineEdit(field));
 }
 
 function saveInlineEdit(field) {
@@ -1131,6 +1132,7 @@ function renderBills() {
         if (e.key === 'Enter') { e.preventDefault(); saveExpenseActual(exp.id); }
         if (e.key === 'Escape') { editingActualId = null; renderBills(); }
       });
+      inp.addEventListener('blur', () => saveExpenseActual(exp.id));
     } else {
       const actualBtn = document.createElement('button');
       actualBtn.className = 'expense-actual-btn' + (isOver ? ' over' : '');
@@ -1398,6 +1400,7 @@ function startBankEdit() {
     if (e.key === 'Enter') { e.preventDefault(); saveBankEdit(); }
     if (e.key === 'Escape') { closeAllInlineEdits(); renderDebt(); }
   });
+  input.addEventListener('blur', () => saveBankEdit());
 }
 
 function saveBankEdit() {
