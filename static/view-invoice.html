@@ -23,14 +23,11 @@
     .inv-header .title h1 { margin: 0 0 3px; font-size: 1.3rem; font-weight: 800; letter-spacing: 1px; }
     .inv-header .title .inv-num { color: #adc4e0; font-size: 0.9rem; }
 
-    /* Meta grid */
-    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-bottom: 1px solid #eee; }
-    .meta-block { padding: 18px 28px; }
-    .meta-block:first-child { border-right: 1px solid #eee; }
-    /* Address sub-columns inside left meta-block */
-    .addr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
-    .addr-col + .addr-col { padding-left: 12px; }
-    /* Label+value pairs (right column) */
+    /* Meta grid — 3 equal columns */
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; border-bottom: 1px solid #eee; }
+    .meta-block { padding: 18px 22px; }
+    .meta-block + .meta-block { border-left: 1px solid #eee; }
+    /* Label+value pairs (details column) */
     .meta-label { margin: 0 0 2px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #8a99aa; font-weight: 700; }
     .meta-value { margin: 0 0 10px; font-size: 0.9rem; color: #1a2633; font-weight: 700; }
     /* Address labels + lines */
@@ -67,12 +64,16 @@
     .error-box h2 { font-size: 1.1rem; color: #1a2633; margin: 0 0 8px; }
     .error-box p  { color: #8a99aa; font-size: 0.9rem; margin: 0; }
 
-    @media (max-width: 560px) {
-      .meta-grid { grid-template-columns: 1fr; }
-      .meta-block:first-child { border-right: none; border-bottom: 1px solid #eee; }
-      .addr-grid { grid-template-columns: 1fr 1fr; }
+    @media (max-width: 600px) {
+      .meta-grid { grid-template-columns: 1fr 1fr; }
+      .meta-grid .meta-block:nth-child(3) { grid-column: 1 / -1; border-left: none; border-top: 1px solid #eee; }
       .inv-header { flex-direction: column; gap: 10px; }
-      .items-wrap, .meta-block, .totals-row, .inv-footer { padding-left: 16px; padding-right: 16px; }
+      .items-wrap, .meta-block, .totals-row, .inv-footer { padding-left: 14px; padding-right: 14px; }
+    }
+    @media (max-width: 400px) {
+      .meta-grid { grid-template-columns: 1fr; }
+      .meta-grid .meta-block:nth-child(3) { grid-column: 1; }
+      .meta-block + .meta-block { border-left: none; border-top: 1px solid #eee; }
     }
   </style>
 </head>
@@ -218,12 +219,8 @@
           </div>
 
           <div class="meta-grid">
-            <div class="meta-block">
-              <div class="addr-grid">
-                <div class="addr-col">${addrBlock('Bill To', billLines)}</div>
-                <div class="addr-col">${addrBlock('Ship To', shipLines)}</div>
-              </div>
-            </div>
+            <div class="meta-block">${addrBlock('Bill To', billLines)}</div>
+            <div class="meta-block">${addrBlock('Ship To', shipLines)}</div>
             <div class="meta-block">
               ${kv('Invoice Date', fmt(inv.date))}
               ${kv('Due Date', dueDate)}
