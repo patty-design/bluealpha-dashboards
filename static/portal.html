@@ -658,11 +658,15 @@
             <td>${fmt(o.date)}</td>
             <td>${money(o.total)}</td>
             <td>${(() => {
+              const seen = new Set();
               const parts = [];
-              if (o.tracking) parts.push(`<a class="tracking-info" href="${trackingUrl(o.tracking)}" target="_blank" rel="noopener">${o.tracking}</a>`);
-              (o.splitShipments || []).forEach(s => {
-                if (s.tracking) parts.push(`<a class="tracking-info" href="${trackingUrl(s.tracking)}" target="_blank" rel="noopener" title="${s.splitNum}">${s.tracking}</a>`);
-              });
+              const addTracking = (trk, title) => {
+                if (!trk || seen.has(trk)) return;
+                seen.add(trk);
+                parts.push(`<a class="tracking-info" href="${trackingUrl(trk)}" target="_blank" rel="noopener"${title ? ` title="${title}"` : ''}>${trk}</a>`);
+              };
+              addTracking(o.tracking);
+              (o.splitShipments || []).forEach(s => addTracking(s.tracking, s.splitNum));
               return parts.length ? parts.join('<br>') : '<span style="color:var(--text-muted)">—</span>';
             })()}</td>
             <td><span class="badge badge-active">Confirmed</span></td>
