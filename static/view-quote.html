@@ -844,7 +844,7 @@ function renderQuoteDetails() {
   const q = quoteData;
 
   // Status banners
-  if (q.isAccepted && !window.viewingAsOrder) {
+  if (false && q.isAccepted && !window.viewingAsOrder) {
     const soLabel = q.soNumber ? `Order ${q.soNumber} is in progress.` : 'Your order is in progress.';
     document.getElementById('bannerAccepted').textContent =
       `This quote has been accepted. ${soLabel}`;
