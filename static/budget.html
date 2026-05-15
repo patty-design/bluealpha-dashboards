@@ -431,6 +431,20 @@
       flex-shrink: 0;
     }
 
+    .edit-btn {
+      background: none;
+      border: none;
+      color: #007aff;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 4px 8px;
+      touch-action: manipulation;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+    }
+
     /* ── Bottom Sheet Modal ── */
     .overlay {
       display: none;
@@ -1344,6 +1358,8 @@ function closeAllInlineEdits() {
 
 // ── Bills ─────────────────────────────────────────────────────────────────
 let editingActualId = null;
+let editingBillId = null;
+let editingGoalId = null;
 
 function fmtPaidDate(dateStr) {
   // dateStr = "YYYY-MM-DD"
@@ -1387,8 +1403,17 @@ function renderBills() {
     delBtn.textContent = '✕';
     delBtn.onclick = () => deleteExpense(exp.id);
 
+    const editBillBtn = document.createElement('button');
+    editBillBtn.className = 'edit-btn';
+    editBillBtn.textContent = '✏️';
+    editBillBtn.onclick = () => openEditBill(exp.id);
+
     topRow.appendChild(nameEl);
-    topRow.appendChild(delBtn);
+    const billBtnWrap = document.createElement('div');
+    billBtnWrap.style.cssText = 'display:flex;align-items:center;gap:0;flex-shrink:0';
+    billBtnWrap.appendChild(editBillBtn);
+    billBtnWrap.appendChild(delBtn);
+    topRow.appendChild(billBtnWrap);
 
     // ── Middle row: Due day | Budgeted | Actual ──
     const midRow = document.createElement('div');
@@ -1613,7 +1638,10 @@ function renderGoals() {
           <div class="goal-name">${escHtml(goal.name)}</div>
           ${dlStr ? `<div class="goal-deadline">Due ${dlStr}</div>` : ''}
         </div>
-        <button class="goal-delete-btn" onclick="deleteGoal('${goal.id}')" style="touch-action:manipulation">✕</button>
+        <div style="display:flex;align-items:center;gap:0;flex-shrink:0">
+          <button class="edit-btn" onclick="openEditGoal('${goal.id}')" style="touch-action:manipulation">✏️</button>
+          <button class="goal-delete-btn" onclick="deleteGoal('${goal.id}')" style="touch-action:manipulation">✕</button>
+        </div>
       </div>
       <div class="progress-wrap">
         <div class="progress-track">
@@ -1683,6 +1711,8 @@ function deleteIncomeEntry(id) {
 
 // ── Sheets ────────────────────────────────────────────────────────────────
 function openBillSheet() {
+  editingBillId = null;
+  document.querySelector('#expense-sheet .sheet-title').textContent = 'Add Bill';
   document.getElementById('exp-name-input').value   = '';
   document.getElementById('exp-budget-input').value = '';
   document.getElementById('bill-dueday-input').value = '';
@@ -1691,7 +1721,22 @@ function openBillSheet() {
   setTimeout(() => document.getElementById('exp-name-input').focus(), 350);
 }
 
+function openEditBill(id) {
+  const exp = data.expenses.find(e => e.id === id);
+  if (!exp) return;
+  editingBillId = id;
+  document.querySelector('#expense-sheet .sheet-title').textContent = 'Edit Bill';
+  document.getElementById('exp-name-input').value    = exp.name;
+  document.getElementById('exp-budget-input').value  = exp.budgeted;
+  document.getElementById('bill-dueday-input').value = exp.dueDay || '';
+  document.getElementById('expense-overlay').classList.add('open');
+  document.getElementById('expense-sheet').classList.add('open');
+  setTimeout(() => document.getElementById('exp-name-input').focus(), 350);
+}
+
 function openGoalSheet() {
+  editingGoalId = null;
+  document.querySelector('#goal-sheet .sheet-title').textContent = 'Add Savings Goal';
   document.getElementById('goal-name-input').value     = '';
   document.getElementById('goal-target-input').value   = '';
   document.getElementById('goal-saved-input').value    = '';
@@ -1701,10 +1746,29 @@ function openGoalSheet() {
   setTimeout(() => document.getElementById('goal-name-input').focus(), 350);
 }
 
+function openEditGoal(id) {
+  const goal = data.goals.find(g => g.id === id);
+  if (!goal) return;
+  editingGoalId = id;
+  document.querySelector('#goal-sheet .sheet-title').textContent = 'Edit Goal';
+  document.getElementById('goal-name-input').value     = goal.name;
+  document.getElementById('goal-target-input').value   = goal.target;
+  document.getElementById('goal-saved-input').value    = goal.saved;
+  document.getElementById('goal-deadline-input').value = goal.deadline || '';
+  document.getElementById('goal-overlay').classList.add('open');
+  document.getElementById('goal-sheet').classList.add('open');
+  setTimeout(() => document.getElementById('goal-name-input').focus(), 350);
+}
+
 function closeSheets() {
   ['expense-overlay','expense-sheet','goal-overlay','goal-sheet','debt-overlay','debt-sheet','debt-pay-overlay','debt-pay-sheet','oneoff-overlay','oneoff-sheet','inc-overlay','inc-sheet'].forEach(id => {
     document.getElementById(id).classList.remove('open');
   });
+  // Reset editing state and sheet titles
+  editingBillId = null;
+  editingGoalId = null;
+  document.querySelector('#expense-sheet .sheet-title').textContent = 'Add Bill';
+  document.querySelector('#goal-sheet .sheet-title').textContent = 'Add Savings Goal';
 }
 
 function saveExpense() {
@@ -1716,7 +1780,17 @@ function saveExpense() {
     document.getElementById('exp-name-input').focus();
     return;
   }
-  data.expenses.push({ id: uid(), name, budgeted: budget, actual: 0, dueDay, paidDate: null });
+  if (editingBillId) {
+    const exp = data.expenses.find(e => e.id === editingBillId);
+    if (exp) {
+      exp.name = name;
+      exp.budgeted = budget;
+      exp.dueDay = dueDay;
+    }
+    editingBillId = null;
+  } else {
+    data.expenses.push({ id: uid(), name, budgeted: budget, actual: 0, dueDay, paidDate: null });
+  }
   saveData(data);
   closeSheets();
   renderBills();
@@ -1732,7 +1806,18 @@ function saveGoal() {
     document.getElementById('goal-name-input').focus();
     return;
   }
-  data.goals.push({ id: uid(), name, target, saved, deadline });
+  if (editingGoalId) {
+    const goal = data.goals.find(g => g.id === editingGoalId);
+    if (goal) {
+      goal.name = name;
+      goal.target = target;
+      goal.saved = saved;
+      goal.deadline = deadline;
+    }
+    editingGoalId = null;
+  } else {
+    data.goals.push({ id: uid(), name, target, saved, deadline });
+  }
   saveData(data);
   closeSheets();
   renderGoals();
