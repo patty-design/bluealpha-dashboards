@@ -8765,8 +8765,8 @@ def portal_admin_shipped_orders(user):
                 continue
             org_name_list = f.get("Bill-To Org Name (from Customer)", [])
             org_name = org_name_list[0] if org_name_list else ""
-            adj_prices = f.get("Adj. Unit Price (from MO Line Items)", [])
-            total = round(sum(float(p or 0) for p in adj_prices), 2)
+            ss_total = order_total_map.get(so_number)
+            total    = round(float(ss_total), 2) if ss_total else 0
             orders.append({
                 "record_id":     rec["id"],
                 "so_number":     so_number,
@@ -9403,7 +9403,9 @@ def admin_shipped_orders():
             order_id = f.get("Order ID", "")
             org_list = f.get("Bill-To Org Name (from Customer)", [])
             org_name = org_list[0] if isinstance(org_list, list) and org_list else (org_list or "")
-            total    = round(sum(li_total_map.get(lid, 0) for lid in f.get("MO Line Items", [])), 2)
+            at_total = round(sum(li_total_map.get(lid, 0) for lid in f.get("MO Line Items", [])), 2)
+            ss_total = order_total_map.get(so_number)
+            total    = round(float(ss_total), 2) if ss_total else at_total
             orders.append({
                 "record_id":     rec["id"],
                 "so_number":     so_number,
