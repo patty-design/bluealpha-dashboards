@@ -498,6 +498,23 @@ if (window.self !== window.top) {
     <div id="bannerSuccess"  class="banner banner-success hidden"></div>
     <div id="bannerDuplicate" class="banner banner-success hidden"></div>
 
+    <!-- PDF download — above header, right-aligned, minimal space -->
+    <div id="pdfBtnRow" style="margin-bottom:6px;display:flex;justify-content:flex-end;">
+      <button class="btn btn-secondary" id="pdfBtn" onclick="downloadDoc()" style="padding:7px 14px;font-size:0.82rem;">Download PDF</button>
+    </div>
+    <script>
+    function downloadDoc() {
+      const url = window.viewingAsOrder ? '/order-pdf/' + recordId : '/quote-pdf/' + recordId;
+      window.open(url);
+    }
+    if (window.viewingAsOrder) {
+      document.addEventListener('DOMContentLoaded', function() {
+        const btn = document.getElementById('pdfBtn');
+        if (btn) btn.textContent = 'Download Sales Order';
+      });
+    }
+    </script>
+
     <!-- Doc header bar (invoice-style) -->
     <div style="background:#1B2438;border-radius:10px 10px 0 0;padding:20px 28px;display:flex;align-items:flex-start;justify-content:space-between;">
       <div>
@@ -554,23 +571,6 @@ if (window.self !== window.top) {
         </div>
       </div>
     </div><!-- /customerCard -->
-
-    <!-- PDF + actions row -->
-    <div id="pdfBtnRow" style="margin:10px 0 8px;display:flex;justify-content:flex-end;">
-      <button class="btn btn-secondary" id="pdfBtn" onclick="downloadDoc()" style="padding:7px 14px;font-size:0.82rem;">Download PDF</button>
-    </div>
-    <script>
-    function downloadDoc() {
-      const url = window.viewingAsOrder ? '/order-pdf/' + recordId : '/quote-pdf/' + recordId;
-      window.open(url);
-    }
-    if (window.viewingAsOrder) {
-      document.addEventListener('DOMContentLoaded', function() {
-        const btn = document.getElementById('pdfBtn');
-        if (btn) btn.textContent = 'Download Sales Order';
-      });
-    }
-    </script>
 
     <!-- Items card -->
     <div class="card">
