@@ -9230,7 +9230,8 @@ def _run_tracking_sync():
             try:
                 def _sync_one_order(order_num, so_date, base_order_num=None):
                     """Fetch shipment tracking for one ShipStation order number and upsert into SO Tracking table.
-                    base_order_num is set for split orders (e.g. 'SO-0337-1' has base 'SO-0337')."""
+                    base_order_num is set for split orders (e.g. 'SO-0337-1' has base 'SO-0337').
+                    Only writes to Airtable if tracking was found — never clears existing data."""
                     r2 = req_lib.get("https://ssapi.shipstation.com/shipments",
                                      params={"orderNumber": order_num, "pageSize": 50},
                                      headers=ss_hdrs, timeout=15)
@@ -9246,6 +9247,11 @@ def _run_tracking_sync():
                             if sd and (not sd_str or sd < sd_str):
                                 sd_str = sd
                     t_str = " | ".join(t_parts)
+
+                    # Only write to Airtable if we found tracking — never overwrite with empty
+                    if not t_str:
+                        return ""
+
                     flds = {"Order #": order_num, "Date": so_date, "Tracking #": t_str}
                     if sd_str:
                         flds["Ship Date"] = sd_str
