@@ -1015,6 +1015,14 @@
       if (frame) frame.style.height = (e.data.height + 32) + 'px';
     }
     if (e.data && e.data.type === 'closeViewQuote') { closeViewQuote(); }
+    if (e.data && e.data.type === 'quoteAccepted') {
+      _quotesCache = null; _ordersCache = null;
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelector('[data-tab="our-orders"]').classList.add('active');
+      document.getElementById('tab-our-orders').classList.add('active');
+      loadOrders();
+    }
     if (e.data && e.data.type === 'quoteSubmitted') {
       quoteBuilderDirty = true;
       _quotesCache = null; _ordersCache = null;
