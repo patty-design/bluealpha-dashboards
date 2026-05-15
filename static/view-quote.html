@@ -50,8 +50,8 @@
     /* ── Container ── */
     .container {
       max-width: 760px;
-      margin: 40px auto;
-      padding: 0 20px 80px;
+      margin: 16px auto;
+      padding: 0 20px 60px;
     }
 
     /* ── Spinner ── */
@@ -498,44 +498,29 @@ if (window.self !== window.top) {
     <div id="bannerSuccess"  class="banner banner-success hidden"></div>
     <div id="bannerDuplicate" class="banner banner-success hidden"></div>
 
-    <!-- Info card -->
-    <div class="card">
-      <div class="quote-number" id="quoteNumber"></div>
-      <div class="quote-org"    id="quoteOrg"></div>
-
-      <div class="meta-row" id="metaRow">
-        <!-- populated by JS -->
+    <!-- Doc header bar (invoice-style) -->
+    <div style="background:#1B2438;border-radius:10px 10px 0 0;padding:20px 28px;display:flex;align-items:flex-start;justify-content:space-between;">
+      <div>
+        <div id="docTypeLabel" style="color:#fff;font-size:1.3rem;font-weight:800;letter-spacing:1px;margin-bottom:3px;">QUOTE</div>
+        <div id="quoteNumber" style="color:#adc4e0;font-size:0.9rem;"></div>
       </div>
-
-      <div class="badges" id="badges">
-        <!-- accepted badge injected here -->
+      <div style="text-align:right;">
+        <div id="quoteOrg" style="color:#adc4e0;font-size:0.85rem;font-weight:600;"></div>
+        <div id="badges" style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"></div>
       </div>
     </div>
 
-    <!-- PDF button pinned below summary card -->
-    <div id="pdfBtnRow" style="margin-bottom:12px;">
-      <button class="btn btn-secondary" id="pdfBtn" onclick="downloadDoc()">Download PDF</button>
-    </div>
-    <script>
-    function downloadDoc() {
-      const url = window.viewingAsOrder ? '/order-pdf/' + recordId : '/quote-pdf/' + recordId;
-      window.open(url);
-    }
-    if (window.viewingAsOrder) {
-      document.addEventListener('DOMContentLoaded', function() {
-        const btn = document.getElementById('pdfBtn');
-        if (btn) btn.textContent = 'Download Sales Order';
-      });
-    }
-    </script>
-
-    <!-- Customer card -->
-    <div class="card" id="customerCard">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <div class="section-title" style="margin-bottom:0;">Customer</div>
-        <button id="editAddressBtn" class="btn btn-secondary" style="display:none;padding:5px 12px;font-size:0.8rem;" onclick="openAddressEdit()">Edit Addresses</button>
+    <!-- Meta section: Bill To + Details (invoice meta-grid style) -->
+    <div id="customerCard" style="background:#fff;border-radius:0;border-left:1px solid #eee;border-right:1px solid #eee;border-bottom:1px solid #eee;margin-bottom:0;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:1px solid #eee;">
+        <div style="padding:18px 28px;border-right:1px solid #eee;">
+          <div id="custInfo"></div>
+          <button id="editAddressBtn" class="btn btn-secondary" style="display:none;padding:4px 10px;font-size:0.78rem;margin-top:10px;" onclick="openAddressEdit()">Edit Addresses</button>
+        </div>
+        <div style="padding:18px 28px;">
+          <div id="metaRow"></div>
+        </div>
       </div>
-      <div id="custInfo" style="margin-top:10px;"></div>
       <!-- Inline address edit form -->
       <div id="addressEditForm" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
@@ -568,7 +553,24 @@ if (window.self !== window.top) {
           <span id="addrSaveMsg" style="font-size:0.84rem;color:var(--muted);"></span>
         </div>
       </div>
+    </div><!-- /customerCard -->
+
+    <!-- PDF + actions row -->
+    <div id="pdfBtnRow" style="margin:10px 0 8px;display:flex;justify-content:flex-end;">
+      <button class="btn btn-secondary" id="pdfBtn" onclick="downloadDoc()" style="padding:7px 14px;font-size:0.82rem;">Download PDF</button>
     </div>
+    <script>
+    function downloadDoc() {
+      const url = window.viewingAsOrder ? '/order-pdf/' + recordId : '/quote-pdf/' + recordId;
+      window.open(url);
+    }
+    if (window.viewingAsOrder) {
+      document.addEventListener('DOMContentLoaded', function() {
+        const btn = document.getElementById('pdfBtn');
+        if (btn) btn.textContent = 'Download Sales Order';
+      });
+    }
+    </script>
 
     <!-- Items card -->
     <div class="card">
@@ -762,35 +764,41 @@ function render() {
   document.getElementById('quoteNumber').textContent = q.quoteNumber;
   document.getElementById('quoteOrg').textContent    = q.customer?.orgName || '';
 
-  // Meta row
-  const metaRow = document.getElementById('metaRow');
-  metaRow.innerHTML = '';
+  // Doc type label
+  const dtLabel = document.getElementById('docTypeLabel');
+  if (dtLabel) dtLabel.textContent = window.viewingAsOrder ? 'SALES ORDER' : 'QUOTE';
 
+  // Meta details panel (right column — label + value pairs)
   function fmtDate(iso) {
     if (!iso) return '—';
     const [y, m, d] = iso.split('-').map(Number);
     return `${m}-${d}-${y}`;
   }
 
-  const dateEl = makeMetaItem(`Date: <strong>${fmtDate(q.date)}</strong>`);
-  metaRow.appendChild(dateEl);
-
-  if (q.expiryDate && !window.viewingAsOrder) {
-    const daysLeft = daysBetween(new Date(), new Date(q.expiryDate));
-    let expEl;
-    if (q.isExpired) {
-      expEl = makeMetaItem(`Expires: <strong>EXPIRED</strong>`);
-      expEl.classList.add('exp');
-    } else if (daysLeft < 30) {
-      expEl = makeMetaItem(`Expires: <strong>${fmtDate(q.expiryDate)}</strong> (${daysLeft}d left)`);
-      expEl.classList.add('warn');
-    } else {
-      expEl = makeMetaItem(`Expires: <strong>${fmtDate(q.expiryDate)}</strong>`);
-    }
-    metaRow.appendChild(expEl);
+  function metaKV(label, value, valueStyle) {
+    return `<p style="margin:0 0 2px;font-size:0.75rem;color:#8a99aa;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">${label}</p>
+            <p style="margin:0 0 10px;font-size:0.9rem;color:#1a2633;${valueStyle||''}">${value}</p>`;
   }
 
-  // Badges (no Net 30, no PO #)
+  const metaRow = document.getElementById('metaRow');
+  metaRow.innerHTML = '';
+  let metaHTML = '';
+  const dateLabel = window.viewingAsOrder ? 'Order Date' : 'Quote Date';
+  metaHTML += metaKV(dateLabel, fmtDate(q.date));
+  if (q.expiryDate && !window.viewingAsOrder) {
+    const daysLeft = daysBetween(new Date(), new Date(q.expiryDate));
+    const expVal = q.isExpired
+      ? `<span style="color:#bd3333;font-weight:700;">EXPIRED</span>`
+      : daysLeft < 30
+        ? `<strong>${fmtDate(q.expiryDate)}</strong> <span style="color:#b87a00;">(${daysLeft}d left)</span>`
+        : `<strong>${fmtDate(q.expiryDate)}</strong>`;
+    metaHTML += metaKV('Expiry Date', expVal);
+  }
+  metaHTML += metaKV('Terms', 'Net 30');
+  if (q.poNumber) metaHTML += metaKV('PO #', escHtml(q.poNumber));
+  metaRow.innerHTML = metaHTML;
+
+  // Badges in header
   const badges = document.getElementById('badges');
   if (q.isAccepted) {
     const soNumber = q.soNumber || '';
@@ -809,48 +817,25 @@ function renderCustomer() {
   const custEl = document.getElementById('custInfo');
   if (custEl) {
     const s = 'font-size:0.88rem;';
-    const muted = 'color:var(--muted);';
+    function addrBlock(title, lines) {
+      let html = `<p style="margin:0 0 8px;font-size:0.72rem;text-transform:uppercase;letter-spacing:.08em;color:#8a99aa;font-weight:700;">${title}</p>`;
+      lines.filter(Boolean).forEach((ln, i) => {
+        html += `<p style="margin:0 0 3px;font-size:0.88rem;color:#1a2633;${i===0?'font-weight:700;':''}">${escHtml(ln)}</p>`;
+      });
+      return html;
+    }
 
-    // Contact block (spans full width)
-    let contact = '';
-    if (c.orgName)     contact += `<div style="font-weight:700;font-size:1rem;margin-bottom:2px;">${escHtml(c.orgName)}</div>`;
-    if (c.contactName) contact += `<div style="${s}${muted}">${escHtml(c.contactName)}</div>`;
-    if (c.email)       contact += `<div style="${s}margin-top:4px;"><a href="mailto:${escHtml(c.email)}" style="color:var(--navy)">${escHtml(c.email)}</a></div>`;
-    if (c.phone)       contact += `<div style="${s}">${escHtml(c.phone)}</div>`;
-
-    // Bill To block
-    const billLines = [
-      c.billToOrg  || c.orgName,
-      c.billToName || c.contactName,
-      c.billToAddr1,
-      c.billToAddr2,
-    ].filter(Boolean);
-    let billHtml = `<div style="font-weight:600;font-size:0.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Bill To</div>`;
-    billLines.forEach((ln, i) => {
-      billHtml += `<div style="${s}${i===0?'font-weight:600;':''}">${escHtml(ln)}</div>`;
-    });
-
-    // Ship To block
-    const shipCity  = c.city  || '';
+    const billLines = [c.billToOrg||c.orgName, c.billToName||c.contactName, c.billToAddr1, c.billToAddr2];
+    const shipCity  = c.city || '';
     const shipState = c.state ? c.state.toUpperCase() : '';
-    const shipZip   = c.zip   || '';
+    const shipZip   = c.zip || '';
     const shipLine2 = [shipCity, [shipState, shipZip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
-    const shipLines = [
-      c.orgName,
-      c.contactName,
-      c.address1,
-      shipLine2,
-    ].filter(Boolean);
-    let shipHtml = `<div style="font-weight:600;font-size:0.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Ship To</div>`;
-    shipLines.forEach((ln, i) => {
-      shipHtml += `<div style="${s}${i===0?'font-weight:600;':''}">${escHtml(ln)}</div>`;
-    });
+    const shipLines = [c.orgName, c.contactName, c.address1, shipLine2];
 
     custEl.innerHTML = `
-      ${contact}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
-        <div>${billHtml}</div>
-        <div>${shipHtml}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
+        <div style="padding-right:16px;">${addrBlock('Bill To', billLines)}</div>
+        <div>${addrBlock('Ship To', shipLines)}</div>
       </div>`;
   }
 }
