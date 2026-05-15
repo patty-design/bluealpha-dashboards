@@ -15,7 +15,7 @@
     .page-header .back  { color: #adc4e0; font-size: 0.85rem; text-decoration: none; }
     .page-header .back:hover { color: #fff; }
     .container { max-width: 760px; margin: 16px auto; padding: 0 16px 60px; }
-    .card { background: #fff; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: hidden; }
+    .card { background: #fff; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: hidden; border: 2px solid #1B2438; }
 
     /* Invoice header bar */
     .inv-header { background: #1B2438; padding: 20px 28px; display: flex; align-items: flex-start; justify-content: space-between; border-radius: 10px 10px 0 0; }
@@ -39,7 +39,7 @@
     /* Line items table */
     .items-wrap { padding: 0 28px 28px; }
     table.items { width: 100%; border-collapse: collapse; margin-top: 24px; }
-    table.items thead tr { background: transparent; border-top: 1px solid #eee; border-bottom: 1px solid #eee; }
+    table.items thead tr { background: transparent; border-bottom: 1px solid #eee; }
     table.items thead th { padding: 10px 12px; color: #8a99aa; font-size: 0.72rem; text-transform: uppercase;
                             letter-spacing: 0.06em; font-weight: 700; text-align: left; }
     table.items thead th.right { text-align: right; }
@@ -88,7 +88,7 @@
     </div>
     <div style="margin-bottom:6px;display:flex;justify-content:flex-end;">
       <button id="downloadBtn" onclick="downloadInvoice()" style="background:#1B2438;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:0.82rem;font-weight:700;cursor:pointer;">
-        ↓ Download PDF
+        ↓ Download Invoice
       </button>
     </div>
     <div class="card" id="invoiceCard">
