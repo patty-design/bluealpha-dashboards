@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="theme-color" content="#f2f2f7">
-  <title>Budget</title>
+  <title>ABC Budgeting</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -130,6 +130,55 @@
     .tab-btn[data-tab="income"].active .tab-label { color: var(--green); }
     .tab-btn[data-tab="expenses"].active .tab-label { color: var(--red); }
     .tab-btn[data-tab="goals"].active .tab-label { color: var(--blue); }
+    .tab-btn[data-tab="debt"].active .tab-label { color: var(--red); }
+
+    /* ── Debt tab ── */
+    .debt-card {
+      background: var(--card);
+      border-radius: 12px;
+      margin: 0 16px 12px;
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+      position: relative;
+    }
+
+    .debt-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .debt-name { font-size: 17px; font-weight: 600; }
+
+    .debt-stats {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      font-size: 13px;
+      color: var(--text2);
+    }
+
+    .debt-min { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+    .debt-delete-btn {
+      background: none; border: none;
+      font-size: 18px; color: var(--text2);
+      cursor: pointer; touch-action: manipulation;
+      padding: 0; line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .paid-off-badge {
+      display: inline-block;
+      background: var(--green);
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      margin-top: 8px;
+    }
 
     /* ── Overview ── */
     .overview-month {
@@ -499,10 +548,29 @@
       </div>
     </div>
 
+    <div class="section-header">Minimum Debt Payments</div>
+    <div class="card">
+      <div class="card-row">
+        <span class="stat-label">Total min payments</span>
+        <span class="stat-value" id="ov-min-payments" style="color:var(--red)">$0/mo</span>
+      </div>
+    </div>
+
     <div class="section-header">Free to Spend</div>
     <div class="card">
       <div class="free-amount" id="ov-free">$0</div>
-      <div class="free-label">after expenses &amp; savings goals</div>
+      <div class="free-label">after expenses, savings &amp; debt payments</div>
+    </div>
+
+    <div class="section-header">Net Position</div>
+    <div class="card">
+      <div class="card-row">
+        <span class="stat-label">Net Position</span>
+        <span class="stat-value" id="ov-net-position">$0</span>
+      </div>
+      <div class="card-row">
+        <span class="stat-label" style="font-size:12px">Bank balance minus total debt</span>
+      </div>
     </div>
   </div>
 
@@ -540,6 +608,27 @@
     </div>
   </div>
 
+  <!-- ── DEBT ── -->
+  <div id="screen-debt" class="screen">
+    <div class="section-header">Accounts</div>
+    <div class="card">
+      <div class="card-row income-row" id="bank-balance-row" onclick="startBankEdit()">
+        <span class="income-row-label">Bank Account Balance</span>
+        <span class="income-row-value" id="bank-balance-display">$0</span>
+      </div>
+    </div>
+
+    <div class="section-header">Debts</div>
+    <div id="debts-list"></div>
+    <button class="add-btn" onclick="openDebtSheet()" style="touch-action:manipulation">
+      <span>＋</span> Add Debt
+    </button>
+    <div class="section-footer" id="debt-footer" style="gap:16px">
+      <span>Total Debt: <strong id="debt-total">$0</strong></span>
+      <span>Min Payments: <strong id="debt-min-total">$0/mo</strong></span>
+    </div>
+  </div>
+
   <!-- ── GOALS ── -->
   <div id="screen-goals" class="screen">
     <div class="section-header">Savings Goals</div>
@@ -562,6 +651,10 @@
     <button class="tab-btn" data-tab="expenses" onclick="switchTab('expenses')" style="touch-action:manipulation">
       <span class="tab-icon">💸</span>
       <span class="tab-label">Expenses</span>
+    </button>
+    <button class="tab-btn" data-tab="debt" onclick="switchTab('debt')" style="touch-action:manipulation">
+      <span class="tab-icon">💳</span>
+      <span class="tab-label">Debt</span>
     </button>
     <button class="tab-btn" data-tab="goals" onclick="switchTab('goals')" style="touch-action:manipulation">
       <span class="tab-icon">🎯</span>
@@ -617,6 +710,33 @@
   </div>
 </div>
 
+<!-- ── DEBT SHEET ── -->
+<div class="overlay" id="debt-overlay" onclick="closeSheets()"></div>
+<div class="sheet" id="debt-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Add Debt</div>
+  <div class="sheet-field">
+    <div class="sheet-label">Name</div>
+    <input class="sheet-input" id="debt-name-input" type="text" placeholder="e.g. Car Loan" autocomplete="off">
+  </div>
+  <div class="sheet-field">
+    <div class="sheet-label">Starting Balance ($)</div>
+    <input class="sheet-input" id="debt-start-input" type="number" inputmode="decimal" placeholder="0.00" min="0" step="0.01">
+  </div>
+  <div class="sheet-field">
+    <div class="sheet-label">Current Balance ($)</div>
+    <input class="sheet-input" id="debt-current-input" type="number" inputmode="decimal" placeholder="0.00" min="0" step="0.01">
+  </div>
+  <div class="sheet-field">
+    <div class="sheet-label">Min Monthly Payment ($)</div>
+    <input class="sheet-input" id="debt-min-input" type="number" inputmode="decimal" placeholder="0.00" min="0" step="0.01">
+  </div>
+  <div class="sheet-actions">
+    <button class="sheet-cancel" onclick="closeSheets()">Cancel</button>
+    <button class="sheet-done" onclick="saveDebt()">Done</button>
+  </div>
+</div>
+
 <script>
 // ── Data ──────────────────────────────────────────────────────────────────
 const STORAGE_KEY = 'budgetData';
@@ -635,6 +755,8 @@ function loadData() {
     income: { goal: 0, actual: 0 },
     expenses: [],
     goals: [],
+    bankBalance: 0,
+    debts: [],
     month: ym
   };
   if (!raw) return def;
@@ -647,6 +769,8 @@ function loadData() {
     income: raw.income || def.income,
     expenses: raw.expenses || [],
     goals: raw.goals || [],
+    bankBalance: raw.bankBalance || 0,
+    debts: raw.debts || [],
     month: raw.month
   };
 }
@@ -715,7 +839,16 @@ function renderAll() {
   renderOverview();
   if (activeTab === 'income') renderIncome();
   if (activeTab === 'expenses') renderExpenses();
+  if (activeTab === 'debt') renderDebt();
   if (activeTab === 'goals') renderGoals();
+}
+
+function totalMinPayments() {
+  return (data.debts || []).reduce((s, d) => s + (d.minPayment || 0), 0);
+}
+
+function totalCurrentDebt() {
+  return (data.debts || []).reduce((s, d) => s + Math.max(0, d.currentBalance || 0), 0);
 }
 
 function renderOverview() {
@@ -723,7 +856,8 @@ function renderOverview() {
   const totalBudgeted = data.expenses.reduce((s, e) => s + (e.budgeted || 0), 0);
   const totalActual   = data.expenses.reduce((s, e) => s + (e.actual  || 0), 0);
   const savings = totalMonthlySavings();
-  const free = (income.actual || 0) - totalActual - savings;
+  const minPayments = totalMinPayments();
+  const free = (income.actual || 0) - totalActual - savings - minPayments;
 
   document.getElementById('overview-month').textContent = monthLabel();
 
@@ -743,10 +877,16 @@ function renderOverview() {
   expBar.style.background = expOver ? 'var(--red)' : 'var(--green)';
 
   document.getElementById('ov-savings').textContent = fmt(savings) + '/mo';
+  document.getElementById('ov-min-payments').textContent = fmt(minPayments) + '/mo';
 
   const freeEl = document.getElementById('ov-free');
   freeEl.textContent = fmt(Math.abs(free)) + (free < 0 ? ' over' : '');
   freeEl.style.color = free >= 0 ? 'var(--green)' : 'var(--red)';
+
+  const netPos = (data.bankBalance || 0) - totalCurrentDebt();
+  const netEl = document.getElementById('ov-net-position');
+  netEl.textContent = (netPos < 0 ? '-' : '') + fmt(Math.abs(netPos));
+  netEl.style.color = netPos >= 0 ? 'var(--green)' : 'var(--red)';
 }
 
 // ── Income ────────────────────────────────────────────────────────────────
@@ -827,6 +967,13 @@ function closeAllInlineEdits() {
     const row = document.getElementById(rowId);
     if (row) row.onclick = () => startInlineEdit(field);
   });
+  // Close bank balance inline edit if open
+  const bankWrap = document.getElementById('inline-edit-wrap-bankBalance');
+  if (bankWrap) bankWrap.remove();
+  const bankDisplay = document.getElementById('bank-balance-display');
+  if (bankDisplay) bankDisplay.style.display = '';
+  const bankRow = document.getElementById('bank-balance-row');
+  if (bankRow) bankRow.onclick = startBankEdit;
 }
 
 // ── Expenses ──────────────────────────────────────────────────────────────
@@ -1021,7 +1168,7 @@ function openGoalSheet() {
 }
 
 function closeSheets() {
-  ['expense-overlay','expense-sheet','goal-overlay','goal-sheet'].forEach(id => {
+  ['expense-overlay','expense-sheet','goal-overlay','goal-sheet','debt-overlay','debt-sheet'].forEach(id => {
     document.getElementById(id).classList.remove('open');
   });
 }
@@ -1053,6 +1200,147 @@ function saveGoal() {
   saveData(data);
   closeSheets();
   renderGoals();
+  renderOverview();
+}
+
+// ── Debt ──────────────────────────────────────────────────────────────────
+function startBankEdit() {
+  if (inlineEditField === 'bankBalance') return;
+  closeAllInlineEdits();
+  inlineEditField = 'bankBalance';
+
+  const row = document.getElementById('bank-balance-row');
+  const display = document.getElementById('bank-balance-display');
+  display.style.display = 'none';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'inline-edit-wrap';
+  wrap.id = 'inline-edit-wrap-bankBalance';
+
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.inputMode = 'decimal';
+  input.className = 'inline-input';
+  input.value = data.bankBalance || '';
+  input.placeholder = '0';
+  input.id = 'inline-input-bankBalance';
+
+  const btn = document.createElement('button');
+  btn.className = 'inline-save-btn';
+  btn.textContent = 'Save';
+  btn.style.touchAction = 'manipulation';
+  btn.onclick = (e) => { e.stopPropagation(); saveBankEdit(); };
+
+  wrap.appendChild(input);
+  wrap.appendChild(btn);
+  row.appendChild(wrap);
+  row.onclick = null;
+
+  input.focus();
+  input.select();
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); saveBankEdit(); }
+    if (e.key === 'Escape') { closeAllInlineEdits(); renderDebt(); }
+  });
+}
+
+function saveBankEdit() {
+  const input = document.getElementById('inline-input-bankBalance');
+  if (!input) return;
+  data.bankBalance = parseFloat(input.value) || 0;
+  saveData(data);
+  closeAllInlineEdits();
+  renderDebt();
+  renderOverview();
+}
+
+function renderDebt() {
+  const bankDisplay = document.getElementById('bank-balance-display');
+  if (bankDisplay && inlineEditField !== 'bankBalance') {
+    bankDisplay.textContent = fmt(data.bankBalance || 0);
+  }
+
+  const list = document.getElementById('debts-list');
+  list.innerHTML = '';
+
+  if (!data.debts || data.debts.length === 0) {
+    list.innerHTML = '<div class="empty-state">No debts added — nice! 🎉</div>';
+  } else {
+    data.debts.forEach(debt => {
+      const card = document.createElement('div');
+      card.className = 'debt-card';
+
+      const paidOff = (debt.currentBalance || 0) <= 0;
+      const pct = debt.startBalance > 0
+        ? clamp(((debt.startBalance - Math.max(0, debt.currentBalance)) / debt.startBalance) * 100, 0, 100)
+        : 0;
+
+      let progressHtml;
+      if (paidOff) {
+        progressHtml = '<span class="paid-off-badge">PAID OFF ✓</span>';
+      } else {
+        progressHtml = `
+          <div class="progress-wrap">
+            <div class="progress-track">
+              <div class="progress-fill" style="background:#ff3b30;width:${pct}%"></div>
+            </div>
+          </div>`;
+      }
+
+      card.innerHTML = `
+        <div class="debt-header">
+          <div class="debt-name">${escHtml(debt.name)}</div>
+          <button class="debt-delete-btn" onclick="deleteDebt('${debt.id}')" style="touch-action:manipulation">✕</button>
+        </div>
+        ${progressHtml}
+        <div class="debt-stats">
+          <span>Started: ${fmt(debt.startBalance)}</span>
+          <span>Remaining: ${fmt(Math.max(0, debt.currentBalance))}</span>
+        </div>
+        <div class="debt-min">Min Payment: ${fmt(debt.minPayment)}/mo</div>
+      `;
+
+      list.appendChild(card);
+    });
+  }
+
+  const totalDebt = totalCurrentDebt();
+  const totalMin = totalMinPayments();
+  document.getElementById('debt-total').textContent = fmt(totalDebt);
+  document.getElementById('debt-min-total').textContent = fmt(totalMin) + '/mo';
+}
+
+function deleteDebt(id) {
+  data.debts = data.debts.filter(d => d.id !== id);
+  saveData(data);
+  renderDebt();
+  renderOverview();
+}
+
+function openDebtSheet() {
+  document.getElementById('debt-name-input').value    = '';
+  document.getElementById('debt-start-input').value   = '';
+  document.getElementById('debt-current-input').value = '';
+  document.getElementById('debt-min-input').value     = '';
+  document.getElementById('debt-overlay').classList.add('open');
+  document.getElementById('debt-sheet').classList.add('open');
+  setTimeout(() => document.getElementById('debt-name-input').focus(), 350);
+}
+
+function saveDebt() {
+  const name    = document.getElementById('debt-name-input').value.trim();
+  const start   = parseFloat(document.getElementById('debt-start-input').value)   || 0;
+  const current = parseFloat(document.getElementById('debt-current-input').value) || 0;
+  const min     = parseFloat(document.getElementById('debt-min-input').value)     || 0;
+  if (!name) {
+    document.getElementById('debt-name-input').focus();
+    return;
+  }
+  data.debts.push({ id: uid(), name, startBalance: start, currentBalance: current, minPayment: min });
+  saveData(data);
+  closeSheets();
+  renderDebt();
   renderOverview();
 }
 
