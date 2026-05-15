@@ -593,18 +593,15 @@
         <span class="income-row-label">Income Goal</span>
         <span class="income-row-value" id="inc-goal-display">$0</span>
       </div>
-      <div class="card-divider"></div>
-      <div class="card-row income-row" id="inc-actual-row" onclick="startInlineEdit('actual')">
-        <span class="income-row-label">Received This Month</span>
-        <span class="income-row-value" id="inc-actual-display">$0</span>
-      </div>
     </div>
+
+    <div id="income-received-section"></div>
 
     <div id="income-min-section"></div>
 
     <div class="section-header">Tip</div>
     <div class="card">
-      <p class="tip-text">Update "Received" as you get paid. Your goal is your expected monthly total.</p>
+      <p class="tip-text">Tap "+ Log Income" to record each payment as you receive it. Your goal is your expected monthly total.</p>
     </div>
   </div>
 
@@ -783,6 +780,29 @@
   </div>
 </div>
 
+<!-- ── INCOME ENTRY SHEET ── -->
+<div class="overlay" id="inc-overlay" onclick="closeSheets()"></div>
+<div class="sheet" id="inc-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Log Income</div>
+  <div class="sheet-field">
+    <div class="sheet-label">Amount</div>
+    <input class="sheet-input" id="inc-amount-input" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" style="font-size:16px">
+  </div>
+  <div class="sheet-field">
+    <div class="sheet-label">Date</div>
+    <input class="sheet-input" id="inc-date-input" type="date" style="font-size:16px">
+  </div>
+  <div class="sheet-field">
+    <div class="sheet-label">Note (optional)</div>
+    <input class="sheet-input" id="inc-note-input" type="text" placeholder="e.g. Paycheck, freelance" style="font-size:16px" autocomplete="off">
+  </div>
+  <div class="sheet-actions">
+    <button class="sheet-cancel" onclick="closeSheets()">Cancel</button>
+    <button class="sheet-done" onclick="saveIncomeEntry()">Done</button>
+  </div>
+</div>
+
 <script>
 // ── Data ──────────────────────────────────────────────────────────────────
 const STORAGE_KEY = 'budgetData';
@@ -798,7 +818,7 @@ function loadData() {
   try { raw = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch(e) {}
   const ym = currentYM();
   const def = {
-    income: { goal: 0, actual: 0 },
+    income: { goal: 0, entries: [] },
     expenses: [],
     goals: [],
     bankBalance: 0,
@@ -807,10 +827,17 @@ function loadData() {
     month: ym
   };
   if (!raw) return def;
-  // Month rollover — reset expenses.actual, paidDate, and oneOffExpenses
+  // Migrate old income.actual → entries
+  if (raw.income && raw.income.actual !== undefined && !raw.income.entries) {
+    raw.income.entries = [];
+    delete raw.income.actual;
+  }
+  // Month rollover — reset expenses.actual, paidDate, oneOffExpenses, and income entries
   if (raw.month !== ym) {
     (raw.expenses || []).forEach(e => { e.actual = 0; e.paidDate = null; });
     raw.oneOffExpenses = [];
+    raw.income = raw.income || {};
+    raw.income.entries = [];
     raw.month = ym;
   }
   // Backfill missing dueDay/paidDate fields
@@ -818,8 +845,11 @@ function loadData() {
     if (e.dueDay === undefined) e.dueDay = null;
     if (e.paidDate === undefined) e.paidDate = null;
   });
+  const inc = raw.income || def.income;
+  if (!inc.entries) inc.entries = [];
+  if (inc.actual !== undefined) delete inc.actual;
   return {
-    income: raw.income || def.income,
+    income: inc,
     expenses: raw.expenses || [],
     goals: raw.goals || [],
     bankBalance: raw.bankBalance || 0,
@@ -914,18 +944,19 @@ function totalCurrentDebt() {
 
 function renderOverview() {
   const income = data.income;
+  const incomeActual = (income.entries || []).reduce((s, e) => s + e.amount, 0);
   const totalBudgeted = data.expenses.reduce((s, e) => s + (e.budgeted || 0), 0);
   const totalActual   = data.expenses.reduce((s, e) => s + (e.actual  || 0), 0);
   const oneOffTotal   = (data.oneOffExpenses || []).reduce((s, e) => s + (e.amount || 0), 0);
   const savings = totalMonthlySavings();
   const minPayments = totalMinPayments();
-  const free = (income.actual || 0) - totalActual - oneOffTotal - savings - minPayments;
+  const free = incomeActual - totalActual - oneOffTotal - savings - minPayments;
 
   document.getElementById('overview-month').textContent = monthLabel();
 
   document.getElementById('ov-income-goal').textContent = fmt(income.goal);
-  document.getElementById('ov-income-actual').textContent = fmt(income.actual);
-  const incPct = income.goal > 0 ? clamp((income.actual / income.goal) * 100, 0, 100) : 0;
+  document.getElementById('ov-income-actual').textContent = fmt(incomeActual);
+  const incPct = income.goal > 0 ? clamp((incomeActual / income.goal) * 100, 0, 100) : 0;
   const incBar = document.getElementById('ov-income-bar');
   incBar.style.width = incPct + '%';
   incBar.style.background = 'var(--green)';
@@ -960,9 +991,50 @@ function renderOverview() {
 let inlineEditField = null;
 
 function renderIncome() {
-  document.getElementById('inc-goal-display').textContent   = fmt(data.income.goal);
-  document.getElementById('inc-actual-display').textContent = fmt(data.income.actual);
+  document.getElementById('inc-goal-display').textContent = fmt(data.income.goal);
+  renderIncomeEntries();
   renderMinimumNeeded();
+}
+
+function formatEntryDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function renderIncomeEntries() {
+  const section = document.getElementById('income-received-section');
+  if (!section) return;
+
+  const entries = (data.income.entries || []).slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  const total = entries.reduce((s, e) => s + e.amount, 0);
+
+  let html = `<div class="section-header">Received This Month</div>`;
+  html += `<div class="card">`;
+
+  if (entries.length === 0) {
+    html += `<div style="text-align:center;color:var(--text2);font-size:14px;padding:18px 0">No income logged yet this month</div>`;
+  } else {
+    entries.forEach((entry, idx) => {
+      if (idx > 0) html += `<div class="card-divider"></div>`;
+      html += `
+        <div class="card-row" style="gap:8px">
+          <span style="font-weight:700;color:var(--text);font-size:0.9rem;min-width:52px">${formatEntryDate(entry.date)}</span>
+          ${entry.note ? `<span style="flex:1;color:var(--text2);font-size:0.82rem">${escHtml(entry.note)}</span>` : `<span style="flex:1"></span>`}
+          <span style="font-weight:700;color:var(--green);font-size:0.9rem">${fmt(entry.amount)}</span>
+          <button style="background:none;border:none;font-size:14px;color:var(--text2);cursor:pointer;touch-action:manipulation;padding:0 0 0 6px;line-height:1;flex-shrink:0" onclick="deleteIncomeEntry('${entry.id}')">✕</button>
+        </div>`;
+    });
+    html += `<div class="card-divider"></div>`;
+    html += `<div class="card-row"><span style="flex:1"></span><span style="font-weight:700;color:var(--text);font-size:0.9rem">Total Received: ${fmt(total)}</span></div>`;
+  }
+
+  html += `</div>`;
+  html += `<button class="add-btn" onclick="openIncomeSheet()" style="touch-action:manipulation;margin-top:0">
+    <span>＋</span> Log Income
+  </button>`;
+
+  section.innerHTML = html;
 }
 
 function renderMinimumNeeded() {
@@ -1012,12 +1084,12 @@ function startInlineEdit(field) {
   closeAllInlineEdits();
 
   inlineEditField = field;
-  const rowId = field === 'goal' ? 'inc-goal-row' : 'inc-actual-row';
-  const displayId = field === 'goal' ? 'inc-goal-display' : 'inc-actual-display';
+  const rowId = 'inc-goal-row';
+  const displayId = 'inc-goal-display';
   const row = document.getElementById(rowId);
   const display = document.getElementById(displayId);
 
-  const currentVal = field === 'goal' ? data.income.goal : data.income.actual;
+  const currentVal = data.income.goal;
 
   display.style.display = 'none';
 
@@ -1058,8 +1130,7 @@ function saveInlineEdit(field) {
   const input = document.getElementById('inline-input-' + field);
   if (!input) return;
   const val = parseFloat(input.value) || 0;
-  if (field === 'goal') data.income.goal = val;
-  else data.income.actual = val;
+  data.income.goal = val;
   saveData(data);
   closeAllInlineEdits();
   renderIncome();
@@ -1068,15 +1139,12 @@ function saveInlineEdit(field) {
 
 function closeAllInlineEdits() {
   inlineEditField = null;
-  ['goal','actual'].forEach(field => {
-    const wrap = document.getElementById('inline-edit-wrap-' + field);
-    if (wrap) wrap.remove();
-    const display = document.getElementById('inc-' + field + '-display');
-    if (display) display.style.display = '';
-    const rowId = field === 'goal' ? 'inc-goal-row' : 'inc-actual-row';
-    const row = document.getElementById(rowId);
-    if (row) row.onclick = () => startInlineEdit(field);
-  });
+  const goalWrap = document.getElementById('inline-edit-wrap-goal');
+  if (goalWrap) goalWrap.remove();
+  const goalDisplay = document.getElementById('inc-goal-display');
+  if (goalDisplay) goalDisplay.style.display = '';
+  const goalRow = document.getElementById('inc-goal-row');
+  if (goalRow) goalRow.onclick = () => startInlineEdit('goal');
   // Close bank balance inline edit if open
   const bankWrap = document.getElementById('inline-edit-wrap-bankBalance');
   if (bankWrap) bankWrap.remove();
@@ -1385,6 +1453,46 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Income Entries ────────────────────────────────────────────────────────
+function openIncomeSheet() {
+  document.getElementById('inc-amount-input').value = '';
+  const today = new Date();
+  const mm = String(today.getMonth()+1).padStart(2,'0');
+  const dd = String(today.getDate()).padStart(2,'0');
+  document.getElementById('inc-date-input').value = `${today.getFullYear()}-${mm}-${dd}`;
+  document.getElementById('inc-note-input').value = '';
+  document.getElementById('inc-overlay').classList.add('open');
+  document.getElementById('inc-sheet').classList.add('open');
+  setTimeout(() => document.getElementById('inc-amount-input').focus(), 350);
+}
+
+function saveIncomeEntry() {
+  const amount = parseFloat(document.getElementById('inc-amount-input').value);
+  const dateValue = document.getElementById('inc-date-input').value;
+  const noteValue = document.getElementById('inc-note-input').value;
+  if (!amount || isNaN(amount) || amount <= 0) {
+    document.getElementById('inc-amount-input').focus();
+    return;
+  }
+  if (!dateValue) {
+    document.getElementById('inc-date-input').focus();
+    return;
+  }
+  if (!data.income.entries) data.income.entries = [];
+  data.income.entries.push({ id: uid(), amount, date: dateValue, note: noteValue.trim() });
+  saveData(data);
+  closeSheets();
+  renderIncomeEntries();
+  renderOverview();
+}
+
+function deleteIncomeEntry(id) {
+  data.income.entries = (data.income.entries || []).filter(e => e.id !== id);
+  saveData(data);
+  renderIncomeEntries();
+  renderOverview();
+}
+
 // ── Sheets ────────────────────────────────────────────────────────────────
 function openBillSheet() {
   document.getElementById('exp-name-input').value   = '';
@@ -1406,7 +1514,7 @@ function openGoalSheet() {
 }
 
 function closeSheets() {
-  ['expense-overlay','expense-sheet','goal-overlay','goal-sheet','debt-overlay','debt-sheet','oneoff-overlay','oneoff-sheet'].forEach(id => {
+  ['expense-overlay','expense-sheet','goal-overlay','goal-sheet','debt-overlay','debt-sheet','oneoff-overlay','oneoff-sheet','inc-overlay','inc-sheet'].forEach(id => {
     document.getElementById(id).classList.remove('open');
   });
 }
