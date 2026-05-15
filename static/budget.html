@@ -15,6 +15,7 @@
       --card: #ffffff;
       --green: #34c759;
       --red: #ff3b30;
+      --orange: #ff9500;
       --blue: #007aff;
       --text: #1c1c1e;
       --text2: #8e8e93;
@@ -122,13 +123,14 @@
       padding: 0;
     }
 
-    .tab-icon { font-size: 22px; line-height: 1; }
+    .tab-icon { font-size: 18px; line-height: 1; }
     .tab-label { font-size: 10px; font-weight: 500; color: var(--text2); }
 
     .tab-btn.active .tab-label { color: var(--blue); }
     .tab-btn[data-tab="overview"].active .tab-icon { filter: none; }
     .tab-btn[data-tab="income"].active .tab-label { color: var(--green); }
-    .tab-btn[data-tab="expenses"].active .tab-label { color: var(--red); }
+    .tab-btn[data-tab="bills"].active .tab-label { color: var(--red); }
+    .tab-btn[data-tab="expenses"].active .tab-label { color: var(--orange); }
     .tab-btn[data-tab="goals"].active .tab-label { color: var(--blue); }
     .tab-btn[data-tab="debt"].active .tab-label { color: var(--red); }
 
@@ -249,7 +251,7 @@
 
     .tip-text { font-size: 14px; color: var(--text2); line-height: 1.5; }
 
-    /* ── Expenses tab ── */
+    /* ── Bills / Expenses tab ── */
     .expense-card {
       background: var(--card);
       border-radius: 12px;
@@ -522,7 +524,7 @@
       </div>
     </div>
 
-    <div class="section-header">Expenses</div>
+    <div class="section-header">Bills</div>
     <div class="card">
       <div class="card-row">
         <span class="stat-label">Budgeted</span>
@@ -537,6 +539,14 @@
         <div class="progress-track">
           <div class="progress-fill" id="ov-exp-bar" style="background:var(--green);width:0%"></div>
         </div>
+      </div>
+    </div>
+
+    <div class="section-header">Expenses</div>
+    <div class="card">
+      <div class="card-row">
+        <span class="stat-label">This Month</span>
+        <span class="stat-value" id="ov-varexp-actual" style="color:var(--orange)">$0</span>
       </div>
     </div>
 
@@ -597,19 +607,22 @@
     </div>
   </div>
 
-  <!-- ── EXPENSES ── -->
-  <div id="screen-expenses" class="screen">
-    <div class="section-header">Monthly Expenses</div>
-    <div id="expenses-list"></div>
-    <button class="add-btn" onclick="openExpenseSheet()" style="touch-action:manipulation">
-      <span>＋</span> Add Expense
+  <!-- ── BILLS ── -->
+  <div id="screen-bills" class="screen">
+    <div class="section-header">Monthly Bills</div>
+    <div id="bills-list"></div>
+    <button class="add-btn" onclick="openBillSheet()" style="touch-action:manipulation">
+      <span>＋</span> Add Bill
     </button>
     <div class="section-footer">
-      <span>Budgeted: <strong id="exp-total-budgeted">$0</strong></span>
-      <span>Spent: <strong id="exp-total-actual">$0</strong></span>
+      <span>Budgeted: <strong id="bills-total-budgeted">$0</strong></span>
+      <span>Spent: <strong id="bills-total-actual">$0</strong></span>
     </div>
+  </div>
 
-    <div id="oneoff-section"></div>
+  <!-- ── EXPENSES (variable / one-off) ── -->
+  <div id="screen-expenses" class="screen">
+    <div id="varexp-section"></div>
   </div>
 
   <!-- ── DEBT ── -->
@@ -652,8 +665,12 @@
       <span class="tab-icon">💰</span>
       <span class="tab-label">Income</span>
     </button>
-    <button class="tab-btn" data-tab="expenses" onclick="switchTab('expenses')" style="touch-action:manipulation">
+    <button class="tab-btn" data-tab="bills" onclick="switchTab('bills')" style="touch-action:manipulation">
       <span class="tab-icon">💸</span>
+      <span class="tab-label">Bills</span>
+    </button>
+    <button class="tab-btn" data-tab="expenses" onclick="switchTab('expenses')" style="touch-action:manipulation">
+      <span class="tab-icon">🛒</span>
       <span class="tab-label">Expenses</span>
     </button>
     <button class="tab-btn" data-tab="debt" onclick="switchTab('debt')" style="touch-action:manipulation">
@@ -668,14 +685,14 @@
 
 </div><!-- #app -->
 
-<!-- ── EXPENSE SHEET ── -->
+<!-- ── BILL SHEET ── -->
 <div class="overlay" id="expense-overlay" onclick="closeSheets()"></div>
 <div class="sheet" id="expense-sheet">
   <div class="sheet-handle"></div>
-  <div class="sheet-title">Add Expense</div>
+  <div class="sheet-title">Add Bill</div>
   <div class="sheet-field">
     <div class="sheet-label">Name</div>
-    <input class="sheet-input" id="exp-name-input" type="text" placeholder="e.g. Groceries" autocomplete="off">
+    <input class="sheet-input" id="exp-name-input" type="text" placeholder="e.g. Rent" autocomplete="off">
   </div>
   <div class="sheet-field">
     <div class="sheet-label">Budgeted Amount ($)</div>
@@ -714,14 +731,14 @@
   </div>
 </div>
 
-<!-- ── ONE-OFF EXPENSE SHEET ── -->
+<!-- ── EXPENSE SHEET (variable) ── -->
 <div class="overlay" id="oneoff-overlay" onclick="closeSheets()"></div>
 <div class="sheet" id="oneoff-sheet">
   <div class="sheet-handle"></div>
-  <div class="sheet-title">Add One-Time Expense</div>
+  <div class="sheet-title">Add Expense</div>
   <div class="sheet-field">
     <div class="sheet-label">Name</div>
-    <input class="sheet-input" id="oneoff-name-input" type="text" placeholder="e.g. Car repair" autocomplete="off" style="font-size:16px">
+    <input class="sheet-input" id="oneoff-name-input" type="text" placeholder="e.g. Groceries" autocomplete="off" style="font-size:16px">
   </div>
   <div class="sheet-field">
     <div class="sheet-label">Amount ($)</div>
@@ -864,7 +881,8 @@ function switchTab(tab) {
 function renderAll() {
   renderOverview();
   if (activeTab === 'income') renderIncome();
-  if (activeTab === 'expenses') renderExpenses();
+  if (activeTab === 'bills') renderBills();
+  if (activeTab === 'expenses') renderExpensesTab();
   if (activeTab === 'debt') renderDebt();
   if (activeTab === 'goals') renderGoals();
 }
@@ -884,7 +902,6 @@ function renderOverview() {
   const oneOffTotal   = (data.oneOffExpenses || []).reduce((s, e) => s + (e.amount || 0), 0);
   const savings = totalMonthlySavings();
   const minPayments = totalMinPayments();
-  const totalSpent = totalActual + oneOffTotal;
   const free = (income.actual || 0) - totalActual - oneOffTotal - savings - minPayments;
 
   document.getElementById('overview-month').textContent = monthLabel();
@@ -897,12 +914,14 @@ function renderOverview() {
   incBar.style.background = 'var(--green)';
 
   document.getElementById('ov-exp-budgeted').textContent = fmt(totalBudgeted);
-  document.getElementById('ov-exp-actual').textContent   = fmt(totalSpent);
-  const expPct = totalBudgeted > 0 ? clamp((totalSpent / totalBudgeted) * 100, 0, 100) : 0;
-  const expOver = totalSpent > totalBudgeted;
+  document.getElementById('ov-exp-actual').textContent   = fmt(totalActual);
+  const expPct = totalBudgeted > 0 ? clamp((totalActual / totalBudgeted) * 100, 0, 100) : 0;
+  const expOver = totalActual > totalBudgeted;
   const expBar = document.getElementById('ov-exp-bar');
   expBar.style.width = (totalBudgeted > 0 ? expPct : 0) + '%';
   expBar.style.background = expOver ? 'var(--red)' : 'var(--green)';
+
+  document.getElementById('ov-varexp-actual').textContent = fmt(oneOffTotal);
 
   document.getElementById('ov-savings').textContent = fmt(savings) + '/mo';
   document.getElementById('ov-min-payments').textContent = fmt(minPayments) + '/mo';
@@ -942,7 +961,7 @@ function renderMinimumNeeded() {
     <div class="section-header">Minimum Needed</div>
     <div class="card">
       <div class="card-row">
-        <span style="font-size:0.85rem;color:var(--text2)">Budgeted Expenses</span>
+        <span style="font-size:0.85rem;color:var(--text2)">Monthly Bills</span>
         <span style="font-size:0.9rem;color:var(--text)">${fmt(budgetedExpenses)}/mo</span>
       </div>
       <div class="card-row">
@@ -1046,15 +1065,15 @@ function closeAllInlineEdits() {
   if (bankRow) bankRow.onclick = startBankEdit;
 }
 
-// ── Expenses ──────────────────────────────────────────────────────────────
+// ── Bills ─────────────────────────────────────────────────────────────────
 let editingActualId = null;
 
-function renderExpenses() {
-  const list = document.getElementById('expenses-list');
+function renderBills() {
+  const list = document.getElementById('bills-list');
   list.innerHTML = '';
 
   if (data.expenses.length === 0) {
-    list.innerHTML = '<div class="empty-state">No expenses yet.<br>Tap Add Expense to get started.</div>';
+    list.innerHTML = '<div class="empty-state">No bills yet.<br>Tap Add Bill to get started.</div>';
   }
 
   data.expenses.forEach(exp => {
@@ -1110,14 +1129,14 @@ function renderExpenses() {
       setTimeout(() => { inp.focus(); inp.select(); }, 50);
       inp.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') { e.preventDefault(); saveExpenseActual(exp.id); }
-        if (e.key === 'Escape') { editingActualId = null; renderExpenses(); }
+        if (e.key === 'Escape') { editingActualId = null; renderBills(); }
       });
     } else {
       const actualBtn = document.createElement('button');
       actualBtn.className = 'expense-actual-btn' + (isOver ? ' over' : '');
       actualBtn.textContent = fmt(exp.actual || 0);
       actualBtn.style.touchAction = 'manipulation';
-      actualBtn.onclick = () => { editingActualId = exp.id; renderExpenses(); };
+      actualBtn.onclick = () => { editingActualId = exp.id; renderBills(); };
 
       const delBtn = document.createElement('button');
       delBtn.className = 'expense-delete-btn';
@@ -1136,31 +1155,29 @@ function renderExpenses() {
 
   const totalBudgeted = data.expenses.reduce((s,e) => s + (e.budgeted||0), 0);
   const totalActual   = data.expenses.reduce((s,e) => s + (e.actual||0),   0);
-  document.getElementById('exp-total-budgeted').textContent = fmt(totalBudgeted);
-  document.getElementById('exp-total-actual').textContent   = fmt(totalActual);
-
-  renderOneOffExpenses();
+  document.getElementById('bills-total-budgeted').textContent = fmt(totalBudgeted);
+  document.getElementById('bills-total-actual').textContent   = fmt(totalActual);
 }
 
-// ── One-Off Expenses ──────────────────────────────────────────────────────
-function renderOneOffExpenses() {
-  const section = document.getElementById('oneoff-section');
+// ── Expenses Tab (variable / one-off) ─────────────────────────────────────
+function renderExpensesTab() {
+  const section = document.getElementById('varexp-section');
   if (!section) return;
 
   const oneOffs    = data.oneOffExpenses || [];
   const oneOffTotal = oneOffs.reduce((s, e) => s + (e.amount || 0), 0);
 
-  let html = `<div class="section-header">One-Time This Month</div>`;
+  let html = `<div class="section-header">Expenses This Month</div>`;
 
   if (oneOffs.length === 0) {
-    html += `<div style="padding:8px 20px 4px;font-size:14px;color:var(--text2)">No one-time expenses this month</div>`;
+    html += `<div style="padding:8px 20px 4px;font-size:14px;color:var(--text2)">No expenses this month</div>`;
   } else {
     oneOffs.forEach(oe => {
       html += `
         <div class="expense-card">
           <div class="expense-row">
             <span style="flex:1;font-size:0.9rem;font-weight:700">${escHtml(oe.name)}</span>
-            <span style="font-size:0.9rem;font-weight:700;color:#ff3b30;margin-right:6px">${fmt(oe.amount)}</span>
+            <span style="font-size:0.9rem;font-weight:700;color:var(--orange);margin-right:6px">${fmt(oe.amount)}</span>
             <button class="expense-delete-btn" onclick="deleteOneOff('${oe.id}')" style="touch-action:manipulation">✕</button>
           </div>
         </div>`;
@@ -1169,10 +1186,10 @@ function renderOneOffExpenses() {
 
   html += `
     <button class="add-btn" onclick="openOneOffSheet()" style="touch-action:manipulation;margin-top:8px">
-      <span>＋</span> Add One-Time Expense
+      <span>＋</span> Add Expense
     </button>
-    <div style="padding:10px 20px 4px;font-size:13px;color:#ff3b30;font-weight:600">
-      One-Time Total: ${fmt(oneOffTotal)}
+    <div style="padding:10px 20px 4px;font-size:13px;color:var(--orange);font-weight:600">
+      Expenses Total: ${fmt(oneOffTotal)}
     </div>`;
 
   section.innerHTML = html;
@@ -1197,14 +1214,14 @@ function saveOneOff() {
   data.oneOffExpenses.push({ id: uid(), name, amount });
   saveData(data);
   closeSheets();
-  renderOneOffExpenses();
+  renderExpensesTab();
   renderOverview();
 }
 
 function deleteOneOff(id) {
   data.oneOffExpenses = (data.oneOffExpenses || []).filter(e => e.id !== id);
   saveData(data);
-  renderOneOffExpenses();
+  renderExpensesTab();
   renderOverview();
 }
 
@@ -1216,7 +1233,7 @@ function saveExpenseActual(id) {
   if (exp) exp.actual = val;
   editingActualId = null;
   saveData(data);
-  renderExpenses();
+  renderBills();
   renderOverview();
 }
 
@@ -1224,7 +1241,7 @@ function deleteExpense(id) {
   data.expenses = data.expenses.filter(e => e.id !== id);
   editingActualId = null;
   saveData(data);
-  renderExpenses();
+  renderBills();
   renderOverview();
 }
 
@@ -1287,7 +1304,7 @@ function escHtml(s) {
 }
 
 // ── Sheets ────────────────────────────────────────────────────────────────
-function openExpenseSheet() {
+function openBillSheet() {
   document.getElementById('exp-name-input').value   = '';
   document.getElementById('exp-budget-input').value = '';
   document.getElementById('expense-overlay').classList.add('open');
@@ -1321,7 +1338,7 @@ function saveExpense() {
   data.expenses.push({ id: uid(), name, budgeted: budget, actual: 0 });
   saveData(data);
   closeSheets();
-  renderExpenses();
+  renderBills();
   renderOverview();
 }
 
@@ -1490,7 +1507,7 @@ document.addEventListener('keydown', e => {
 // ── Init ──────────────────────────────────────────────────────────────────
 renderAll();
 
-// Re-render income/expenses/goals when their tabs become visible
+// Re-render income/bills/expenses/goals when their tabs become visible
 // (already handled in switchTab)
 </script>
 </body>
