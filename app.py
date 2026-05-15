@@ -6070,14 +6070,26 @@ def portal_orders(user):
             fields=["Document ID", "Order ID", "Date", "MO Line Items", "Customer", "Sales Order Status", "Go-to PDF"],
             formula='{Order Type}="Sales Order"',
         )
-        # Fetch tracking from Sales Order Tracking table (Automated Data base)
+        # Fetch tracking from Sales Order Tracking table (including split orders)
         tracking_recs = at_get_all(
             _SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
-            fields=["Order #", "Tracking #"],
+            fields=["Order #", "Tracking #", "Base Order #"],
             base_id=_SO_TRACKING_BASE,
         )
-        tracking_map = {r["fields"].get("Order #", "").strip(): (r["fields"].get("Tracking #") or "")
-                        for r in tracking_recs if r.get("fields", {}).get("Order #")}
+        tracking_map      = {}  # so_number → main tracking
+        split_tracking_map = {}  # so_number → list of {split_num, tracking}
+        for r in tracking_recs:
+            f2 = r.get("fields", {})
+            key  = f2.get("Order #", "").strip()
+            trk  = f2.get("Tracking #") or ""
+            base = f2.get("Base Order #") or ""
+            if not key:
+                continue
+            if base:
+                # This is a split — add to parent's split list
+                split_tracking_map.setdefault(base, []).append({"splitNum": key, "tracking": trk})
+            else:
+                tracking_map[key] = trk
         records = [r for r in records
                    if customer_id in r.get("fields", {}).get("Customer", [])
                    and r.get("fields", {}).get("Sales Order Status") == "Approved"]
@@ -6105,12 +6117,13 @@ def portal_orders(user):
             go_to_pdf_field = f.get("Go-to PDF") or {}
             go_to_pdf_url   = go_to_pdf_field.get("url", "") if isinstance(go_to_pdf_field, dict) else ""
             orders.append({
-                "record_id":  r["id"],
-                "so_number":  so_number,
-                "date":       f.get("Date", ""),
-                "total":      round(total, 2),
-                "go_to_pdf":  go_to_pdf_url,
-                "tracking":   tracking_map.get(so_number, ""),
+                "record_id":      r["id"],
+                "so_number":      so_number,
+                "date":           f.get("Date", ""),
+                "total":          round(total, 2),
+                "go_to_pdf":      go_to_pdf_url,
+                "tracking":       tracking_map.get(so_number, ""),
+                "splitShipments": split_tracking_map.get(so_number, []),
             })
         orders.sort(key=lambda x: x.get("date", ""), reverse=True)
         _ORDERS_CACHE[customer_id] = {"ts": _time_mod.time(), "data": orders}
@@ -8353,60 +8366,174 @@ def portal_admin_shipped_orders(user):
                 invoiced_ids[oid]     = doc
                 invoiced_rec_ids[oid] = ir["id"]
 
-        # Fetch tracking + ship date from SO Tracking Link
+        # Fetch tracking + ship date + base order from SO Tracking Link
         tracking_recs = at_get_all(
             _SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
-            fields=["Order #", "Tracking #", "Ship Date"],
+            fields=["Order #", "Tracking #", "Ship Date", "Base Order #"],
             base_id=_SO_TRACKING_BASE,
         )
-        tracking_map  = {}
-        ship_date_map = {}
+        tracking_map   = {}
+        ship_date_map  = {}
+        base_order_map = {}
         for r in tracking_recs:
             f2 = r.get("fields", {})
             key = f2.get("Order #", "").strip()
             if key:
-                tracking_map[key]  = f2.get("Tracking #") or ""
-                ship_date_map[key] = f2.get("Ship Date") or ""
+                tracking_map[key]   = f2.get("Tracking #") or ""
+                ship_date_map[key]  = f2.get("Ship Date") or ""
+                base_order_map[key] = f2.get("Base Order #") or ""
+
+        so_by_doc = {rec.get("fields", {}).get("Document ID", ""): rec for rec in so_records}
 
         orders = []
+
+        # Main orders
         for rec in so_records:
             f = rec.get("fields", {})
             so_number  = f.get("Document ID", "")
             order_id   = str(f.get("Order ID", "")).strip()
             tracking   = tracking_map.get(so_number, "")
             if not tracking:
-                continue  # skip unshipped
+                continue
             org_name_list = f.get("Bill-To Org Name (from Customer)", [])
             org_name = org_name_list[0] if org_name_list else ""
             adj_prices = f.get("Adj. Unit Price (from MO Line Items)", [])
             total = round(sum(float(p or 0) for p in adj_prices), 2)
-            invoiced        = order_id in invoiced_ids
-            inv_number      = invoiced_ids.get(order_id)
-            inv_record_id   = invoiced_rec_ids.get(order_id, "")
             orders.append({
-                "record_id":    rec["id"],
-                "so_number":    so_number,
-                "order_id":     order_id,
-                "date":         f.get("Date", ""),
-                "ship_date":    ship_date_map.get(so_number, ""),
-                "org_name":     org_name,
-                "total":        total,
-                "tracking":     tracking,
-                "invoiced":     invoiced,
-                "inv_number":   inv_number,
-                "inv_record_id": inv_record_id,
+                "record_id":     rec["id"],
+                "so_number":     so_number,
+                "order_id":      order_id,
+                "date":          f.get("Date", ""),
+                "ship_date":     ship_date_map.get(so_number, ""),
+                "org_name":      org_name,
+                "total":         total,
+                "tracking":      tracking,
+                "invoiced":      order_id in invoiced_ids,
+                "inv_number":    invoiced_ids.get(order_id),
+                "inv_record_id": invoiced_rec_ids.get(order_id, ""),
+                "is_split":      False,
+                "split_suffix":  "",
             })
 
-        orders.sort(key=lambda x: x.get("date", ""), reverse=True)
+        # Split orders
+        for order_num, base_order_num in base_order_map.items():
+            if not base_order_num:
+                continue
+            tracking = tracking_map.get(order_num, "")
+            if not tracking:
+                continue
+            parent_rec = so_by_doc.get(base_order_num)
+            if not parent_rec:
+                continue
+            pf = parent_rec.get("fields", {})
+            order_id_base = str(pf.get("Order ID", "")).strip()
+            split_suffix  = order_num[len(base_order_num):].lstrip("-")
+            split_order_id = f"{order_id_base}-{split_suffix}" if split_suffix else order_id_base
+            org_name_list  = pf.get("Bill-To Org Name (from Customer)", [])
+            org_name = org_name_list[0] if org_name_list else ""
+            orders.append({
+                "record_id":     parent_rec["id"],
+                "so_number":     order_num,
+                "order_id":      split_order_id,
+                "date":          pf.get("Date", ""),
+                "ship_date":     ship_date_map.get(order_num, ""),
+                "org_name":      org_name,
+                "total":         0,
+                "tracking":      tracking,
+                "invoiced":      split_order_id in invoiced_ids,
+                "inv_number":    invoiced_ids.get(split_order_id),
+                "inv_record_id": invoiced_rec_ids.get(split_order_id, ""),
+                "is_split":      True,
+                "split_suffix":  split_suffix,
+            })
+
+        orders.sort(key=lambda x: (x.get("date", ""), x.get("so_number", "")), reverse=True)
         return Response(json.dumps({"orders": orders}), headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
 
+def _fetch_so_line_items(record_id, split_order_number=None):
+    """Shared helper: fetch Airtable line items for an SO record.
+    If split_order_number is given (e.g. 'SO-0337-1'), fetches that ShipStation order's
+    items, matches by SKU to Airtable line items, and pre-checks those with SS quantities."""
+    read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+    r = req_lib.get(
+        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+        headers=at_headers(read_token), timeout=15,
+    )
+    if r.status_code != 200:
+        return None, f"SO not found (AT {r.status_code})"
+    so_fields = r.json().get("fields", {})
+    li_ids = so_fields.get("MO Line Items", [])
+
+    import concurrent.futures as _cfli
+    def _fetch_li(li_id):
+        try:
+            lr = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+                headers=at_headers(read_token), timeout=10,
+            )
+            if lr.status_code == 200:
+                return li_id, lr.json()
+        except Exception:
+            pass
+        return li_id, None
+    with _cfli.ThreadPoolExecutor(max_workers=10) as _exli:
+        _resli = list(_exli.map(_fetch_li, li_ids))
+
+    line_items = []
+    for li_id, li_data in _resli:
+        if not li_data:
+            continue
+        lf = li_data.get("fields", {})
+        pname = (lf.get("Product Name (from Product SKU)") or [None])[0] or \
+                (lf.get("Name + Variations (from Product SKU)") or [None])[0] or ""
+        confirmed_price = lf.get("Confirmed Unit Price")
+        adj_list = lf.get("Adj. Unit Price (from MO Line Items)", [])
+        price = confirmed_price if confirmed_price is not None else (float(adj_list[0]) if adj_list else 0)
+        sku_ids = lf.get("SKU ID (from Product SKU)", [])
+        sku_str = sku_ids[0].strip().upper() if sku_ids else ""
+        line_items.append({
+            "lineItemId":    li_id,
+            "name":          pname,
+            "qty":           lf.get("Qty.", 0),
+            "unit_price":    float(price),
+            "sku":           sku_str,
+            "defaultChecked": True,   # default: all checked; may be overridden for splits
+        })
+
+    # If this is a split order, fetch SS items and match by SKU
+    if split_order_number:
+        ss_r = req_lib.get("https://ssapi.shipstation.com/orders",
+                            params={"orderNumber": split_order_number, "pageSize": 5},
+                            headers=ss_headers(), timeout=15)
+        ss_items = {}  # sku → qty
+        if ss_r.ok:
+            for order in ss_r.json().get("orders", []):
+                for item in order.get("items", []):
+                    sku = (item.get("sku") or "").strip().upper()
+                    qty = int(item.get("quantity") or 0)
+                    if sku:
+                        ss_items[sku] = ss_items.get(sku, 0) + qty
+
+        if ss_items:
+            for li in line_items:
+                sku = li["sku"]
+                if sku in ss_items:
+                    li["defaultChecked"] = True
+                    li["qty"] = ss_items[sku]   # use SS quantity for the split
+                else:
+                    li["defaultChecked"] = False  # not in this split shipment
+
+    return line_items, None
+
+
 @app.route("/api/portal/admin/so-line-items/<record_id>", methods=["GET", "OPTIONS"])
 @portal_login_required
 def portal_admin_so_line_items(user, record_id):
-    """Fetch line items for a Sales Order (for invoice item selection). Admin only."""
+    """Fetch line items for a Sales Order (for invoice item selection). Admin only.
+    Optional ?split=SO-0337-1 to pre-check/qty from ShipStation split order."""
     if request.method == "OPTIONS":
         return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type",
                                      "Access-Control-Allow-Methods": "GET"})
@@ -8414,53 +8541,10 @@ def portal_admin_so_line_items(user, record_id):
     if not portal_can(user, "manage_team"):
         return Response(json.dumps({"error": "Insufficient permissions"}), status=403, headers=c, mimetype="application/json")
     try:
-        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-
-        # Fetch the SO record
-        r = req_lib.get(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
-            headers=at_headers(read_token), timeout=15,
-        )
-        if r.status_code != 200:
-            return Response(json.dumps({"error": f"SO not found (AT {r.status_code})"}),
-                            status=404, headers=c, mimetype="application/json")
-        so_fields = r.json().get("fields", {})
-        li_ids = so_fields.get("MO Line Items", [])
-
-        line_items = []
-        import concurrent.futures as _cf2
-        def _fetch_li(li_id):
-            try:
-                lr = req_lib.get(
-                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
-                    headers=at_headers(read_token), timeout=10,
-                )
-                if lr.status_code == 200:
-                    return li_id, lr.json()
-            except Exception:
-                pass
-            return li_id, None
-        with _cf2.ThreadPoolExecutor(max_workers=10) as _ex2:
-            _res2 = list(_ex2.map(_fetch_li, li_ids))
-
-        for li_id, li_data in _res2:
-            if not li_data:
-                continue
-            lf = li_data.get("fields", {})
-            product_name_list = lf.get("Product Name (from Product SKU)", [])
-            product_name = product_name_list[0] if product_name_list else (lf.get("Name + Variations (from Product SKU)", [None])[0] if lf.get("Name + Variations (from Product SKU)") else "")
-            confirmed_price = lf.get("Confirmed Unit Price")
-            adj_list = lf.get("Adj. Unit Price (from MO Line Items)", [])
-            price = confirmed_price if confirmed_price is not None else (float(adj_list[0]) if adj_list else 0)
-            qty = lf.get("Qty.", 0)
-            line_items.append({
-                "lineItemId":  li_id,
-                "name":        product_name,
-                "qty":         qty,
-                "unit_price":  float(price),
-                "sku_ids":     lf.get("Product SKU", []),
-            })
-
+        split_order_number = request.args.get("split") or None
+        line_items, err = _fetch_so_line_items(record_id, split_order_number)
+        if err:
+            return Response(json.dumps({"error": err}), status=404, headers=c, mimetype="application/json")
         return Response(json.dumps({"lineItems": line_items}), headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
@@ -8479,12 +8563,14 @@ def portal_admin_convert_to_invoice(user, record_id):
     if not portal_can(user, "manage_team"):
         return Response(json.dumps({"error": "Insufficient permissions"}), status=403, headers=c, mimetype="application/json")
     try:
-        # Parse optional selected line items from request body
+        # Parse optional body: selected line items + split suffix
         selected_items = None  # None = use all
+        split_suffix   = ""
         try:
             body = request.get_json(silent=True) or {}
             if "lineItems" in body:
                 selected_items = {item["lineItemId"]: int(item["qty"]) for item in body["lineItems"] if int(item.get("qty", 0)) > 0}
+            split_suffix = str(body.get("splitSuffix") or "").strip()
         except Exception:
             pass
 
@@ -8504,12 +8590,14 @@ def portal_admin_convert_to_invoice(user, record_id):
         if so_fields.get("Order Type") != "Sales Order":
             return Response(json.dumps({"error": "Not a Sales Order"}), status=400, headers=c, mimetype="application/json")
 
-        order_id_str = str(so_fields.get("Order ID", "")).strip()
-        so_number    = so_fields.get("Document ID", f"SO-{order_id_str}")
-        customer_ids = so_fields.get("Customer", [])
-        po_number    = so_fields.get("Purchase Order #", "")
+        base_order_id = str(so_fields.get("Order ID", "")).strip()
+        # For split invoices use order_id like "0337-1" so Document ID becomes "IN-0337-1"
+        order_id_str  = f"{base_order_id}-{split_suffix}" if split_suffix else base_order_id
+        so_number     = so_fields.get("Document ID", f"SO-{base_order_id}")
+        customer_ids  = so_fields.get("Customer", [])
+        po_number     = so_fields.get("Purchase Order #", "")
 
-        # Check not already invoiced
+        # Check not already invoiced (exact order_id match handles splits separately)
         existing_inv = at_get_all(
             MANUAL_ORDERS_TABLE_ID, read_token,
             fields=["Document ID"],
@@ -8520,7 +8608,8 @@ def portal_admin_convert_to_invoice(user, record_id):
             return Response(json.dumps({"error": f"Already invoiced as {inv_num}"}),
                             status=400, headers=c, mimetype="application/json")
 
-        # Get tracking and ship date
+        # Get tracking and ship date (use split order number for splits)
+        tracking_order_num = f"{so_number}-{split_suffix}" if split_suffix else so_number
         tracking_recs = at_get_all(
             _SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
             fields=["Order #", "Tracking #", "Ship Date"],
@@ -8529,7 +8618,7 @@ def portal_admin_convert_to_invoice(user, record_id):
         tracking  = ""
         ship_date = ""
         for tr in tracking_recs:
-            if tr.get("fields", {}).get("Order #", "").strip() == so_number:
+            if tr.get("fields", {}).get("Order #", "").strip() == tracking_order_num:
                 tracking  = tr["fields"].get("Tracking #") or ""
                 ship_date = tr["fields"].get("Ship Date") or ""
                 break
@@ -8838,18 +8927,25 @@ def admin_shipped_orders():
                             for r in inv_recs if r.get("fields", {}).get("Order ID")}
         invoiced_rec_ids = {r["fields"].get("Order ID", ""): r["id"]
                             for r in inv_recs if r.get("fields", {}).get("Order ID")}
-        # Tracking + ship date map: SO number → tracking #, ship date
+        # Tracking + ship date map: SO number → tracking #, ship date, base order #
         tracking_recs = at_get_all(_SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
-                                    fields=["Order #", "Tracking #", "Ship Date"], base_id=_SO_TRACKING_BASE)
+                                    fields=["Order #", "Tracking #", "Ship Date", "Base Order #"],
+                                    base_id=_SO_TRACKING_BASE)
         tracking_map  = {}
         ship_date_map = {}
+        base_order_map = {}  # split order # → parent order #
         for r in tracking_recs:
             f2 = r.get("fields", {})
             key = f2.get("Order #", "").strip()
             if key:
-                tracking_map[key]  = f2.get("Tracking #") or ""
-                ship_date_map[key] = f2.get("Ship Date") or ""
-        # Batch-fetch line item totals (same as portal_orders)
+                tracking_map[key]   = f2.get("Tracking #") or ""
+                ship_date_map[key]  = f2.get("Ship Date") or ""
+                base_order_map[key] = f2.get("Base Order #") or ""
+
+        # Build SO record lookup: document_id → record
+        so_by_doc = {rec.get("fields", {}).get("Document ID", ""): rec for rec in records}
+
+        # Batch-fetch line item totals
         all_li_ids = []
         for rec in records:
             all_li_ids.extend(rec.get("fields", {}).get("MO Line Items", []))
@@ -8861,13 +8957,16 @@ def admin_shipped_orders():
                                      fields=["Dynamic Line Item Total"], formula=formula_li)
                 for lr in li_recs:
                     li_total_map[lr["id"]] = float(lr.get("fields", {}).get("Dynamic Line Item Total") or 0)
+
         orders = []
+
+        # Main orders
         for rec in records:
             f = rec.get("fields", {})
             so_number = f.get("Document ID", f'SO-{f.get("Order ID","")}')
             tracking  = tracking_map.get(so_number, "")
             if not tracking:
-                continue  # only shipped orders
+                continue
             order_id = f.get("Order ID", "")
             org_list = f.get("Bill-To Org Name (from Customer)", [])
             org_name = org_list[0] if isinstance(org_list, list) and org_list else (org_list or "")
@@ -8884,8 +8983,45 @@ def admin_shipped_orders():
                 "invoiced":      order_id in invoiced,
                 "inv_number":    invoiced.get(order_id),
                 "inv_record_id": invoiced_rec_ids.get(order_id, ""),
+                "is_split":      False,
+                "split_suffix":  "",
             })
-        orders.sort(key=lambda x: x["date"], reverse=True)
+
+        # Split orders (Base Order # is set in tracking table)
+        for order_num, base_order_num in base_order_map.items():
+            if not base_order_num:
+                continue
+            tracking = tracking_map.get(order_num, "")
+            if not tracking:
+                continue
+            parent_rec = so_by_doc.get(base_order_num)
+            if not parent_rec:
+                continue
+            pf = parent_rec.get("fields", {})
+            order_id_base = pf.get("Order ID", "")
+            # Split suffix: the part after the last "-" in the split order number beyond base
+            # e.g. "SO-0337-1" → suffix "1"
+            split_suffix = order_num[len(base_order_num):].lstrip("-")
+            split_order_id = f"{order_id_base}-{split_suffix}" if split_suffix else order_id_base
+            org_list = pf.get("Bill-To Org Name (from Customer)", [])
+            org_name = org_list[0] if isinstance(org_list, list) and org_list else (org_list or "")
+            orders.append({
+                "record_id":     parent_rec["id"],  # parent Airtable record for customer/PO info
+                "so_number":     order_num,
+                "order_id":      split_order_id,
+                "date":          pf.get("Date", ""),
+                "ship_date":     ship_date_map.get(order_num, ""),
+                "org_name":      org_name,
+                "total":         0,  # items come from ShipStation, not Airtable totals
+                "tracking":      tracking,
+                "invoiced":      split_order_id in invoiced,
+                "inv_number":    invoiced.get(split_order_id),
+                "inv_record_id": invoiced_rec_ids.get(split_order_id, ""),
+                "is_split":      True,
+                "split_suffix":  split_suffix,
+            })
+
+        orders.sort(key=lambda x: (x.get("date", ""), x.get("so_number", "")), reverse=True)
         return Response(json.dumps({"orders": orders}), headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
@@ -8893,7 +9029,8 @@ def admin_shipped_orders():
 
 @app.route("/api/admin/so-line-items/<record_id>", methods=["GET", "OPTIONS"])
 def admin_so_line_items(record_id):
-    """Fetch line items for a Sales Order to populate the invoice item-selection modal."""
+    """Fetch line items for a Sales Order to populate the invoice item-selection modal.
+    Optional ?split=SO-0337-1 to pre-check/qty from ShipStation split order."""
     if request.method == "OPTIONS":
         return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type",
                                      "Access-Control-Allow-Methods": "GET"})
@@ -8901,47 +9038,10 @@ def admin_so_line_items(record_id):
     if not check_admin_session(request):
         return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
     try:
-        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-        r = req_lib.get(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
-            headers=at_headers(read_token), timeout=15,
-        )
-        if not r.ok:
-            return Response(json.dumps({"error": "SO not found"}), status=404, headers=c, mimetype="application/json")
-        so_fields = r.json().get("fields", {})
-        li_ids = so_fields.get("MO Line Items", [])
-
-        def _first(lst):
-            return lst[0] if isinstance(lst, list) and lst else (lst or "")
-
-        line_items = []
-        import concurrent.futures as _cf3
-        def _fetch_li3(li_id):
-            try:
-                lr = req_lib.get(
-                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
-                    headers=at_headers(read_token), timeout=10,
-                )
-                if lr.status_code == 200:
-                    return li_id, lr.json()
-            except Exception:
-                pass
-            return li_id, None
-        with _cf3.ThreadPoolExecutor(max_workers=10) as _ex3:
-            _res3 = list(_ex3.map(_fetch_li3, li_ids))
-
-        for li_id, li_data in _res3:
-            if not li_data:
-                continue
-            lf = li_data.get("fields", {})
-            pname = _first(lf.get("Product Name (from Product SKU)", [])) or _first(lf.get("Name + Variations (from Product SKU)", [])) or "Item"
-            price = lf.get("Confirmed Unit Price") or (_first(lf.get("Adj. Unit Price (from MO Line Items)", [])) or 0)
-            line_items.append({
-                "lineItemId": li_id,
-                "name":       pname,
-                "qty":        lf.get("Qty.", 0),
-                "unit_price": float(price),
-            })
+        split_order_number = request.args.get("split") or None
+        line_items, err = _fetch_so_line_items(record_id, split_order_number)
+        if err:
+            return Response(json.dumps({"error": err}), status=404, headers=c, mimetype="application/json")
         return Response(json.dumps({"lineItems": line_items}), headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
@@ -8958,12 +9058,14 @@ def admin_convert_to_invoice(record_id):
     if not check_admin_session(request):
         return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
     try:
-        # Parse optional selected line items
+        # Parse optional selected line items + split suffix
         selected_items = None
+        split_suffix   = ""
         try:
             body = request.get_json(silent=True) or {}
             if "lineItems" in body:
                 selected_items = {item["lineItemId"]: int(item["qty"]) for item in body["lineItems"] if int(item.get("qty", 0)) > 0}
+            split_suffix = str(body.get("splitSuffix") or "").strip()
         except Exception:
             pass
 
@@ -8981,8 +9083,11 @@ def admin_convert_to_invoice(record_id):
         if so_fields.get("Order Type") != "Sales Order":
             return Response(json.dumps({"error": "Not a Sales Order"}), status=400, headers=c, mimetype="application/json")
 
-        order_id_str = so_fields.get("Order ID", "")
-        so_number    = so_fields.get("Document ID", f"SO-{order_id_str}")
+        base_order_id = str(so_fields.get("Order ID", "")).strip()
+        order_id_str  = f"{base_order_id}-{split_suffix}" if split_suffix else base_order_id
+        so_number     = so_fields.get("Document ID", f"SO-{base_order_id}")
+        # For splits, tracking is under the split order number (e.g. SO-0337-1)
+        tracking_order_num = f"{so_number}-{split_suffix}" if split_suffix else so_number
 
         # Check not already invoiced
         existing = at_get_all(MANUAL_ORDERS_TABLE_ID, read_token,
@@ -8992,13 +9097,13 @@ def admin_convert_to_invoice(record_id):
             inv_doc = existing[0]["fields"].get("Document ID", f"IN-{order_id_str}")
             return Response(json.dumps({"error": f"Already invoiced as {inv_doc}"}), status=400, headers=c, mimetype="application/json")
 
-        # Get tracking and ship date
+        # Get tracking and ship date (use split order number for splits)
         tracking_recs = at_get_all(_SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
                                     fields=["Order #", "Tracking #", "Ship Date"], base_id=_SO_TRACKING_BASE)
         tracking  = ""
         ship_date = ""
         for _tr in tracking_recs:
-            if _tr.get("fields", {}).get("Order #", "").strip() == so_number:
+            if _tr.get("fields", {}).get("Order #", "").strip() == tracking_order_num:
                 tracking  = _tr["fields"].get("Tracking #", "")
                 ship_date = _tr["fields"].get("Ship Date", "")
                 break
@@ -9123,47 +9228,58 @@ def _run_tracking_sync():
             if not doc_id:
                 continue
             try:
-                # Get tracking and ship date from ShipStation
-                r = req_lib.get("https://ssapi.shipstation.com/shipments",
-                                 params={"orderNumber": doc_id, "pageSize": 50},
-                                 headers=ss_hdrs, timeout=15)
-                tracking_parts = []
-                ship_date_str  = ""
-                if r.ok:
-                    for s in r.json().get("shipments", []):
-                        if s.get("voided"):
-                            continue
-                        tn = (s.get("trackingNumber") or "").strip()
-                        carrier = (s.get("carrierCode") or "").strip()
-                        if tn and tn not in tracking_parts:
-                            tracking_parts.append(tn)
-                        # Use the earliest non-voided ship date
-                        sd = (s.get("shipDate") or "")[:10]
-                        if sd and (not ship_date_str or sd < ship_date_str):
-                            ship_date_str = sd
+                def _sync_one_order(order_num, so_date, base_order_num=None):
+                    """Fetch shipment tracking for one ShipStation order number and upsert into SO Tracking table.
+                    base_order_num is set for split orders (e.g. 'SO-0337-1' has base 'SO-0337')."""
+                    r2 = req_lib.get("https://ssapi.shipstation.com/shipments",
+                                     params={"orderNumber": order_num, "pageSize": 50},
+                                     headers=ss_hdrs, timeout=15)
+                    t_parts, sd_str = [], ""
+                    if r2.ok:
+                        for s in r2.json().get("shipments", []):
+                            if s.get("voided"):
+                                continue
+                            tn = (s.get("trackingNumber") or "").strip()
+                            if tn and tn not in t_parts:
+                                t_parts.append(tn)
+                            sd = (s.get("shipDate") or "")[:10]
+                            if sd and (not sd_str or sd < sd_str):
+                                sd_str = sd
+                    t_str = " | ".join(t_parts)
+                    flds = {"Order #": order_num, "Date": so_date, "Tracking #": t_str}
+                    if sd_str:
+                        flds["Ship Date"] = sd_str
+                    if base_order_num:
+                        flds["Base Order #"] = base_order_num
+                    if order_num in existing_by_doc:
+                        req_lib.patch(
+                            f"https://api.airtable.com/v0/{_SO_TRACKING_BASE}/{_SO_TRACKING_TABLE}/{existing_by_doc[order_num]}",
+                            headers=dest_headers, json={"fields": flds}, timeout=15,
+                        )
+                    else:
+                        req_lib.post(
+                            f"https://api.airtable.com/v0/{_SO_TRACKING_BASE}/{_SO_TRACKING_TABLE}",
+                            headers=dest_headers, json={"records": [{"fields": flds}]}, timeout=15,
+                        )
+                    return t_str
 
-                tracking_str = " | ".join(tracking_parts)
-                fields = {
-                    "Order #":    doc_id,
-                    "Date":       f.get("Date", ""),
-                    "Tracking #": tracking_str,
-                }
-                if ship_date_str:
-                    fields["Ship Date"] = ship_date_str
-
-                if doc_id in existing_by_doc:
-                    req_lib.patch(
-                        f"https://api.airtable.com/v0/{_SO_TRACKING_BASE}/{_SO_TRACKING_TABLE}/{existing_by_doc[doc_id]}",
-                        headers=dest_headers, json={"fields": fields}, timeout=15,
-                    )
-                else:
-                    req_lib.post(
-                        f"https://api.airtable.com/v0/{_SO_TRACKING_BASE}/{_SO_TRACKING_TABLE}",
-                        headers=dest_headers, json={"records": [{"fields": fields}]}, timeout=15,
-                    )
-                if tracking_str:
-                    print(f"[tracking-sync] {doc_id}: {tracking_str}")
+                # Sync the main order
+                t = _sync_one_order(doc_id, f.get("Date", ""))
+                if t:
+                    print(f"[tracking-sync] {doc_id}: {t}")
                     synced += 1
+
+                # Check for split orders (-1, -2, -3)
+                for split_n in range(1, 4):
+                    split_id = f"{doc_id}-{split_n}"
+                    t_split = _sync_one_order(split_id, f.get("Date", ""), base_order_num=doc_id)
+                    if t_split:
+                        print(f"[tracking-sync] {split_id} (split): {t_split}")
+                        synced += 1
+                    else:
+                        # No tracking (or no order) for this suffix — stop checking further
+                        break
+
             except Exception as exc:
                 print(f"[tracking-sync] error for {doc_id}: {exc}")
 

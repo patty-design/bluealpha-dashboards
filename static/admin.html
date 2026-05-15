@@ -881,18 +881,23 @@
           const trackCell = o.tracking
             ? `<a href="${trackingUrl(o.tracking)}" style="font-family:monospace;font-size:0.82rem;color:#1a5276;">${esc(o.tracking)}</a>`
             : '—';
-          const soLink = `<a href="/view-quote/${esc(o.record_id)}" target="_blank" rel="noopener" style="font-weight:700;color:#1B2438;text-decoration:none;" title="View sales order">${esc(o.so_number)} ↗</a>`;
+          const splitBadge = o.is_split ? `<span style="display:inline-block;margin-left:6px;background:#f0f4ff;color:#1B2438;font-size:0.68rem;font-weight:700;padding:1px 7px;border-radius:8px;letter-spacing:.04em;vertical-align:middle;">SPLIT</span>` : '';
+          const soLink = o.is_split
+            ? `<span style="font-weight:700;color:#1B2438;">${esc(o.so_number)}</span>${splitBadge}`
+            : `<a href="/view-quote/${esc(o.record_id)}" target="_blank" rel="noopener" style="font-weight:700;color:#1B2438;text-decoration:none;" title="View sales order">${esc(o.so_number)} ↗</a>`;
           const shipDateCell = o.ship_date ? fmt(o.ship_date) : '<span style="color:#aaa;">—</span>';
+          const totalCell = o.is_split ? '<span style="color:#aaa;font-size:0.82rem;">see SS</span>' : `$${o.total.toFixed(2)}`;
           const actionCell = o.invoiced
             ? (o.inv_record_id
                 ? `<a href="/view-invoice/${esc(o.inv_record_id)}" style="color:#2d7a2d;font-weight:600;font-size:0.85rem;text-decoration:none;">Invoiced ✓ ${esc(o.inv_number||'')} ↗</a>`
                 : `<span style="color:#2d7a2d;font-weight:600;font-size:0.85rem;">Invoiced ✓ ${esc(o.inv_number||'')}</span>`)
-            : `<button class="btn btn-primary" style="padding:5px 12px;font-size:0.82rem;" onclick="openInvoiceModal('${esc(o.record_id)}','${esc(o.so_number)}',this)">Convert to Invoice</button>`;
-          return `<tr>
+            : `<button class="btn btn-primary" style="padding:5px 12px;font-size:0.82rem;" onclick="openInvoiceModal('${esc(o.record_id)}','${esc(o.so_number)}',this,${JSON.stringify(o.split_suffix||'')})">Convert to Invoice</button>`;
+          const rowStyle = o.is_split ? ' style="background:#f7f9ff;"' : '';
+          return `<tr${rowStyle}>
             <td>${soLink}</td>
             <td>${fmt(o.date)}</td>
             <td>${esc(o.org_name||'—')}</td>
-            <td>$${o.total.toFixed(2)}</td>
+            <td>${totalCell}</td>
             <td>${trackCell}</td>
             <td>${shipDateCell}</td>
             <td>${actionCell}</td>
@@ -934,14 +939,16 @@
     }
 
     // ── Invoice Item-Selection Modal ──────────────────────────────────────────
-    let _invoiceModalRecordId = null;
-    let _invoiceModalSoNumber = null;
-    let _invoiceModalBtn      = null;
+    let _invoiceModalRecordId  = null;
+    let _invoiceModalSoNumber  = null;
+    let _invoiceModalBtn       = null;
+    let _invoiceModalSplitSuffix = '';
 
-    async function openInvoiceModal(recordId, soNumber, btn) {
-      _invoiceModalRecordId = recordId;
-      _invoiceModalSoNumber = soNumber;
-      _invoiceModalBtn      = btn;
+    async function openInvoiceModal(recordId, soNumber, btn, splitSuffix) {
+      _invoiceModalRecordId    = recordId;
+      _invoiceModalSoNumber    = soNumber;
+      _invoiceModalBtn         = btn;
+      _invoiceModalSplitSuffix = splitSuffix || '';
 
       const modal    = document.getElementById('invoiceModal');
       const titleEl  = document.getElementById('invoiceModalTitle');
@@ -954,7 +961,8 @@
       modal.style.display = 'flex';
 
       try {
-        const resp = await fetch(`/api/admin/so-line-items/${recordId}`);
+        const splitParam = splitSuffix ? `?split=${encodeURIComponent(soNumber)}` : '';
+        const resp = await fetch(`/api/admin/so-line-items/${recordId}${splitParam}`);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
         const items = data.lineItems || [];
@@ -1057,10 +1065,12 @@
       submitEl.textContent = 'Converting…';
 
       try {
+        const body = { lineItems: selected };
+        if (_invoiceModalSplitSuffix) body.splitSuffix = _invoiceModalSplitSuffix;
         const resp = await fetch(`/api/admin/convert-to-invoice/${_invoiceModalRecordId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lineItems: selected }),
+          body: JSON.stringify(body),
         });
         const data = await resp.json();
         if (!resp.ok || !data.success) {

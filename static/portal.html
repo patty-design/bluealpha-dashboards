@@ -649,7 +649,14 @@
             <td><strong>${o.so_number || '—'}</strong></td>
             <td>${fmt(o.date)}</td>
             <td>${money(o.total)}</td>
-            <td>${o.tracking ? `<a class="tracking-info" href="${trackingUrl(o.tracking)}" target="_blank" rel="noopener">${o.tracking}</a>` : '<span style="color:var(--text-muted)">—</span>'}</td>
+            <td>${(() => {
+              const parts = [];
+              if (o.tracking) parts.push(`<a class="tracking-info" href="${trackingUrl(o.tracking)}" target="_blank" rel="noopener">${o.tracking}</a>`);
+              (o.splitShipments || []).forEach(s => {
+                if (s.tracking) parts.push(`<a class="tracking-info" href="${trackingUrl(s.tracking)}" target="_blank" rel="noopener" title="${s.splitNum}">${s.tracking}</a>`);
+              });
+              return parts.length ? parts.join('<br>') : '<span style="color:var(--text-muted)">—</span>';
+            })()}</td>
             <td><span class="badge badge-active">Confirmed</span></td>
             <td><button class="btn-sm" onclick="openViewOrder('${o.record_id}')">View →</button></td>
           </tr>`).join('') +
