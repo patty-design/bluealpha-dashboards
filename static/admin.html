@@ -878,19 +878,21 @@
             ? `<a href="${trackingUrl(o.tracking)}" target="_blank" rel="noopener" style="font-family:monospace;font-size:0.82rem;color:#1a5276;">${esc(o.tracking)}</a>`
             : '—';
           const soLink = `<a href="/view-quote/${esc(o.record_id)}" target="_blank" rel="noopener" style="font-weight:700;color:#1B2438;text-decoration:none;" title="View sales order">${esc(o.so_number)} ↗</a>`;
+          const shipDateCell = o.ship_date ? fmt(o.ship_date) : '<span style="color:#aaa;">—</span>';
           const actionCell = o.invoiced
             ? `<span style="color:#2d7a2d;font-weight:600;font-size:0.85rem;">Invoiced ✓ ${esc(o.inv_number||'')}</span>`
             : `<button class="btn btn-primary" style="padding:5px 12px;font-size:0.82rem;" onclick="openInvoiceModal('${esc(o.record_id)}','${esc(o.so_number)}',this)">Convert to Invoice</button>`;
           return `<tr>
             <td>${soLink}</td>
             <td>${fmt(o.date)}</td>
+            <td>${shipDateCell}</td>
             <td>${esc(o.org_name||'—')}</td>
             <td>$${o.total.toFixed(2)}</td>
             <td>${trackCell}</td>
             <td>${actionCell}</td>
           </tr>`;
         }).join('');
-        el.innerHTML = '<table><thead><tr><th>Sales Order #</th><th>Date</th><th>Organization</th><th>Total</th><th>Tracking</th><th>Action</th></tr></thead><tbody>' + tbody + '</tbody></table>';
+        el.innerHTML = '<table><thead><tr><th>Sales Order #</th><th>SO Date</th><th>Ship Date</th><th>Organization</th><th>Total</th><th>Tracking</th><th>Action</th></tr></thead><tbody>' + tbody + '</tbody></table>';
         shippedLoaded = true;
       } catch (e) {
         el.innerHTML = `<div class="empty-state">Failed to load: ${esc(e.message)}</div>`;

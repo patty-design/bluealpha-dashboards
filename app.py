@@ -3853,7 +3853,7 @@ def send_quote_accepted_email(to_email, to_name, org_name, qu_number, so_number)
         print(f"[send_quote_accepted_email] failed: {e}")
 
 
-def send_invoice_email(to_email, to_name, org_name, so_number, inv_number, line_items, total, tracking):
+def send_invoice_email(to_email, to_name, org_name, so_number, inv_number, line_items, total, tracking, ship_date=None):
     """Send invoice email after SO is converted to invoice."""
     if not SENDGRID_API_KEY:
         return
@@ -3863,6 +3863,14 @@ def send_invoice_email(to_email, to_name, org_name, so_number, inv_number, line_
     from datetime import timedelta
     due_date = (_today_utc() + timedelta(days=30)).strftime("%B %d, %Y")
     today_str = _today_utc().strftime("%B %d, %Y")
+    ship_date_display = ""
+    if ship_date:
+        try:
+            from datetime import date as _dt_date
+            sd = _dt_date.fromisoformat(ship_date[:10])
+            ship_date_display = sd.strftime("%B %d, %Y")
+        except Exception:
+            ship_date_display = ship_date
 
     # Build line items rows
     li_rows = ""
@@ -3916,6 +3924,7 @@ def send_invoice_email(to_email, to_name, org_name, so_number, inv_number, line_
                   <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Tracking #</td>
                   <td style="padding:4px 0;color:#1a2633;font-size:13px;">{tracking_display}</td>
                 </tr>
+                {'<tr><td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Ship Date</td><td style="padding:4px 0;color:#1a2633;font-size:13px;">' + ship_date_display + '</td></tr>' if ship_date_display else ''}
                 <tr>
                   <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Terms</td>
                   <td style="padding:4px 0;color:#1a2633;font-size:13px;">Net 30</td>
@@ -8338,14 +8347,20 @@ def portal_admin_shipped_orders(user):
             if oid:
                 invoiced_ids[oid] = doc
 
-        # Fetch tracking from SO Tracking Link
+        # Fetch tracking + ship date from SO Tracking Link
         tracking_recs = at_get_all(
             _SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
-            fields=["Order #", "Tracking #"],
+            fields=["Order #", "Tracking #", "Ship Date"],
             base_id=_SO_TRACKING_BASE,
         )
-        tracking_map = {r["fields"].get("Order #", "").strip(): (r["fields"].get("Tracking #") or "")
-                        for r in tracking_recs if r.get("fields", {}).get("Order #")}
+        tracking_map  = {}
+        ship_date_map = {}
+        for r in tracking_recs:
+            f2 = r.get("fields", {})
+            key = f2.get("Order #", "").strip()
+            if key:
+                tracking_map[key]  = f2.get("Tracking #") or ""
+                ship_date_map[key] = f2.get("Ship Date") or ""
 
         orders = []
         for rec in so_records:
@@ -8366,6 +8381,7 @@ def portal_admin_shipped_orders(user):
                 "so_number":  so_number,
                 "order_id":   order_id,
                 "date":       f.get("Date", ""),
+                "ship_date":  ship_date_map.get(so_number, ""),
                 "org_name":   org_name,
                 "total":      total,
                 "tracking":   tracking,
@@ -8496,16 +8512,18 @@ def portal_admin_convert_to_invoice(user, record_id):
             return Response(json.dumps({"error": f"Already invoiced as {inv_num}"}),
                             status=400, headers=c, mimetype="application/json")
 
-        # Get tracking
+        # Get tracking and ship date
         tracking_recs = at_get_all(
             _SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
-            fields=["Order #", "Tracking #"],
+            fields=["Order #", "Tracking #", "Ship Date"],
             base_id=_SO_TRACKING_BASE,
         )
-        tracking = ""
+        tracking  = ""
+        ship_date = ""
         for tr in tracking_recs:
             if tr.get("fields", {}).get("Order #", "").strip() == so_number:
-                tracking = tr["fields"].get("Tracking #") or ""
+                tracking  = tr["fields"].get("Tracking #") or ""
+                ship_date = tr["fields"].get("Ship Date") or ""
                 break
 
         # Fetch line items — use selected subset if provided, else all
@@ -8604,7 +8622,7 @@ def portal_admin_convert_to_invoice(user, record_id):
         if to_email:
             try:
                 send_invoice_email(to_email, to_name, org_name, so_number, inv_number,
-                                   email_line_items, total, tracking)
+                                   email_line_items, total, tracking, ship_date=ship_date)
             except Exception as email_err:
                 print(f"[convert-to-invoice] email failed: {email_err}")
 
@@ -8707,11 +8725,17 @@ def admin_shipped_orders():
                                formula='{Order Type}="Invoice"')
         invoiced = {r["fields"].get("Order ID", ""): r["fields"].get("Document ID", "")
                     for r in inv_recs if r.get("fields", {}).get("Order ID")}
-        # Tracking map: SO number → tracking #
+        # Tracking + ship date map: SO number → tracking #, ship date
         tracking_recs = at_get_all(_SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
-                                    fields=["Order #", "Tracking #"], base_id=_SO_TRACKING_BASE)
-        tracking_map = {r["fields"].get("Order #", ""): r["fields"].get("Tracking #", "")
-                        for r in tracking_recs if r.get("fields", {}).get("Order #")}
+                                    fields=["Order #", "Tracking #", "Ship Date"], base_id=_SO_TRACKING_BASE)
+        tracking_map  = {}
+        ship_date_map = {}
+        for r in tracking_recs:
+            f2 = r.get("fields", {})
+            key = f2.get("Order #", "").strip()
+            if key:
+                tracking_map[key]  = f2.get("Tracking #") or ""
+                ship_date_map[key] = f2.get("Ship Date") or ""
         # Batch-fetch line item totals (same as portal_orders)
         all_li_ids = []
         for rec in records:
@@ -8740,6 +8764,7 @@ def admin_shipped_orders():
                 "so_number":  so_number,
                 "order_id":   order_id,
                 "date":       f.get("Date", ""),
+                "ship_date":  ship_date_map.get(so_number, ""),
                 "org_name":   org_name,
                 "total":      total,
                 "tracking":   tracking,
@@ -8853,11 +8878,16 @@ def admin_convert_to_invoice(record_id):
             inv_doc = existing[0]["fields"].get("Document ID", f"IN-{order_id_str}")
             return Response(json.dumps({"error": f"Already invoiced as {inv_doc}"}), status=400, headers=c, mimetype="application/json")
 
-        # Get tracking
+        # Get tracking and ship date
         tracking_recs = at_get_all(_SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
-                                    fields=["Order #", "Tracking #"], base_id=_SO_TRACKING_BASE)
-        tracking = next((r["fields"].get("Tracking #", "") for r in tracking_recs
-                         if r["fields"].get("Order #") == so_number), "")
+                                    fields=["Order #", "Tracking #", "Ship Date"], base_id=_SO_TRACKING_BASE)
+        tracking  = ""
+        ship_date = ""
+        for _tr in tracking_recs:
+            if _tr.get("fields", {}).get("Order #", "").strip() == so_number:
+                tracking  = _tr["fields"].get("Tracking #", "")
+                ship_date = _tr["fields"].get("Ship Date", "")
+                break
 
         # Get billing info from SO
         def _first(lst):
@@ -8933,7 +8963,7 @@ def admin_convert_to_invoice(record_id):
         if bill_email:
             try:
                 send_invoice_email(bill_email, bill_name, org_name, so_number, inv_number,
-                                   li_items_for_email, total, tracking)
+                                   li_items_for_email, total, tracking, ship_date=ship_date)
             except Exception as email_err:
                 print(f"[convert-to-invoice] email failed: {email_err}")
 
@@ -8979,11 +9009,12 @@ def _run_tracking_sync():
             if not doc_id:
                 continue
             try:
-                # Get tracking from ShipStation
+                # Get tracking and ship date from ShipStation
                 r = req_lib.get("https://ssapi.shipstation.com/shipments",
                                  params={"orderNumber": doc_id, "pageSize": 50},
                                  headers=ss_hdrs, timeout=15)
                 tracking_parts = []
+                ship_date_str  = ""
                 if r.ok:
                     for s in r.json().get("shipments", []):
                         if s.get("voided"):
@@ -8992,6 +9023,10 @@ def _run_tracking_sync():
                         carrier = (s.get("carrierCode") or "").strip()
                         if tn and tn not in tracking_parts:
                             tracking_parts.append(tn)
+                        # Use the earliest non-voided ship date
+                        sd = (s.get("shipDate") or "")[:10]
+                        if sd and (not ship_date_str or sd < ship_date_str):
+                            ship_date_str = sd
 
                 tracking_str = " | ".join(tracking_parts)
                 fields = {
@@ -8999,6 +9034,8 @@ def _run_tracking_sync():
                     "Date":       f.get("Date", ""),
                     "Tracking #": tracking_str,
                 }
+                if ship_date_str:
+                    fields["Ship Date"] = ship_date_str
 
                 if doc_id in existing_by_doc:
                     req_lib.patch(
