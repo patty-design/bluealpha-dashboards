@@ -577,7 +577,7 @@ if (window.self !== window.top) {
     </div><!-- /customerCard -->
 
     <!-- Items card -->
-    <div class="card" style="padding:0;">
+    <div class="card" style="padding:0;border:2px solid #1B2438;">
       <table class="items-table" id="itemsTable" style="margin:0;">
         <thead>
           <tr>
@@ -591,20 +591,20 @@ if (window.self !== window.top) {
         <tbody id="itemsTbody"></tbody>
       </table>
 
-    </div><!-- /items card -->
-
-    <!-- Totals (outside the box) -->
-    <div style="display:flex;justify-content:flex-end;padding:8px 0 4px;">
-      <div style="min-width:240px;">
-        <div id="vRowShipping" class="hidden" style="display:flex;justify-content:space-between;padding:6px 0;font-size:0.88rem;color:#555;border-top:1px solid var(--border);">
-          <span>Shipping</span><span id="vShipping">$0.00</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:8px 0 6px;font-size:1rem;font-weight:700;color:#1B2438;border-top:2px solid #1B2438;">
-          <span>Total Due</span><span id="vTotal">$0.00</span>
+      <!-- Totals (inside the box) -->
+      <div style="display:flex;justify-content:flex-end;padding:8px 28px 14px;">
+        <div style="min-width:240px;">
+          <div id="vRowShipping" class="hidden" style="display:flex;justify-content:space-between;padding:6px 0;font-size:0.88rem;color:#555;border-top:1px solid var(--border);">
+            <span>Shipping</span><span id="vShipping">$0.00</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0 4px;font-size:1rem;font-weight:700;color:#1B2438;border-top:2px solid #1B2438;">
+            <span>Total Due</span><span id="vTotal">$0.00</span>
+          </div>
         </div>
       </div>
-    </div>
-    <span id="vSubtotal" style="display:none;">$0.00</span>
+      <span id="vSubtotal" style="display:none;">$0.00</span>
+
+    </div><!-- /items card -->
 
     <!-- Add item + Save (outside the box, editable mode only) -->
     <div id="addItemSection" style="margin-top:4px;">

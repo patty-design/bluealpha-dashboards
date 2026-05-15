@@ -16,6 +16,7 @@
     .page-header .back:hover { color: #fff; }
     .container { max-width: 760px; margin: 16px auto; padding: 0 16px 60px; }
     .card { background: #fff; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: hidden; }
+    .items-card { border: 2px solid #1B2438; border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
 
 
     /* Invoice header bar */
@@ -232,7 +233,8 @@
             </div>
           </div>
 
-          <div class="items-wrap">
+          <div class="items-card">
+          <div class="items-wrap" style="padding:0 28px 0;">
             <table class="items">
               <thead>
                 <tr>
@@ -245,8 +247,7 @@
               <tbody>${liRows || '<tr><td colspan="4" style="text-align:center;color:#aaa;padding:20px;">No line items</td></tr>'}</tbody>
             </table>
           </div>
-
-          <div class="totals-row">
+          <div class="totals-row" style="padding-top:4px;padding-bottom:14px;">
             <div class="totals-box">
               <div class="totals-line grand">
                 <span>Total Due</span>
@@ -254,6 +255,7 @@
               </div>
             </div>
           </div>
+          </div><!-- /items-card -->
 
           ${(inv.stripeCcUrl || inv.stripeAchUrl) ? `
           <div id="paymentSection" style="padding:20px 28px;border-top:1px solid #eee;background:#f9fafb;">
