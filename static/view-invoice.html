@@ -84,7 +84,7 @@
       </button>
     </div>
     <div style="margin-bottom:12px;display:flex;justify-content:flex-end;">
-      <button id="downloadBtn" onclick="window.print()" style="background:#1B2438;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:0.85rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
+      <button id="downloadBtn" onclick="downloadInvoice()" style="background:#1B2438;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:0.85rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
         ⬇ Download PDF
       </button>
     </div>
@@ -92,15 +92,6 @@
       <div class="loading">Loading invoice…</div>
     </div>
   </div>
-
-  <style>
-    @media print {
-      .page-header, #backBtnRow, #downloadBtn, #paymentSection { display: none !important; }
-      body { background: #fff; }
-      .container { margin: 0; padding: 0; max-width: 100%; }
-      .card { box-shadow: none; }
-    }
-  </style>
 
   <script>
     const recordId = location.pathname.split('/').pop();
@@ -124,6 +115,20 @@
       if (inPortal) {
         window.parent.postMessage({ type: 'viewInvoiceHeight', height: document.body.scrollHeight }, '*');
       }
+    }
+
+    function downloadInvoice() {
+      const btn = document.getElementById('downloadBtn');
+      if (btn) { btn.disabled = true; btn.textContent = 'Downloading…'; }
+      const a = document.createElement('a');
+      a.href = '/invoice-pdf/' + recordId;
+      a.download = '';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => {
+        if (btn) { btn.disabled = false; btn.textContent = '⬇ Download PDF'; }
+      }, 2000);
     }
 
     function fmt(s) {

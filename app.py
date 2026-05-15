@@ -5424,6 +5424,343 @@ def order_pdf(record_id):
         return Response(json.dumps({"error": str(e)}), status=500, headers=cors(), mimetype="application/json")
 
 
+def _build_invoice_pdf_bytes(inv):
+    """Generate PDF bytes for an invoice dict (matching quote/SO style)."""
+    import os, tempfile
+    from fpdf import FPDF
+
+    def _fmt_date(iso_str):
+        try:
+            from datetime import date as _d
+            d = _d.fromisoformat(iso_str)
+            return f"{d.month}-{d.day}-{d.year}"
+        except Exception:
+            return iso_str or ""
+
+    def _due_date(iso_str):
+        try:
+            from datetime import date as _d, timedelta
+            return _fmt_date((_d.fromisoformat(iso_str) + timedelta(days=30)).isoformat())
+        except Exception:
+            return ""
+
+    inv_number  = inv.get("invNumber", "")
+    so_number   = inv.get("soNumber", "")
+    date_str    = inv.get("date", "")
+    po_number   = inv.get("poNumber", "")
+    org_name    = inv.get("orgName", "")
+    contact     = inv.get("contact", "")
+    email       = inv.get("email", "")
+    addr1       = inv.get("addr1", "")
+    addr2       = inv.get("addr2", "")
+    tracking    = inv.get("tracking", "")
+    ship_date   = inv.get("shipDate", "")
+    line_items  = inv.get("lineItems", [])
+    subtotal    = inv.get("subtotal", 0.0)
+    cc_url      = inv.get("stripeCcUrl", "")
+    ach_url     = inv.get("stripeAchUrl", "")
+
+    _static_dir    = os.path.dirname(os.path.abspath(__file__))
+    logo_local_ref = None
+    for _c in ["ba-logo-white-bg.jpg", "ba-logo-dark.png", "ba-logo.jpg"]:
+        _p = os.path.join(_static_dir, "static", _c)
+        if os.path.exists(_p):
+            logo_local_ref = _p
+            break
+    _inv_ref = inv_number
+
+    class InvPDF(FPDF):
+        def header(self):
+            if self.page_no() <= 1:
+                return
+            self.set_fill_color(255, 255, 255)
+            self.rect(19, 6, 28, 10, style="F")
+            try:
+                self.image(logo_local_ref, x=19, y=6, w=28)
+            except Exception:
+                self.set_xy(19, 8)
+                self.set_font("Helvetica", "B", 9)
+                self.set_text_color(27, 36, 56)
+                self.cell(28, 5, "BLUE ALPHA", border=0)
+            self.set_xy(49, 9)
+            self.set_font("Helvetica", "B", 8)
+            self.set_text_color(27, 36, 56)
+            self.cell(0, 5, _inv_ref, border=0)
+            self.set_draw_color(27, 36, 56)
+            self.set_line_width(0.4)
+            self.line(19, 18, 19 + 177, 18)
+            self.ln(4)
+
+    pdf = InvPDF(orientation="P", unit="mm", format="letter")
+    pdf.set_margins(19, 19, 19)
+    pdf.set_auto_page_break(auto=True, margin=25)
+    pdf.add_page()
+
+    W     = 177.0
+    NAVY  = (27,  36,  56)
+    MUTED = (107, 122, 141)
+    TEXT  = (26,  38,  51)
+    LG    = (245, 247, 250)
+    BD    = (221, 227, 234)
+    RED   = (189,  51,  51)
+
+    LOGO_W, LOGO_TOP = 58.0, 13.0
+    logo_file = logo_local_ref
+    if not logo_file:
+        import urllib.request
+        _tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        try:
+            urllib.request.urlretrieve(
+                "https://www.bluealphabelts.com/wp-content/uploads/2024/04/logo-1.png", _tmp.name)
+            logo_file = _tmp.name
+        except Exception:
+            logo_file = None
+    try:
+        if logo_file:
+            pdf.image(logo_file, x=19, y=LOGO_TOP, w=LOGO_W)
+    except Exception:
+        pdf.set_xy(19, LOGO_TOP)
+        pdf.set_font("Helvetica", "B", 18)
+        pdf.set_text_color(*NAVY)
+        pdf.cell(LOGO_W, 10, "BLUE ALPHA", border=0)
+
+    right_x = 19 + W * 0.55
+    right_w = W * 0.45
+    pdf.set_xy(right_x, LOGO_TOP)
+    pdf.set_font("Helvetica", "B", 28)
+    pdf.set_text_color(*NAVY)
+    pdf.cell(right_w, 12, "INVOICE", align="R", new_x="LMARGIN", new_y="NEXT")
+    for cline, bold, size in [
+        ("Blue Alpha",        True,  8),
+        ("35 Andrew St.",     False, 8),
+        ("Newnan, GA 30263",  False, 8),
+        ("678-961-3304",      False, 8),
+        ("info@bluealpha.us", False, 8),
+    ]:
+        pdf.set_xy(right_x, pdf.get_y())
+        pdf.set_font("Helvetica", "B" if bold else "", size)
+        pdf.set_text_color(*TEXT if bold else MUTED)
+        pdf.cell(right_w, 4.5, cline, align="R", new_x="LMARGIN", new_y="NEXT")
+
+    pdf.set_y(max(pdf.get_y(), LOGO_TOP + LOGO_W * 0.39 + 2))
+    pdf.set_draw_color(*NAVY)
+    pdf.set_line_width(0.7)
+    pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
+    pdf.ln(5)
+
+    y_info = pdf.get_y()
+    col_w  = W / 2
+
+    def kv(label, value):
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.set_text_color(*MUTED)
+        pdf.cell(38, 5.5, label, border=0)
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*TEXT)
+        pdf.cell(col_w - 38, 5.5, str(value), border=0, new_x="LMARGIN", new_y="NEXT")
+
+    kv("Invoice Number:", inv_number)
+    kv("Invoice Date:",   _fmt_date(date_str))
+    kv("Due Date (Net 30):", _due_date(date_str))
+    if so_number:
+        kv("Sales Order:", so_number)
+    if po_number:
+        kv("PO #:", po_number)
+    if ship_date:
+        kv("Ship Date:", _fmt_date(ship_date))
+    if tracking:
+        kv("Tracking #:", tracking)
+
+    y_after_details = pdf.get_y()
+
+    bill_x = 19 + col_w
+    pdf.set_xy(bill_x, y_info)
+    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_text_color(*MUTED)
+    pdf.cell(col_w, 5.5, "Bill To", border=0, new_x="LEFT", new_y="NEXT")
+    for ln in [org_name, contact, email, addr1, addr2]:
+        if ln:
+            pdf.set_x(bill_x)
+            pdf.set_font("Helvetica", "B" if ln == org_name else "", 8)
+            pdf.set_text_color(*TEXT)
+            pdf.cell(col_w, 5, ln, border=0, new_x="LEFT", new_y="NEXT")
+
+    pdf.set_y(max(y_after_details, pdf.get_y()) + 4)
+
+    # ── Line items table ──────────────────────────────────────────────
+    name_w = W - 14 - 28 - 28
+    col_widths = [name_w, 14, 28, 28]
+    headers    = ["DESCRIPTION", "QTY", "UNIT PRICE", "TOTAL"]
+    aligns     = ["L",           "R",   "R",          "R"]
+    row_h      = 7
+
+    pdf.set_fill_color(*NAVY)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 8)
+    for w, h, a in zip(col_widths, headers, aligns):
+        pdf.cell(w, row_h, h, border=0, align=a, fill=True)
+    pdf.ln()
+
+    pdf.set_font("Helvetica", "", 8)
+    for idx, item in enumerate(line_items):
+        pdf.set_fill_color(*LG)
+        pdf.set_text_color(*TEXT)
+        row_data = [
+            item.get("name", ""),
+            str(int(item.get("qty", 0))),
+            f"${float(item.get('unit_price', 0)):.2f}",
+            f"${float(item.get('total', 0)):.2f}",
+        ]
+        for w, cell_val, a in zip(col_widths, row_data, aligns):
+            pdf.cell(w, row_h, cell_val, border=0, align=a, fill=(idx % 2 == 0))
+        pdf.ln()
+
+    pdf.ln(3)
+
+    # ── Totals ────────────────────────────────────────────────────────
+    def totals_row(label, value, bold=False):
+        pdf.set_font("Helvetica", "B" if bold else "", 9)
+        pdf.cell(W - 56, 6, "", border=0)
+        pdf.set_text_color(*TEXT if bold else MUTED)
+        pdf.cell(28, 6, label, border=0, align="R")
+        pdf.set_text_color(*TEXT)
+        pdf.cell(28, 6, value, border=0, align="R", new_x="LMARGIN", new_y="NEXT")
+
+    y_rule = pdf.get_y()
+    pdf.set_draw_color(*NAVY)
+    pdf.set_line_width(0.4)
+    pdf.line(19 + W - 56, y_rule, 19 + W, y_rule)
+    pdf.ln(1)
+    totals_row("Total Due", f"${subtotal:.2f}", bold=True)
+    pdf.ln(5)
+
+    # ── Footer ────────────────────────────────────────────────────────
+    PAGE_H     = 279.4
+    BOT_MARGIN = 6
+    has_stripe = bool(cc_url or ach_url)
+    footer_h   = 28 + (14 if has_stripe else 0)
+    footer_y   = PAGE_H - BOT_MARGIN - footer_h
+    if pdf.get_y() < footer_y:
+        pdf.set_y(footer_y)
+    pdf.set_auto_page_break(auto=False)
+
+    pdf.set_draw_color(*BD)
+    pdf.set_line_width(0.3)
+    pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
+    pdf.ln(2)
+
+    if has_stripe:
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.set_text_color(*NAVY)
+        pdf.cell(W, 5, "Pay Online:", border=0, new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 8)
+        if cc_url:
+            pdf.set_x(19)
+            pdf.set_text_color(*MUTED)
+            pdf.write(5, "Credit Card: ")
+            pdf.set_text_color(91, 127, 160)
+            pdf.set_font("Helvetica", "U", 8)
+            pdf.write(5, cc_url, link=cc_url)
+            pdf.set_font("Helvetica", "", 8)
+            pdf.ln(5)
+        if ach_url:
+            pdf.set_x(19)
+            pdf.set_text_color(*MUTED)
+            pdf.write(5, "ACH/Bank Transfer: ")
+            pdf.set_text_color(91, 127, 160)
+            pdf.set_font("Helvetica", "U", 8)
+            pdf.write(5, ach_url, link=ach_url)
+            pdf.set_font("Helvetica", "", 8)
+            pdf.ln(6)
+
+    pdf.set_font("Helvetica", "", 7.5)
+    pdf.set_text_color(*MUTED)
+    pdf.cell(W, 4.5, "Payment terms: Net 30 from invoice date. A 1.5% monthly late fee applies to unpaid balances after 30 days.", border=0, new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(1)
+    pdf.cell(W, 4.5, "Questions? Contact us at info@bluealpha.us or 678-961-3304.", border=0, new_x="LMARGIN", new_y="NEXT")
+
+    return bytes(pdf.output())
+
+
+@app.route("/invoice-pdf/<record_id>", methods=["GET"])
+def invoice_pdf(record_id):
+    c = cors()
+    try:
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+            headers=at_headers(read_token), timeout=15,
+        )
+        if not r.ok:
+            return Response(json.dumps({"error": "Invoice not found"}), status=404, headers=c, mimetype="application/json")
+        fields = r.json().get("fields", {})
+        if fields.get("Order Type") != "Invoice":
+            return Response(json.dumps({"error": "Not an invoice"}), status=400, headers=c, mimetype="application/json")
+
+        def _first(lst):
+            return lst[0] if isinstance(lst, list) and lst else (lst or "")
+
+        order_id   = str(fields.get("Order ID", "")).strip()
+        inv_number = fields.get("Document ID", f"IN-{order_id}")
+        so_number  = f"SO-{order_id}" if order_id else ""
+
+        tracking = ship_date = ""
+        tracking_recs = at_get_all(_SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
+                                    fields=["Order #", "Tracking #", "Ship Date"], base_id=_SO_TRACKING_BASE)
+        for tr in tracking_recs:
+            if tr.get("fields", {}).get("Order #", "").strip() == so_number:
+                tracking  = tr["fields"].get("Tracking #", "")
+                ship_date = tr["fields"].get("Ship Date", "")
+                break
+
+        li_ids = fields.get("MO Line Items", [])
+        line_items = []
+        for li_id in li_ids:
+            lr = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+                headers=at_headers(read_token), timeout=10,
+            )
+            if lr.ok:
+                lf = lr.json().get("fields", {})
+                pname = _first(lf.get("Product Name (from Product SKU)", [])) or \
+                        _first(lf.get("Name + Variations (from Product SKU)", [])) or "Item"
+                price = lf.get("Confirmed Unit Price") or 0
+                qty   = lf.get("Qty.", 0)
+                line_items.append({"name": pname, "qty": qty, "unit_price": float(price),
+                                   "total": round(qty * float(price), 2)})
+
+        inv = {
+            "invNumber":    inv_number,
+            "soNumber":     so_number,
+            "date":         fields.get("Date", ""),
+            "poNumber":     fields.get("Purchase Order #", ""),
+            "orgName":      _first(fields.get("Bill-To Org Name (from Customer)", [])),
+            "contact":      _first(fields.get("Bill-To Contact Name (from Customer)", [])),
+            "email":        _first(fields.get("Bill-To Contact Email (from Customer)", [])),
+            "addr1":        _first(fields.get("Bill-To Address (Line 1) (from Customer)", [])),
+            "addr2":        _first(fields.get("Bill-To Address (Line 2) (from Customer)", [])),
+            "tracking":     tracking,
+            "shipDate":     ship_date,
+            "lineItems":    line_items,
+            "subtotal":     round(sum(li["total"] for li in line_items), 2),
+            "stripeCcUrl":  fields.get("Stripe Invoice URL (CC)", ""),
+            "stripeAchUrl": fields.get("Stripe Invoice URL (ACH)", ""),
+        }
+
+        pdf_bytes = _build_invoice_pdf_bytes(inv)
+        return Response(
+            pdf_bytes,
+            headers={
+                **cors(),
+                "Content-Disposition": f'attachment; filename="{inv_number}.pdf"',
+                "Content-Type": "application/pdf",
+            },
+        )
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Customer Portal Routes
 # ─────────────────────────────────────────────────────────────────────────────
