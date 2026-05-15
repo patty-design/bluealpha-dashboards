@@ -8379,10 +8379,75 @@ def portal_admin_shipped_orders(user):
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
 
+@app.route("/api/portal/admin/so-line-items/<record_id>", methods=["GET", "OPTIONS"])
+@portal_login_required
+def portal_admin_so_line_items(user, record_id):
+    """Fetch line items for a Sales Order (for invoice item selection). Admin only."""
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type",
+                                     "Access-Control-Allow-Methods": "GET"})
+    c = cors()
+    if not portal_can(user, "manage_team"):
+        return Response(json.dumps({"error": "Insufficient permissions"}), status=403, headers=c, mimetype="application/json")
+    try:
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+
+        # Fetch the SO record
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+            headers=at_headers(read_token), timeout=15,
+        )
+        if r.status_code != 200:
+            return Response(json.dumps({"error": f"SO not found (AT {r.status_code})"}),
+                            status=404, headers=c, mimetype="application/json")
+        so_fields = r.json().get("fields", {})
+        li_ids = so_fields.get("MO Line Items", [])
+
+        line_items = []
+        import concurrent.futures as _cf2
+        def _fetch_li(li_id):
+            try:
+                lr = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+                    headers=at_headers(read_token), timeout=10,
+                )
+                if lr.status_code == 200:
+                    return li_id, lr.json()
+            except Exception:
+                pass
+            return li_id, None
+        with _cf2.ThreadPoolExecutor(max_workers=10) as _ex2:
+            _res2 = list(_ex2.map(_fetch_li, li_ids))
+
+        for li_id, li_data in _res2:
+            if not li_data:
+                continue
+            lf = li_data.get("fields", {})
+            product_name_list = lf.get("Product Name (from Product SKU)", [])
+            product_name = product_name_list[0] if product_name_list else (lf.get("Name + Variations (from Product SKU)", [None])[0] if lf.get("Name + Variations (from Product SKU)") else "")
+            confirmed_price = lf.get("Confirmed Unit Price")
+            adj_list = lf.get("Adj. Unit Price (from MO Line Items)", [])
+            price = confirmed_price if confirmed_price is not None else (float(adj_list[0]) if adj_list else 0)
+            qty = lf.get("Qty.", 0)
+            line_items.append({
+                "lineItemId":  li_id,
+                "name":        product_name,
+                "qty":         qty,
+                "unit_price":  float(price),
+                "sku_ids":     lf.get("Product SKU", []),
+            })
+
+        return Response(json.dumps({"lineItems": line_items}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
 @app.route("/api/portal/admin/convert-to-invoice/<record_id>", methods=["POST", "OPTIONS"])
 @portal_login_required
 def portal_admin_convert_to_invoice(user, record_id):
-    """Convert an approved SO into an Invoice record and send invoice email. Admin only."""
+    """Convert an approved SO into an Invoice record and send invoice email. Admin only.
+    Optional body: {"lineItems": [{"lineItemId": "...", "qty": N}]} to invoice a subset/adjusted qtys.
+    If omitted, all line items are copied at their original quantities."""
     if request.method == "OPTIONS":
         return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type",
                                      "Access-Control-Allow-Methods": "POST"})
@@ -8390,6 +8455,15 @@ def portal_admin_convert_to_invoice(user, record_id):
     if not portal_can(user, "manage_team"):
         return Response(json.dumps({"error": "Insufficient permissions"}), status=403, headers=c, mimetype="application/json")
     try:
+        # Parse optional selected line items from request body
+        selected_items = None  # None = use all
+        try:
+            body = request.get_json(silent=True) or {}
+            if "lineItems" in body:
+                selected_items = {item["lineItemId"]: int(item["qty"]) for item in body["lineItems"] if int(item.get("qty", 0)) > 0}
+        except Exception:
+            pass
+
         write_token = RETURNS_WRITE_TOKEN
         read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or write_token
 
@@ -8434,8 +8508,11 @@ def portal_admin_convert_to_invoice(user, record_id):
                 tracking = tr["fields"].get("Tracking #") or ""
                 break
 
-        # Fetch line items
+        # Fetch line items — use selected subset if provided, else all
         li_ids = so_fields.get("MO Line Items", [])
+        if selected_items is not None:
+            li_ids = [lid for lid in li_ids if lid in selected_items]
+
         email_line_items = []
         for li_id in li_ids:
             li_r = req_lib.get(
@@ -8448,11 +8525,12 @@ def portal_admin_convert_to_invoice(user, record_id):
             lf = li_r.json().get("fields", {})
             product_name_list = lf.get("Product Name (from Product SKU)", [])
             product_name = product_name_list[0] if product_name_list else ""
-            qty = lf.get("Qty.", 0)
+            # Use caller-specified qty if provided, else original
+            qty = selected_items[li_id] if (selected_items is not None and li_id in selected_items) else lf.get("Qty.", 0)
             confirmed_price = lf.get("Confirmed Unit Price")
             adj_list = lf.get("Adj. Unit Price (from MO Line Items)", [])
             price = confirmed_price if confirmed_price is not None else (float(adj_list[0]) if adj_list else 0)
-            email_line_items.append({"name": product_name, "qty": qty, "unit_price": price})
+            email_line_items.append({"name": product_name, "qty": qty, "unit_price": price, "_li_fields": lf})
 
         # Create Invoice record
         inv_body = {
@@ -8484,15 +8562,9 @@ def portal_admin_convert_to_invoice(user, record_id):
         inv_record = inv_r.json()
         inv_record_id = inv_record["id"]
 
-        # Copy line items from SO to Invoice
-        for li_id in li_ids:
-            li_r = req_lib.get(
-                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
-                headers=at_headers(read_token), timeout=10,
-            )
-            if li_r.status_code != 200:
-                continue
-            lf = li_r.json().get("fields", {})
+        # Copy (selected) line items from SO to Invoice with (possibly adjusted) qty
+        for item in email_line_items:
+            lf = item.pop("_li_fields")
             confirmed_price = lf.get("Confirmed Unit Price")
             adj_list = lf.get("Adj. Unit Price (from MO Line Items)", [])
             price = confirmed_price if confirmed_price is not None else (float(adj_list[0]) if adj_list else 0)
@@ -8502,7 +8574,7 @@ def portal_admin_convert_to_invoice(user, record_id):
                 json={"fields": {
                     "Manual Order":         [inv_record_id],
                     "Product SKU":          lf.get("Product SKU", []),
-                    "Qty.":                 lf.get("Qty.", 0),
+                    "Qty.":                 item["qty"],
                     "Confirmed Unit Price": float(price),
                 }},
                 timeout=15,
@@ -8680,9 +8752,66 @@ def admin_shipped_orders():
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
 
+@app.route("/api/admin/so-line-items/<record_id>", methods=["GET", "OPTIONS"])
+def admin_so_line_items(record_id):
+    """Fetch line items for a Sales Order to populate the invoice item-selection modal."""
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type",
+                                     "Access-Control-Allow-Methods": "GET"})
+    c = cors()
+    if not check_admin_session(request):
+        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+    try:
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+            headers=at_headers(read_token), timeout=15,
+        )
+        if not r.ok:
+            return Response(json.dumps({"error": "SO not found"}), status=404, headers=c, mimetype="application/json")
+        so_fields = r.json().get("fields", {})
+        li_ids = so_fields.get("MO Line Items", [])
+
+        def _first(lst):
+            return lst[0] if isinstance(lst, list) and lst else (lst or "")
+
+        line_items = []
+        import concurrent.futures as _cf3
+        def _fetch_li3(li_id):
+            try:
+                lr = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+                    headers=at_headers(read_token), timeout=10,
+                )
+                if lr.status_code == 200:
+                    return li_id, lr.json()
+            except Exception:
+                pass
+            return li_id, None
+        with _cf3.ThreadPoolExecutor(max_workers=10) as _ex3:
+            _res3 = list(_ex3.map(_fetch_li3, li_ids))
+
+        for li_id, li_data in _res3:
+            if not li_data:
+                continue
+            lf = li_data.get("fields", {})
+            pname = _first(lf.get("Product Name (from Product SKU)", [])) or _first(lf.get("Name + Variations (from Product SKU)", [])) or "Item"
+            price = lf.get("Confirmed Unit Price") or (_first(lf.get("Adj. Unit Price (from MO Line Items)", [])) or 0)
+            line_items.append({
+                "lineItemId": li_id,
+                "name":       pname,
+                "qty":        lf.get("Qty.", 0),
+                "unit_price": float(price),
+            })
+        return Response(json.dumps({"lineItems": line_items}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
 @app.route("/api/admin/convert-to-invoice/<record_id>", methods=["POST", "OPTIONS"])
 def admin_convert_to_invoice(record_id):
-    """Convert an approved SO to an Invoice (admin portal)."""
+    """Convert an approved SO to an Invoice (admin portal).
+    Optional body: {"lineItems": [{"lineItemId": "...", "qty": N}]} to invoice a subset/adjusted qtys."""
     if request.method == "OPTIONS":
         return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type",
                                      "Access-Control-Allow-Methods": "POST"})
@@ -8690,6 +8819,15 @@ def admin_convert_to_invoice(record_id):
     if not check_admin_session(request):
         return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
     try:
+        # Parse optional selected line items
+        selected_items = None
+        try:
+            body = request.get_json(silent=True) or {}
+            if "lineItems" in body:
+                selected_items = {item["lineItemId"]: int(item["qty"]) for item in body["lineItems"] if int(item.get("qty", 0)) > 0}
+        except Exception:
+            pass
+
         read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
         write_token = RETURNS_WRITE_TOKEN
 
@@ -8730,6 +8868,10 @@ def admin_convert_to_invoice(record_id):
         customer_ids = so_fields.get("Customer", [])
         po_number    = so_fields.get("Purchase Order #", "")
 
+        # Determine which line items to copy
+        all_li_ids = so_fields.get("MO Line Items", [])
+        li_ids_to_copy = [lid for lid in all_li_ids if selected_items is None or lid in selected_items]
+
         # Create Invoice record
         inv_body = {
             "fields": {
@@ -8759,9 +8901,9 @@ def admin_convert_to_invoice(record_id):
         )
         inv_number = inv_fetch.json().get("fields", {}).get("Document ID", f"IN-{order_id_str}") if inv_fetch.ok else f"IN-{order_id_str}"
 
-        # Copy line items
+        # Copy (selected) line items with (possibly adjusted) quantities
         li_items_for_email = []
-        for li_id in so_fields.get("MO Line Items", []):
+        for li_id in li_ids_to_copy:
             li_r = req_lib.get(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
                 headers=at_headers(read_token), timeout=10,
@@ -8770,7 +8912,7 @@ def admin_convert_to_invoice(record_id):
                 continue
             lf = li_r.json().get("fields", {})
             price = lf.get("Confirmed Unit Price") or (_first(lf.get("Adj. Unit Price (from MO Line Items)", [])) or 0)
-            qty   = lf.get("Qty.", 0)
+            qty   = selected_items[li_id] if (selected_items is not None and li_id in selected_items) else lf.get("Qty.", 0)
             pname_list = lf.get("Product Name (from Product SKU)", [])
             pname = _first(pname_list) if pname_list else "Item"
             req_lib.post(

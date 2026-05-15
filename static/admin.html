@@ -877,11 +877,12 @@
           const trackCell = o.tracking
             ? `<a href="${trackingUrl(o.tracking)}" target="_blank" rel="noopener" style="font-family:monospace;font-size:0.82rem;color:#1a5276;">${esc(o.tracking)}</a>`
             : '—';
+          const soLink = `<a href="/view-quote/${esc(o.record_id)}" target="_blank" rel="noopener" style="font-weight:700;color:#1B2438;text-decoration:none;" title="View sales order">${esc(o.so_number)} ↗</a>`;
           const actionCell = o.invoiced
             ? `<span style="color:#2d7a2d;font-weight:600;font-size:0.85rem;">Invoiced ✓ ${esc(o.inv_number||'')}</span>`
-            : `<button class="btn btn-primary" style="padding:5px 12px;font-size:0.82rem;" onclick="convertToInvoice('${o.record_id}','${esc(o.so_number)}',this)">Convert to Invoice</button>`;
+            : `<button class="btn btn-primary" style="padding:5px 12px;font-size:0.82rem;" onclick="openInvoiceModal('${esc(o.record_id)}','${esc(o.so_number)}',this)">Convert to Invoice</button>`;
           return `<tr>
-            <td><strong>${esc(o.so_number)}</strong></td>
+            <td>${soLink}</td>
             <td>${fmt(o.date)}</td>
             <td>${esc(o.org_name||'—')}</td>
             <td>$${o.total.toFixed(2)}</td>
@@ -896,27 +897,151 @@
       }
     }
 
-    async function convertToInvoice(recordId, soNumber, btn) {
-      if (!confirm(`Convert ${soNumber} to invoice? An invoice will be emailed to the billing contact.`)) return;
-      btn.disabled = true;
-      btn.textContent = 'Converting…';
+    // ── Invoice Item-Selection Modal ──────────────────────────────────────────
+    let _invoiceModalRecordId = null;
+    let _invoiceModalSoNumber = null;
+    let _invoiceModalBtn      = null;
+
+    async function openInvoiceModal(recordId, soNumber, btn) {
+      _invoiceModalRecordId = recordId;
+      _invoiceModalSoNumber = soNumber;
+      _invoiceModalBtn      = btn;
+
+      const modal    = document.getElementById('invoiceModal');
+      const titleEl  = document.getElementById('invoiceModalTitle');
+      const bodyEl   = document.getElementById('invoiceModalBody');
+      const submitEl = document.getElementById('invoiceModalSubmit');
+
+      titleEl.textContent = `Convert ${soNumber} to Invoice`;
+      bodyEl.innerHTML = '<div style="text-align:center;padding:24px;color:#555;">Loading items…</div>';
+      submitEl.disabled = true;
+      modal.style.display = 'flex';
+
       try {
-        const resp = await fetch(`/api/admin/convert-to-invoice/${recordId}`, {
+        const resp = await fetch(`/api/admin/so-line-items/${recordId}`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        const items = data.lineItems || [];
+        if (!items.length) {
+          bodyEl.innerHTML = '<div style="color:#c0392b;padding:12px;">No line items found on this sales order.</div>';
+          return;
+        }
+        bodyEl.innerHTML = `
+          <p style="margin:0 0 12px;font-size:0.88rem;color:#555;">Select which items to include on the invoice and confirm quantities.</p>
+          <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+            <thead>
+              <tr style="border-bottom:2px solid #ddd;">
+                <th style="text-align:left;padding:6px 8px;">Include</th>
+                <th style="text-align:left;padding:6px 8px;">Item</th>
+                <th style="text-align:right;padding:6px 8px;">Unit Price</th>
+                <th style="text-align:center;padding:6px 8px;">Qty</th>
+                <th style="text-align:right;padding:6px 8px;">Line Total</th>
+              </tr>
+            </thead>
+            <tbody id="invoiceItemRows">
+              ${items.map((item, i) => `
+                <tr data-idx="${i}" style="border-bottom:1px solid #eee;">
+                  <td style="padding:8px;text-align:center;">
+                    <input type="checkbox" class="inv-check" data-idx="${i}" checked
+                      style="width:16px;height:16px;cursor:pointer;" onchange="updateInvoiceRow(${i})">
+                  </td>
+                  <td style="padding:8px;">${esc(item.name)}</td>
+                  <td style="padding:8px;text-align:right;">$${parseFloat(item.unit_price).toFixed(2)}</td>
+                  <td style="padding:8px;text-align:center;">
+                    <input type="number" class="inv-qty" data-idx="${i}" data-unit="${item.unit_price}"
+                      data-id="${esc(item.lineItemId)}"
+                      value="${item.qty}" min="1" max="9999" step="1"
+                      style="width:64px;text-align:center;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:0.88rem;"
+                      oninput="updateInvoiceRow(${i})">
+                  </td>
+                  <td style="padding:8px;text-align:right;" id="inv-total-${i}">$${(item.qty * item.unit_price).toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="border-top:2px solid #ddd;font-weight:700;">
+                <td colspan="4" style="padding:8px;text-align:right;">Invoice Total:</td>
+                <td style="padding:8px;text-align:right;" id="invoiceGrandTotal">$${items.reduce((s,i)=>s+i.qty*i.unit_price,0).toFixed(2)}</td>
+              </tr>
+            </tfoot>
+          </table>
+          <p style="margin:12px 0 0;font-size:0.82rem;color:#777;">An invoice email will be sent to the billing contact automatically.</p>
+        `;
+        submitEl.disabled = false;
+      } catch (e) {
+        bodyEl.innerHTML = `<div style="color:#c0392b;padding:12px;">Failed to load items: ${esc(e.message)}</div>`;
+      }
+    }
+
+    function updateInvoiceRow(idx) {
+      const check = document.querySelector(`.inv-check[data-idx="${idx}"]`);
+      const qtyEl = document.querySelector(`.inv-qty[data-idx="${idx}"]`);
+      const totalEl = document.getElementById(`inv-total-${idx}`);
+      const unitPrice = parseFloat(qtyEl.dataset.unit) || 0;
+      const qty = parseInt(qtyEl.value) || 0;
+      const enabled = check.checked;
+      qtyEl.disabled = !enabled;
+      qtyEl.style.opacity = enabled ? '1' : '0.4';
+      totalEl.textContent = enabled ? `$${(qty * unitPrice).toFixed(2)}` : '—';
+      // Update grand total
+      let grand = 0;
+      document.querySelectorAll('.inv-check').forEach(cb => {
+        if (cb.checked) {
+          const i = cb.dataset.idx;
+          const q = parseInt(document.querySelector(`.inv-qty[data-idx="${i}"]`).value) || 0;
+          const u = parseFloat(document.querySelector(`.inv-qty[data-idx="${i}"]`).dataset.unit) || 0;
+          grand += q * u;
+        }
+      });
+      document.getElementById('invoiceGrandTotal').textContent = `$${grand.toFixed(2)}`;
+    }
+
+    function closeInvoiceModal() {
+      document.getElementById('invoiceModal').style.display = 'none';
+      _invoiceModalRecordId = null;
+      _invoiceModalSoNumber = null;
+      _invoiceModalBtn      = null;
+    }
+
+    async function submitInvoiceModal() {
+      const checks = document.querySelectorAll('.inv-check');
+      const selected = [];
+      checks.forEach(cb => {
+        if (cb.checked) {
+          const i = cb.dataset.idx;
+          const qtyEl = document.querySelector(`.inv-qty[data-idx="${i}"]`);
+          selected.push({ lineItemId: qtyEl.dataset.id, qty: parseInt(qtyEl.value) || 0 });
+        }
+      });
+      if (!selected.length) { alert('Please select at least one item.'); return; }
+      if (!selected.every(s => s.qty > 0)) { alert('All selected items must have a quantity > 0.'); return; }
+
+      const submitEl = document.getElementById('invoiceModalSubmit');
+      submitEl.disabled = true;
+      submitEl.textContent = 'Converting…';
+
+      try {
+        const resp = await fetch(`/api/admin/convert-to-invoice/${_invoiceModalRecordId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lineItems: selected }),
         });
         const data = await resp.json();
         if (!resp.ok || !data.success) {
           alert('Error: ' + (data.error || 'Unknown error'));
-          btn.disabled = false;
-          btn.textContent = 'Convert to Invoice';
+          submitEl.disabled = false;
+          submitEl.textContent = 'Create Invoice';
           return;
         }
-        btn.parentElement.innerHTML = `<span style="color:#2d7a2d;font-weight:600;font-size:0.85rem;">Invoiced ✓ ${esc(data.invNumber||'')}</span>`;
+        // Update the button in the table
+        if (_invoiceModalBtn) {
+          _invoiceModalBtn.parentElement.innerHTML = `<span style="color:#2d7a2d;font-weight:600;font-size:0.85rem;">Invoiced ✓ ${esc(data.invNumber||'')}</span>`;
+        }
+        closeInvoiceModal();
       } catch (e) {
         alert('Error: ' + e.message);
-        btn.disabled = false;
-        btn.textContent = 'Convert to Invoice';
+        submitEl.disabled = false;
+        submitEl.textContent = 'Create Invoice';
       }
     }
 
@@ -939,3 +1064,21 @@
   </script>
 </body>
 </html>
+<!-- Invoice Item-Selection Modal -->
+<div id="invoiceModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,0.22);max-width:680px;width:94%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 14px;border-bottom:1px solid #e5e5e5;">
+      <h3 id="invoiceModalTitle" style="margin:0;font-size:1.05rem;color:#1B2438;font-weight:700;"></h3>
+      <button onclick="closeInvoiceModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#999;line-height:1;padding:0 4px;" title="Close">&times;</button>
+    </div>
+    <!-- Body -->
+    <div id="invoiceModalBody" style="padding:20px 22px;overflow-y:auto;flex:1;"></div>
+    <!-- Footer -->
+    <div style="padding:14px 22px;border-top:1px solid #e5e5e5;display:flex;justify-content:flex-end;gap:10px;">
+      <button onclick="closeInvoiceModal()" style="padding:9px 20px;border:1px solid #ccc;border-radius:6px;background:#f5f5f5;cursor:pointer;font-size:0.9rem;font-weight:600;color:#555;">Cancel</button>
+      <button id="invoiceModalSubmit" onclick="submitInvoiceModal()" disabled
+        style="padding:9px 22px;border:none;border-radius:6px;background:#1B2438;color:#fff;cursor:pointer;font-size:0.9rem;font-weight:700;">Create Invoice</button>
+    </div>
+  </div>
+</div>
