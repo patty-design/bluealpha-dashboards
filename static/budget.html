@@ -624,6 +624,11 @@
         <span class="stat-label" style="font-size:12px">Bank balance minus total debt</span>
       </div>
     </div>
+
+    <div style="text-align:center;padding:20px 20px 8px;font-size:0.8rem;color:#8e8e93;">
+      <span id="sync-status-label">Sync: not set up</span> ·
+      <button onclick="openSyncSetup()" style="background:none;border:none;color:#007aff;font-size:0.8rem;cursor:pointer;touch-action:manipulation;">Change</button>
+    </div>
   </div>
 
   <!-- ── INCOME ── -->
@@ -836,6 +841,22 @@
   </div>
 </div>
 
+<!-- ── SYNC SETUP SHEET ── -->
+<div class="overlay" id="sync-setup-overlay" onclick="closeSyncSetup()"></div>
+<div class="sheet" id="sync-setup-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Set Up Sync</div>
+  <div class="sheet-field">
+    <p style="font-size:14px;color:#8e8e93;margin:0 0 14px;line-height:1.5">Choose a short code so your data syncs across devices and your parent can stay in the loop.</p>
+    <div class="sheet-label">Sync Code</div>
+    <input class="sheet-input" id="sync-code-input" type="text" placeholder="e.g. abbey or grace123" maxlength="32" style="font-size:16px" autocomplete="off" autocapitalize="none" spellcheck="false">
+  </div>
+  <div class="sheet-actions">
+    <button class="sheet-cancel" onclick="closeSyncSetup()">Skip for now</button>
+    <button class="sheet-done" onclick="startSyncing()">Start Syncing</button>
+  </div>
+</div>
+
 <!-- ── INCOME ENTRY SHEET ── -->
 <div class="overlay" id="inc-overlay" onclick="closeSheets()"></div>
 <div class="sheet" id="inc-sheet">
@@ -862,6 +883,9 @@
 <script>
 // ── Data ──────────────────────────────────────────────────────────────────
 const STORAGE_KEY = 'budgetData';
+const API_BASE = 'https://bluealpha-dashboards-production.up.railway.app';
+let syncCode = null;
+let syncTimeout = null;
 
 function currentYM() {
   const d = new Date();
@@ -922,15 +946,29 @@ function loadData() {
     bankBalance: raw.bankBalance || 0,
     debts: raw.debts || [],
     oneOffExpenses: raw.oneOffExpenses || [],
-    month: raw.month
+    month: raw.month,
+    syncCode: raw.syncCode || null
   };
 }
 
 function saveData(d) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+  data = d;
+  if (syncCode) {
+    clearTimeout(syncTimeout);
+    syncTimeout = setTimeout(syncToServer, 1500);
+  }
 }
 
 let data = loadData();
+
+// Initialize sync after data is loaded
+if (data.syncCode) {
+  syncCode = data.syncCode;
+  setTimeout(syncFromServer, 500);
+} else {
+  setTimeout(() => openSyncSetup(true), 500);
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 function ordinal(n) {
@@ -977,6 +1015,87 @@ function monthLabel() {
   const [y, m] = currentYM().split('-');
   const d = new Date(Number(y), Number(m) - 1, 1);
   return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+// ── Sync ──────────────────────────────────────────────────────────────────
+async function syncToServer() {
+  if (!syncCode) return;
+  try {
+    await fetch(`${API_BASE}/api/budget/sync/${syncCode}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: data })
+    });
+  } catch (e) { /* silent fail — offline mode still works */ }
+}
+
+async function syncFromServer() {
+  if (!syncCode) return;
+  try {
+    const resp = await fetch(`${API_BASE}/api/budget/sync/${syncCode}`);
+    if (resp.ok) {
+      const result = await resp.json();
+      if (result.data) {
+        data = result.data;
+        data.syncCode = syncCode;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        renderAll();
+        updateSyncLabel();
+      }
+    }
+  } catch (e) { /* silent fail */ }
+}
+
+function showToast(msg) {
+  let t = document.getElementById('sync-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'sync-toast';
+    t.style.cssText = 'position:fixed;top:env(safe-area-inset-top,0);left:50%;transform:translateX(-50%);background:#1c1c1e;color:#fff;padding:8px 18px;border-radius:20px;font-size:0.82rem;font-weight:600;z-index:9999;margin-top:12px;pointer-events:none;transition:opacity 0.3s;';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._timeout);
+  t._timeout = setTimeout(() => { t.style.opacity = '0'; }, 2500);
+}
+
+function updateSyncLabel() {
+  const lbl = document.getElementById('sync-status-label');
+  if (!lbl) return;
+  lbl.textContent = syncCode ? `Syncing as ${syncCode}` : 'Sync: not set up';
+}
+
+let _syncSetupFirstRun = false;
+
+function openSyncSetup(firstRun) {
+  _syncSetupFirstRun = !!firstRun;
+  const input = document.getElementById('sync-code-input');
+  if (input) input.value = syncCode || '';
+  document.getElementById('sync-setup-overlay').classList.add('open');
+  document.getElementById('sync-setup-sheet').classList.add('open');
+  setTimeout(() => { if (input) input.focus(); }, 350);
+}
+
+function closeSyncSetup() {
+  document.getElementById('sync-setup-overlay').classList.remove('open');
+  document.getElementById('sync-setup-sheet').classList.remove('open');
+}
+
+function startSyncing() {
+  const raw = document.getElementById('sync-code-input').value.trim();
+  const code = raw.toLowerCase().replace(/[^a-z0-9\-]/g, '').slice(0, 32);
+  if (!code) {
+    document.getElementById('sync-code-input').focus();
+    return;
+  }
+  syncCode = code;
+  data.syncCode = code;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  syncToServer();
+  closeSyncSetup();
+  updateSyncLabel();
+  showToast(`✓ Syncing as ${code}`);
 }
 
 // ── Tab Switching ─────────────────────────────────────────────────────────
@@ -1052,6 +1171,8 @@ function renderOverview() {
   const netEl = document.getElementById('ov-net-position');
   netEl.textContent = (netPos < 0 ? '-' : '') + fmt(Math.abs(netPos));
   netEl.style.color = netPos >= 0 ? 'var(--green)' : 'var(--red)';
+
+  updateSyncLabel();
 }
 
 // ── Income ────────────────────────────────────────────────────────────────

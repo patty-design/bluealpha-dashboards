@@ -3092,9 +3092,74 @@ def awaiting_shipment():
 def budget_page():
     return send_from_directory("static", "budget.html")
 
+@app.route("/budget-parent")
+def budget_parent_page():
+    return send_from_directory("static", "budget-parent.html")
+
 @app.route("/exchange")
 def exchange_portal():
     return send_from_directory("static", "exchange.html")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Budget Cloud Sync API
+# ─────────────────────────────────────────────────────────────────────────────
+
+BUDGET_SYNC_DIR = os.path.join(os.path.dirname(__file__), 'budget_sync_data')
+os.makedirs(BUDGET_SYNC_DIR, exist_ok=True)
+
+def _safe_sync_code(code):
+    """Sanitize sync code: lowercase alphanumeric + hyphens only, max 32 chars."""
+    return re.sub(r'[^a-z0-9\-]', '', code.lower())[:32]
+
+@app.after_request
+def add_cors_budget(response):
+    if request.path.startswith('/api/budget/'):
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    return response
+
+@app.route("/api/budget/sync/<code>", methods=["OPTIONS"])
+def budget_sync_options(code):
+    resp = app.make_default_options_response()
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, DELETE, OPTIONS'
+    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    return resp
+
+@app.route("/api/budget/sync/<code>", methods=["GET"])
+def budget_sync_get(code):
+    code = _safe_sync_code(code)
+    if not code:
+        return Response(json.dumps({"error": "invalid code"}), status=400, mimetype="application/json")
+    path = os.path.join(BUDGET_SYNC_DIR, f"{code}.json")
+    if not os.path.exists(path):
+        return Response(json.dumps({"error": "not found"}), status=404, mimetype="application/json")
+    with open(path) as f:
+        data = json.load(f)
+    return Response(json.dumps(data), mimetype="application/json")
+
+@app.route("/api/budget/sync/<code>", methods=["POST"])
+def budget_sync_post(code):
+    code = _safe_sync_code(code)
+    if not code:
+        return Response(json.dumps({"error": "invalid code"}), status=400, mimetype="application/json")
+    payload = request.get_json(force=True)
+    if not payload or "data" not in payload:
+        return Response(json.dumps({"error": "missing data"}), status=400, mimetype="application/json")
+    path = os.path.join(BUDGET_SYNC_DIR, f"{code}.json")
+    from datetime import datetime as _bdt
+    with open(path, 'w') as f:
+        json.dump({"data": payload["data"], "updated": _bdt.utcnow().isoformat()}, f)
+    return Response(json.dumps({"ok": True}), mimetype="application/json")
+
+@app.route("/api/budget/sync/<code>", methods=["DELETE"])
+def budget_sync_delete(code):
+    code = _safe_sync_code(code)
+    path = os.path.join(BUDGET_SYNC_DIR, f"{code}.json")
+    if os.path.exists(path):
+        os.remove(path)
+    return Response(json.dumps({"ok": True}), mimetype="application/json")
 
 
 @app.route("/api/verify-exchange", methods=["POST", "OPTIONS"])
