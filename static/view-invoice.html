@@ -74,10 +74,15 @@
 <body>
   <div class="page-header">
     <span class="brand">BLUE ALPHA</span>
-    <a class="back" href="javascript:history.back()">← Back</a>
+    <span></span>
   </div>
 
   <div class="container">
+    <div style="margin-bottom:12px;">
+      <button onclick="history.back()" style="background:none;border:none;cursor:pointer;color:#1B2438;font-size:0.9rem;font-weight:600;display:flex;align-items:center;gap:6px;padding:0;">
+        ← Back to Invoices
+      </button>
+    </div>
     <div class="card" id="invoiceCard">
       <div class="loading">Loading invoice…</div>
     </div>
