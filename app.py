@@ -9396,6 +9396,9 @@ def _run_tracking_sync():
                         for s in r2.json().get("shipments", []):
                             if s.get("voided"):
                                 continue
+                            # Exact order number match — ShipStation does prefix matching
+                            if s.get("orderNumber", "").strip() != order_num:
+                                continue
                             tn = (s.get("trackingNumber") or "").strip()
                             if tn and tn not in t_parts:
                                 t_parts.append(tn)
