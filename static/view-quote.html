@@ -175,21 +175,25 @@
     .items-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
+    }
+    .items-table thead tr {
+      background: transparent;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
     }
     .items-table th {
       text-align: left;
-      font-size: 0.78rem;
+      font-size: 0.72rem;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.06em;
       color: var(--muted);
-      padding: 8px 10px;
-      border-bottom: 1px solid var(--border);
+      padding: 10px 12px;
     }
     .items-table th.right { text-align: right; }
     .items-table td {
-      padding: 10px 10px;
+      padding: 10px 12px;
       border-bottom: 1px solid var(--border);
       vertical-align: middle;
     }
@@ -573,18 +577,14 @@ if (window.self !== window.top) {
     </div><!-- /customerCard -->
 
     <!-- Items card -->
-    <div class="card">
-      <div class="section-title">
-        Items <span class="section-count" id="itemCount">0</span>
-      </div>
-
-      <table class="items-table" id="itemsTable">
+    <div class="card" style="padding:0;">
+      <table class="items-table" id="itemsTable" style="margin:0;">
         <thead>
           <tr>
-            <th>Product</th>
+            <th style="padding-left:28px;">Description</th>
             <th class="right">Qty</th>
             <th class="right">Unit Price</th>
-            <th class="right">Line Total</th>
+            <th class="right" style="padding-right:28px;">Total</th>
             <th id="thRemove"></th>
           </tr>
         </thead>
@@ -628,20 +628,17 @@ if (window.self !== window.top) {
       </div>
 
       <!-- Totals -->
-      <div class="totals-block">
-        <div class="totals-row">
-          <span>Subtotal</span>
-          <span class="val" id="vSubtotal">$0.00</span>
-        </div>
-        <div class="totals-row hidden" id="vRowShipping">
-          <span>Shipping</span>
-          <span class="val" id="vShipping">$0.00</span>
-        </div>
-        <div class="totals-row total-final">
-          <span>Total</span>
-          <span class="val" id="vTotal">$0.00</span>
+      <div style="display:flex;justify-content:flex-end;padding:0 28px 16px;">
+        <div style="min-width:240px;">
+          <div id="vRowShipping" class="hidden" style="display:flex;justify-content:space-between;padding:6px 0;font-size:0.88rem;color:#555;border-top:1px solid var(--border);">
+            <span>Shipping</span><span id="vShipping">$0.00</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0 6px;font-size:1rem;font-weight:700;color:#1B2438;border-top:2px solid #1B2438;">
+            <span>Total Due</span><span id="vTotal">$0.00</span>
+          </div>
         </div>
       </div>
+      <span id="vSubtotal" style="display:none;">$0.00</span>
 
       <!-- Save button (editable mode only) -->
       <div class="save-row" id="saveRow">
