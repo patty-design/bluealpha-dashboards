@@ -891,7 +891,7 @@
             ? (o.inv_record_id
                 ? `<a href="/view-invoice/${esc(o.inv_record_id)}" style="color:#2d7a2d;font-weight:600;font-size:0.85rem;text-decoration:none;">Invoiced ✓ ${esc(o.inv_number||'')} ↗</a>`
                 : `<span style="color:#2d7a2d;font-weight:600;font-size:0.85rem;">Invoiced ✓ ${esc(o.inv_number||'')}</span>`)
-            : `<button class="btn btn-primary" style="padding:5px 12px;font-size:0.82rem;" onclick="openInvoiceModal('${esc(o.record_id)}','${esc(o.so_number)}',this,${JSON.stringify(o.split_suffix||'')})">Convert to Invoice</button>`;
+            : `<button class="btn btn-primary" style="padding:5px 12px;font-size:0.82rem;" onclick="openInvoiceModal('${esc(o.record_id)}','${esc(o.so_number)}',this,'${esc(o.split_suffix||'')}')">Convert to Invoice</button>`;
           const rowStyle = o.is_split ? ' style="background:#f7f9ff;"' : '';
           return `<tr${rowStyle}>
             <td>${soLink}</td>
