@@ -9240,6 +9240,7 @@ def _run_tracking_sync():
                                      params={"orderNumber": order_num, "pageSize": 50},
                                      headers=ss_hdrs, timeout=15)
                     t_parts, sd_str = [], ""
+                    order_total = None
                     if r2.ok:
                         for s in r2.json().get("shipments", []):
                             if s.get("voided"):
@@ -9250,24 +9251,16 @@ def _run_tracking_sync():
                             sd = (s.get("shipDate") or "")[:10]
                             if sd and (not sd_str or sd < sd_str):
                                 sd_str = sd
+                            # Calculate total from shipment items (unitPrice × qty)
+                            for item in s.get("shipmentItems", []):
+                                unit_price = float(item.get("unitPrice") or 0)
+                                qty = int(item.get("quantity") or 0)
+                                order_total = (order_total or 0) + unit_price * qty
                     t_str = " | ".join(t_parts)
 
                     # Only write to Airtable if we found tracking — never overwrite with empty
                     if not t_str:
                         return ""
-
-                    # Fetch order total from ShipStation orders API
-                    order_total = None
-                    try:
-                        ro = req_lib.get("https://ssapi.shipstation.com/orders",
-                                         params={"orderNumber": order_num, "pageSize": 5},
-                                         headers=ss_hdrs, timeout=10)
-                        if ro.ok:
-                            orders_list = ro.json().get("orders", [])
-                            if orders_list:
-                                order_total = orders_list[0].get("orderTotal")
-                    except Exception:
-                        pass
 
                     flds = {"Order #": order_num, "Date": so_date, "Tracking #": t_str}
                     if sd_str:
@@ -9282,10 +9275,15 @@ def _run_tracking_sync():
                             headers=dest_headers, json={"fields": flds}, timeout=15,
                         )
                     else:
-                        req_lib.post(
+                        new_r = req_lib.post(
                             f"https://api.airtable.com/v0/{_SO_TRACKING_BASE}/{_SO_TRACKING_TABLE}",
                             headers=dest_headers, json={"records": [{"fields": flds}]}, timeout=15,
                         )
+                        # Register new record so subsequent splits don't duplicate it
+                        if new_r.ok:
+                            new_records = new_r.json().get("records", [])
+                            if new_records:
+                                existing_by_doc[order_num] = new_records[0]["id"]
                     return t_str
 
                 # Sync the main order
