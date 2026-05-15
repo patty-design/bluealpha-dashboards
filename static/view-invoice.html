@@ -78,11 +78,13 @@
   </div>
 
   <div class="container">
-    <div id="backBtnRow" style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
+    <div id="backBtnRow" style="margin-bottom:12px;">
       <button id="backBtn" onclick="goBack()" style="background:none;border:none;cursor:pointer;color:#1B2438;font-size:0.9rem;font-weight:600;display:flex;align-items:center;gap:6px;padding:0;">
         ← Back to Invoices
       </button>
-      <button onclick="window.print()" style="background:#1B2438;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:0.85rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
+    </div>
+    <div style="margin-bottom:12px;display:flex;justify-content:flex-end;">
+      <button id="downloadBtn" onclick="window.print()" style="background:#1B2438;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:0.85rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
         ⬇ Download PDF
       </button>
     </div>
@@ -93,7 +95,7 @@
 
   <style>
     @media print {
-      .page-header, #backBtn, button { display: none !important; }
+      .page-header, #backBtnRow, #downloadBtn, #paymentSection { display: none !important; }
       body { background: #fff; }
       .container { margin: 0; padding: 0; max-width: 100%; }
       .card { box-shadow: none; }
@@ -237,7 +239,7 @@
           </div>
 
           ${(inv.stripeCcUrl || inv.stripeAchUrl) ? `
-          <div style="padding:20px 36px;border-top:1px solid #eee;background:#f9fafb;">
+          <div id="paymentSection" style="padding:20px 36px;border-top:1px solid #eee;background:#f9fafb;">
             <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#8a99aa;margin-bottom:12px;">Pay Online</div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
               ${inv.stripeCcUrl ? `
