@@ -588,62 +588,61 @@ if (window.self !== window.top) {
         <tbody id="itemsTbody"></tbody>
       </table>
 
-      <!-- Add item expander -->
-      <div id="addItemSection">
-        <button class="add-item-toggle" onclick="toggleAddItem()">+ Add another item</button>
-        <div id="addItemPanel" class="add-item-panel hidden">
-          <div class="v-add-wrap">
-            <div class="v-add-row">
-              <label>Product</label>
-              <select id="vProd" onchange="vOnProduct()"><option value="">Select a product…</option></select>
-            </div>
-            <div class="v-add-row hidden" id="vColorRow">
-              <label>Color</label>
-              <select id="vColor" onchange="vOnColor()"><option value="">Select a color…</option></select>
-            </div>
-            <div class="v-add-row hidden" id="vSizeRow">
-              <label>Size</label>
-              <select id="vSize" onchange="vOnSize()"><option value="">Select a size…</option></select>
-            </div>
-            <div class="v-add-row hidden" id="vFvarRow">
-              <label>Style / Version</label>
-              <select id="vFvar" onchange="vOnFvar()"><option value="">Select a style…</option></select>
-            </div>
-            <div class="v-add-row hidden" id="vAddonRow">
-              <label>Add-on</label>
-              <select id="vAddon"><option value="">No add-on</option></select>
-            </div>
-            <div class="v-add-row hidden" id="vQtyAddRow">
-              <label>Qty</label>
-              <div style="display:flex;gap:8px;align-items:center;">
-                <input type="number" id="vQty" min="1" value="1" style="width:70px;">
-                <button class="btn btn-add" onclick="vDoAdd()">Add</button>
-              </div>
+    </div><!-- /items card -->
+
+    <!-- Totals (outside the box) -->
+    <div style="display:flex;justify-content:flex-end;padding:8px 0 4px;">
+      <div style="min-width:240px;">
+        <div id="vRowShipping" class="hidden" style="display:flex;justify-content:space-between;padding:6px 0;font-size:0.88rem;color:#555;border-top:1px solid var(--border);">
+          <span>Shipping</span><span id="vShipping">$0.00</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0 6px;font-size:1rem;font-weight:700;color:#1B2438;border-top:2px solid #1B2438;">
+          <span>Total Due</span><span id="vTotal">$0.00</span>
+        </div>
+      </div>
+    </div>
+    <span id="vSubtotal" style="display:none;">$0.00</span>
+
+    <!-- Add item + Save (outside the box, editable mode only) -->
+    <div id="addItemSection" style="margin-top:4px;">
+      <button class="add-item-toggle" onclick="toggleAddItem()">+ Add another item</button>
+      <div id="addItemPanel" class="add-item-panel hidden">
+        <div class="v-add-wrap">
+          <div class="v-add-row">
+            <label>Product</label>
+            <select id="vProd" onchange="vOnProduct()"><option value="">Select a product…</option></select>
+          </div>
+          <div class="v-add-row hidden" id="vColorRow">
+            <label>Color</label>
+            <select id="vColor" onchange="vOnColor()"><option value="">Select a color…</option></select>
+          </div>
+          <div class="v-add-row hidden" id="vSizeRow">
+            <label>Size</label>
+            <select id="vSize" onchange="vOnSize()"><option value="">Select a size…</option></select>
+          </div>
+          <div class="v-add-row hidden" id="vFvarRow">
+            <label>Style / Version</label>
+            <select id="vFvar" onchange="vOnFvar()"><option value="">Select a style…</option></select>
+          </div>
+          <div class="v-add-row hidden" id="vAddonRow">
+            <label>Add-on</label>
+            <select id="vAddon"><option value="">No add-on</option></select>
+          </div>
+          <div class="v-add-row hidden" id="vQtyAddRow">
+            <label>Qty</label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="number" id="vQty" min="1" value="1" style="width:70px;">
+              <button class="btn btn-add" onclick="vDoAdd()">Add</button>
             </div>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Totals -->
-      <div style="display:flex;justify-content:flex-end;padding:0 28px 16px;">
-        <div style="min-width:240px;">
-          <div id="vRowShipping" class="hidden" style="display:flex;justify-content:space-between;padding:6px 0;font-size:0.88rem;color:#555;border-top:1px solid var(--border);">
-            <span>Shipping</span><span id="vShipping">$0.00</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0 6px;font-size:1rem;font-weight:700;color:#1B2438;border-top:2px solid #1B2438;">
-            <span>Total Due</span><span id="vTotal">$0.00</span>
-          </div>
-        </div>
-      </div>
-      <span id="vSubtotal" style="display:none;">$0.00</span>
-
-      <!-- Save button (editable mode only) -->
-      <div class="save-row" id="saveRow">
-        <button class="btn btn-primary" id="btnSave" onclick="saveChanges()">Save Changes</button>
-        <button class="btn btn-secondary" id="btnRevert" onclick="revertChanges()" style="display:none;">Revert</button>
-        <span class="save-confirm" id="saveConfirm">✓ Changes saved</span>
-      </div>
-
+    <div class="save-row" id="saveRow" style="margin-top:8px;">
+      <button class="btn btn-primary" id="btnSave" onclick="saveChanges()">Save Changes</button>
+      <button class="btn btn-secondary" id="btnRevert" onclick="revertChanges()" style="display:none;">Revert</button>
+      <span class="save-confirm" id="saveConfirm">✓ Changes saved</span>
     </div>
 
     <!-- Notes card -->
