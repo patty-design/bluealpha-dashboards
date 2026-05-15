@@ -8505,28 +8505,52 @@ def _fetch_so_line_items(record_id, split_order_number=None):
             "defaultChecked": True,   # default: all checked; may be overridden for splits
         })
 
-    # If this is a split order, fetch SS items and match by SKU
-    if split_order_number:
+    def _ss_items_for_order(order_num):
+        """Query ShipStation orders API and return {sku: qty} for exact order number match."""
         ss_r = req_lib.get("https://ssapi.shipstation.com/orders",
-                            params={"orderNumber": split_order_number, "pageSize": 5},
+                            params={"orderNumber": order_num, "pageSize": 5},
                             headers=ss_headers(), timeout=15)
-        ss_items = {}  # sku → qty
+        result = {}
         if ss_r.ok:
             for order in ss_r.json().get("orders", []):
+                if order.get("orderNumber", "").strip() != order_num:
+                    continue  # exact match only
                 for item in order.get("items", []):
                     sku = (item.get("sku") or "").strip().upper()
                     qty = int(item.get("quantity") or 0)
                     if sku:
-                        ss_items[sku] = ss_items.get(sku, 0) + qty
+                        result[sku] = result.get(sku, 0) + qty
+        return result
 
+    # If this is a split order, fetch SS items and match by SKU
+    if split_order_number:
+        ss_items = _ss_items_for_order(split_order_number)
         if ss_items:
             for li in line_items:
                 sku = li["sku"]
                 if sku in ss_items:
                     li["defaultChecked"] = True
-                    li["qty"] = ss_items[sku]   # use SS quantity for the split
+                    li["qty"] = ss_items[sku]
                 else:
-                    li["defaultChecked"] = False  # not in this split shipment
+                    li["defaultChecked"] = False
+
+    else:
+        # Main order — check if it has splits in ShipStation and use SS quantities if so
+        so_number = so_fields.get("Document ID", "")
+        if so_number:
+            tracking_recs = at_get_all(_SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
+                                        fields=["Order #", "Base Order #"],
+                                        base_id=_SO_TRACKING_BASE)
+            has_splits = any(
+                r.get("fields", {}).get("Base Order #") == so_number
+                for r in tracking_recs
+            )
+            if has_splits:
+                ss_items = _ss_items_for_order(so_number)
+                if ss_items:
+                    for li in line_items:
+                        if li["sku"] in ss_items:
+                            li["qty"] = ss_items[li["sku"]]
 
     return line_items, None
 
