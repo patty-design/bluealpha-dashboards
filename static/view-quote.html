@@ -794,7 +794,7 @@ function render() {
         : `<strong>${fmtDate(q.expiryDate)}</strong>`;
     metaHTML += metaKV('Expiry Date', expVal);
   }
-  metaHTML += metaKV('Terms', 'Net 30');
+  if (!window.viewingAsOrder) metaHTML += metaKV('Terms', 'Net 30');
   if (q.poNumber) metaHTML += metaKV('PO #', escHtml(q.poNumber));
   metaRow.innerHTML = metaHTML;
 
