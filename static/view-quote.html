@@ -179,7 +179,10 @@
     }
     .items-table thead tr {
       background: transparent;
-      border-bottom: 1px solid var(--border);
+    }
+    .items-table thead {
+      outline: 2px solid #1B2438;
+      border-radius: 6px;
     }
     .items-table th {
       text-align: left;
@@ -574,7 +577,7 @@ if (window.self !== window.top) {
     </div><!-- /customerCard -->
 
     <!-- Items card -->
-    <div class="card" style="padding:0;border:2px solid #1B2438;">
+    <div class="card" style="padding:0;">
       <table class="items-table" id="itemsTable" style="margin:0;">
         <thead>
           <tr>
