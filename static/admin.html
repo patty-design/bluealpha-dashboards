@@ -885,7 +885,7 @@
           const soLink = o.is_split
             ? `<span style="font-weight:700;color:#1B2438;">${esc(o.so_number)}</span>${splitBadge}`
             : `<a href="/view-quote/${esc(o.record_id)}" target="_blank" rel="noopener" style="font-weight:700;color:#1B2438;text-decoration:none;" title="View sales order">${esc(o.so_number)} ↗</a>`;
-          const shipDateCell = o.ship_date ? fmt(o.ship_date) : '<span style="color:#aaa;">—</span>';
+          const shipDateCell = o.ship_date ? fmtShort(o.ship_date) : '<span style="color:#aaa;">—</span>';
           const totalCell = o.total ? `$${o.total.toFixed(2)}` : '<span style="color:#aaa;font-size:0.82rem;">—</span>';
           const actionCell = o.invoiced
             ? (o.inv_record_id
@@ -895,7 +895,7 @@
           const rowStyle = o.is_split ? ' style="background:#f7f9ff;"' : '';
           return `<tr${rowStyle}>
             <td>${soLink}</td>
-            <td>${fmt(o.date)}</td>
+            <td>${fmtShort(o.date)}</td>
             <td>${esc(o.org_name||'—')}</td>
             <td>${totalCell}</td>
             <td>${trackCell}</td>
@@ -1112,6 +1112,13 @@
       if (!s) return '—';
       try { return new Date(s + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); }
       catch { return s; }
+    }
+    function fmtShort(s) {
+      if (!s) return '—';
+      try {
+        const d = new Date(s + 'T12:00:00');
+        return `${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(-2)}`;
+      } catch { return s; }
     }
     function esc(s) {
       return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
