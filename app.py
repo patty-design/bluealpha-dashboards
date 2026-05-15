@@ -9251,16 +9251,25 @@ def _run_tracking_sync():
                             sd = (s.get("shipDate") or "")[:10]
                             if sd and (not sd_str or sd < sd_str):
                                 sd_str = sd
-                            # Calculate total from shipment items (unitPrice × qty)
-                            for item in s.get("shipmentItems", []):
-                                unit_price = float(item.get("unitPrice") or 0)
-                                qty = int(item.get("quantity") or 0)
-                                order_total = (order_total or 0) + unit_price * qty
                     t_str = " | ".join(t_parts)
 
                     # Only write to Airtable if we found tracking — never overwrite with empty
                     if not t_str:
                         return ""
+
+                    # Get order total from ShipStation orders API (shipmentItems don't carry prices)
+                    try:
+                        ro = req_lib.get("https://ssapi.shipstation.com/orders",
+                                         params={"orderNumber": order_num, "pageSize": 5},
+                                         headers=ss_hdrs, timeout=15)
+                        if ro.ok:
+                            ss_orders = ro.json().get("orders", [])
+                            if ss_orders:
+                                ot = ss_orders[0].get("orderTotal")
+                                if ot is not None and float(ot) > 0:
+                                    order_total = float(ot)
+                    except Exception as _ot_err:
+                        print(f"[tracking-sync] order total fetch failed for {order_num}: {_ot_err}")
 
                     flds = {"Order #": order_num, "Date": so_date, "Tracking #": t_str}
                     if sd_str:
