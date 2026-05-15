@@ -29,7 +29,7 @@
     .meta-block + .meta-block { border-left: 1px solid #eee; }
     /* Label+value pairs (details column) */
     .meta-label { margin: 0 0 2px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #8a99aa; font-weight: 700; }
-    .meta-value { margin: 0 0 10px; font-size: 0.9rem; color: #1a2633; font-weight: 700; }
+    .meta-value { margin: 0 0 10px; font-size: 0.9rem; color: #1a2633; }
     /* Address labels + lines */
     .addr-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #8a99aa; font-weight: 700; margin-bottom: 7px; }
     .addr-line  { font-size: 0.88rem; color: #1a2633; margin: 0 0 3px; line-height: 1.45; }
@@ -194,8 +194,8 @@
         // Address helpers
         function addrBlock(title, lines) {
           let html = `<div class="addr-title">${title}</div>`;
-          lines.filter(Boolean).forEach((ln, i) => {
-            html += `<p class="addr-line"${i===0?' style="font-weight:700;"':''}>${esc(ln)}</p>`;
+          lines.filter(Boolean).forEach((ln) => {
+            html += `<p class="addr-line">${esc(ln)}</p>`;
           });
           return html;
         }
