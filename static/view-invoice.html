@@ -207,6 +207,7 @@
         const shipLines = [inv.shipOrg, inv.shipName, inv.shipAddr1, inv.shipAddr2];
 
         card.innerHTML = `
+          <div style="border:2px solid #1B2438;border-radius:10px;overflow:hidden;margin-bottom:12px;">
           <div class="inv-header">
             <div class="title">
               <h1>INVOICE</h1>
@@ -232,6 +233,7 @@
               ${inv.tracking ? kv('Tracking', trackingHtml) : ''}
             </div>
           </div>
+          </div><!-- /upper box -->
 
           <div class="items-card">
           <div class="items-wrap" style="padding:0 28px 0;">

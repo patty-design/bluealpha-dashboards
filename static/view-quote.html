@@ -519,8 +519,11 @@ if (window.self !== window.top) {
     }
     </script>
 
-    <!-- Doc header bar (invoice-style) -->
-    <div style="background:#1B2438;border-radius:10px 10px 0 0;padding:20px 28px;display:flex;align-items:flex-start;justify-content:space-between;">
+    <!-- Upper box: header + meta -->
+    <div style="border:2px solid #1B2438;border-radius:10px;overflow:hidden;margin-bottom:12px;">
+
+    <!-- Doc header bar -->
+    <div style="background:#1B2438;padding:20px 28px;display:flex;align-items:flex-start;justify-content:space-between;">
       <div>
         <div id="docTypeLabel" style="color:#fff;font-size:1.3rem;font-weight:800;letter-spacing:1px;margin-bottom:3px;">QUOTE</div>
         <div id="quoteNumber" style="color:#adc4e0;font-size:0.9rem;"></div>
@@ -531,9 +534,9 @@ if (window.self !== window.top) {
       </div>
     </div>
 
-    <!-- Meta section: Bill To + Details (invoice meta-grid style) -->
-    <div id="customerCard" style="background:#fff;border-radius:0;border-left:1px solid #eee;border-right:1px solid #eee;border-bottom:1px solid #eee;margin-bottom:0;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:1px solid #eee;">
+    <!-- Meta section: Bill To + Details -->
+    <div id="customerCard" style="background:#fff;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
         <div style="padding:18px 28px;border-right:1px solid #eee;">
           <div id="custInfo"></div>
           <button id="editAddressBtn" class="btn btn-secondary" style="display:none;padding:4px 10px;font-size:0.78rem;margin-top:10px;" onclick="openAddressEdit()">Edit Addresses</button>
@@ -575,8 +578,9 @@ if (window.self !== window.top) {
         </div>
       </div>
     </div><!-- /customerCard -->
+    </div><!-- /upper box -->
 
-    <!-- Items card -->
+    <!-- Items card (lower box) -->
     <div class="card" style="padding:0;border:2px solid #1B2438;">
       <table class="items-table" id="itemsTable" style="margin:0;">
         <thead>
