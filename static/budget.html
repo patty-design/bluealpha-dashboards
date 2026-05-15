@@ -151,35 +151,76 @@
       margin-bottom: 8px;
     }
 
-    .debt-name { font-size: 17px; font-weight: 600; }
-
-    .debt-stats {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 6px;
-      font-size: 13px;
-      color: var(--text2);
-    }
-
-    .debt-min { font-size: 13px; color: var(--text2); margin-top: 4px; }
+    .debt-name { font-size: 0.95rem; font-weight: 700; }
 
     .debt-delete-btn {
       background: none; border: none;
-      font-size: 18px; color: var(--text2);
+      font-size: 16px; color: var(--text2);
       cursor: pointer; touch-action: manipulation;
       padding: 0; line-height: 1;
       flex-shrink: 0;
     }
 
-    .paid-off-badge {
-      display: inline-block;
-      background: var(--green);
-      color: white;
+    .debt-amounts-row {
+      display: flex;
+      gap: 16px;
       font-size: 13px;
-      font-weight: 700;
-      padding: 4px 10px;
-      border-radius: 20px;
+      color: var(--text2);
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .debt-amounts-row .debt-val {
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .debt-payments-label {
+      font-size: 13px;
+      color: var(--text2);
+      margin-bottom: 6px;
+    }
+
+    .debt-payment-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+      font-size: 13px;
+    }
+
+    .debt-payment-date { color: var(--text2); min-width: 48px; }
+    .debt-payment-amt { font-weight: 600; color: var(--green); flex: 1; }
+
+    .debt-payment-del {
+      background: none; border: none;
+      font-size: 13px; color: var(--text2);
+      cursor: pointer; touch-action: manipulation;
+      padding: 0; line-height: 1;
+    }
+
+    .debt-total-row {
       margin-top: 8px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .debt-log-btn {
+      margin-top: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: none;
+      border: 1.5px solid var(--blue);
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--blue);
+      cursor: pointer;
+      touch-action: manipulation;
+      font-family: inherit;
     }
 
     /* ── Overview ── */
@@ -640,8 +681,8 @@
       <span>＋</span> Add Debt
     </button>
     <div class="section-footer" id="debt-footer" style="gap:16px">
-      <span>Total Debt: <strong id="debt-total">$0</strong></span>
-      <span>Min Payments: <strong id="debt-min-total">$0/mo</strong></span>
+      <span>Total Outstanding: <strong id="debt-total">$0</strong></span>
+      <span>Total Due/Mo: <strong id="debt-min-total">$0/mo</strong></span>
     </div>
   </div>
 
@@ -760,23 +801,38 @@
   <div class="sheet-title">Add Debt</div>
   <div class="sheet-field">
     <div class="sheet-label">Name</div>
-    <input class="sheet-input" id="debt-name-input" type="text" placeholder="e.g. Car Loan" autocomplete="off">
+    <input class="sheet-input" id="debt-name-input" type="text" placeholder="e.g. Car Loan" autocomplete="off" style="font-size:16px">
   </div>
   <div class="sheet-field">
-    <div class="sheet-label">Starting Balance ($)</div>
-    <input class="sheet-input" id="debt-start-input" type="number" inputmode="decimal" placeholder="0.00" min="0" step="0.01">
+    <div class="sheet-label">Outstanding Amount ($)</div>
+    <input class="sheet-input" id="debt-outstanding-input" type="number" inputmode="decimal" placeholder="0.00" min="0" step="0.01" style="font-size:16px">
   </div>
   <div class="sheet-field">
-    <div class="sheet-label">Current Balance ($)</div>
-    <input class="sheet-input" id="debt-current-input" type="number" inputmode="decimal" placeholder="0.00" min="0" step="0.01">
-  </div>
-  <div class="sheet-field">
-    <div class="sheet-label">Min Monthly Payment ($)</div>
-    <input class="sheet-input" id="debt-min-input" type="number" inputmode="decimal" placeholder="0.00" min="0" step="0.01">
+    <div class="sheet-label">Monthly Payment Due ($)</div>
+    <input class="sheet-input" id="debt-monthlydue-input" type="number" inputmode="decimal" placeholder="0.00" min="0" step="0.01" style="font-size:16px">
   </div>
   <div class="sheet-actions">
     <button class="sheet-cancel" onclick="closeSheets()">Cancel</button>
     <button class="sheet-done" onclick="saveDebt()">Done</button>
+  </div>
+</div>
+
+<!-- ── DEBT PAY SHEET ── -->
+<div class="overlay" id="debt-pay-overlay" onclick="closeSheets()"></div>
+<div class="sheet" id="debt-pay-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Log Payment</div>
+  <div class="sheet-field">
+    <div class="sheet-label">Amount</div>
+    <input class="sheet-input" id="debt-pay-amount-input" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" style="font-size:16px">
+  </div>
+  <div class="sheet-field">
+    <div class="sheet-label">Date</div>
+    <input class="sheet-input" id="debt-pay-date-input" type="date" style="font-size:16px">
+  </div>
+  <div class="sheet-actions">
+    <button class="sheet-cancel" onclick="closeSheets()">Cancel</button>
+    <button class="sheet-done" onclick="saveDebtPayment()">Done</button>
   </div>
 </div>
 
@@ -832,14 +888,25 @@ function loadData() {
     raw.income.entries = [];
     delete raw.income.actual;
   }
-  // Month rollover — reset expenses.actual, paidDate, oneOffExpenses, and income entries
+  // Month rollover — reset expenses.actual, paidDate, oneOffExpenses, income entries, and debt payments
   if (raw.month !== ym) {
     (raw.expenses || []).forEach(e => { e.actual = 0; e.paidDate = null; });
     raw.oneOffExpenses = [];
     raw.income = raw.income || {};
     raw.income.entries = [];
+    (raw.debts || []).forEach(d => { d.payments = []; });
     raw.month = ym;
   }
+  // Migrate old debt fields to new model
+  (raw.debts || []).forEach(d => {
+    if (d.outstanding === undefined) {
+      d.outstanding = d.currentBalance || d.startBalance || 0;
+    }
+    if (d.monthlyDue === undefined) {
+      d.monthlyDue = d.minPayment || 0;
+    }
+    if (!d.payments) d.payments = [];
+  });
   // Backfill missing dueDay/paidDate fields
   (raw.expenses || []).forEach(e => {
     if (e.dueDay === undefined) e.dueDay = null;
@@ -935,11 +1002,11 @@ function renderAll() {
 }
 
 function totalMinPayments() {
-  return (data.debts || []).reduce((s, d) => s + (d.minPayment || 0), 0);
+  return (data.debts || []).reduce((s, d) => s + (d.monthlyDue || 0), 0);
 }
 
 function totalCurrentDebt() {
-  return (data.debts || []).reduce((s, d) => s + Math.max(0, d.currentBalance || 0), 0);
+  return (data.debts || []).reduce((s, d) => s + Math.max(0, d.outstanding || 0), 0);
 }
 
 function renderOverview() {
@@ -1514,7 +1581,7 @@ function openGoalSheet() {
 }
 
 function closeSheets() {
-  ['expense-overlay','expense-sheet','goal-overlay','goal-sheet','debt-overlay','debt-sheet','oneoff-overlay','oneoff-sheet','inc-overlay','inc-sheet'].forEach(id => {
+  ['expense-overlay','expense-sheet','goal-overlay','goal-sheet','debt-overlay','debt-sheet','debt-pay-overlay','debt-pay-sheet','oneoff-overlay','oneoff-sheet','inc-overlay','inc-sheet'].forEach(id => {
     document.getElementById(id).classList.remove('open');
   });
 }
@@ -1552,6 +1619,8 @@ function saveGoal() {
 }
 
 // ── Debt ──────────────────────────────────────────────────────────────────
+let activeDebtId = null;
+
 function startBankEdit() {
   if (inlineEditField === 'bankBalance') return;
   closeAllInlineEdits();
@@ -1620,21 +1689,32 @@ function renderDebt() {
       const card = document.createElement('div');
       card.className = 'debt-card';
 
-      const paidOff = (debt.currentBalance || 0) <= 0;
-      const pct = debt.startBalance > 0
-        ? clamp(((debt.startBalance - Math.max(0, debt.currentBalance)) / debt.startBalance) * 100, 0, 100)
-        : 0;
+      const payments = debt.payments || [];
+      const totalPaid = payments.reduce((s, p) => s + (p.amount || 0), 0);
+      const monthlyDue = debt.monthlyDue || 0;
 
-      let progressHtml;
-      if (paidOff) {
-        progressHtml = '<span class="paid-off-badge">PAID OFF ✓</span>';
+      let totalColor;
+      if (totalPaid === 0) totalColor = 'var(--text2)';
+      else if (totalPaid >= monthlyDue) totalColor = '#34c759';
+      else totalColor = '#ff9500';
+
+      // Payments list HTML
+      let paymentsHtml = '';
+      if (payments.length === 0) {
+        paymentsHtml = `<div style="color:var(--text2);font-size:13px;padding:2px 0 4px">No payments logged yet</div>`;
       } else {
-        progressHtml = `
-          <div class="progress-wrap">
-            <div class="progress-track">
-              <div class="progress-fill" style="background:#ff3b30;width:${pct}%"></div>
-            </div>
-          </div>`;
+        const sorted = payments.slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+        sorted.forEach(p => {
+          const [py, pm, pd] = p.date.split('-').map(Number);
+          const dt = new Date(py, pm - 1, pd);
+          const dateLabel = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          paymentsHtml += `
+            <div class="debt-payment-row">
+              <span class="debt-payment-date">${dateLabel}</span>
+              <span class="debt-payment-amt">${fmt(p.amount)}</span>
+              <button class="debt-payment-del" onclick="deleteDebtPayment('${debt.id}','${p.id}')" style="touch-action:manipulation">✕</button>
+            </div>`;
+        });
       }
 
       card.innerHTML = `
@@ -1642,12 +1722,16 @@ function renderDebt() {
           <div class="debt-name">${escHtml(debt.name)}</div>
           <button class="debt-delete-btn" onclick="deleteDebt('${debt.id}')" style="touch-action:manipulation">✕</button>
         </div>
-        ${progressHtml}
-        <div class="debt-stats">
-          <span>Started: ${fmt(debt.startBalance)}</span>
-          <span>Remaining: ${fmt(Math.max(0, debt.currentBalance))}</span>
+        <div class="debt-amounts-row">
+          <span>Outstanding: <span class="debt-val" id="debt-outstanding-${debt.id}" onclick="startDebtInlineEdit('${debt.id}','outstanding')">${fmt(debt.outstanding || 0)}</span></span>
+          <span>Due: <span class="debt-val" id="debt-monthlydue-${debt.id}" onclick="startDebtInlineEdit('${debt.id}','monthlydue')">${fmt(monthlyDue)}/mo</span></span>
         </div>
-        <div class="debt-min">Min Payment: ${fmt(debt.minPayment)}/mo</div>
+        <div class="debt-payments-label">Payments this month:</div>
+        ${paymentsHtml}
+        <div class="debt-total-row" style="color:${totalColor}">
+          Total paid: ${fmt(totalPaid)} of ${fmt(monthlyDue)} due
+        </div>
+        <button class="debt-log-btn" onclick="openDebtPaySheet('${debt.id}')" style="touch-action:manipulation">＋ Log Payment</button>
       `;
 
       list.appendChild(card);
@@ -1668,29 +1752,133 @@ function deleteDebt(id) {
 }
 
 function openDebtSheet() {
-  document.getElementById('debt-name-input').value    = '';
-  document.getElementById('debt-start-input').value   = '';
-  document.getElementById('debt-current-input').value = '';
-  document.getElementById('debt-min-input').value     = '';
+  document.getElementById('debt-name-input').value        = '';
+  document.getElementById('debt-outstanding-input').value = '';
+  document.getElementById('debt-monthlydue-input').value  = '';
   document.getElementById('debt-overlay').classList.add('open');
   document.getElementById('debt-sheet').classList.add('open');
   setTimeout(() => document.getElementById('debt-name-input').focus(), 350);
 }
 
 function saveDebt() {
-  const name    = document.getElementById('debt-name-input').value.trim();
-  const start   = parseFloat(document.getElementById('debt-start-input').value)   || 0;
-  const current = parseFloat(document.getElementById('debt-current-input').value) || 0;
-  const min     = parseFloat(document.getElementById('debt-min-input').value)     || 0;
+  const name       = document.getElementById('debt-name-input').value.trim();
+  const outstanding = parseFloat(document.getElementById('debt-outstanding-input').value) || 0;
+  const monthlyDue  = parseFloat(document.getElementById('debt-monthlydue-input').value)  || 0;
   if (!name) {
     document.getElementById('debt-name-input').focus();
     return;
   }
-  data.debts.push({ id: uid(), name, startBalance: start, currentBalance: current, minPayment: min });
+  data.debts.push({ id: uid(), name, outstanding, monthlyDue, payments: [] });
   saveData(data);
   closeSheets();
   renderDebt();
   renderOverview();
+}
+
+function openDebtPaySheet(debtId) {
+  activeDebtId = debtId;
+  document.getElementById('debt-pay-amount-input').value = '';
+  const today = new Date();
+  const mm = String(today.getMonth()+1).padStart(2,'0');
+  const dd = String(today.getDate()).padStart(2,'0');
+  document.getElementById('debt-pay-date-input').value = `${today.getFullYear()}-${mm}-${dd}`;
+  document.getElementById('debt-pay-overlay').classList.add('open');
+  document.getElementById('debt-pay-sheet').classList.add('open');
+  setTimeout(() => document.getElementById('debt-pay-amount-input').focus(), 350);
+}
+
+function saveDebtPayment() {
+  const amount = parseFloat(document.getElementById('debt-pay-amount-input').value);
+  const dateValue = document.getElementById('debt-pay-date-input').value;
+  if (!amount || isNaN(amount) || amount <= 0) {
+    document.getElementById('debt-pay-amount-input').focus();
+    return;
+  }
+  if (!dateValue) {
+    document.getElementById('debt-pay-date-input').focus();
+    return;
+  }
+  const debt = (data.debts || []).find(d => d.id === activeDebtId);
+  if (debt) {
+    if (!debt.payments) debt.payments = [];
+    debt.payments.push({ id: uid(), amount, date: dateValue });
+    saveData(data);
+  }
+  closeSheets();
+  renderDebt();
+  renderOverview();
+}
+
+function deleteDebtPayment(debtId, payId) {
+  const debt = (data.debts || []).find(d => d.id === debtId);
+  if (debt) {
+    debt.payments = (debt.payments || []).filter(p => p.id !== payId);
+    saveData(data);
+    renderDebt();
+    renderOverview();
+  }
+}
+
+// Inline edit for outstanding/monthlydue on debt cards
+let debtInlineEditId = null;
+let debtInlineEditField = null;
+
+function startDebtInlineEdit(debtId, field) {
+  // If already editing this field, ignore
+  if (debtInlineEditId === debtId && debtInlineEditField === field) return;
+  closeDebtInlineEdit();
+
+  debtInlineEditId = debtId;
+  debtInlineEditField = field;
+
+  const debt = (data.debts || []).find(d => d.id === debtId);
+  if (!debt) return;
+
+  const elId = field === 'outstanding' ? `debt-outstanding-${debtId}` : `debt-monthlydue-${debtId}`;
+  const el = document.getElementById(elId);
+  if (!el) return;
+
+  const currentVal = field === 'outstanding' ? (debt.outstanding || 0) : (debt.monthlyDue || 0);
+
+  const inp = document.createElement('input');
+  inp.type = 'number';
+  inp.inputMode = 'decimal';
+  inp.style.cssText = 'width:90px;height:28px;font-size:13px;font-family:inherit;border:1.5px solid var(--blue);border-radius:6px;padding:0 6px;color:var(--text);background:var(--bg);text-align:right;outline:none;';
+  inp.value = currentVal || '';
+  inp.placeholder = '0';
+  inp.id = `debt-inline-input-${debtId}-${field}`;
+
+  el.replaceWith(inp);
+  inp.focus();
+  inp.select();
+
+  const save = () => saveDebtInlineEdit(debtId, field);
+  inp.addEventListener('blur', save);
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); save(); }
+    if (e.key === 'Escape') { closeDebtInlineEdit(); renderDebt(); }
+  });
+}
+
+function saveDebtInlineEdit(debtId, field) {
+  const inp = document.getElementById(`debt-inline-input-${debtId}-${field}`);
+  if (!inp) return;
+  const val = parseFloat(inp.value) || 0;
+  const debt = (data.debts || []).find(d => d.id === debtId);
+  if (debt) {
+    if (field === 'outstanding') debt.outstanding = val;
+    else debt.monthlyDue = val;
+    saveData(data);
+  }
+  debtInlineEditId = null;
+  debtInlineEditField = null;
+  renderDebt();
+  renderOverview();
+}
+
+function closeDebtInlineEdit() {
+  debtInlineEditId = null;
+  debtInlineEditField = null;
 }
 
 // Close sheets on Escape
