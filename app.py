@@ -8756,13 +8756,28 @@ def portal_invoices(user):
         # Fetch all invoices and filter in Python (linked field formula trick)
         inv_records = at_get_all(
             MANUAL_ORDERS_TABLE_ID, read_token,
-            fields=["Document ID", "Order ID", "Date", "Adj. Unit Price (from MO Line Items)",
+            fields=["Document ID", "Order ID", "Date", "MO Line Items",
                     "Sales Order Status", "Go-to PDF", "Customer"],
             formula='{Order Type}="Invoice"',
         )
         # Filter to this customer
         inv_records = [r for r in inv_records
                        if customer_id in r.get("fields", {}).get("Customer", [])]
+
+        # Batch-fetch all line items to calculate totals (Adj. Unit Price is a chained lookup — doesn't work)
+        all_li_ids = []
+        for rec in inv_records:
+            all_li_ids.extend(rec.get("fields", {}).get("MO Line Items", []))
+        li_total_map = {}  # line_item_id → Dynamic Line Item Total
+        if all_li_ids:
+            for i in range(0, len(all_li_ids), 100):
+                batch = all_li_ids[i:i+100]
+                formula = "OR(" + ",".join(f'RECORD_ID()="{lid}"' for lid in batch) + ")"
+                li_recs = at_get_all(MO_LINE_ITEMS_TABLE_ID, read_token,
+                                     fields=["Dynamic Line Item Total"],
+                                     formula=formula)
+                for lr in li_recs:
+                    li_total_map[lr["id"]] = float(lr.get("fields", {}).get("Dynamic Line Item Total") or 0)
 
         # Fetch tracking from SO Tracking Link (keyed by SO-{order_id})
         tracking_recs = at_get_all(
@@ -8779,8 +8794,8 @@ def portal_invoices(user):
             order_id   = str(f.get("Order ID", "")).strip()
             so_number  = f"SO-{order_id}" if order_id else ""
             inv_number = f.get("Document ID", f"IN-{order_id}")
-            adj_prices = f.get("Adj. Unit Price (from MO Line Items)", [])
-            total      = round(sum(float(p or 0) for p in adj_prices), 2)
+            li_ids     = f.get("MO Line Items", [])
+            total      = round(sum(li_total_map.get(lid, 0) for lid in li_ids), 2)
             tracking   = tracking_map.get(so_number, "")
             go_to_pdf_field = f.get("Go-to PDF") or {}
             go_to_pdf_url   = go_to_pdf_field.get("url", "") if isinstance(go_to_pdf_field, dict) else ""
