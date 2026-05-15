@@ -8652,10 +8652,11 @@ def portal_admin_convert_to_invoice(user, record_id):
         # Create Invoice record
         inv_body = {
             "fields": {
-                "Order Type":         "Invoice",
-                "Order ID":           order_id_str,
-                "Date":               _today_utc().isoformat(),
-                "Sales Order Status": "Approved",
+                "Order Type":                  "Invoice",
+                "Order ID":                    order_id_str,
+                "Date":                        _today_utc().isoformat(),
+                "Sales Order Status":          "Approved",
+                "Ready for ShipStation (SOs)": False,  # invoices must never sync to ShipStation
             }
         }
         if customer_ids:
@@ -9166,10 +9167,11 @@ def admin_convert_to_invoice(record_id):
         # Create Invoice record
         inv_body = {
             "fields": {
-                "Order Type":         "Invoice",
-                "Order ID":           order_id_str,
-                "Date":               _today_utc().isoformat(),
-                "Sales Order Status": "Approved",
+                "Order Type":                "Invoice",
+                "Order ID":                  order_id_str,
+                "Date":                      _today_utc().isoformat(),
+                "Sales Order Status":        "Approved",
+                "Ready for ShipStation (SOs)": False,  # invoices must never sync to ShipStation
             }
         }
         if customer_ids:
