@@ -235,6 +235,25 @@
             </div>
           </div>
 
+          ${(inv.stripeCcUrl || inv.stripeAchUrl) ? `
+          <div style="padding:20px 36px;border-top:1px solid #eee;background:#f9fafb;">
+            <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#8a99aa;margin-bottom:12px;">Pay Online</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+              ${inv.stripeCcUrl ? `
+                <a href="${inv.stripeCcUrl}" target="_blank" rel="noopener"
+                  style="display:inline-flex;align-items:center;gap:7px;background:#1B2438;color:#fff;padding:10px 20px;border-radius:7px;font-size:0.88rem;font-weight:700;text-decoration:none;">
+                  💳 Pay by Credit Card
+                  ${inv.stripeCcStatus === 'Paid' ? '<span style="background:#1a7a3c;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:10px;margin-left:4px;">PAID</span>' : ''}
+                </a>` : ''}
+              ${inv.stripeAchUrl ? `
+                <a href="${inv.stripeAchUrl}" target="_blank" rel="noopener"
+                  style="display:inline-flex;align-items:center;gap:7px;background:#5B7FA0;color:#fff;padding:10px 20px;border-radius:7px;font-size:0.88rem;font-weight:700;text-decoration:none;">
+                  🏦 Pay by ACH / Bank Transfer
+                  ${inv.stripeAchStatus === 'Paid' ? '<span style="background:#1a7a3c;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:10px;margin-left:4px;">PAID</span>' : ''}
+                </a>` : ''}
+            </div>
+          </div>` : ''}
+
           <div class="inv-footer">
             Payment terms: Net 30 from invoice date. <strong>A 1.5% monthly late fee applies to unpaid balances after 30 days.</strong><br>
             Questions? Contact us at <a href="mailto:info@bluealpha.us" style="color:#1B2438;">info@bluealpha.us</a> or 678-961-3304.

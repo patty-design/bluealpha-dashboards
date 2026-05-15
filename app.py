@@ -8902,20 +8902,29 @@ def invoice_detail(record_id):
 
         subtotal = round(sum(li["total"] for li in line_items), 2)
 
+        stripe_cc_url  = fields.get("Stripe Invoice URL (CC)", "")
+        stripe_ach_url = fields.get("Stripe Invoice URL (ACH)", "")
+        stripe_cc_status  = fields.get("Stripe Invoice Status (CC)", "")
+        stripe_ach_status = fields.get("Stripe Invoice Status (ACH)", "")
+
         return Response(json.dumps({
-            "invNumber":  inv_number,
-            "soNumber":   so_number,
-            "date":       date_str,
-            "poNumber":   po_number,
-            "orgName":    org_name,
-            "contact":    contact,
-            "email":      email,
-            "addr1":      addr1,
-            "addr2":      addr2,
-            "tracking":   tracking,
-            "shipDate":   ship_date,
-            "lineItems":  line_items,
-            "subtotal":   subtotal,
+            "invNumber":       inv_number,
+            "soNumber":        so_number,
+            "date":            date_str,
+            "poNumber":        po_number,
+            "orgName":         org_name,
+            "contact":         contact,
+            "email":           email,
+            "addr1":           addr1,
+            "addr2":           addr2,
+            "tracking":        tracking,
+            "shipDate":        ship_date,
+            "lineItems":       line_items,
+            "subtotal":        subtotal,
+            "stripeCcUrl":     stripe_cc_url,
+            "stripeAchUrl":    stripe_ach_url,
+            "stripeCcStatus":  stripe_cc_status,
+            "stripeAchStatus": stripe_ach_status,
         }), headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
