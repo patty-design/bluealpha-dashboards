@@ -589,6 +589,8 @@
       </div>
     </div>
 
+    <div id="income-min-section"></div>
+
     <div class="section-header">Tip</div>
     <div class="card">
       <p class="tip-text">Update "Received" as you get paid. Your goal is your expected monthly total.</p>
@@ -606,6 +608,8 @@
       <span>Budgeted: <strong id="exp-total-budgeted">$0</strong></span>
       <span>Spent: <strong id="exp-total-actual">$0</strong></span>
     </div>
+
+    <div id="oneoff-section"></div>
   </div>
 
   <!-- ── DEBT ── -->
@@ -710,6 +714,25 @@
   </div>
 </div>
 
+<!-- ── ONE-OFF EXPENSE SHEET ── -->
+<div class="overlay" id="oneoff-overlay" onclick="closeSheets()"></div>
+<div class="sheet" id="oneoff-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Add One-Time Expense</div>
+  <div class="sheet-field">
+    <div class="sheet-label">Name</div>
+    <input class="sheet-input" id="oneoff-name-input" type="text" placeholder="e.g. Car repair" autocomplete="off" style="font-size:16px">
+  </div>
+  <div class="sheet-field">
+    <div class="sheet-label">Amount ($)</div>
+    <input class="sheet-input" id="oneoff-amount-input" type="number" inputmode="decimal" placeholder="0.00" min="0" step="0.01" style="font-size:16px">
+  </div>
+  <div class="sheet-actions">
+    <button class="sheet-cancel" onclick="closeSheets()">Cancel</button>
+    <button class="sheet-done" onclick="saveOneOff()">Done</button>
+  </div>
+</div>
+
 <!-- ── DEBT SHEET ── -->
 <div class="overlay" id="debt-overlay" onclick="closeSheets()"></div>
 <div class="sheet" id="debt-sheet">
@@ -757,12 +780,14 @@ function loadData() {
     goals: [],
     bankBalance: 0,
     debts: [],
+    oneOffExpenses: [],
     month: ym
   };
   if (!raw) return def;
-  // Month rollover — reset expenses.actual
+  // Month rollover — reset expenses.actual and oneOffExpenses
   if (raw.month !== ym) {
     (raw.expenses || []).forEach(e => { e.actual = 0; });
+    raw.oneOffExpenses = [];
     raw.month = ym;
   }
   return {
@@ -771,6 +796,7 @@ function loadData() {
     goals: raw.goals || [],
     bankBalance: raw.bankBalance || 0,
     debts: raw.debts || [],
+    oneOffExpenses: raw.oneOffExpenses || [],
     month: raw.month
   };
 }
@@ -855,9 +881,11 @@ function renderOverview() {
   const income = data.income;
   const totalBudgeted = data.expenses.reduce((s, e) => s + (e.budgeted || 0), 0);
   const totalActual   = data.expenses.reduce((s, e) => s + (e.actual  || 0), 0);
+  const oneOffTotal   = (data.oneOffExpenses || []).reduce((s, e) => s + (e.amount || 0), 0);
   const savings = totalMonthlySavings();
   const minPayments = totalMinPayments();
-  const free = (income.actual || 0) - totalActual - savings - minPayments;
+  const totalSpent = totalActual + oneOffTotal;
+  const free = (income.actual || 0) - totalActual - oneOffTotal - savings - minPayments;
 
   document.getElementById('overview-month').textContent = monthLabel();
 
@@ -869,9 +897,9 @@ function renderOverview() {
   incBar.style.background = 'var(--green)';
 
   document.getElementById('ov-exp-budgeted').textContent = fmt(totalBudgeted);
-  document.getElementById('ov-exp-actual').textContent   = fmt(totalActual);
-  const expPct = totalBudgeted > 0 ? clamp((totalActual / totalBudgeted) * 100, 0, 100) : 0;
-  const expOver = totalActual > totalBudgeted;
+  document.getElementById('ov-exp-actual').textContent   = fmt(totalSpent);
+  const expPct = totalBudgeted > 0 ? clamp((totalSpent / totalBudgeted) * 100, 0, 100) : 0;
+  const expOver = totalSpent > totalBudgeted;
   const expBar = document.getElementById('ov-exp-bar');
   expBar.style.width = (totalBudgeted > 0 ? expPct : 0) + '%';
   expBar.style.background = expOver ? 'var(--red)' : 'var(--green)';
@@ -895,6 +923,48 @@ let inlineEditField = null;
 function renderIncome() {
   document.getElementById('inc-goal-display').textContent   = fmt(data.income.goal);
   document.getElementById('inc-actual-display').textContent = fmt(data.income.actual);
+  renderMinimumNeeded();
+}
+
+function renderMinimumNeeded() {
+  const section = document.getElementById('income-min-section');
+  if (!section) return;
+
+  const budgetedExpenses = data.expenses.reduce((s, e) => s + (e.budgeted || 0), 0);
+  const monthlySavings   = totalMonthlySavings();
+  const minDebtPayments  = totalMinPayments();
+  const totalNeeded      = budgetedExpenses + monthlySavings + minDebtPayments;
+  const goal             = data.income.goal || 0;
+  const isOk             = goal >= totalNeeded;
+  const diff             = Math.abs(goal - totalNeeded);
+
+  section.innerHTML = `
+    <div class="section-header">Minimum Needed</div>
+    <div class="card">
+      <div class="card-row">
+        <span style="font-size:0.85rem;color:var(--text2)">Budgeted Expenses</span>
+        <span style="font-size:0.9rem;color:var(--text)">${fmt(budgetedExpenses)}/mo</span>
+      </div>
+      <div class="card-row">
+        <span style="font-size:0.85rem;color:var(--text2)">Monthly Savings</span>
+        <span style="font-size:0.9rem;color:var(--text)">${fmt(monthlySavings)}/mo</span>
+      </div>
+      <div class="card-row">
+        <span style="font-size:0.85rem;color:var(--text2)">Min Debt Payments</span>
+        <span style="font-size:0.9rem;color:var(--text)">${fmt(minDebtPayments)}/mo</span>
+      </div>
+      <div style="height:1px;background:var(--bg);margin:4px -16px 0"></div>
+      <div class="card-row">
+        <span style="font-size:0.85rem;color:var(--text2);font-weight:700">Total Needed</span>
+        <span style="font-size:0.9rem;color:var(--text);font-weight:700">${fmt(totalNeeded)}/mo</span>
+      </div>
+    </div>
+    <div style="padding:2px 20px 14px;font-size:14px;color:${isOk ? 'var(--green)' : '#ff9500'}">
+      ${isOk
+        ? '✓ Your income goal covers everything'
+        : `⚠ Your income goal is ${fmt(diff)} short`}
+    </div>
+  `;
 }
 
 function startInlineEdit(field) {
@@ -1068,6 +1138,74 @@ function renderExpenses() {
   const totalActual   = data.expenses.reduce((s,e) => s + (e.actual||0),   0);
   document.getElementById('exp-total-budgeted').textContent = fmt(totalBudgeted);
   document.getElementById('exp-total-actual').textContent   = fmt(totalActual);
+
+  renderOneOffExpenses();
+}
+
+// ── One-Off Expenses ──────────────────────────────────────────────────────
+function renderOneOffExpenses() {
+  const section = document.getElementById('oneoff-section');
+  if (!section) return;
+
+  const oneOffs    = data.oneOffExpenses || [];
+  const oneOffTotal = oneOffs.reduce((s, e) => s + (e.amount || 0), 0);
+
+  let html = `<div class="section-header">One-Time This Month</div>`;
+
+  if (oneOffs.length === 0) {
+    html += `<div style="padding:8px 20px 4px;font-size:14px;color:var(--text2)">No one-time expenses this month</div>`;
+  } else {
+    oneOffs.forEach(oe => {
+      html += `
+        <div class="expense-card">
+          <div class="expense-row">
+            <span style="flex:1;font-size:0.9rem;font-weight:700">${escHtml(oe.name)}</span>
+            <span style="font-size:0.9rem;font-weight:700;color:#ff3b30;margin-right:6px">${fmt(oe.amount)}</span>
+            <button class="expense-delete-btn" onclick="deleteOneOff('${oe.id}')" style="touch-action:manipulation">✕</button>
+          </div>
+        </div>`;
+    });
+  }
+
+  html += `
+    <button class="add-btn" onclick="openOneOffSheet()" style="touch-action:manipulation;margin-top:8px">
+      <span>＋</span> Add One-Time Expense
+    </button>
+    <div style="padding:10px 20px 4px;font-size:13px;color:#ff3b30;font-weight:600">
+      One-Time Total: ${fmt(oneOffTotal)}
+    </div>`;
+
+  section.innerHTML = html;
+}
+
+function openOneOffSheet() {
+  document.getElementById('oneoff-name-input').value   = '';
+  document.getElementById('oneoff-amount-input').value = '';
+  document.getElementById('oneoff-overlay').classList.add('open');
+  document.getElementById('oneoff-sheet').classList.add('open');
+  setTimeout(() => document.getElementById('oneoff-name-input').focus(), 350);
+}
+
+function saveOneOff() {
+  const name   = document.getElementById('oneoff-name-input').value.trim();
+  const amount = parseFloat(document.getElementById('oneoff-amount-input').value) || 0;
+  if (!name) {
+    document.getElementById('oneoff-name-input').focus();
+    return;
+  }
+  if (!data.oneOffExpenses) data.oneOffExpenses = [];
+  data.oneOffExpenses.push({ id: uid(), name, amount });
+  saveData(data);
+  closeSheets();
+  renderOneOffExpenses();
+  renderOverview();
+}
+
+function deleteOneOff(id) {
+  data.oneOffExpenses = (data.oneOffExpenses || []).filter(e => e.id !== id);
+  saveData(data);
+  renderOneOffExpenses();
+  renderOverview();
 }
 
 function saveExpenseActual(id) {
@@ -1168,7 +1306,7 @@ function openGoalSheet() {
 }
 
 function closeSheets() {
-  ['expense-overlay','expense-sheet','goal-overlay','goal-sheet','debt-overlay','debt-sheet'].forEach(id => {
+  ['expense-overlay','expense-sheet','goal-overlay','goal-sheet','debt-overlay','debt-sheet','oneoff-overlay','oneoff-sheet'].forEach(id => {
     document.getElementById(id).classList.remove('open');
   });
 }
