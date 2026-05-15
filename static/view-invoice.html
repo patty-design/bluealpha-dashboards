@@ -72,15 +72,18 @@
   </style>
 </head>
 <body>
-  <div class="page-header">
+  <div class="page-header" id="pageHeader">
     <span class="brand">BLUE ALPHA</span>
     <span></span>
   </div>
 
   <div class="container">
-    <div style="margin-bottom:12px;">
-      <button onclick="history.back()" style="background:none;border:none;cursor:pointer;color:#1B2438;font-size:0.9rem;font-weight:600;display:flex;align-items:center;gap:6px;padding:0;">
+    <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
+      <button id="backBtn" onclick="goBack()" style="background:none;border:none;cursor:pointer;color:#1B2438;font-size:0.9rem;font-weight:600;display:flex;align-items:center;gap:6px;padding:0;">
         ← Back to Invoices
+      </button>
+      <button onclick="window.print()" style="background:#1B2438;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:0.85rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
+        ⬇ Download PDF
       </button>
     </div>
     <div class="card" id="invoiceCard">
@@ -88,8 +91,37 @@
     </div>
   </div>
 
+  <style>
+    @media print {
+      .page-header, #backBtn, button { display: none !important; }
+      body { background: #fff; }
+      .container { margin: 0; padding: 0; max-width: 100%; }
+      .card { box-shadow: none; }
+    }
+  </style>
+
   <script>
     const recordId = location.pathname.split('/').pop();
+    const inPortal = window.self !== window.top;
+
+    // Hide header when inside portal iframe
+    if (inPortal) {
+      document.getElementById('pageHeader').style.display = 'none';
+    }
+
+    function goBack() {
+      if (inPortal) {
+        window.parent.postMessage({ type: 'closeViewInvoice' }, '*');
+      } else {
+        history.back();
+      }
+    }
+
+    function reportHeight() {
+      if (inPortal) {
+        window.parent.postMessage({ type: 'viewInvoiceHeight', height: document.body.scrollHeight }, '*');
+      }
+    }
 
     function fmt(s) {
       if (!s) return '—';
@@ -211,6 +243,7 @@
       } catch (e) {
         card.innerHTML = `<div class="error-box"><h2>Error</h2><p>${esc(e.message)}</p></div>`;
       }
+      setTimeout(reportHeight, 100);
     }
 
     load();

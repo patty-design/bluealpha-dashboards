@@ -342,6 +342,18 @@
         scrolling="no"></iframe>
     </div>
 
+    <!-- View Invoice Panel (not a nav tab — shown when View → is clicked) -->
+    <div class="tab-panel" id="tab-view-invoice">
+      <div style="margin-bottom:12px;">
+        <button onclick="closeViewInvoice()" style="background:none;border:none;cursor:pointer;color:var(--navy);font-size:0.9rem;font-weight:600;display:flex;align-items:center;gap:6px;padding:0;">
+          ← Back to Invoices
+        </button>
+      </div>
+      <iframe id="viewInvoiceFrame" src=""
+        style="width:100%;border:none;display:block;min-height:600px;"
+        scrolling="no"></iframe>
+    </div>
+
     <!-- Our Orders Tab -->
     <div class="tab-panel" id="tab-our-orders">
       <div class="card">
@@ -676,14 +688,14 @@
           el.innerHTML = '<div class="empty-state"><p>No invoices yet.</p></div>';
           return;
         }
-        el.innerHTML = '<table><thead><tr><th>Invoice #</th><th>Sales Order</th><th>Date</th><th>Total</th><th>Tracking</th><th>PDF</th></tr></thead><tbody>' +
+        el.innerHTML = '<table><thead><tr><th>Invoice #</th><th>Sales Order</th><th>Date</th><th>Total</th><th>Tracking</th><th></th></tr></thead><tbody>' +
           data.invoices.map(inv => `<tr>
             <td><strong>${inv.inv_number || '—'}</strong></td>
             <td>${inv.so_number || '—'}</td>
             <td>${fmt(inv.date)}</td>
             <td>${money(inv.total)}</td>
             <td>${inv.tracking ? `<a class="tracking-info" href="${trackingUrl(inv.tracking)}" target="_blank" rel="noopener">${inv.tracking}</a>` : '<span style="color:var(--text-muted)">—</span>'}</td>
-            <td>${inv.go_to_pdf ? `<a class="btn-sm" href="${inv.go_to_pdf}" target="_blank" rel="noopener">PDF</a>` : '—'}</td>
+            <td><button class="btn-sm" onclick="openViewInvoice('${inv.record_id}')">View →</button></td>
           </tr>`).join('') +
           '</tbody></table>';
       } catch (e) {
@@ -1015,6 +1027,11 @@
       if (frame) frame.style.height = (e.data.height + 32) + 'px';
     }
     if (e.data && e.data.type === 'closeViewQuote') { closeViewQuote(); }
+    if (e.data && e.data.type === 'viewInvoiceHeight') {
+      const frame = document.getElementById('viewInvoiceFrame');
+      if (frame) frame.style.height = (e.data.height + 32) + 'px';
+    }
+    if (e.data && e.data.type === 'closeViewInvoice') { closeViewInvoice(); }
     if (e.data && e.data.type === 'quoteAccepted') {
       _quotesCache = null; _ordersCache = null;
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -1068,6 +1085,23 @@
     document.getElementById('viewQuoteFrame').src = '';
     if (_viewReturnTab === 'our-orders') loadOrders();
     else loadQuotes();
+  }
+
+  function openViewInvoice(recordId) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    const frame = document.getElementById('viewInvoiceFrame');
+    frame.src = '/view-invoice/' + recordId + '?from=portal';
+    document.getElementById('tab-view-invoice').classList.add('active');
+  }
+
+  function closeViewInvoice() {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelector('[data-tab="invoices"]').classList.add('active');
+    document.getElementById('tab-invoices').classList.add('active');
+    document.getElementById('viewInvoiceFrame').src = '';
+    loadInvoices();
   }
 
   async function duplicateQuote(recordId, btn) {
