@@ -4095,21 +4095,43 @@ def _fetch_quote_data(record_id):
 
     subtotal = sum(i["qty"] * i["unitPrice"] for i in line_items)
 
+    # For Sales Orders: check if an invoice exists for this order_id
+    inv_record_id = ""
+    inv_number    = ""
+    if order_type == "Sales Order" and order_id:
+        try:
+            inv_formula = f'AND({{Order Type}}="Invoice",{{Order ID}}="{order_id}")'
+            inv_r = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}",
+                headers=at_headers(token),
+                params={"filterByFormula": inv_formula, "fields[]": ["Document ID"], "maxRecords": 1},
+                timeout=15,
+            )
+            if inv_r.status_code == 200:
+                inv_recs = inv_r.json().get("records", [])
+                if inv_recs:
+                    inv_record_id = inv_recs[0]["id"]
+                    inv_number    = inv_recs[0].get("fields", {}).get("Document ID", f"IN-{order_id}")
+        except Exception:
+            pass
+
     return {
-        "recordId":    record_id,
-        "orderId":     order_id,
-        "quoteNumber": quote_number,
-        "date":        date_str,
-        "expiryDate":  expiry_str,
-        "isExpired":   is_expired,
-        "isAccepted":  is_accepted,
-        "poNumber":    po_number,
-        "notes":       notes,
-        "customer":    customer,
-        "lineItems":   line_items,
-        "subtotal":    round(subtotal, 2),
-        "shipping":    0,
-        "total":       round(subtotal, 2),
+        "recordId":      record_id,
+        "orderId":       order_id,
+        "quoteNumber":   quote_number,
+        "date":          date_str,
+        "expiryDate":    expiry_str,
+        "isExpired":     is_expired,
+        "isAccepted":    is_accepted,
+        "poNumber":      po_number,
+        "notes":         notes,
+        "customer":      customer,
+        "lineItems":     line_items,
+        "subtotal":      round(subtotal, 2),
+        "shipping":      0,
+        "total":         round(subtotal, 2),
+        "invRecordId":   inv_record_id,
+        "invNumber":     inv_number,
     }
 
 

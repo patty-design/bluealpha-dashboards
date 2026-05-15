@@ -762,6 +762,14 @@ function render() {
 
   // Quote number & org
   document.getElementById('quoteNumber').textContent = q.quoteNumber;
+  if (window.viewingAsOrder && q.invRecordId) {
+    const invLink = document.createElement('a');
+    invLink.href = `/view-invoice/${q.invRecordId}`;
+    invLink.textContent = `View Invoice ${q.invNumber || ''}`.trim();
+    invLink.style.cssText = 'color:#adc4e0;font-size:0.82rem;text-decoration:underline;display:inline-block;margin-top:4px;';
+    document.getElementById('quoteNumber').appendChild(document.createElement('br'));
+    document.getElementById('quoteNumber').appendChild(invLink);
+  }
   document.getElementById('quoteOrg').textContent    = q.customer?.orgName || '';
 
   // Doc type label
