@@ -989,7 +989,7 @@
               ${items.map((item, i) => `
                 <tr data-idx="${i}" style="border-bottom:1px solid #eee;">
                   <td style="padding:8px;text-align:center;">
-                    <input type="checkbox" class="inv-check" data-idx="${i}" checked
+                    <input type="checkbox" class="inv-check" data-idx="${i}" ${item.defaultChecked === false ? '' : 'checked'}
                       style="width:16px;height:16px;cursor:pointer;" onchange="updateInvoiceRow(${i})">
                   </td>
                   <td style="padding:8px;">${esc(item.name)}</td>
@@ -1117,23 +1117,21 @@
       return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
   </script>
-</body>
-</html>
-<!-- Invoice Item-Selection Modal -->
-<div id="invoiceModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
-  <div style="background:#fff;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,0.22);max-width:680px;width:94%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">
-    <!-- Header -->
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 14px;border-bottom:1px solid #e5e5e5;">
-      <h3 id="invoiceModalTitle" style="margin:0;font-size:1.05rem;color:#1B2438;font-weight:700;"></h3>
-      <button onclick="closeInvoiceModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#999;line-height:1;padding:0 4px;" title="Close">&times;</button>
-    </div>
-    <!-- Body -->
-    <div id="invoiceModalBody" style="padding:20px 22px;overflow-y:auto;flex:1;"></div>
-    <!-- Footer -->
-    <div style="padding:14px 22px;border-top:1px solid #e5e5e5;display:flex;justify-content:flex-end;gap:10px;">
-      <button onclick="closeInvoiceModal()" style="padding:9px 20px;border:1px solid #ccc;border-radius:6px;background:#f5f5f5;cursor:pointer;font-size:0.9rem;font-weight:600;color:#555;">Cancel</button>
-      <button id="invoiceModalSubmit" onclick="submitInvoiceModal()" disabled
-        style="padding:9px 22px;border:none;border-radius:6px;background:#1B2438;color:#fff;cursor:pointer;font-size:0.9rem;font-weight:700;">Create Invoice</button>
+
+  <!-- Invoice Item-Selection Modal -->
+  <div id="invoiceModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,0.22);max-width:680px;width:94%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 14px;border-bottom:1px solid #e5e5e5;">
+        <h3 id="invoiceModalTitle" style="margin:0;font-size:1.05rem;color:#1B2438;font-weight:700;"></h3>
+        <button onclick="closeInvoiceModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#999;line-height:1;padding:0 4px;" title="Close">&times;</button>
+      </div>
+      <div id="invoiceModalBody" style="padding:20px 22px;overflow-y:auto;flex:1;"></div>
+      <div style="padding:14px 22px;border-top:1px solid #e5e5e5;display:flex;justify-content:flex-end;gap:10px;">
+        <button onclick="closeInvoiceModal()" style="padding:9px 20px;border:1px solid #ccc;border-radius:6px;background:#f5f5f5;cursor:pointer;font-size:0.9rem;font-weight:600;color:#555;">Cancel</button>
+        <button id="invoiceModalSubmit" onclick="submitInvoiceModal()" disabled
+          style="padding:9px 22px;border:none;border-radius:6px;background:#1B2438;color:#fff;cursor:pointer;font-size:0.9rem;font-weight:700;">Create Invoice</button>
+      </div>
     </div>
   </div>
-</div>
+</body>
+</html>
