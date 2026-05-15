@@ -3088,6 +3088,10 @@ def awaiting_shipment():
     return Response(json.dumps(result), headers=cors_headers, mimetype="application/json")
 
 
+@app.route("/budget")
+def budget_page():
+    return send_from_directory("static", "budget.html")
+
 @app.route("/exchange")
 def exchange_portal():
     return send_from_directory("static", "exchange.html")

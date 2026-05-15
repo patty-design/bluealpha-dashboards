@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#f2f2f7">
+  <title>Budget</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f2f2f7;
+      --card: #ffffff;
+      --green: #34c759;
+      --red: #ff3b30;
+      --blue: #007aff;
+      --text: #1c1c1e;
+      --text2: #8e8e93;
+      --border: rgba(0,0,0,0.08);
+      --tab-h: 56px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    /* ── Layout ── */
+    #app { display: flex; flex-direction: column; height: 100%; height: 100dvh; }
+
+    .screen {
+      display: none;
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 16px);
+    }
+    .screen.active { display: block; }
+
+    /* ── Section headers ── */
+    .section-header {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text2);
+      padding: 18px 20px 6px;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      margin: 0 16px 12px;
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+
+    .card-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 44px;
+      padding: 6px 0;
+    }
+
+    .card-divider {
+      height: 1px;
+      background: var(--bg);
+      margin: 0 -16px;
+    }
+
+    /* ── Progress bars ── */
+    .progress-wrap { margin-top: 8px; }
+    .progress-track {
+      height: 6px;
+      background: var(--bg);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+      max-width: 100%;
+    }
+
+    /* ── Tab bar ── */
+    #tab-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0; right: 0;
+      height: calc(var(--tab-h) + env(safe-area-inset-bottom));
+      padding-bottom: env(safe-area-inset-bottom);
+      background: rgba(242,242,247,0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(0,0,0,0.1);
+      display: flex;
+      align-items: flex-start;
+      z-index: 100;
+    }
+
+    .tab-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: var(--tab-h);
+      gap: 2px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      padding: 0;
+    }
+
+    .tab-icon { font-size: 22px; line-height: 1; }
+    .tab-label { font-size: 10px; font-weight: 500; color: var(--text2); }
+
+    .tab-btn.active .tab-label { color: var(--blue); }
+    .tab-btn[data-tab="overview"].active .tab-icon { filter: none; }
+    .tab-btn[data-tab="income"].active .tab-label { color: var(--green); }
+    .tab-btn[data-tab="expenses"].active .tab-label { color: var(--red); }
+    .tab-btn[data-tab="goals"].active .tab-label { color: var(--blue); }
+
+    /* ── Overview ── */
+    .overview-month {
+      font-size: 22px;
+      font-weight: 700;
+      padding: 20px 20px 4px;
+    }
+
+    .stat-label { font-size: 14px; color: var(--text2); }
+    .stat-value { font-size: 14px; font-weight: 600; }
+
+    .free-amount {
+      font-size: 42px;
+      font-weight: 700;
+      text-align: center;
+      padding: 8px 0 4px;
+      letter-spacing: -1px;
+    }
+
+    .free-label {
+      font-size: 13px;
+      color: var(--text2);
+      text-align: center;
+    }
+
+    /* ── Income tab ── */
+    .income-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 44px;
+      padding: 6px 0;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .income-row-label { font-size: 16px; }
+    .income-row-value { font-size: 16px; font-weight: 600; color: var(--green); }
+
+    .inline-edit-wrap { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-end; }
+    .inline-input {
+      width: 120px;
+      height: 36px;
+      font-size: 16px;
+      font-family: inherit;
+      border: 1.5px solid var(--blue);
+      border-radius: 8px;
+      padding: 0 10px;
+      color: var(--text);
+      background: var(--bg);
+      text-align: right;
+      outline: none;
+    }
+
+    .inline-save-btn {
+      height: 36px;
+      padding: 0 14px;
+      background: var(--blue);
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      touch-action: manipulation;
+      font-family: inherit;
+    }
+
+    .tip-text { font-size: 14px; color: var(--text2); line-height: 1.5; }
+
+    /* ── Expenses tab ── */
+    .expense-card {
+      background: var(--card);
+      border-radius: 12px;
+      margin: 0 16px 8px;
+      padding: 12px 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+
+    .expense-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 44px;
+    }
+
+    .expense-name { flex: 1; font-size: 15px; font-weight: 500; }
+
+    .expense-amt {
+      font-size: 14px;
+      color: var(--text2);
+      white-space: nowrap;
+    }
+
+    .expense-actual-btn {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      background: var(--bg);
+      border: none;
+      border-radius: 8px;
+      padding: 6px 10px;
+      min-height: 34px;
+      min-width: 68px;
+      text-align: right;
+      cursor: pointer;
+      touch-action: manipulation;
+      font-family: inherit;
+    }
+
+    .expense-actual-btn.over { color: var(--red); }
+    .expense-delete-btn {
+      width: 30px; height: 30px;
+      background: none;
+      border: none;
+      font-size: 18px;
+      color: var(--red);
+      cursor: pointer;
+      touch-action: manipulation;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .expense-inline-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .expense-inline-input {
+      width: 90px;
+      height: 34px;
+      font-size: 16px;
+      font-family: inherit;
+      border: 1.5px solid var(--blue);
+      border-radius: 8px;
+      padding: 0 8px;
+      color: var(--text);
+      background: var(--bg);
+      text-align: right;
+      outline: none;
+    }
+
+    .add-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: calc(100% - 32px);
+      margin: 4px 16px 0;
+      height: 50px;
+      background: var(--card);
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--blue);
+      cursor: pointer;
+      touch-action: manipulation;
+      font-family: inherit;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+
+    .section-footer {
+      font-size: 13px;
+      color: var(--text2);
+      padding: 10px 20px 0;
+      display: flex;
+      gap: 16px;
+    }
+
+    /* ── Goals tab ── */
+    .goal-card {
+      background: var(--card);
+      border-radius: 12px;
+      margin: 0 16px 12px;
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+      position: relative;
+    }
+
+    .goal-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .goal-name { font-size: 17px; font-weight: 600; }
+    .goal-deadline { font-size: 13px; color: var(--text2); margin-top: 2px; }
+
+    .goal-stats {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--text2);
+    }
+
+    .goal-mo-needed { font-weight: 600; color: var(--blue); }
+
+    .goal-delete-btn {
+      background: none; border: none;
+      font-size: 18px; color: var(--text2);
+      cursor: pointer; touch-action: manipulation;
+      padding: 0; line-height: 1;
+      flex-shrink: 0;
+    }
+
+    /* ── Bottom Sheet Modal ── */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 200;
+      touch-action: none;
+    }
+    .overlay.open { display: block; }
+
+    .sheet {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--card);
+      border-radius: 20px 20px 0 0;
+      z-index: 201;
+      padding: 0 0 calc(20px + env(safe-area-inset-bottom));
+      transform: translateY(110%);
+      transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .sheet.open { transform: translateY(0); }
+
+    .sheet-handle {
+      width: 36px; height: 5px;
+      background: #d1d1d6;
+      border-radius: 3px;
+      margin: 12px auto 8px;
+    }
+
+    .sheet-title {
+      font-size: 17px;
+      font-weight: 700;
+      text-align: center;
+      padding: 4px 20px 16px;
+    }
+
+    .sheet-field {
+      margin: 0 20px 14px;
+    }
+
+    .sheet-label {
+      font-size: 13px;
+      color: var(--text2);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .sheet-input {
+      width: 100%;
+      height: 50px;
+      font-size: 17px;
+      font-family: inherit;
+      border: 1.5px solid #d1d1d6;
+      border-radius: 12px;
+      padding: 0 14px;
+      color: var(--text);
+      background: var(--bg);
+      outline: none;
+      -webkit-appearance: none;
+    }
+    .sheet-input:focus { border-color: var(--blue); }
+
+    .sheet-input[type="date"] { color: var(--text); }
+
+    .sheet-actions {
+      display: flex;
+      gap: 12px;
+      padding: 6px 20px 0;
+    }
+
+    .sheet-cancel {
+      flex: 1; height: 50px;
+      background: var(--bg);
+      border: none;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: 500;
+      color: var(--text);
+      cursor: pointer;
+      touch-action: manipulation;
+      font-family: inherit;
+    }
+
+    .sheet-done {
+      flex: 2; height: 50px;
+      background: var(--blue);
+      border: none;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: 700;
+      color: white;
+      cursor: pointer;
+      touch-action: manipulation;
+      font-family: inherit;
+    }
+
+    /* ── Empty states ── */
+    .empty-state {
+      text-align: center;
+      color: var(--text2);
+      font-size: 15px;
+      padding: 32px 20px;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── OVERVIEW ── -->
+  <div id="screen-overview" class="screen active">
+    <div class="overview-month" id="overview-month"></div>
+
+    <div class="section-header">Income</div>
+    <div class="card">
+      <div class="card-row">
+        <span class="stat-label">Goal</span>
+        <span class="stat-value" id="ov-income-goal">$0</span>
+      </div>
+      <div class="card-divider"></div>
+      <div class="card-row">
+        <span class="stat-label">Received</span>
+        <span class="stat-value" id="ov-income-actual" style="color:var(--green)">$0</span>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-track">
+          <div class="progress-fill" id="ov-income-bar" style="background:var(--green);width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-header">Expenses</div>
+    <div class="card">
+      <div class="card-row">
+        <span class="stat-label">Budgeted</span>
+        <span class="stat-value" id="ov-exp-budgeted">$0</span>
+      </div>
+      <div class="card-divider"></div>
+      <div class="card-row">
+        <span class="stat-label">Spent</span>
+        <span class="stat-value" id="ov-exp-actual">$0</span>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-track">
+          <div class="progress-fill" id="ov-exp-bar" style="background:var(--green);width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-header">Savings Required</div>
+    <div class="card">
+      <div class="card-row">
+        <span class="stat-label">Monthly savings needed</span>
+        <span class="stat-value" id="ov-savings" style="color:var(--blue)">$0/mo</span>
+      </div>
+    </div>
+
+    <div class="section-header">Free to Spend</div>
+    <div class="card">
+      <div class="free-amount" id="ov-free">$0</div>
+      <div class="free-label">after expenses &amp; savings goals</div>
+    </div>
+  </div>
+
+  <!-- ── INCOME ── -->
+  <div id="screen-income" class="screen">
+    <div class="section-header">Monthly Income</div>
+    <div class="card">
+      <div class="card-row income-row" id="inc-goal-row" onclick="startInlineEdit('goal')">
+        <span class="income-row-label">Income Goal</span>
+        <span class="income-row-value" id="inc-goal-display">$0</span>
+      </div>
+      <div class="card-divider"></div>
+      <div class="card-row income-row" id="inc-actual-row" onclick="startInlineEdit('actual')">
+        <span class="income-row-label">Received This Month</span>
+        <span class="income-row-value" id="inc-actual-display">$0</span>
+      </div>
+    </div>
+
+    <div class="section-header">Tip</div>
+    <div class="card">
+      <p class="tip-text">Update "Received" as you get paid. Your goal is your expected monthly total.</p>
+    </div>
+  </div>
+
+  <!-- ── EXPENSES ── -->
+  <div id="screen-expenses" class="screen">
+    <div class="section-header">Monthly Expenses</div>
+    <div id="expenses-list"></div>
+    <button class="add-btn" onclick="openExpenseSheet()" style="touch-action:manipulation">
+      <span>＋</span> Add Expense
+    </button>
+    <div class="section-footer">
+      <span>Budgeted: <strong id="exp-total-budgeted">$0</strong></span>
+      <span>Spent: <strong id="exp-total-actual">$0</strong></span>
+    </div>
+  </div>
+
+  <!-- ── GOALS ── -->
+  <div id="screen-goals" class="screen">
+    <div class="section-header">Savings Goals</div>
+    <div id="goals-list"></div>
+    <button class="add-btn" onclick="openGoalSheet()" style="touch-action:manipulation">
+      <span>＋</span> Add Goal
+    </button>
+  </div>
+
+  <!-- ── TAB BAR ── -->
+  <div id="tab-bar">
+    <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')" style="touch-action:manipulation">
+      <span class="tab-icon">📊</span>
+      <span class="tab-label">Overview</span>
+    </button>
+    <button class="tab-btn" data-tab="income" onclick="switchTab('income')" style="touch-action:manipulation">
+      <span class="tab-icon">💰</span>
+      <span class="tab-label">Income</span>
+    </button>
+    <button class="tab-btn" data-tab="expenses" onclick="switchTab('expenses')" style="touch-action:manipulation">
+      <span class="tab-icon">💸</span>
+      <span class="tab-label">Expenses</span>
+    </button>
+    <button class="tab-btn" data-tab="goals" onclick="switchTab('goals')" style="touch-action:manipulation">
+      <span class="tab-icon">🎯</span>
+      <span class="tab-label">Goals</span>
+    </button>
+  </div>
+
+</div><!-- #app -->
+
+<!-- ── EXPENSE SHEET ── -->
+<div class="overlay" id="expense-overlay" onclick="closeSheets()"></div>
+<div class="sheet" id="expense-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Add Expense</div>
+  <div class="sheet-field">
+    <div class="sheet-label">Name</div>
+    <input class="sheet-input" id="exp-name-input" type="text" placeholder="e.g. Groceries" autocomplete="off">
+  </div>
+  <div class="sheet-field">
+    <div class="sheet-label">Budgeted Amount ($)</div>
+    <input class="sheet-input" id="exp-budget-input" type="number" inputmode="decimal" placeholder="0.00" min="0" step="0.01">
+  </div>
+  <div class="sheet-actions">
+    <button class="sheet-cancel" onclick="closeSheets()">Cancel</button>
+    <button class="sheet-done" onclick="saveExpense()">Add</button>
+  </div>
+</div>
+
+<!-- ── GOAL SHEET ── -->
+<div class="overlay" id="goal-overlay" onclick="closeSheets()"></div>
+<div class="sheet" id="goal-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Add Savings Goal</div>
+  <div class="sheet-field">
+    <div class="sheet-label">Goal Name</div>
+    <input class="sheet-input" id="goal-name-input" type="text" placeholder="e.g. Emergency Fund" autocomplete="off">
+  </div>
+  <div class="sheet-field">
+    <div class="sheet-label">Target Amount ($)</div>
+    <input class="sheet-input" id="goal-target-input" type="number" inputmode="decimal" placeholder="0.00" min="0" step="0.01">
+  </div>
+  <div class="sheet-field">
+    <div class="sheet-label">Already Saved ($)</div>
+    <input class="sheet-input" id="goal-saved-input" type="number" inputmode="decimal" placeholder="0.00" min="0" step="0.01">
+  </div>
+  <div class="sheet-field">
+    <div class="sheet-label">Deadline</div>
+    <input class="sheet-input" id="goal-deadline-input" type="date">
+  </div>
+  <div class="sheet-actions">
+    <button class="sheet-cancel" onclick="closeSheets()">Cancel</button>
+    <button class="sheet-done" onclick="saveGoal()">Add</button>
+  </div>
+</div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'budgetData';
+
+function currentYM() {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}`;
+}
+
+function loadData() {
+  let raw;
+  try { raw = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch(e) {}
+  const ym = currentYM();
+  const def = {
+    income: { goal: 0, actual: 0 },
+    expenses: [],
+    goals: [],
+    month: ym
+  };
+  if (!raw) return def;
+  // Month rollover — reset expenses.actual
+  if (raw.month !== ym) {
+    (raw.expenses || []).forEach(e => { e.actual = 0; });
+    raw.month = ym;
+  }
+  return {
+    income: raw.income || def.income,
+    expenses: raw.expenses || [],
+    goals: raw.goals || [],
+    month: raw.month
+  };
+}
+
+function saveData(d) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+}
+
+let data = loadData();
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function fmt(n) {
+  if (n == null || isNaN(n)) n = 0;
+  return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+function fmtDec(n) {
+  if (n == null || isNaN(n)) n = 0;
+  return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
+function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
+// Calculate monthly savings needed for a single goal
+function monthlyNeeded(goal) {
+  if (!goal.deadline) return 0;
+  const remaining = Math.max(0, goal.target - goal.saved);
+  if (remaining <= 0) return 0;
+  const now = new Date();
+  const dl = new Date(goal.deadline + 'T00:00:00');
+  const diffMs = dl - now;
+  if (diffMs <= 0) return remaining; // overdue — show full remaining
+  const monthsLeft = diffMs / (1000 * 60 * 60 * 24 * 30.44);
+  if (monthsLeft < 1) return remaining;
+  return remaining / monthsLeft;
+}
+
+function totalMonthlySavings() {
+  return data.goals.reduce((s, g) => s + monthlyNeeded(g), 0);
+}
+
+function monthLabel() {
+  const [y, m] = currentYM().split('-');
+  const d = new Date(Number(y), Number(m) - 1, 1);
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+// ── Tab Switching ─────────────────────────────────────────────────────────
+let activeTab = 'overview';
+
+function switchTab(tab) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('screen-' + tab).classList.add('active');
+  document.querySelector(`.tab-btn[data-tab="${tab}"]`).classList.add('active');
+  activeTab = tab;
+  renderAll();
+}
+
+// ── Render ────────────────────────────────────────────────────────────────
+function renderAll() {
+  renderOverview();
+  if (activeTab === 'income') renderIncome();
+  if (activeTab === 'expenses') renderExpenses();
+  if (activeTab === 'goals') renderGoals();
+}
+
+function renderOverview() {
+  const income = data.income;
+  const totalBudgeted = data.expenses.reduce((s, e) => s + (e.budgeted || 0), 0);
+  const totalActual   = data.expenses.reduce((s, e) => s + (e.actual  || 0), 0);
+  const savings = totalMonthlySavings();
+  const free = (income.actual || 0) - totalActual - savings;
+
+  document.getElementById('overview-month').textContent = monthLabel();
+
+  document.getElementById('ov-income-goal').textContent = fmt(income.goal);
+  document.getElementById('ov-income-actual').textContent = fmt(income.actual);
+  const incPct = income.goal > 0 ? clamp((income.actual / income.goal) * 100, 0, 100) : 0;
+  const incBar = document.getElementById('ov-income-bar');
+  incBar.style.width = incPct + '%';
+  incBar.style.background = 'var(--green)';
+
+  document.getElementById('ov-exp-budgeted').textContent = fmt(totalBudgeted);
+  document.getElementById('ov-exp-actual').textContent   = fmt(totalActual);
+  const expPct = totalBudgeted > 0 ? clamp((totalActual / totalBudgeted) * 100, 0, 100) : 0;
+  const expOver = totalActual > totalBudgeted;
+  const expBar = document.getElementById('ov-exp-bar');
+  expBar.style.width = (totalBudgeted > 0 ? expPct : 0) + '%';
+  expBar.style.background = expOver ? 'var(--red)' : 'var(--green)';
+
+  document.getElementById('ov-savings').textContent = fmt(savings) + '/mo';
+
+  const freeEl = document.getElementById('ov-free');
+  freeEl.textContent = fmt(Math.abs(free)) + (free < 0 ? ' over' : '');
+  freeEl.style.color = free >= 0 ? 'var(--green)' : 'var(--red)';
+}
+
+// ── Income ────────────────────────────────────────────────────────────────
+let inlineEditField = null;
+
+function renderIncome() {
+  document.getElementById('inc-goal-display').textContent   = fmt(data.income.goal);
+  document.getElementById('inc-actual-display').textContent = fmt(data.income.actual);
+}
+
+function startInlineEdit(field) {
+  if (inlineEditField === field) return;
+  // Close any open inline edits first
+  closeAllInlineEdits();
+
+  inlineEditField = field;
+  const rowId = field === 'goal' ? 'inc-goal-row' : 'inc-actual-row';
+  const displayId = field === 'goal' ? 'inc-goal-display' : 'inc-actual-display';
+  const row = document.getElementById(rowId);
+  const display = document.getElementById(displayId);
+
+  const currentVal = field === 'goal' ? data.income.goal : data.income.actual;
+
+  display.style.display = 'none';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'inline-edit-wrap';
+  wrap.id = 'inline-edit-wrap-' + field;
+
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.inputMode = 'decimal';
+  input.className = 'inline-input';
+  input.value = currentVal || '';
+  input.placeholder = '0';
+  input.id = 'inline-input-' + field;
+
+  const btn = document.createElement('button');
+  btn.className = 'inline-save-btn';
+  btn.textContent = 'Save';
+  btn.style.touchAction = 'manipulation';
+  btn.onclick = (e) => { e.stopPropagation(); saveInlineEdit(field); };
+
+  wrap.appendChild(input);
+  wrap.appendChild(btn);
+  row.appendChild(wrap);
+  row.onclick = null;
+
+  input.focus();
+  input.select();
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); saveInlineEdit(field); }
+    if (e.key === 'Escape') { closeAllInlineEdits(); renderIncome(); }
+  });
+}
+
+function saveInlineEdit(field) {
+  const input = document.getElementById('inline-input-' + field);
+  if (!input) return;
+  const val = parseFloat(input.value) || 0;
+  if (field === 'goal') data.income.goal = val;
+  else data.income.actual = val;
+  saveData(data);
+  closeAllInlineEdits();
+  renderIncome();
+  renderOverview();
+}
+
+function closeAllInlineEdits() {
+  inlineEditField = null;
+  ['goal','actual'].forEach(field => {
+    const wrap = document.getElementById('inline-edit-wrap-' + field);
+    if (wrap) wrap.remove();
+    const display = document.getElementById('inc-' + field + '-display');
+    if (display) display.style.display = '';
+    const rowId = field === 'goal' ? 'inc-goal-row' : 'inc-actual-row';
+    const row = document.getElementById(rowId);
+    if (row) row.onclick = () => startInlineEdit(field);
+  });
+}
+
+// ── Expenses ──────────────────────────────────────────────────────────────
+let editingActualId = null;
+
+function renderExpenses() {
+  const list = document.getElementById('expenses-list');
+  list.innerHTML = '';
+
+  if (data.expenses.length === 0) {
+    list.innerHTML = '<div class="empty-state">No expenses yet.<br>Tap Add Expense to get started.</div>';
+  }
+
+  data.expenses.forEach(exp => {
+    const card = document.createElement('div');
+    card.className = 'expense-card';
+
+    const row = document.createElement('div');
+    row.className = 'expense-row';
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'expense-name';
+    nameEl.textContent = exp.name;
+
+    const budgetedEl = document.createElement('span');
+    budgetedEl.className = 'expense-amt';
+    budgetedEl.textContent = fmt(exp.budgeted);
+
+    const isOver = (exp.actual || 0) > (exp.budgeted || 0);
+
+    if (editingActualId === exp.id) {
+      // Inline editing actual amount
+      const wrap = document.createElement('div');
+      wrap.className = 'expense-inline-wrap';
+
+      const inp = document.createElement('input');
+      inp.type = 'number';
+      inp.inputMode = 'decimal';
+      inp.className = 'expense-inline-input';
+      inp.value = exp.actual || '';
+      inp.placeholder = '0';
+      inp.id = 'exp-actual-inp-' + exp.id;
+
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'inline-save-btn';
+      saveBtn.textContent = 'Save';
+      saveBtn.style.touchAction = 'manipulation';
+      saveBtn.onclick = () => saveExpenseActual(exp.id);
+
+      wrap.appendChild(inp);
+      wrap.appendChild(saveBtn);
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'expense-delete-btn';
+      delBtn.innerHTML = '✕';
+      delBtn.title = 'Delete';
+      delBtn.onclick = () => deleteExpense(exp.id);
+
+      row.appendChild(nameEl);
+      row.appendChild(budgetedEl);
+      row.appendChild(wrap);
+      row.appendChild(delBtn);
+
+      setTimeout(() => { inp.focus(); inp.select(); }, 50);
+      inp.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); saveExpenseActual(exp.id); }
+        if (e.key === 'Escape') { editingActualId = null; renderExpenses(); }
+      });
+    } else {
+      const actualBtn = document.createElement('button');
+      actualBtn.className = 'expense-actual-btn' + (isOver ? ' over' : '');
+      actualBtn.textContent = fmt(exp.actual || 0);
+      actualBtn.style.touchAction = 'manipulation';
+      actualBtn.onclick = () => { editingActualId = exp.id; renderExpenses(); };
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'expense-delete-btn';
+      delBtn.innerHTML = '✕';
+      delBtn.onclick = () => deleteExpense(exp.id);
+
+      row.appendChild(nameEl);
+      row.appendChild(budgetedEl);
+      row.appendChild(actualBtn);
+      row.appendChild(delBtn);
+    }
+
+    card.appendChild(row);
+    list.appendChild(card);
+  });
+
+  const totalBudgeted = data.expenses.reduce((s,e) => s + (e.budgeted||0), 0);
+  const totalActual   = data.expenses.reduce((s,e) => s + (e.actual||0),   0);
+  document.getElementById('exp-total-budgeted').textContent = fmt(totalBudgeted);
+  document.getElementById('exp-total-actual').textContent   = fmt(totalActual);
+}
+
+function saveExpenseActual(id) {
+  const inp = document.getElementById('exp-actual-inp-' + id);
+  if (!inp) return;
+  const val = parseFloat(inp.value) || 0;
+  const exp = data.expenses.find(e => e.id === id);
+  if (exp) exp.actual = val;
+  editingActualId = null;
+  saveData(data);
+  renderExpenses();
+  renderOverview();
+}
+
+function deleteExpense(id) {
+  data.expenses = data.expenses.filter(e => e.id !== id);
+  editingActualId = null;
+  saveData(data);
+  renderExpenses();
+  renderOverview();
+}
+
+// ── Goals ─────────────────────────────────────────────────────────────────
+function renderGoals() {
+  const list = document.getElementById('goals-list');
+  list.innerHTML = '';
+
+  if (data.goals.length === 0) {
+    list.innerHTML = '<div class="empty-state">No savings goals yet.<br>Tap Add Goal to get started.</div>';
+    return;
+  }
+
+  data.goals.forEach(goal => {
+    const pct = goal.target > 0 ? clamp((goal.saved / goal.target) * 100, 0, 100) : 0;
+    const mo  = monthlyNeeded(goal);
+    const remaining = Math.max(0, goal.target - goal.saved);
+
+    let dlStr = '';
+    if (goal.deadline) {
+      const dl = new Date(goal.deadline + 'T00:00:00');
+      dlStr = dl.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    }
+
+    const card = document.createElement('div');
+    card.className = 'goal-card';
+
+    card.innerHTML = `
+      <div class="goal-header">
+        <div>
+          <div class="goal-name">${escHtml(goal.name)}</div>
+          ${dlStr ? `<div class="goal-deadline">Due ${dlStr}</div>` : ''}
+        </div>
+        <button class="goal-delete-btn" onclick="deleteGoal('${goal.id}')" style="touch-action:manipulation">✕</button>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-track">
+          <div class="progress-fill" style="background:var(--blue);width:${pct}%"></div>
+        </div>
+      </div>
+      <div class="goal-stats">
+        <span>${fmt(goal.saved)} saved of ${fmt(goal.target)}</span>
+        <span class="goal-mo-needed">${fmt(mo)}/mo needed</span>
+      </div>
+    `;
+
+    list.appendChild(card);
+  });
+}
+
+function deleteGoal(id) {
+  data.goals = data.goals.filter(g => g.id !== id);
+  saveData(data);
+  renderGoals();
+  renderOverview();
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Sheets ────────────────────────────────────────────────────────────────
+function openExpenseSheet() {
+  document.getElementById('exp-name-input').value   = '';
+  document.getElementById('exp-budget-input').value = '';
+  document.getElementById('expense-overlay').classList.add('open');
+  document.getElementById('expense-sheet').classList.add('open');
+  setTimeout(() => document.getElementById('exp-name-input').focus(), 350);
+}
+
+function openGoalSheet() {
+  document.getElementById('goal-name-input').value     = '';
+  document.getElementById('goal-target-input').value   = '';
+  document.getElementById('goal-saved-input').value    = '';
+  document.getElementById('goal-deadline-input').value = '';
+  document.getElementById('goal-overlay').classList.add('open');
+  document.getElementById('goal-sheet').classList.add('open');
+  setTimeout(() => document.getElementById('goal-name-input').focus(), 350);
+}
+
+function closeSheets() {
+  ['expense-overlay','expense-sheet','goal-overlay','goal-sheet'].forEach(id => {
+    document.getElementById(id).classList.remove('open');
+  });
+}
+
+function saveExpense() {
+  const name   = document.getElementById('exp-name-input').value.trim();
+  const budget = parseFloat(document.getElementById('exp-budget-input').value) || 0;
+  if (!name) {
+    document.getElementById('exp-name-input').focus();
+    return;
+  }
+  data.expenses.push({ id: uid(), name, budgeted: budget, actual: 0 });
+  saveData(data);
+  closeSheets();
+  renderExpenses();
+  renderOverview();
+}
+
+function saveGoal() {
+  const name     = document.getElementById('goal-name-input').value.trim();
+  const target   = parseFloat(document.getElementById('goal-target-input').value) || 0;
+  const saved    = parseFloat(document.getElementById('goal-saved-input').value)  || 0;
+  const deadline = document.getElementById('goal-deadline-input').value;
+  if (!name) {
+    document.getElementById('goal-name-input').focus();
+    return;
+  }
+  data.goals.push({ id: uid(), name, target, saved, deadline });
+  saveData(data);
+  closeSheets();
+  renderGoals();
+  renderOverview();
+}
+
+// Close sheets on Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeSheets();
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────
+renderAll();
+
+// Re-render income/expenses/goals when their tabs become visible
+// (already handled in switchTab)
+</script>
+</body>
+</html>
