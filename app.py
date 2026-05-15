@@ -9280,6 +9280,14 @@ def invoice_detail(record_id):
         email       = _first(fields.get("Bill-To Contact Email (from Customer)", []))
         addr1       = _first(fields.get("Bill-To Address (Line 1) (from Customer)", []))
         addr2       = _first(fields.get("Bill-To Address (Line 2) (from Customer)", []))
+        ship_city   = _first(fields.get("Customer City (from Customer)", []))
+        ship_state  = _first(fields.get("Customer State (from Customer)", []))
+        ship_zip    = _first(fields.get("Customer Zip Code (from Customer)", []))
+        ship_csz    = ", ".join(filter(None, [ship_city, f"{ship_state} {ship_zip}".strip()]))
+        ship_org    = _first(fields.get("Organization Name (from Customer)", []))
+        ship_name   = _first(fields.get("Main Contact Name (from Customer)", []))
+        ship_addr1  = _first(fields.get("Customer Address (Line 1) (from Customer)", []))
+        ship_addr2  = _first(fields.get("Customer Address (Line 2) (from Customer)", [])) or ship_csz
 
         # Get tracking + ship date from SO Tracking table
         tracking  = ""
@@ -9344,6 +9352,10 @@ def invoice_detail(record_id):
             "email":           email,
             "addr1":           addr1,
             "addr2":           addr2,
+            "shipOrg":         ship_org,
+            "shipName":        ship_name,
+            "shipAddr1":       ship_addr1,
+            "shipAddr2":       ship_addr2,
             "tracking":        tracking,
             "shipDate":        ship_date,
             "lineItems":       line_items,
