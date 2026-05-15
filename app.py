@@ -5455,6 +5455,10 @@ def _build_invoice_pdf_bytes(inv):
     addr2       = inv.get("addr2", "")
     tracking    = inv.get("tracking", "")
     ship_date   = inv.get("shipDate", "")
+    ship_org    = inv.get("shipOrg", "")
+    ship_name   = inv.get("shipName", "")
+    ship_addr1  = inv.get("shipAddr1", "")
+    ship_addr2  = inv.get("shipAddr2", "")
     line_items  = inv.get("lineItems", [])
     subtotal    = inv.get("subtotal", 0.0)
     cc_url      = inv.get("stripeCcUrl", "")
@@ -5573,17 +5577,33 @@ def _build_invoice_pdf_bytes(inv):
 
     y_after_details = pdf.get_y()
 
+    right_col_w = col_w / 2
+
+    # Bill To (left half of right column)
     bill_x = 19 + col_w
     pdf.set_xy(bill_x, y_info)
     pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(*MUTED)
-    pdf.cell(col_w, 5.5, "Bill To", border=0, new_x="LEFT", new_y="NEXT")
+    pdf.cell(right_col_w, 5.5, "Bill To", border=0, new_x="LEFT", new_y="NEXT")
     for ln in [org_name, contact, email, addr1, addr2]:
         if ln:
             pdf.set_x(bill_x)
             pdf.set_font("Helvetica", "B" if ln == org_name else "", 8)
             pdf.set_text_color(*TEXT)
-            pdf.cell(col_w, 5, ln, border=0, new_x="LEFT", new_y="NEXT")
+            pdf.cell(right_col_w, 5, ln, border=0, new_x="LEFT", new_y="NEXT")
+
+    # Ship To (right half of right column)
+    ship_x = bill_x + right_col_w
+    pdf.set_xy(ship_x, y_info)
+    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_text_color(*MUTED)
+    pdf.cell(right_col_w, 5.5, "Ship To", border=0, new_x="LEFT", new_y="NEXT")
+    for ln in [ship_org, ship_name, ship_addr1, ship_addr2]:
+        if ln:
+            pdf.set_x(ship_x)
+            pdf.set_font("Helvetica", "B" if ln == ship_org else "", 8)
+            pdf.set_text_color(*TEXT)
+            pdf.cell(right_col_w, 5, ln, border=0, new_x="LEFT", new_y="NEXT")
 
     pdf.set_y(max(y_after_details, pdf.get_y()) + 4)
 
@@ -5729,6 +5749,11 @@ def invoice_pdf(record_id):
                 line_items.append({"name": pname, "qty": qty, "unit_price": float(price),
                                    "total": round(qty * float(price), 2)})
 
+        ship_city  = _first(fields.get("Customer City (from Customer)", []))
+        ship_state = _first(fields.get("Customer State (from Customer)", []))
+        ship_zip   = _first(fields.get("Customer Zip Code (from Customer)", []))
+        ship_csz   = ", ".join(filter(None, [ship_city, f"{ship_state} {ship_zip}".strip()]))
+
         inv = {
             "invNumber":    inv_number,
             "soNumber":     so_number,
@@ -5739,6 +5764,10 @@ def invoice_pdf(record_id):
             "email":        _first(fields.get("Bill-To Contact Email (from Customer)", [])),
             "addr1":        _first(fields.get("Bill-To Address (Line 1) (from Customer)", [])),
             "addr2":        _first(fields.get("Bill-To Address (Line 2) (from Customer)", [])),
+            "shipOrg":      _first(fields.get("Organization Name (from Customer)", [])),
+            "shipName":     _first(fields.get("Main Contact Name (from Customer)", [])),
+            "shipAddr1":    _first(fields.get("Customer Address (Line 1) (from Customer)", [])),
+            "shipAddr2":    _first(fields.get("Customer Address (Line 2) (from Customer)", [])) or ship_csz,
             "tracking":     tracking,
             "shipDate":     ship_date,
             "lineItems":    line_items,
