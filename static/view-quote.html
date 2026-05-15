@@ -10,7 +10,7 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --navy:    #003a6c;
+      --navy:    #1B2438;
       --red:     #ae0000;
       --light:   #f5f7fa;
       --border:  #dde3ea;
@@ -201,6 +201,13 @@
     .items-table td.right { text-align: right; color: var(--text); }
     .items-table td.muted { color: var(--muted); }
     .items-table tr:last-child td { border-bottom: none; }
+
+    /* ── Shared address/meta classes (match view-invoice.html exactly) ── */
+    .addr-title { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em; color:#8a99aa; font-weight:700; margin:0 0 7px; font-family:'Montserrat',sans-serif; }
+    .addr-line  { font-size:0.88rem; color:#1a2633; margin:0 0 3px; line-height:1.45; }
+    .addr-line.bold { font-weight:700; }
+    .meta-label { margin:0 0 2px; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.06em; color:#8a99aa; font-weight:700; font-family:'Montserrat',sans-serif; }
+    .meta-value { margin:0 0 10px; font-size:0.9rem; color:#1a2633; }
 
     .qty-input {
       width: 70px;
@@ -786,8 +793,7 @@ function render() {
   }
 
   function metaKV(label, value, valueStyle) {
-    return `<p style="margin:0 0 2px;font-size:0.75rem;color:#8a99aa;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">${label}</p>
-            <p style="margin:0 0 10px;font-size:0.9rem;color:#1a2633;${valueStyle||''}">${value}</p>`;
+    return `<p class="meta-label">${label}</p><p class="meta-value"${valueStyle?` style="${valueStyle}"`:''}>${value}</p>`;
   }
 
   const metaRow = document.getElementById('metaRow');
@@ -826,9 +832,9 @@ function renderCustomer() {
   const c = quoteData.customer || {};
 
   function addrBlock(title, lines) {
-    let html = `<p style="margin:0 0 7px;font-size:0.72rem;text-transform:uppercase;letter-spacing:.08em;color:#8a99aa;font-weight:700;">${title}</p>`;
+    let html = `<div class="addr-title">${title}</div>`;
     lines.filter(Boolean).forEach((ln, i) => {
-      html += `<p style="margin:0 0 3px;font-size:0.88rem;color:#1a2633;line-height:1.45;${i===0?'font-weight:700;':''}">${escHtml(ln)}</p>`;
+      html += `<p class="addr-line${i===0?' bold':''}">${escHtml(ln)}</p>`;
     });
     return html;
   }
