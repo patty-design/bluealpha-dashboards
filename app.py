@@ -8369,19 +8369,21 @@ def portal_admin_shipped_orders(user):
         # Fetch tracking + ship date + base order from SO Tracking Link
         tracking_recs = at_get_all(
             _SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
-            fields=["Order #", "Tracking #", "Ship Date", "Base Order #"],
+            fields=["Order #", "Tracking #", "Ship Date", "Base Order #", "Order Total"],
             base_id=_SO_TRACKING_BASE,
         )
-        tracking_map   = {}
-        ship_date_map  = {}
-        base_order_map = {}
+        tracking_map    = {}
+        ship_date_map   = {}
+        base_order_map  = {}
+        order_total_map = {}
         for r in tracking_recs:
             f2 = r.get("fields", {})
             key = f2.get("Order #", "").strip()
             if key:
-                tracking_map[key]   = f2.get("Tracking #") or ""
-                ship_date_map[key]  = f2.get("Ship Date") or ""
-                base_order_map[key] = f2.get("Base Order #") or ""
+                tracking_map[key]    = f2.get("Tracking #") or ""
+                ship_date_map[key]   = f2.get("Ship Date") or ""
+                base_order_map[key]  = f2.get("Base Order #") or ""
+                order_total_map[key] = f2.get("Order Total")
 
         so_by_doc = {rec.get("fields", {}).get("Document ID", ""): rec for rec in so_records}
 
@@ -8438,7 +8440,7 @@ def portal_admin_shipped_orders(user):
                 "date":          pf.get("Date", ""),
                 "ship_date":     ship_date_map.get(order_num, ""),
                 "org_name":      org_name,
-                "total":         0,
+                "total":         round(float(order_total_map.get(order_num) or 0), 2),
                 "tracking":      tracking,
                 "invoiced":      split_order_id in invoiced_ids,
                 "inv_number":    invoiced_ids.get(split_order_id),
@@ -8929,18 +8931,20 @@ def admin_shipped_orders():
                             for r in inv_recs if r.get("fields", {}).get("Order ID")}
         # Tracking + ship date map: SO number → tracking #, ship date, base order #
         tracking_recs = at_get_all(_SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
-                                    fields=["Order #", "Tracking #", "Ship Date", "Base Order #"],
+                                    fields=["Order #", "Tracking #", "Ship Date", "Base Order #", "Order Total"],
                                     base_id=_SO_TRACKING_BASE)
-        tracking_map  = {}
-        ship_date_map = {}
-        base_order_map = {}  # split order # → parent order #
+        tracking_map    = {}
+        ship_date_map   = {}
+        base_order_map  = {}  # split order # → parent order #
+        order_total_map = {}
         for r in tracking_recs:
             f2 = r.get("fields", {})
             key = f2.get("Order #", "").strip()
             if key:
-                tracking_map[key]   = f2.get("Tracking #") or ""
-                ship_date_map[key]  = f2.get("Ship Date") or ""
-                base_order_map[key] = f2.get("Base Order #") or ""
+                tracking_map[key]    = f2.get("Tracking #") or ""
+                ship_date_map[key]   = f2.get("Ship Date") or ""
+                base_order_map[key]  = f2.get("Base Order #") or ""
+                order_total_map[key] = f2.get("Order Total")
 
         # Build SO record lookup: document_id → record
         so_by_doc = {rec.get("fields", {}).get("Document ID", ""): rec for rec in records}
@@ -9012,7 +9016,7 @@ def admin_shipped_orders():
                 "date":          pf.get("Date", ""),
                 "ship_date":     ship_date_map.get(order_num, ""),
                 "org_name":      org_name,
-                "total":         0,  # items come from ShipStation, not Airtable totals
+                "total":         round(float(order_total_map.get(order_num) or 0), 2),
                 "tracking":      tracking,
                 "invoiced":      split_order_id in invoiced,
                 "inv_number":    invoiced.get(split_order_id),
@@ -9252,11 +9256,26 @@ def _run_tracking_sync():
                     if not t_str:
                         return ""
 
+                    # Fetch order total from ShipStation orders API
+                    order_total = None
+                    try:
+                        ro = req_lib.get("https://ssapi.shipstation.com/orders",
+                                         params={"orderNumber": order_num, "pageSize": 5},
+                                         headers=ss_hdrs, timeout=10)
+                        if ro.ok:
+                            orders_list = ro.json().get("orders", [])
+                            if orders_list:
+                                order_total = orders_list[0].get("orderTotal")
+                    except Exception:
+                        pass
+
                     flds = {"Order #": order_num, "Date": so_date, "Tracking #": t_str}
                     if sd_str:
                         flds["Ship Date"] = sd_str
                     if base_order_num:
                         flds["Base Order #"] = base_order_num
+                    if order_total is not None:
+                        flds["Order Total"] = float(order_total)
                     if order_num in existing_by_doc:
                         req_lib.patch(
                             f"https://api.airtable.com/v0/{_SO_TRACKING_BASE}/{_SO_TRACKING_TABLE}/{existing_by_doc[order_num]}",
