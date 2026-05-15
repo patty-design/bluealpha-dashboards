@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Invoice — Blue Alpha</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; padding: 0; background: #f5f7fa; font-family: Arial, Helvetica, sans-serif; color: #1a2633; }
+    .page-header {
+      background: #1B2438; padding: 18px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .page-header .brand { color: #fff; font-size: 18px; font-weight: 800; letter-spacing: 2px; }
+    .page-header .back  { color: #adc4e0; font-size: 0.85rem; text-decoration: none; }
+    .page-header .back:hover { color: #fff; }
+    .container { max-width: 760px; margin: 36px auto; padding: 0 16px 60px; }
+    .card { background: #fff; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: hidden; }
+
+    /* Invoice header bar */
+    .inv-header { background: #1B2438; padding: 28px 36px; display: flex; align-items: flex-start; justify-content: space-between; }
+    .inv-header .title { color: #fff; }
+    .inv-header .title h1 { margin: 0 0 4px; font-size: 1.3rem; font-weight: 800; letter-spacing: 1px; }
+    .inv-header .title .inv-num { color: #adc4e0; font-size: 0.9rem; }
+    .inv-header .badge { background: #BD3333; color: #fff; font-size: 0.72rem; font-weight: 700;
+                          padding: 4px 10px; border-radius: 12px; letter-spacing: 0.5px; text-transform: uppercase; margin-top: 6px; }
+
+    /* Meta grid */
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-bottom: 1px solid #eee; }
+    .meta-block { padding: 24px 36px; }
+    .meta-block:first-child { border-right: 1px solid #eee; }
+    .meta-block h3 { margin: 0 0 10px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #8a99aa; font-weight: 700; }
+    .meta-block p  { margin: 0 0 4px; font-size: 0.88rem; color: #1a2633; line-height: 1.5; }
+    .meta-block p.label { color: #8a99aa; font-size: 0.78rem; margin: 8px 0 2px; }
+
+    /* Line items table */
+    .items-wrap { padding: 0 36px 28px; }
+    table.items { width: 100%; border-collapse: collapse; margin-top: 24px; }
+    table.items thead tr { background: #1B2438; }
+    table.items thead th { padding: 10px 12px; color: #fff; font-size: 0.72rem; text-transform: uppercase;
+                            letter-spacing: 0.06em; font-weight: 700; text-align: left; }
+    table.items thead th.right { text-align: right; }
+    table.items thead th.center { text-align: center; }
+    table.items tbody tr { border-bottom: 1px solid #eee; }
+    table.items tbody tr:last-child { border-bottom: none; }
+    table.items tbody td { padding: 10px 12px; font-size: 0.88rem; color: #1a2633; }
+    table.items tbody td.right { text-align: right; }
+    table.items tbody td.center { text-align: center; }
+    .totals-row { display: flex; justify-content: flex-end; padding: 0 36px 8px; }
+    .totals-box { min-width: 240px; }
+    .totals-line { display: flex; justify-content: space-between; padding: 6px 0;
+                   font-size: 0.88rem; color: #555; border-top: 1px solid #eee; }
+    .totals-line.grand { font-size: 1rem; font-weight: 800; color: #1B2438; border-top: 2px solid #1B2438; }
+
+    /* Footer note */
+    .inv-footer { padding: 20px 36px; background: #f5f7fa; border-top: 1px solid #eee;
+                   font-size: 0.78rem; color: #8a99aa; line-height: 1.6; }
+    .inv-footer strong { color: #BD3333; }
+
+    /* States */
+    .loading { text-align: center; padding: 80px 20px; color: #8a99aa; font-size: 0.95rem; }
+    .error-box { text-align: center; padding: 60px 20px; }
+    .error-box h2 { font-size: 1.1rem; color: #1a2633; margin: 0 0 8px; }
+    .error-box p  { color: #8a99aa; font-size: 0.9rem; margin: 0; }
+
+    @media (max-width: 560px) {
+      .meta-grid { grid-template-columns: 1fr; }
+      .meta-block:first-child { border-right: none; border-bottom: 1px solid #eee; }
+      .inv-header { flex-direction: column; gap: 10px; }
+      .items-wrap, .meta-block, .totals-row, .inv-footer { padding-left: 20px; padding-right: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-header">
+    <span class="brand">BLUE ALPHA</span>
+    <a class="back" href="javascript:history.back()">← Back</a>
+  </div>
+
+  <div class="container">
+    <div class="card" id="invoiceCard">
+      <div class="loading">Loading invoice…</div>
+    </div>
+  </div>
+
+  <script>
+    const recordId = location.pathname.split('/').pop();
+
+    function fmt(s) {
+      if (!s) return '—';
+      try { return new Date(s + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }); }
+      catch { return s; }
+    }
+    function esc(s) {
+      return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function money(n) {
+      return '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    async function load() {
+      const card = document.getElementById('invoiceCard');
+      try {
+        const resp = await fetch(`/api/invoice-detail/${recordId}`);
+        if (!resp.ok) {
+          const d = await resp.json().catch(() => ({}));
+          card.innerHTML = `<div class="error-box"><h2>Invoice Not Found</h2><p>${esc(d.error || 'This invoice could not be loaded.')}</p></div>`;
+          return;
+        }
+        const inv = await resp.json();
+        document.title = `${esc(inv.invNumber)} — Blue Alpha Invoice`;
+
+        // Due date = invoice date + 30 days
+        let dueDate = '—';
+        if (inv.date) {
+          try {
+            const d = new Date(inv.date + 'T12:00:00');
+            d.setDate(d.getDate() + 30);
+            dueDate = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+          } catch {}
+        }
+
+        // Line items rows
+        const liRows = (inv.lineItems || []).map(li => `
+          <tr>
+            <td>${esc(li.name)}</td>
+            <td class="center">${li.qty}</td>
+            <td class="right">${money(li.unit_price)}</td>
+            <td class="right">${money(li.total)}</td>
+          </tr>
+        `).join('');
+
+        // Tracking link
+        const tn = (inv.tracking || '').trim();
+        let trackingHtml = tn ? tn : '—';
+        if (tn) {
+          const url = /^1Z/i.test(tn.replace(/\s/g,''))
+            ? `https://www.ups.com/track?tracknum=${encodeURIComponent(tn)}`
+            : `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(tn)}`;
+          trackingHtml = `<a href="${url}" target="_blank" rel="noopener" style="color:#1B2438;">${esc(tn)}</a>`;
+        }
+
+        // Address
+        const addrParts = [inv.addr1, inv.addr2].filter(Boolean);
+        const addrHtml  = addrParts.map(a => `<p>${esc(a)}</p>`).join('');
+
+        card.innerHTML = `
+          <div class="inv-header">
+            <div class="title">
+              <h1>INVOICE</h1>
+              <div class="inv-num">${esc(inv.invNumber)}</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="color:#adc4e0;font-size:0.82rem;margin-bottom:4px;">Sales Order: <strong style="color:#fff;">${esc(inv.soNumber)}</strong></div>
+              ${inv.poNumber ? `<div style="color:#adc4e0;font-size:0.82rem;">PO #: <strong style="color:#fff;">${esc(inv.poNumber)}</strong></div>` : ''}
+            </div>
+          </div>
+
+          <div class="meta-grid">
+            <div class="meta-block">
+              <h3>Bill To</h3>
+              <p><strong>${esc(inv.orgName || '—')}</strong></p>
+              ${inv.contact ? `<p>${esc(inv.contact)}</p>` : ''}
+              ${inv.email   ? `<p style="color:#5B7FA0;">${esc(inv.email)}</p>` : ''}
+              ${addrHtml}
+            </div>
+            <div class="meta-block">
+              <h3>Invoice Details</h3>
+              <p class="label">Invoice Date</p>
+              <p>${fmt(inv.date)}</p>
+              <p class="label">Due Date (Net 30)</p>
+              <p><strong>${dueDate}</strong></p>
+              ${inv.shipDate ? `<p class="label">Ship Date</p><p>${fmt(inv.shipDate)}</p>` : ''}
+              ${inv.tracking ? `<p class="label">Tracking</p><p>${trackingHtml}</p>` : ''}
+            </div>
+          </div>
+
+          <div class="items-wrap">
+            <table class="items">
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th class="center">Qty</th>
+                  <th class="right">Unit Price</th>
+                  <th class="right">Total</th>
+                </tr>
+              </thead>
+              <tbody>${liRows || '<tr><td colspan="4" style="text-align:center;color:#aaa;padding:20px;">No line items</td></tr>'}</tbody>
+            </table>
+          </div>
+
+          <div class="totals-row">
+            <div class="totals-box">
+              <div class="totals-line grand">
+                <span>Total Due</span>
+                <span>${money(inv.subtotal)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="inv-footer">
+            Payment terms: Net 30 from invoice date. <strong>A 1.5% monthly late fee applies to unpaid balances after 30 days.</strong><br>
+            Questions? Contact us at <a href="mailto:info@bluealpha.us" style="color:#1B2438;">info@bluealpha.us</a> or 678-961-3304.
+          </div>
+        `;
+      } catch (e) {
+        card.innerHTML = `<div class="error-box"><h2>Error</h2><p>${esc(e.message)}</p></div>`;
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

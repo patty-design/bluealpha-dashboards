@@ -3677,6 +3677,10 @@ def quote_gate_page():
 def view_quote_page(record_id):
     return send_from_directory("static", "view-quote.html")
 
+@app.route("/view-invoice/<record_id>")
+def view_invoice_page(record_id):
+    return send_from_directory("static", "view-invoice.html")
+
 
 def _clean_product_name(name):
     """Strip marketing suffixes from product names."""
@@ -8707,6 +8711,109 @@ def portal_invoices(user):
 
 
 threading.Thread(target=_ontime_bg_worker, daemon=True).start()
+
+# ── Invoice detail (admin read-only preview) ──────────────────────────────────
+
+@app.route("/api/invoice-detail/<record_id>", methods=["GET", "OPTIONS"])
+def invoice_detail(record_id):
+    """Return full invoice details for the admin read-only preview page."""
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type"})
+    c = cors()
+    try:
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+
+        # Fetch invoice record
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+            headers=at_headers(read_token), timeout=15,
+        )
+        if not r.ok:
+            return Response(json.dumps({"error": "Invoice not found"}), status=404, headers=c, mimetype="application/json")
+        fields = r.json().get("fields", {})
+        if fields.get("Order Type") != "Invoice":
+            return Response(json.dumps({"error": "Not an invoice"}), status=400, headers=c, mimetype="application/json")
+
+        def _first(lst):
+            return lst[0] if isinstance(lst, list) and lst else (lst or "")
+
+        order_id    = str(fields.get("Order ID", "")).strip()
+        inv_number  = fields.get("Document ID", f"IN-{order_id}")
+        so_number   = f"SO-{order_id}" if order_id else ""
+        date_str    = fields.get("Date", "")
+        po_number   = fields.get("Purchase Order #", "")
+        org_name    = _first(fields.get("Bill-To Org Name (from Customer)", []))
+        contact     = _first(fields.get("Bill-To Contact Name (from Customer)", []))
+        email       = _first(fields.get("Bill-To Contact Email (from Customer)", []))
+        addr1       = _first(fields.get("Bill-To Address (Line 1) (from Customer)", []))
+        addr2       = _first(fields.get("Bill-To Address (Line 2) (from Customer)", []))
+
+        # Get tracking + ship date from SO Tracking table
+        tracking  = ""
+        ship_date = ""
+        tracking_recs = at_get_all(
+            _SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
+            fields=["Order #", "Tracking #", "Ship Date"],
+            base_id=_SO_TRACKING_BASE,
+        )
+        for tr in tracking_recs:
+            if tr.get("fields", {}).get("Order #", "").strip() == so_number:
+                tracking  = tr["fields"].get("Tracking #", "")
+                ship_date = tr["fields"].get("Ship Date", "")
+                break
+
+        # Fetch line items
+        li_ids = fields.get("MO Line Items", [])
+        import concurrent.futures as _cf_inv
+        def _fetch_inv_li(li_id):
+            try:
+                lr = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+                    headers=at_headers(read_token), timeout=10,
+                )
+                if lr.status_code == 200:
+                    return li_id, lr.json()
+            except Exception:
+                pass
+            return li_id, None
+        with _cf_inv.ThreadPoolExecutor(max_workers=10) as _ex_inv:
+            _li_results = list(_ex_inv.map(_fetch_inv_li, li_ids))
+
+        line_items = []
+        for li_id, li_data in _li_results:
+            if not li_data:
+                continue
+            lf = li_data.get("fields", {})
+            pname = _first(lf.get("Product Name (from Product SKU)", [])) or _first(lf.get("Name + Variations (from Product SKU)", [])) or "Item"
+            price = lf.get("Confirmed Unit Price") or (_first(lf.get("Adj. Unit Price (from MO Line Items)", [])) or 0)
+            qty   = lf.get("Qty.", 0)
+            line_items.append({
+                "name":       pname,
+                "qty":        qty,
+                "unit_price": float(price),
+                "total":      round(qty * float(price), 2),
+            })
+
+        subtotal = round(sum(li["total"] for li in line_items), 2)
+
+        return Response(json.dumps({
+            "invNumber":  inv_number,
+            "soNumber":   so_number,
+            "date":       date_str,
+            "poNumber":   po_number,
+            "orgName":    org_name,
+            "contact":    contact,
+            "email":      email,
+            "addr1":      addr1,
+            "addr2":      addr2,
+            "tracking":   tracking,
+            "shipDate":   ship_date,
+            "lineItems":  line_items,
+            "subtotal":   subtotal,
+        }), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
 
 # ── Admin portal: Shipped Orders & Invoice Conversion ────────────────────────
 
