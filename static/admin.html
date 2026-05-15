@@ -341,6 +341,10 @@
       <!-- Admin: Shipped Orders -->
       <div class="tab-panel" id="tab-shipped">
         <div class="card" style="padding:24px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <span style="font-size:0.85rem;color:#777;">Orders ship from ShipStation. Ship dates sync nightly at 6 PM ET.</span>
+            <button id="syncTrackingBtn" onclick="triggerTrackingSync()" style="padding:6px 14px;border:1px solid #1B2438;border-radius:6px;background:#fff;color:#1B2438;font-size:0.82rem;font-weight:600;cursor:pointer;">🔄 Sync Now</button>
+          </div>
           <div id="shippedContent"><div class="loading">Loading…</div></div>
         </div>
       </div>
@@ -885,17 +889,45 @@
           return `<tr>
             <td>${soLink}</td>
             <td>${fmt(o.date)}</td>
-            <td>${shipDateCell}</td>
             <td>${esc(o.org_name||'—')}</td>
             <td>$${o.total.toFixed(2)}</td>
             <td>${trackCell}</td>
+            <td>${shipDateCell}</td>
             <td>${actionCell}</td>
           </tr>`;
         }).join('');
-        el.innerHTML = '<table><thead><tr><th>Sales Order #</th><th>SO Date</th><th>Ship Date</th><th>Organization</th><th>Total</th><th>Tracking</th><th>Action</th></tr></thead><tbody>' + tbody + '</tbody></table>';
+        el.innerHTML = '<table><thead><tr><th>Sales Order #</th><th>SO Date</th><th>Organization</th><th>Total</th><th>Tracking</th><th>Ship Date</th><th>Action</th></tr></thead><tbody>' + tbody + '</tbody></table>';
         shippedLoaded = true;
       } catch (e) {
         el.innerHTML = `<div class="empty-state">Failed to load: ${esc(e.message)}</div>`;
+      }
+    }
+
+    async function triggerTrackingSync() {
+      const btn = document.getElementById('syncTrackingBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Syncing…';
+      try {
+        const resp = await fetch('/api/admin/trigger-tracking-sync', { method: 'POST' });
+        const data = await resp.json();
+        if (!resp.ok) {
+          alert('Error: ' + (data.error || 'Unknown error'));
+          btn.disabled = false;
+          btn.textContent = '🔄 Sync Now';
+          return;
+        }
+        btn.textContent = '✓ Syncing in background…';
+        // Reload the table after ~35s to show updated ship dates
+        setTimeout(() => {
+          shippedLoaded = false;
+          btn.disabled = false;
+          btn.textContent = '🔄 Sync Now';
+          loadShippedOrders();
+        }, 35000);
+      } catch (e) {
+        alert('Error: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = '🔄 Sync Now';
       }
     }
 

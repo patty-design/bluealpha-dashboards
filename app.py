@@ -9083,6 +9083,16 @@ def _tracking_sync_worker():
 threading.Thread(target=_tracking_sync_worker, daemon=True).start()
 
 
+@app.route("/api/admin/trigger-tracking-sync", methods=["POST"])
+def admin_trigger_tracking_sync():
+    """Trigger tracking sync from the admin portal (session cookie auth)."""
+    c = cors()
+    if not check_admin_session(request):
+        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+    threading.Thread(target=_run_tracking_sync, daemon=True).start()
+    return Response(json.dumps({"ok": True, "message": "Tracking sync started — ship dates will update in ~30 seconds"}), headers=c, mimetype="application/json")
+
+
 @app.route("/api/admin/sync-tracking", methods=["POST"])
 def admin_sync_tracking():
     """Manually trigger a tracking sync (admin only)."""
