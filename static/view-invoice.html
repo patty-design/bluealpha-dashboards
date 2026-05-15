@@ -78,7 +78,7 @@
   </div>
 
   <div class="container">
-    <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
+    <div id="backBtnRow" style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
       <button id="backBtn" onclick="goBack()" style="background:none;border:none;cursor:pointer;color:#1B2438;font-size:0.9rem;font-weight:600;display:flex;align-items:center;gap:6px;padding:0;">
         ← Back to Invoices
       </button>
@@ -104,9 +104,10 @@
     const recordId = location.pathname.split('/').pop();
     const inPortal = window.self !== window.top;
 
-    // Hide header when inside portal iframe
+    // Hide header + back button when inside portal iframe (portal provides its own back button)
     if (inPortal) {
       document.getElementById('pageHeader').style.display = 'none';
+      document.getElementById('backBtnRow').style.display = 'none';
     }
 
     function goBack() {
