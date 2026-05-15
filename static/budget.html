@@ -540,6 +540,7 @@
           <div class="progress-fill" id="ov-exp-bar" style="background:var(--green);width:0%"></div>
         </div>
       </div>
+      <div id="ov-bills-paid-line" style="font-size:0.78rem;color:var(--text2);margin-top:6px"></div>
     </div>
 
     <div class="section-header">Expenses</div>
@@ -615,6 +616,7 @@
       <span>＋</span> Add Bill
     </button>
     <div class="section-footer">
+      <span id="bills-paid-count">0 of 0 paid</span>
       <span>Budgeted: <strong id="bills-total-budgeted">$0</strong></span>
       <span>Spent: <strong id="bills-total-actual">$0</strong></span>
     </div>
@@ -697,6 +699,10 @@
   <div class="sheet-field">
     <div class="sheet-label">Budgeted Amount ($)</div>
     <input class="sheet-input" id="exp-budget-input" type="number" inputmode="decimal" placeholder="0.00" min="0" step="0.01">
+  </div>
+  <div class="sheet-field">
+    <div class="sheet-label">Due Day (optional)</div>
+    <input class="sheet-input" id="bill-dueday-input" type="number" inputmode="numeric" placeholder="e.g. 15" min="1" max="31" style="font-size:16px">
   </div>
   <div class="sheet-actions">
     <button class="sheet-cancel" onclick="closeSheets()">Cancel</button>
@@ -801,12 +807,17 @@ function loadData() {
     month: ym
   };
   if (!raw) return def;
-  // Month rollover — reset expenses.actual and oneOffExpenses
+  // Month rollover — reset expenses.actual, paidDate, and oneOffExpenses
   if (raw.month !== ym) {
-    (raw.expenses || []).forEach(e => { e.actual = 0; });
+    (raw.expenses || []).forEach(e => { e.actual = 0; e.paidDate = null; });
     raw.oneOffExpenses = [];
     raw.month = ym;
   }
+  // Backfill missing dueDay/paidDate fields
+  (raw.expenses || []).forEach(e => {
+    if (e.dueDay === undefined) e.dueDay = null;
+    if (e.paidDate === undefined) e.paidDate = null;
+  });
   return {
     income: raw.income || def.income,
     expenses: raw.expenses || [],
@@ -825,6 +836,12 @@ function saveData(d) {
 let data = loadData();
 
 // ── Helpers ───────────────────────────────────────────────────────────────
+function ordinal(n) {
+  const s = ['th','st','nd','rd'];
+  const v = n % 100;
+  return n + (s[(v-20)%10] || s[v] || s[0]);
+}
+
 function fmt(n) {
   if (n == null || isNaN(n)) n = 0;
   return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -920,6 +937,9 @@ function renderOverview() {
   const expBar = document.getElementById('ov-exp-bar');
   expBar.style.width = (totalBudgeted > 0 ? expPct : 0) + '%';
   expBar.style.background = expOver ? 'var(--red)' : 'var(--green)';
+  const billsPaidCount = data.expenses.filter(e => e.paidDate).length;
+  const billsTotalCount = data.expenses.length;
+  document.getElementById('ov-bills-paid-line').textContent = billsTotalCount > 0 ? `${billsPaidCount} of ${billsTotalCount} bills paid` : '';
 
   document.getElementById('ov-varexp-actual').textContent = fmt(oneOffTotal);
 
@@ -1069,9 +1089,19 @@ function closeAllInlineEdits() {
 // ── Bills ─────────────────────────────────────────────────────────────────
 let editingActualId = null;
 
+function fmtPaidDate(dateStr) {
+  // dateStr = "YYYY-MM-DD"
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 function renderBills() {
   const list = document.getElementById('bills-list');
   list.innerHTML = '';
+
+  const today = new Date();
+  const todayDay = today.getDate();
 
   if (data.expenses.length === 0) {
     list.innerHTML = '<div class="empty-state">No bills yet.<br>Tap Add Bill to get started.</div>';
@@ -1080,22 +1110,47 @@ function renderBills() {
   data.expenses.forEach(exp => {
     const card = document.createElement('div');
     card.className = 'expense-card';
-
-    const row = document.createElement('div');
-    row.className = 'expense-row';
-
-    const nameEl = document.createElement('span');
-    nameEl.className = 'expense-name';
-    nameEl.textContent = exp.name;
-
-    const budgetedEl = document.createElement('span');
-    budgetedEl.className = 'expense-amt';
-    budgetedEl.textContent = fmt(exp.budgeted);
+    // Paid state: green left border
+    if (exp.paidDate) {
+      card.style.borderLeft = '3px solid #34c759';
+    }
 
     const isOver = (exp.actual || 0) > (exp.budgeted || 0);
+    const isOverdue = exp.dueDay && !exp.paidDate && todayDay > exp.dueDay;
+
+    // ── Top row: Name + Delete ──
+    const topRow = document.createElement('div');
+    topRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:4px';
+
+    const nameEl = document.createElement('span');
+    nameEl.style.cssText = 'font-weight:700;font-size:0.95rem';
+    nameEl.textContent = exp.name;
+
+    const delBtn = document.createElement('button');
+    delBtn.style.cssText = 'background:none;border:none;font-size:16px;color:var(--text2);cursor:pointer;touch-action:manipulation;padding:0;line-height:1;flex-shrink:0';
+    delBtn.textContent = '✕';
+    delBtn.onclick = () => deleteExpense(exp.id);
+
+    topRow.appendChild(nameEl);
+    topRow.appendChild(delBtn);
+
+    // ── Middle row: Due day | Budgeted | Actual ──
+    const midRow = document.createElement('div');
+    midRow.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap';
+
+    if (exp.dueDay) {
+      const dueEl = document.createElement('span');
+      dueEl.style.cssText = 'font-size:0.82rem;' + (isOverdue ? 'color:#ff3b30;font-weight:600' : 'color:var(--text2)');
+      dueEl.textContent = 'Due the ' + ordinal(exp.dueDay);
+      midRow.appendChild(dueEl);
+    }
+
+    const budgetedEl = document.createElement('span');
+    budgetedEl.style.cssText = 'font-size:0.82rem;color:var(--text2)';
+    budgetedEl.textContent = 'Budgeted: ' + fmt(exp.budgeted);
+    midRow.appendChild(budgetedEl);
 
     if (editingActualId === exp.id) {
-      // Inline editing actual amount
       const wrap = document.createElement('div');
       wrap.className = 'expense-inline-wrap';
 
@@ -1115,17 +1170,7 @@ function renderBills() {
 
       wrap.appendChild(inp);
       wrap.appendChild(saveBtn);
-
-      const delBtn = document.createElement('button');
-      delBtn.className = 'expense-delete-btn';
-      delBtn.innerHTML = '✕';
-      delBtn.title = 'Delete';
-      delBtn.onclick = () => deleteExpense(exp.id);
-
-      row.appendChild(nameEl);
-      row.appendChild(budgetedEl);
-      row.appendChild(wrap);
-      row.appendChild(delBtn);
+      midRow.appendChild(wrap);
 
       setTimeout(() => { inp.focus(); inp.select(); }, 50);
       inp.addEventListener('keydown', (e) => {
@@ -1136,27 +1181,62 @@ function renderBills() {
     } else {
       const actualBtn = document.createElement('button');
       actualBtn.className = 'expense-actual-btn' + (isOver ? ' over' : '');
-      actualBtn.textContent = fmt(exp.actual || 0);
+      actualBtn.style.fontSize = '0.82rem';
       actualBtn.style.touchAction = 'manipulation';
+      actualBtn.textContent = 'Actual: ' + fmt(exp.actual || 0);
       actualBtn.onclick = () => { editingActualId = exp.id; renderBills(); };
-
-      const delBtn = document.createElement('button');
-      delBtn.className = 'expense-delete-btn';
-      delBtn.innerHTML = '✕';
-      delBtn.onclick = () => deleteExpense(exp.id);
-
-      row.appendChild(nameEl);
-      row.appendChild(budgetedEl);
-      row.appendChild(actualBtn);
-      row.appendChild(delBtn);
+      midRow.appendChild(actualBtn);
     }
 
-    card.appendChild(row);
+    // ── Bottom row: Mark Paid / Paid state ──
+    const bottomRow = document.createElement('div');
+    bottomRow.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:4px';
+
+    if (!exp.paidDate) {
+      const markPaidBtn = document.createElement('button');
+      markPaidBtn.style.cssText = 'background:#34c759;color:#fff;border:none;border-radius:20px;padding:6px 16px;font-size:0.85rem;font-weight:600;touch-action:manipulation;cursor:pointer;font-family:inherit';
+      markPaidBtn.textContent = 'Mark Paid';
+      markPaidBtn.onclick = () => {
+        const d = new Date();
+        const mm = String(d.getMonth()+1).padStart(2,'0');
+        const dd = String(d.getDate()).padStart(2,'0');
+        exp.paidDate = `${d.getFullYear()}-${mm}-${dd}`;
+        saveData(data);
+        renderBills();
+        renderOverview();
+      };
+      bottomRow.appendChild(markPaidBtn);
+    } else {
+      const paidLabel = document.createElement('span');
+      paidLabel.style.cssText = 'color:#34c759;font-size:0.85rem;font-weight:600';
+      paidLabel.textContent = '✓ Paid ' + fmtPaidDate(exp.paidDate);
+
+      const undoBtn = document.createElement('button');
+      undoBtn.style.cssText = 'background:none;border:none;color:var(--text2);font-size:0.78rem;cursor:pointer;touch-action:manipulation;padding:0;font-family:inherit';
+      undoBtn.textContent = 'Undo';
+      undoBtn.onclick = () => {
+        exp.paidDate = null;
+        saveData(data);
+        renderBills();
+        renderOverview();
+      };
+
+      bottomRow.appendChild(paidLabel);
+      bottomRow.appendChild(undoBtn);
+    }
+
+    card.appendChild(topRow);
+    card.appendChild(midRow);
+    card.appendChild(bottomRow);
     list.appendChild(card);
   });
 
   const totalBudgeted = data.expenses.reduce((s,e) => s + (e.budgeted||0), 0);
   const totalActual   = data.expenses.reduce((s,e) => s + (e.actual||0),   0);
+  const paidCount     = data.expenses.filter(e => e.paidDate).length;
+  const totalCount    = data.expenses.length;
+
+  document.getElementById('bills-paid-count').textContent    = `${paidCount} of ${totalCount} paid`;
   document.getElementById('bills-total-budgeted').textContent = fmt(totalBudgeted);
   document.getElementById('bills-total-actual').textContent   = fmt(totalActual);
 }
@@ -1309,6 +1389,7 @@ function escHtml(s) {
 function openBillSheet() {
   document.getElementById('exp-name-input').value   = '';
   document.getElementById('exp-budget-input').value = '';
+  document.getElementById('bill-dueday-input').value = '';
   document.getElementById('expense-overlay').classList.add('open');
   document.getElementById('expense-sheet').classList.add('open');
   setTimeout(() => document.getElementById('exp-name-input').focus(), 350);
@@ -1333,11 +1414,13 @@ function closeSheets() {
 function saveExpense() {
   const name   = document.getElementById('exp-name-input').value.trim();
   const budget = parseFloat(document.getElementById('exp-budget-input').value) || 0;
+  const dueDayRaw = document.getElementById('bill-dueday-input').value.trim();
+  const dueDay = dueDayRaw ? Math.min(31, Math.max(1, parseInt(dueDayRaw, 10))) : null;
   if (!name) {
     document.getElementById('exp-name-input').focus();
     return;
   }
-  data.expenses.push({ id: uid(), name, budgeted: budget, actual: 0 });
+  data.expenses.push({ id: uid(), name, budgeted: budget, actual: 0, dueDay, paidDate: null });
   saveData(data);
   closeSheets();
   renderBills();
