@@ -4,9 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Invoice — Blue Alpha</title>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; }
-    body { margin: 0; padding: 0; background: #f5f7fa; font-family: Arial, Helvetica, sans-serif; color: #1a2633; }
+    body { margin: 0; padding: 0; background: #f5f7fa; font-family: 'Lato', 'Helvetica Neue', Arial, sans-serif; color: #1a2633; }
     .page-header {
       background: #1B2438; padding: 18px 32px;
       display: flex; align-items: center; justify-content: space-between;
@@ -14,49 +15,50 @@
     .page-header .brand { color: #fff; font-size: 18px; font-weight: 800; letter-spacing: 2px; }
     .page-header .back  { color: #adc4e0; font-size: 0.85rem; text-decoration: none; }
     .page-header .back:hover { color: #fff; }
-    .container { max-width: 760px; margin: 16px auto; padding: 0 16px 60px; }
-    .card { background: #fff; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: hidden; }
-    .items-card { margin-bottom: 16px; }
+    .container { max-width: 760px; margin: 16px auto; padding: 0 20px 60px; }
 
+    /* invoiceCard is a transparent wrapper — the inner boxes carry their own borders */
+    #invoiceCard { background: transparent; box-shadow: none; border-radius: 0; overflow: visible; padding: 0; }
 
     /* Invoice header bar */
-    .inv-header { background: #1B2438; padding: 20px 28px; display: flex; align-items: flex-start; justify-content: space-between; border-radius: 10px 10px 0 0; }
+    .inv-header { background: #1B2438; padding: 20px 28px; display: flex; align-items: flex-start; justify-content: space-between; }
     .inv-header .title { color: #fff; }
-    .inv-header .title h1 { margin: 0 0 3px; font-size: 1.3rem; font-weight: 800; letter-spacing: 1px; }
+    .inv-header .title h1 { margin: 0 0 3px; font-size: 1.3rem; font-weight: 800; letter-spacing: 1px; font-family: 'Montserrat', sans-serif; }
     .inv-header .title .inv-num { color: #adc4e0; font-size: 0.9rem; }
 
-    /* Meta grid — 2 columns (addresses left, details right) */
-    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-bottom: 1px solid #eee; }
+    /* Meta grid — 3 columns: Bill To | Ship To | Details */
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; background: #fff; }
     .meta-block { padding: 18px 28px; }
     .meta-block + .meta-block { border-left: 1px solid #eee; }
-    /* Bill To + Ship To sub-columns inside left block */
-    .addr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
     /* Label+value pairs (details column) */
-    .meta-label { margin: 0 0 2px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #8a99aa; font-weight: 700; }
+    .meta-label { margin: 0 0 2px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #8a99aa; font-weight: 700; font-family: 'Montserrat', sans-serif; }
     .meta-value { margin: 0 0 10px; font-size: 0.9rem; color: #1a2633; }
     /* Address labels + lines */
-    .addr-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #8a99aa; font-weight: 700; margin-bottom: 7px; }
+    .addr-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #8a99aa; font-weight: 700; margin: 0 0 7px; font-family: 'Montserrat', sans-serif; }
     .addr-line  { font-size: 0.88rem; color: #1a2633; margin: 0 0 3px; line-height: 1.45; }
 
     /* Line items table */
-    .items-wrap { padding: 0 28px 16px; }
-    table.items { width: 100%; border-collapse: collapse; margin-top: 24px; }
+    table.items { width: 100%; border-collapse: collapse; }
     table.items thead tr { background: transparent; }
-    table.items thead { outline: 2px solid #1B2438; border-radius: 6px; }
-    table.items thead th { padding: 10px 12px; color: #8a99aa; font-size: 0.72rem; text-transform: uppercase;
-                            letter-spacing: 0.06em; font-weight: 700; text-align: left; }
+    table.items thead { border-bottom: 2px solid #1B2438; }
+    table.items thead th { padding: 10px 16px; color: #8a99aa; font-size: 0.72rem; text-transform: uppercase;
+                            letter-spacing: 0.06em; font-weight: 700; text-align: left; font-family: 'Montserrat', sans-serif; }
+    table.items thead th:first-child { padding-left: 28px; }
+    table.items thead th:last-child  { padding-right: 28px; }
     table.items thead th.right { text-align: right; }
     table.items thead th.center { text-align: center; }
     table.items tbody tr { border-bottom: 1px solid #eee; }
     table.items tbody tr:last-child { border-bottom: none; }
-    table.items tbody td { padding: 10px 12px; font-size: 0.88rem; color: #1a2633; }
+    table.items tbody td { padding: 10px 16px; font-size: 0.88rem; color: #1a2633; }
+    table.items tbody td:first-child { padding-left: 28px; }
+    table.items tbody td:last-child  { padding-right: 28px; }
     table.items tbody td.right { text-align: right; }
     table.items tbody td.center { text-align: center; }
-    .totals-row { display: flex; justify-content: flex-end; padding: 0 28px 8px; }
-    .totals-box { min-width: 240px; }
-    .totals-line { display: flex; justify-content: space-between; padding: 6px 0;
-                   font-size: 0.88rem; color: #555; border-top: 1px solid #eee; }
-    .totals-line.grand { font-size: 1rem; font-weight: 800; color: #1B2438; border-top: 2px solid #1B2438; }
+
+    /* Totals row */
+    .totals-row { display: flex; justify-content: flex-end; padding: 10px 28px 14px; }
+    .totals-box { min-width: 240px; border-top: 2px solid #1B2438; padding-top: 8px;
+                  display: flex; justify-content: space-between; font-size: 1rem; font-weight: 700; color: #1B2438; }
 
     /* Footer note */
     .inv-footer { padding: 20px 28px; background: #f5f7fa; border-top: 1px solid #eee;
@@ -73,7 +75,7 @@
       .meta-grid { grid-template-columns: 1fr; }
       .meta-block + .meta-block { border-left: none; border-top: 1px solid #eee; }
       .inv-header { flex-direction: column; gap: 10px; }
-      .items-wrap, .meta-block, .totals-row, .inv-footer { padding-left: 16px; padding-right: 16px; }
+      .meta-block, .totals-row, .inv-footer { padding-left: 16px; padding-right: 16px; }
     }
   </style>
 </head>
@@ -220,12 +222,8 @@
           </div>
 
           <div class="meta-grid">
-            <div class="meta-block">
-              <div class="addr-grid">
-                <div>${addrBlock('Bill To', billLines)}</div>
-                <div>${addrBlock('Ship To', shipLines)}</div>
-              </div>
-            </div>
+            <div class="meta-block">${addrBlock('Bill To', billLines)}</div>
+            <div class="meta-block">${addrBlock('Ship To', shipLines)}</div>
             <div class="meta-block">
               ${kv('Invoice Date', fmt(inv.date))}
               ${kv('Due Date', dueDate)}
@@ -235,8 +233,7 @@
           </div>
           </div><!-- /upper box -->
 
-          <div class="items-card">
-          <div class="items-wrap" style="padding:0 28px 0;">
+          <div style="border:2px solid #1B2438;border-radius:10px;overflow:hidden;">
             <table class="items">
               <thead>
                 <tr>
@@ -246,18 +243,15 @@
                   <th class="right">Total</th>
                 </tr>
               </thead>
-              <tbody>${liRows || '<tr><td colspan="4" style="text-align:center;color:#aaa;padding:20px;">No line items</td></tr>'}</tbody>
+              <tbody>${liRows || '<tr><td colspan="4" style="text-align:center;color:#aaa;padding:20px 28px;">No line items</td></tr>'}</tbody>
             </table>
-          </div>
-          <div class="totals-row" style="padding-top:4px;padding-bottom:14px;">
-            <div class="totals-box">
-              <div class="totals-line grand">
+            <div class="totals-row">
+              <div class="totals-box">
                 <span>Total Due</span>
                 <span>${money(inv.subtotal)}</span>
               </div>
             </div>
-          </div>
-          </div><!-- /items-card -->
+          </div><!-- /items card -->
 
           ${(inv.stripeCcUrl || inv.stripeAchUrl) ? `
           <div id="paymentSection" style="padding:20px 28px;border-top:1px solid #eee;background:#f9fafb;">

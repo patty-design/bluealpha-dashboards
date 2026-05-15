@@ -181,8 +181,7 @@
       background: transparent;
     }
     .items-table thead {
-      outline: 2px solid #1B2438;
-      border-radius: 6px;
+      border-bottom: 2px solid #1B2438;
     }
     .items-table th {
       text-align: left;
@@ -191,11 +190,11 @@
       text-transform: uppercase;
       letter-spacing: 0.06em;
       color: var(--muted);
-      padding: 10px 12px;
+      padding: 10px 16px;
     }
     .items-table th.right { text-align: right; }
     .items-table td {
-      padding: 10px 12px;
+      padding: 10px 16px;
       border-bottom: 1px solid var(--border);
       vertical-align: middle;
     }
@@ -536,10 +535,13 @@ if (window.self !== window.top) {
 
     <!-- Meta section: Bill To + Details -->
     <div id="customerCard" style="background:#fff;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;">
         <div style="padding:18px 28px;border-right:1px solid #eee;">
           <div id="custInfo"></div>
           <button id="editAddressBtn" class="btn btn-secondary" style="display:none;padding:4px 10px;font-size:0.78rem;margin-top:10px;" onclick="openAddressEdit()">Edit Addresses</button>
+        </div>
+        <div style="padding:18px 28px;border-right:1px solid #eee;">
+          <div id="shipInfo"></div>
         </div>
         <div style="padding:18px 28px;">
           <div id="metaRow"></div>
@@ -581,27 +583,27 @@ if (window.self !== window.top) {
     </div><!-- /upper box -->
 
     <!-- Items -->
-    <div class="card" style="padding:0;border:none;box-shadow:none;background:transparent;">
+    <div style="border:2px solid #1B2438;border-radius:10px;overflow:hidden;">
       <table class="items-table" id="itemsTable" style="margin:0;">
         <thead>
           <tr>
             <th style="padding-left:28px;">Description</th>
             <th class="right">Qty</th>
             <th class="right">Unit Price</th>
-            <th class="right" style="padding-right:28px;">Total</th>
-            <th id="thRemove"></th>
+            <th class="right" style="padding-right:28px;" id="thTotal">Total</th>
+            <th id="thRemove" style="width:36px;"></th>
           </tr>
         </thead>
         <tbody id="itemsTbody"></tbody>
       </table>
 
       <!-- Totals (inside the box) -->
-      <div style="display:flex;justify-content:flex-end;padding:8px 28px 14px;">
-        <div style="min-width:240px;">
-          <div id="vRowShipping" class="hidden" style="display:flex;justify-content:space-between;padding:6px 0;font-size:0.88rem;color:#555;border-top:1px solid var(--border);">
+      <div style="display:flex;justify-content:flex-end;padding:10px 28px 14px;">
+        <div style="min-width:240px;border-top:2px solid #1B2438;padding-top:8px;">
+          <div id="vRowShipping" class="hidden" style="display:flex;justify-content:space-between;padding-bottom:6px;font-size:0.88rem;color:#555;">
             <span>Shipping</span><span id="vShipping">$0.00</span>
           </div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0 4px;font-size:1rem;font-weight:700;color:#1B2438;border-top:2px solid #1B2438;">
+          <div style="display:flex;justify-content:space-between;font-size:1rem;font-weight:700;color:#1B2438;">
             <span>Total Due</span><span id="vTotal">$0.00</span>
           </div>
         </div>
@@ -822,30 +824,27 @@ function render() {
 
 function renderCustomer() {
   const c = quoteData.customer || {};
-  const custEl = document.getElementById('custInfo');
-  if (custEl) {
-    const s = 'font-size:0.88rem;';
-    function addrBlock(title, lines) {
-      let html = `<p style="margin:0 0 8px;font-size:0.72rem;text-transform:uppercase;letter-spacing:.08em;color:#8a99aa;font-weight:700;">${title}</p>`;
-      lines.filter(Boolean).forEach((ln, i) => {
-        html += `<p style="margin:0 0 3px;font-size:0.88rem;color:#1a2633;${i===0?'font-weight:700;':''}">${escHtml(ln)}</p>`;
-      });
-      return html;
-    }
 
-    const billLines = [c.billToOrg||c.orgName, c.billToName||c.contactName, c.billToAddr1, c.billToAddr2];
-    const shipCity  = c.city || '';
-    const shipState = c.state ? c.state.toUpperCase() : '';
-    const shipZip   = c.zip || '';
-    const shipLine2 = [shipCity, [shipState, shipZip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
-    const shipLines = [c.orgName, c.contactName, c.address1, shipLine2];
-
-    custEl.innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
-        <div style="padding-right:16px;">${addrBlock('Bill To', billLines)}</div>
-        <div>${addrBlock('Ship To', shipLines)}</div>
-      </div>`;
+  function addrBlock(title, lines) {
+    let html = `<p style="margin:0 0 7px;font-size:0.72rem;text-transform:uppercase;letter-spacing:.08em;color:#8a99aa;font-weight:700;">${title}</p>`;
+    lines.filter(Boolean).forEach((ln, i) => {
+      html += `<p style="margin:0 0 3px;font-size:0.88rem;color:#1a2633;line-height:1.45;${i===0?'font-weight:700;':''}">${escHtml(ln)}</p>`;
+    });
+    return html;
   }
+
+  const billLines = [c.billToOrg||c.orgName, c.billToName||c.contactName, c.billToAddr1, c.billToAddr2];
+  const shipCity  = c.city || '';
+  const shipState = c.state ? c.state.toUpperCase() : '';
+  const shipZip   = c.zip || '';
+  const shipLine2 = [shipCity, [shipState, shipZip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  const shipLines = [c.orgName, c.contactName, c.address1, shipLine2];
+
+  const custEl = document.getElementById('custInfo');
+  if (custEl) custEl.innerHTML = addrBlock('Bill To', billLines);
+
+  const shipEl = document.getElementById('shipInfo');
+  if (shipEl) shipEl.innerHTML = addrBlock('Ship To', shipLines);
 }
 
 function renderQuoteDetails() {
@@ -904,22 +903,22 @@ function renderItemsTable() {
 
     if (editable) {
       tr.innerHTML = `
-        <td>${escHtml(item.name)}</td>
+        <td style="padding-left:28px;">${escHtml(item.name)}</td>
         <td class="right">
           <input type="number" class="qty-input" min="1" value="${item.qty}"
                  data-idx="${i}" onchange="onQtyChange(this)">
         </td>
         <td class="right muted">$${item.unitPrice.toFixed(2)}</td>
-        <td class="right" id="vLineTotal_${i}">$${lineTotal}</td>
-        <td><button class="btn-remove" onclick="removeViewItem(${i})" title="Remove">✕</button></td>
+        <td class="right" id="vLineTotal_${i}" style="padding-right:28px;">$${lineTotal}</td>
+        <td style="padding:0;width:36px;"><button class="btn-remove" onclick="removeViewItem(${i})" title="Remove">✕</button></td>
       `;
     } else {
       tr.innerHTML = `
-        <td>${escHtml(item.name)}</td>
+        <td style="padding-left:28px;">${escHtml(item.name)}</td>
         <td class="right">${item.qty}</td>
         <td class="right muted">$${item.unitPrice.toFixed(2)}</td>
-        <td class="right">$${lineTotal}</td>
-        <td></td>
+        <td class="right" style="padding-right:28px;">$${lineTotal}</td>
+        <td style="padding:0;"></td>
       `;
     }
     tbody.appendChild(tr);
