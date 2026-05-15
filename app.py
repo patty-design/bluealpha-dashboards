@@ -8338,14 +8338,16 @@ def portal_admin_shipped_orders(user):
             fields=["Order ID", "Document ID"],
             formula='{Order Type}="Invoice"',
         )
-        # Build dict: order_id -> inv_number (Document ID of the invoice)
-        invoiced_ids = {}
+        # Build dicts: order_id -> inv_number, order_id -> inv_record_id
+        invoiced_ids     = {}
+        invoiced_rec_ids = {}
         for ir in inv_records:
             f = ir.get("fields", {})
             oid = str(f.get("Order ID", "")).strip()
             doc = f.get("Document ID", "")
             if oid:
-                invoiced_ids[oid] = doc
+                invoiced_ids[oid]     = doc
+                invoiced_rec_ids[oid] = ir["id"]
 
         # Fetch tracking + ship date from SO Tracking Link
         tracking_recs = at_get_all(
@@ -8374,19 +8376,21 @@ def portal_admin_shipped_orders(user):
             org_name = org_name_list[0] if org_name_list else ""
             adj_prices = f.get("Adj. Unit Price (from MO Line Items)", [])
             total = round(sum(float(p or 0) for p in adj_prices), 2)
-            invoiced   = order_id in invoiced_ids
-            inv_number = invoiced_ids.get(order_id)
+            invoiced        = order_id in invoiced_ids
+            inv_number      = invoiced_ids.get(order_id)
+            inv_record_id   = invoiced_rec_ids.get(order_id, "")
             orders.append({
-                "record_id":  rec["id"],
-                "so_number":  so_number,
-                "order_id":   order_id,
-                "date":       f.get("Date", ""),
-                "ship_date":  ship_date_map.get(so_number, ""),
-                "org_name":   org_name,
-                "total":      total,
-                "tracking":   tracking,
-                "invoiced":   invoiced,
-                "inv_number": inv_number,
+                "record_id":    rec["id"],
+                "so_number":    so_number,
+                "order_id":     order_id,
+                "date":         f.get("Date", ""),
+                "ship_date":    ship_date_map.get(so_number, ""),
+                "org_name":     org_name,
+                "total":        total,
+                "tracking":     tracking,
+                "invoiced":     invoiced,
+                "inv_number":   inv_number,
+                "inv_record_id": inv_record_id,
             })
 
         orders.sort(key=lambda x: x.get("date", ""), reverse=True)
@@ -8630,7 +8634,7 @@ def portal_admin_convert_to_invoice(user, record_id):
         _ORDERS_CACHE.clear()
         _INVOICES_CACHE.clear()
 
-        return Response(json.dumps({"success": True, "invNumber": inv_number}), headers=c, mimetype="application/json")
+        return Response(json.dumps({"success": True, "invNumber": inv_number, "invRecordId": inv_record_id}), headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
@@ -8719,12 +8723,14 @@ def admin_shipped_orders():
             fields=["Document ID", "Order ID", "Date", "Bill-To Org Name (from Customer)", "MO Line Items"],
             formula='AND({Order Type}="Sales Order",{Sales Order Status}="Approved",IS_AFTER({Date},"2026-04-30"))',
         )
-        # Existing invoices: order_id → inv_number
+        # Existing invoices: order_id → inv_number + record_id
         inv_recs = at_get_all(MANUAL_ORDERS_TABLE_ID, read_token,
                                fields=["Order ID", "Document ID"],
                                formula='{Order Type}="Invoice"')
-        invoiced = {r["fields"].get("Order ID", ""): r["fields"].get("Document ID", "")
-                    for r in inv_recs if r.get("fields", {}).get("Order ID")}
+        invoiced         = {r["fields"].get("Order ID", ""): r["fields"].get("Document ID", "")
+                            for r in inv_recs if r.get("fields", {}).get("Order ID")}
+        invoiced_rec_ids = {r["fields"].get("Order ID", ""): r["id"]
+                            for r in inv_recs if r.get("fields", {}).get("Order ID")}
         # Tracking + ship date map: SO number → tracking #, ship date
         tracking_recs = at_get_all(_SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
                                     fields=["Order #", "Tracking #", "Ship Date"], base_id=_SO_TRACKING_BASE)
@@ -8760,16 +8766,17 @@ def admin_shipped_orders():
             org_name = org_list[0] if isinstance(org_list, list) and org_list else (org_list or "")
             total    = round(sum(li_total_map.get(lid, 0) for lid in f.get("MO Line Items", [])), 2)
             orders.append({
-                "record_id":  rec["id"],
-                "so_number":  so_number,
-                "order_id":   order_id,
-                "date":       f.get("Date", ""),
-                "ship_date":  ship_date_map.get(so_number, ""),
-                "org_name":   org_name,
-                "total":      total,
-                "tracking":   tracking,
-                "invoiced":   order_id in invoiced,
-                "inv_number": invoiced.get(order_id),
+                "record_id":     rec["id"],
+                "so_number":     so_number,
+                "order_id":      order_id,
+                "date":          f.get("Date", ""),
+                "ship_date":     ship_date_map.get(so_number, ""),
+                "org_name":      org_name,
+                "total":         total,
+                "tracking":      tracking,
+                "invoiced":      order_id in invoiced,
+                "inv_number":    invoiced.get(order_id),
+                "inv_record_id": invoiced_rec_ids.get(order_id, ""),
             })
         orders.sort(key=lambda x: x["date"], reverse=True)
         return Response(json.dumps({"orders": orders}), headers=c, mimetype="application/json")
@@ -8969,7 +8976,7 @@ def admin_convert_to_invoice(record_id):
 
         _ORDERS_CACHE.clear()
         _INVOICES_CACHE.clear()
-        return Response(json.dumps({"success": True, "invNumber": inv_number}), headers=c, mimetype="application/json")
+        return Response(json.dumps({"success": True, "invNumber": inv_number, "invRecordId": inv_record_id}), headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 

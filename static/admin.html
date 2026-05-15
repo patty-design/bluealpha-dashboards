@@ -884,7 +884,9 @@
           const soLink = `<a href="/view-quote/${esc(o.record_id)}" target="_blank" rel="noopener" style="font-weight:700;color:#1B2438;text-decoration:none;" title="View sales order">${esc(o.so_number)} ↗</a>`;
           const shipDateCell = o.ship_date ? fmt(o.ship_date) : '<span style="color:#aaa;">—</span>';
           const actionCell = o.invoiced
-            ? `<span style="color:#2d7a2d;font-weight:600;font-size:0.85rem;">Invoiced ✓ ${esc(o.inv_number||'')}</span>`
+            ? (o.inv_record_id
+                ? `<a href="/view-quote/${esc(o.inv_record_id)}" target="_blank" rel="noopener" style="color:#2d7a2d;font-weight:600;font-size:0.85rem;text-decoration:none;">Invoiced ✓ ${esc(o.inv_number||'')} ↗</a>`
+                : `<span style="color:#2d7a2d;font-weight:600;font-size:0.85rem;">Invoiced ✓ ${esc(o.inv_number||'')}</span>`)
             : `<button class="btn btn-primary" style="padding:5px 12px;font-size:0.82rem;" onclick="openInvoiceModal('${esc(o.record_id)}','${esc(o.so_number)}',this)">Convert to Invoice</button>`;
           return `<tr>
             <td>${soLink}</td>
@@ -1069,7 +1071,10 @@
         }
         // Update the button in the table
         if (_invoiceModalBtn) {
-          _invoiceModalBtn.parentElement.innerHTML = `<span style="color:#2d7a2d;font-weight:600;font-size:0.85rem;">Invoiced ✓ ${esc(data.invNumber||'')}</span>`;
+          const invLink = data.invRecordId
+            ? `<a href="/view-quote/${esc(data.invRecordId)}" target="_blank" rel="noopener" style="color:#2d7a2d;font-weight:600;font-size:0.85rem;text-decoration:none;">Invoiced ✓ ${esc(data.invNumber||'')} ↗</a>`
+            : `<span style="color:#2d7a2d;font-weight:600;font-size:0.85rem;">Invoiced ✓ ${esc(data.invNumber||'')}</span>`;
+          _invoiceModalBtn.parentElement.innerHTML = invLink;
         }
         closeInvoiceModal();
       } catch (e) {
