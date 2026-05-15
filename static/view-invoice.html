@@ -196,8 +196,8 @@
         // Address helpers
         function addrBlock(title, lines) {
           let html = `<div class="addr-title">${title}</div>`;
-          lines.filter(Boolean).forEach((ln) => {
-            html += `<p class="addr-line">${esc(ln)}</p>`;
+          lines.filter(Boolean).forEach((ln, i) => {
+            html += `<p class="addr-line"${i===0?' style="font-weight:700;"':''}>${esc(ln)}</p>`;
           });
           return html;
         }
@@ -216,8 +216,7 @@
               <div class="inv-num">${esc(inv.invNumber)}</div>
             </div>
             <div style="text-align:right;">
-              <div style="color:#adc4e0;font-size:0.82rem;margin-bottom:4px;">Sales Order: <strong style="color:#fff;">${esc(inv.soNumber)}</strong></div>
-              ${inv.poNumber ? `<div style="color:#adc4e0;font-size:0.82rem;">PO #: <strong style="color:#fff;">${esc(inv.poNumber)}</strong></div>` : ''}
+              <div style="color:#adc4e0;font-size:0.85rem;font-weight:600;">${esc(inv.orgName || '')}</div>
             </div>
           </div>
 
@@ -225,8 +224,10 @@
             <div class="meta-block">${addrBlock('Bill To', billLines)}</div>
             <div class="meta-block">${addrBlock('Ship To', shipLines)}</div>
             <div class="meta-block">
+              ${inv.soNumber ? kv('Sales Order', inv.soNumber) : ''}
               ${kv('Invoice Date', fmt(inv.date))}
               ${kv('Due Date', dueDate)}
+              ${inv.poNumber ? kv('PO #', esc(inv.poNumber)) : ''}
               ${inv.shipDate ? kv('Ship Date', fmt(inv.shipDate)) : ''}
               ${inv.tracking ? kv('Tracking', trackingHtml) : ''}
             </div>
