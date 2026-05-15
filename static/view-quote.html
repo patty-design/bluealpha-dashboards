@@ -888,7 +888,8 @@ function renderItemsTable() {
   const canEdit = !portalUser || portalUser.canCreateQuote !== false;
   const editable = !q.isAccepted && !q.isExpired && canEdit;
 
-  document.getElementById('itemCount').textContent = editItems.length;
+  const _ic = document.getElementById('itemCount');
+  if (_ic) _ic.textContent = editItems.length;
 
   const tbody = document.getElementById('itemsTbody');
   tbody.innerHTML = '';
