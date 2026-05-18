@@ -1532,6 +1532,18 @@ function vDoAdd() {
   );
   if (!sku) { alert('Could not find matching product. Please check your selections.'); return; }
 
+  // If this SKU is already on the quote, just increment qty instead of duplicating
+  const existing = editItems.find(i => i.skuRecordId === sku.recordId);
+  if (existing) {
+    existing.qty += qty;
+    markDirty();
+    renderItemsTable();
+    document.getElementById('vProd').value = '';
+    vResetFrom('color');
+    document.getElementById('vQty').value = 1;
+    return;
+  }
+
   editItems.push({
     skuRecordId: sku.recordId,
     skuId:       sku.skuId || '',
