@@ -297,7 +297,9 @@
     }
     .items-table th:first-child { padding-left: 28px; }
     .items-table th:last-child  { padding-right: 28px; }
-    .items-table th.right { text-align: right; }
+    .items-table th.right  { text-align: right; }
+    .items-table th.center { text-align: center; }
+    .items-table td.center { text-align: center; }
 
     .items-table td {
       padding: 12px 16px;
@@ -766,7 +768,7 @@ if (window.self !== window.top) {
           <thead>
             <tr>
               <th>Description</th>
-              <th class="right">Qty</th>
+              <th class="center">Qty</th>
               <th class="right">Unit Price</th>
               <th class="right" id="thTotal">Total</th>
               <th id="thRemove" style="width:40px;"></th>
@@ -1061,7 +1063,7 @@ function renderItemsTable() {
     if (editable) {
       tr.innerHTML = `
         <td>${escHtml(item.name)}</td>
-        <td class="right">
+        <td class="center">
           <input type="number" class="qty-input" min="1" value="${item.qty}"
                  data-idx="${i}" onchange="onQtyChange(this)">
         </td>
@@ -1072,7 +1074,7 @@ function renderItemsTable() {
     } else {
       tr.innerHTML = `
         <td>${escHtml(item.name)}</td>
-        <td class="right">${item.qty}</td>
+        <td class="center">${item.qty}</td>
         <td class="right muted">$${item.unitPrice.toFixed(2)}</td>
         <td class="right">$${lineTotal}</td>
         <td></td>
