@@ -4725,13 +4725,13 @@ def create_quote():
 
         if provided_cust_id:
             cust_id = provided_cust_id
-            # Update customer record with any form changes
+            # Only update address/phone — never overwrite org name or contact name from the
+            # quote form, as Chrome autofill can corrupt those fields on the customer record
+            # and break billing info on ALL existing quotes for that customer.
             _cust_update = {}
-            if org_name:     _cust_update["Organization Name"]             = org_name
-            if contact_name: _cust_update["Main Contact Name"]             = contact_name
-            if phone:        _cust_update["Main Contact Phone #"]          = phone
-            if _line1:       _cust_update["Customer Address (Line 1)"]     = _line1
-            if _line2:       _cust_update["Customer Address (Line 2)"]     = _line2
+            if phone:  _cust_update["Main Contact Phone #"]      = phone
+            if _line1: _cust_update["Customer Address (Line 1)"] = _line1
+            if _line2: _cust_update["Customer Address (Line 2)"] = _line2
             if _cust_update:
                 try:
                     req_lib.patch(

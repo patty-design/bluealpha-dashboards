@@ -1419,10 +1419,21 @@
     ['cpMsg','profMsg'].forEach(id => { const el = document.getElementById(id); el.className = 'modal-msg'; el.textContent = ''; });
     document.getElementById('pwMatchMsg').style.display = 'none';
 
-    // Set profile fields then open — autofill can't fire before modal is visible
-    document.getElementById('profName').value  = profName;
-    document.getElementById('profEmail').value = profEmail;
+    // Set profile fields with readonly to block Chrome autofill, then remove readonly after delay
+    const pn = document.getElementById('profName');
+    const pe = document.getElementById('profEmail');
+    pn.setAttribute('readonly', 'readonly');
+    pe.setAttribute('readonly', 'readonly');
+    pn.value = profName;
+    pe.value = profEmail;
     document.getElementById('changePwModal').classList.add('open');
+    // Remove readonly after Chrome's autofill window (200ms), re-assert correct values
+    setTimeout(() => {
+      pn.value = profName;
+      pe.value = profEmail;
+      pn.removeAttribute('readonly');
+      pe.removeAttribute('readonly');
+    }, 300);
   }
   function closeChangePw() {
     document.getElementById('changePwModal').classList.remove('open');
