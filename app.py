@@ -4098,7 +4098,15 @@ def _fetch_quote_data(record_id):
         except Exception:
             pass
 
-    # Fetch customer
+    # Snapshot fields stored directly on the MO record (preferred — immune to customer record changes)
+    _snap_org     = fields.get("Snapshot Org", "")
+    _snap_contact = fields.get("Snapshot Contact", "")
+    _snap_email   = fields.get("Snapshot Email", "")
+    _snap_phone   = fields.get("Snapshot Phone", "")
+    _snap_addr1   = fields.get("Snapshot Addr 1", "")
+    _snap_addr2   = fields.get("Snapshot Addr 2", "")
+
+    # Fetch customer record as fallback for older quotes that pre-date snapshot fields
     customer_ids = fields.get("Customer", [])
     customer = {}
     if customer_ids:
@@ -4110,21 +4118,33 @@ def _fetch_quote_data(record_id):
         if cr.status_code == 200:
             cf = cr.json().get("fields", {})
             customer = {
-                "orgName":      cf.get("Organization Name", ""),
-                "contactName":  cf.get("Main Contact Name", ""),
-                "email":        cf.get("Main Contact Email", ""),
-                "phone":        cf.get("Main Contact Phone #", ""),
-                "address1":     cf.get("Customer Address (Line 1)", ""),
-                "address2":     cf.get("Customer Address (Line 2)", ""),
+                # Use snapshot if present, fall back to customer record
+                "orgName":      _snap_org     or cf.get("Organization Name", ""),
+                "contactName":  _snap_contact or cf.get("Main Contact Name", ""),
+                "email":        _snap_email   or cf.get("Main Contact Email", ""),
+                "phone":        _snap_phone   or cf.get("Main Contact Phone #", ""),
+                "address1":     _snap_addr1   or cf.get("Customer Address (Line 1)", ""),
+                "address2":     _snap_addr2   or cf.get("Customer Address (Line 2)", ""),
                 "city":         cf.get("Customer City", ""),
                 "state":        cf.get("Customer State", ""),
                 "zip":          cf.get("Customer Zip Code", ""),
-                "billToName":   cf.get("Bill-To Contact Name", "") or cf.get("Main Contact Name", ""),
-                "billToEmail":  cf.get("Bill-To Contact Email", "") or cf.get("Main Contact Email", ""),
-                "billToOrg":    cf.get("Bill-To Org Name", "") or cf.get("Organization Name", ""),
-                "billToAddr1":  cf.get("Bill-To Address (Line 1)", ""),
-                "billToAddr2":  cf.get("Bill-To Address (Line 2)", ""),
+                "billToName":   _snap_contact or cf.get("Bill-To Contact Name", "") or cf.get("Main Contact Name", ""),
+                "billToEmail":  _snap_email   or cf.get("Bill-To Contact Email", "") or cf.get("Main Contact Email", ""),
+                "billToOrg":    _snap_org     or cf.get("Bill-To Org Name", "") or cf.get("Organization Name", ""),
+                "billToAddr1":  _snap_addr1   or cf.get("Bill-To Address (Line 1)", ""),
+                "billToAddr2":  _snap_addr2   or cf.get("Bill-To Address (Line 2)", ""),
             }
+    elif _snap_org or _snap_contact or _snap_email:
+        # No linked customer but snapshot exists (edge case)
+        customer = {
+            "orgName":    _snap_org,     "contactName": _snap_contact,
+            "email":      _snap_email,   "phone":       _snap_phone,
+            "address1":   _snap_addr1,   "address2":    _snap_addr2,
+            "city": "", "state": "", "zip": "",
+            "billToName":  _snap_contact, "billToEmail": _snap_email,
+            "billToOrg":   _snap_org,
+            "billToAddr1": _snap_addr1,  "billToAddr2": _snap_addr2,
+        }
 
     # Fetch line items in parallel
     li_record_ids = fields.get("MO Line Items", [])
@@ -4791,13 +4811,28 @@ def create_quote():
             size_note_block = "Size/fit specs:\n" + "\n".join(item_size_notes)
             notes = (notes + "\n\n" + size_note_block).strip() if notes else size_note_block
 
+        # Build snapshot addr 2 from city/state/zip
+        _snap_addr2 = ""
+        if city and state:
+            _snap_addr2 = f"{city}, {state} {zip_code}".strip()
+        elif city or state or zip_code:
+            _snap_addr2 = " ".join(filter(None, [city, state, zip_code]))
+
         mo_body = {
             "fields": {
-                "Order Type":  "Quote",
-                "Order ID":    order_id_str,
-                "Date":        today_str,
-                "Expiry Date": expiry_str,
-                "Customer":    [cust_id],
+                "Order Type":       "Quote",
+                "Order ID":         order_id_str,
+                "Date":             today_str,
+                "Expiry Date":      expiry_str,
+                "Customer":         [cust_id],
+                # Snapshot billing/shipping — stored directly so customer record changes
+                # never alter this quote's displayed info
+                "Snapshot Org":     org_name,
+                "Snapshot Contact": contact_name,
+                "Snapshot Email":   email,
+                "Snapshot Phone":   phone,
+                "Snapshot Addr 1":  address1,
+                "Snapshot Addr 2":  _snap_addr2,
             }
         }
         if po_number:
@@ -4989,12 +5024,37 @@ def accept_quote(record_id):
         # Note: Document ID, MO Is Approved, Ready for ShipStation (SOs), Origin Quote are all
         # formula fields — Airtable computes them automatically. Do NOT write them.
         # Sales Order Status = "Approved" drives both MO Is Approved and Ready for ShipStation.
+        # Carry snapshot fields from the quote to the SO — prefer billing form data if provided,
+        # otherwise inherit whatever was stored on the quote record
+        _b_org     = (billing.get("org")   or "").strip() or mo_fields.get("Snapshot Org", "")
+        _b_name    = (billing.get("name")  or "").strip() or mo_fields.get("Snapshot Contact", "")
+        _b_email   = (billing.get("email") or "").strip() or mo_fields.get("Snapshot Email", "")
+        _b_phone   = (billing.get("phone") or "").strip() or mo_fields.get("Snapshot Phone", "")
+        _b_addr1   = (billing.get("addr1") or "").strip()
+        if billing.get("addr2"): _b_addr1 = f"{_b_addr1}, {billing['addr2']}".strip(" ,")
+        if not _b_addr1: _b_addr1 = mo_fields.get("Snapshot Addr 1", "")
+        _b_city    = (billing.get("city",  "") or "").strip()
+        _b_state   = (billing.get("state", "") or "").strip()
+        _b_zip     = (billing.get("zip",   "") or "").strip()
+        if _b_city and _b_state:
+            _b_addr2 = f"{_b_city}, {_b_state} {_b_zip}".strip()
+        elif _b_city or _b_state or _b_zip:
+            _b_addr2 = " ".join(filter(None, [_b_city, _b_state, _b_zip]))
+        else:
+            _b_addr2 = mo_fields.get("Snapshot Addr 2", "")
+
         so_body = {
             "fields": {
                 "Order Type":         "Sales Order",
                 "Order ID":           order_id_str,
                 "Date":               date_str,
                 "Sales Order Status": "Approved",
+                "Snapshot Org":       _b_org,
+                "Snapshot Contact":   _b_name,
+                "Snapshot Email":     _b_email,
+                "Snapshot Phone":     _b_phone,
+                "Snapshot Addr 1":    _b_addr1,
+                "Snapshot Addr 2":    _b_addr2,
             }
         }
         if customer_ids:
