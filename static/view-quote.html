@@ -885,16 +885,17 @@ let   catalog     = null;
 let   catalogLoaded = false;
 let   editItems   = [];
 let   savedItems  = [];
-let   dirty              = false;
-let   pendingAddSelection = false;  // true once Add button is visible but item not yet committed
+// Exposed on window so the portal parent can read them cross-frame (let doesn't create window props)
+window.dirty              = false;
+window.pendingAddSelection = false;
 
 function markDirty() {
-  dirty = true;
+  window.dirty = true;
   const btn = document.getElementById('btnRevert');
   if (btn) btn.style.display = '';
 }
 function markClean() {
-  dirty = false;
+  window.dirty = false;
   const btn = document.getElementById('btnRevert');
   if (btn) btn.style.display = 'none';
 }
@@ -910,7 +911,7 @@ function revertChanges() {
 // the portal's own beforeunload covers this to avoid double dialogs.
 if (window.self === window.top) {
   window.addEventListener('beforeunload', e => {
-    if (dirty || pendingAddSelection) {
+    if (window.dirty || window.pendingAddSelection) {
       e.preventDefault();
       e.returnValue = 'You have unsaved changes. Leave without saving?';
     }
@@ -1372,7 +1373,7 @@ let addItemOpen = false;
 async function toggleAddItem() {
   addItemOpen = !addItemOpen;
   document.getElementById('addItemPanel').classList.toggle('hidden', !addItemOpen);
-  if (!addItemOpen) pendingAddSelection = false;  // panel closed — no longer pending
+  if (!addItemOpen) window.pendingAddSelection = false;  // panel closed — no longer pending
   if (addItemOpen && !catalogLoaded) await loadCatalog();
 }
 
@@ -1490,7 +1491,7 @@ function vOnFvar(forcedFvarId) {
     document.getElementById('vAddonRow').classList.remove('hidden');
   }
   document.getElementById('vQtyAddRow').classList.remove('hidden');
-  pendingAddSelection = true;  // Add button is now visible — warn on refresh
+  window.pendingAddSelection = true;  // Add button is now visible — warn on refresh
 }
 
 function vResetFrom(level) {
@@ -1561,7 +1562,7 @@ function vDoAdd() {
   markDirty();
   renderItemsTable();
 
-  pendingAddSelection = false;  // item committed — clear pending flag
+  window.pendingAddSelection = false;  // item committed — clear pending flag
   document.getElementById('vProd').value = '';
   vResetFrom('color');
   document.getElementById('vQty').value = 1;
@@ -1604,7 +1605,7 @@ async function saveChanges() {
 
 // ─── Accept modal ─────────────────────────────────────────────────────────────
 function openModal() {
-  if (dirty) {
+  if (window.dirty) {
     alert('You have unsaved changes. Please click "Save Changes" before accepting the quote.');
     return;
   }
