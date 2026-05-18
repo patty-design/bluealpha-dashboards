@@ -916,7 +916,10 @@ function revertChanges() {
 // the portal's own beforeunload covers this to avoid double dialogs.
 if (window.self === window.top) {
   window.addEventListener('beforeunload', e => {
-    if (window.dirty || window.pendingAddSelection) {
+    const _hasPendingSelection = window.pendingAddSelection
+      && !!(document.getElementById('vProd')?.value)
+      && !!(document.getElementById('vColor')?.value);
+    if (window.dirty || _hasPendingSelection) {
       e.preventDefault();
       e.returnValue = 'You have unsaved changes. Leave without saving?';
     }
@@ -1593,7 +1596,11 @@ function vDoAdd() {
     (!fvarId || s.featureVarId===fvarId) &&
     (addonId ? s.addonId===addonId : (!s.addonId || !document.getElementById('vAddonRow') || document.getElementById('vAddonRow').classList.contains('hidden')))
   );
-  if (!sku) { alert('Could not find matching product. Please check your selections.'); return; }
+  if (!sku) {
+    window.pendingAddSelection = false; // clear so save doesn't retry
+    if (parentId && colorId) alert('Could not find matching product. Please check your selections.');
+    return;
+  }
 
   // If this SKU is already on the quote, just increment qty instead of duplicating
   const existing = editItems.find(i => i.skuRecordId === sku.recordId);
@@ -1626,7 +1633,9 @@ function vDoAdd() {
 // ─── Save changes ─────────────────────────────────────────────────────────────
 async function saveChanges() {
   // If the add-item panel has a fully-selected item pending, add it first
-  if (window.pendingAddSelection) vDoAdd();
+  const _prodVal = document.getElementById('vProd')?.value;
+  const _colorVal = document.getElementById('vColor')?.value;
+  if (window.pendingAddSelection && _prodVal && _colorVal) vDoAdd();
 
   const btn     = document.getElementById('btnSave');
   const confirm = document.getElementById('saveConfirm');
