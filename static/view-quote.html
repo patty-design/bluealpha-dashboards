@@ -831,7 +831,7 @@ if (window.self !== window.top) {
 
     <!-- Save / Revert -->
     <div class="save-row hidden" id="saveRow">
-      <button class="btn btn-primary" id="btnSave" onclick="saveChanges()">Save Changes</button>
+      <button class="btn btn-primary" id="btnSave" onclick="saveChanges()" disabled>Save Changes</button>
       <button class="btn btn-secondary" id="btnRevert" onclick="revertChanges()" style="display:none;">Revert</button>
       <span class="save-confirm" id="saveConfirm">✓ Changes saved</span>
     </div>
@@ -891,13 +891,17 @@ window.pendingAddSelection = false;
 
 function markDirty() {
   window.dirty = true;
-  const btn = document.getElementById('btnRevert');
-  if (btn) btn.style.display = '';
+  const revert = document.getElementById('btnRevert');
+  if (revert) revert.style.display = '';
+  const save = document.getElementById('btnSave');
+  if (save) save.disabled = false;
 }
 function markClean() {
   window.dirty = false;
-  const btn = document.getElementById('btnRevert');
-  if (btn) btn.style.display = 'none';
+  const revert = document.getElementById('btnRevert');
+  if (revert) revert.style.display = 'none';
+  const save = document.getElementById('btnSave');
+  if (save) save.disabled = true;
 }
 
 function revertChanges() {
