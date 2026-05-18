@@ -5941,14 +5941,14 @@ def _build_invoice_pdf_bytes(inv):
     pdf.set_text_color(*MUTED)
 
     # Line 1
-    pdf.write(4.5, "Questions about this invoice? Contact us at info@bluealpha.us or 678-961-3304.")
+    pdf.write(4.5, "Payment terms are Net 30 from invoice date. A 1.5% monthly late fee applies after 30 days.")
     pdf.ln(5)
 
     # Line 2
     pdf.set_font("Helvetica", "", 7.5)
     pdf.set_text_color(*MUTED)
     pdf.cell(W, 4.5,
-        "Payment terms are Net 30 from invoice date. A 1.5% monthly late fee applies after 30 days.",
+        "Questions about this invoice? Contact us at info@bluealpha.us or 678-961-3304.",
         border=0, new_x="LMARGIN", new_y="NEXT")
 
     return bytes(pdf.output())
