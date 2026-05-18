@@ -5371,7 +5371,8 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
     col_widths = [sku_w, name_w, 14, 25, 25]
     headers    = ["SKU", "DESCRIPTION", "QTY", "UNIT PRICE", "TOTAL"]
     aligns     = ["L",   "L",           "R",   "R",          "R"    ]
-    row_h      = 7
+    row_h      = 7    # minimum row height (single-line items)
+    line_h     = 4.5  # tighter line height inside wrapped descriptions
 
     pdf.set_fill_color(*NAVY)
     pdf.set_text_color(255, 255, 255)
@@ -5407,9 +5408,11 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
         # ── Step 1: render description with auto-break OFF to measure real height ──
         pdf.set_auto_page_break(auto=False)
         pdf.set_xy(19 + sku_w, row_y)
-        pdf.multi_cell(name_w, row_h, name_val, border=0, align="L")
+        pdf.multi_cell(name_w, line_h, name_val, border=0, align="L")
         actual_end_y  = pdf.get_y()
-        actual_row_h  = actual_end_y - row_y
+        # Enforce minimum row height (single-line items need the same spacing as the gap between items)
+        actual_row_h  = max(actual_end_y - row_y, row_h)
+        actual_end_y  = row_y + actual_row_h
         pdf.set_auto_page_break(auto=True, margin=25)
 
         # ── Step 2: page break if this row overruns the trigger ──
@@ -5420,9 +5423,10 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
             # Re-measure on new page
             pdf.set_auto_page_break(auto=False)
             pdf.set_xy(19 + sku_w, row_y)
-            pdf.multi_cell(name_w, row_h, name_val, border=0, align="L")
+            pdf.multi_cell(name_w, line_h, name_val, border=0, align="L")
             actual_end_y = pdf.get_y()
-            actual_row_h = actual_end_y - row_y
+            actual_row_h = max(actual_end_y - row_y, row_h)
+            actual_end_y = row_y + actual_row_h
             pdf.set_auto_page_break(auto=True, margin=25)
 
         # ── Step 3: draw background rect with correct height (covers step-1 text) ──
@@ -5431,7 +5435,7 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
             pdf.set_fill_color(*LG)
             pdf.rect(19, row_y, W, actual_row_h, style="F")
             pdf.set_xy(19 + sku_w, row_y)
-            pdf.multi_cell(name_w, row_h, name_val, border=0, align="L")
+            pdf.multi_cell(name_w, line_h, name_val, border=0, align="L")
 
         # ── Step 5: SKU + numeric columns (pinned to row_y, full row height) ──
         pdf.set_xy(19, row_y)
