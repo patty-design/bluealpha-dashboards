@@ -5425,13 +5425,12 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
             pdf.set_auto_page_break(auto=True, margin=25)
 
         # ── Step 3: draw background rect with correct height (covers step-1 text) ──
+        # ── Step 4: re-render description on top of background (filled rows only) ──
         if fill_row:
             pdf.set_fill_color(*LG)
             pdf.rect(19, row_y, W, actual_row_h, style="F")
-
-        # ── Step 4: re-render description on top of background ──
-        pdf.set_xy(19 + sku_w, row_y)
-        pdf.multi_cell(name_w, row_h, name_val, border=0, align="L")
+            pdf.set_xy(19 + sku_w, row_y)
+            pdf.multi_cell(name_w, row_h, name_val, border=0, align="L")
 
         # ── Step 5: SKU + numeric columns (pinned to row_y, full row height) ──
         pdf.set_xy(19, row_y)
