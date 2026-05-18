@@ -544,9 +544,21 @@ function render(inv) {
   document.getElementById('billToCol').innerHTML =
     addrBlock('Bill To', [inv.orgName, inv.contact, inv.addr1, inv.addr2]);
 
-  // Ship To
-  document.getElementById('shipToCol').innerHTML =
-    addrBlock('Ship To', [inv.shipOrg, inv.shipName, inv.shipAddr1, inv.shipAddr2]);
+  // Ship To — includes ship date and tracking below the address
+  let shipHTML = addrBlock('Ship To', [inv.shipOrg, inv.shipName, inv.shipAddr1, inv.shipAddr2]);
+  if (inv.shipDate || inv.tracking) {
+    shipHTML += '<div style="margin-top:12px;">';
+    if (inv.shipDate) shipHTML += metaKV('Ship Date', fmtDate(inv.shipDate));
+    if (inv.tracking) {
+      const tn = inv.tracking.trim();
+      const url = /^1Z/i.test(tn.replace(/\s/g, ''))
+        ? `https://www.ups.com/track?tracknum=${encodeURIComponent(tn)}`
+        : `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(tn)}`;
+      shipHTML += metaKV('Tracking', `<a href="${url}" target="_blank" rel="noopener" style="color:var(--navy);">${escHtml(tn)}</a>`);
+    }
+    shipHTML += '</div>';
+  }
+  document.getElementById('shipToCol').innerHTML = shipHTML;
 
   // Invoice Details
   let detHTML = '';
@@ -555,14 +567,6 @@ function render(inv) {
   detHTML += metaKV('Invoice Date', fmtDate(inv.date));
   detHTML += metaKV('Due Date', dueDateStr(inv.date));
   if (inv.poNumber) detHTML += metaKV('PO #', escHtml(inv.poNumber));
-  if (inv.shipDate) detHTML += metaKV('Ship Date', fmtDate(inv.shipDate));
-  if (inv.tracking) {
-    const tn = inv.tracking.trim();
-    const url = /^1Z/i.test(tn.replace(/\s/g, ''))
-      ? `https://www.ups.com/track?tracknum=${encodeURIComponent(tn)}`
-      : `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(tn)}`;
-    detHTML += metaKV('Tracking', `<a href="${url}" target="_blank" rel="noopener" style="color:var(--navy);">${escHtml(tn)}</a>`);
-  }
   document.getElementById('detailsCol').innerHTML = detHTML;
 
   // Line items
