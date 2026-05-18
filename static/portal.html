@@ -485,6 +485,16 @@
     // Tab switching
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
+        // If the view-quote panel is open and has unsaved changes, confirm before leaving
+        const _vqPanel = document.getElementById('tab-view-quote');
+        const _vqFrame = document.getElementById('viewQuoteFrame');
+        if (_vqPanel && _vqPanel.classList.contains('active') && _vqFrame && _vqFrame.contentWindow) {
+          const _cw = _vqFrame.contentWindow;
+          if ((_cw.dirty || _cw.pendingAddSelection) &&
+              !confirm('You have unsaved changes. Leave this quote without saving?')) {
+            return;
+          }
+        }
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
         tab.classList.add('active');
