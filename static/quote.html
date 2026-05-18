@@ -1251,11 +1251,11 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredA
       defaultVal = '';
     } else if (noneAddonId) {
       defaultVal = noneAddonId;
-    } else if (_addonOptional) {
-      // Optional add-ons with no explicit default → show "None" (blank option always present)
-      defaultVal = '';
     } else {
-      defaultVal = addons[0][0];
+      // Optional add-ons (not in the required list) default to "None" (blank option)
+      const _ADDON_NOT_OPTIONAL = ['battle belt lite', 'mini medical pouch', 'non molle adapters'];
+      const _isOptional = !_ADDON_NOT_OPTIONAL.some(n => _parentNameLower.includes(n));
+      defaultVal = _isOptional ? '' : addons[0][0];
     }
   }
   addonSel.value = defaultVal;
