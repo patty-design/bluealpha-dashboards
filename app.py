@@ -5283,68 +5283,73 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
     pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
     pdf.ln(5)
 
-    # ── Quote details (left) + Bill To / Ship To (right) ─────────────
-    y_info = pdf.get_y()
-    col_w  = W / 2
-    right_col_w = col_w / 2  # split right half for Bill To | Ship To
+    # ── Bill To | Ship To | Quote Details (3 equal columns) ──────────
+    y_info  = pdf.get_y()
+    col3_w  = W / 3.0
+    bill_x  = 19
+    ship_x  = 19 + col3_w
+    meta_x  = 19 + col3_w * 2
 
-    def kv(label, value):
-        pdf.set_font("Helvetica", "B", 8)
-        pdf.set_text_color(*MUTED)
-        pdf.cell(34, 5.5, label, border=0)
-        pdf.set_font("Helvetica", "", 8)
-        pdf.set_text_color(*TEXT)
-        pdf.cell(col_w - 34, 5.5, str(value), border=0, new_x="LMARGIN", new_y="NEXT")
-
-    if doc_type == "order":
-        kv("Order Number:", q_number)
-        kv("Order Date:",   q_date)
-        kv("Terms:",        "Net 30")
-        if q_po:
-            kv("PO #:", q_po)
-    else:
-        kv("Quote Number:", q_number)
-        kv("Quote Date:",   q_date)
-        kv("Expiry Date:",  q_expiry)
-        kv("Terms:",        "Net 30")
-        if q_po:
-            kv("PO #:", q_po)
-
-    y_after_details = pdf.get_y()
-
-    # Right: Bill To (left half of right column)
-    bill_x = 19 + col_w
+    # --- Bill To ---
     pdf.set_xy(bill_x, y_info)
-    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_font("Helvetica", "B", 7)
     pdf.set_text_color(*MUTED)
-    pdf.cell(right_col_w, 5.5, "Bill To", border=0, new_x="LEFT", new_y="NEXT")
+    pdf.cell(col3_w, 5.5, "BILL TO", border=0, new_x="LEFT", new_y="NEXT")
     for ln in [bill_org, bill_name, bill_addr1, bill_addr2]:
         if ln:
             pdf.set_x(bill_x)
             pdf.set_font("Helvetica", "B" if ln == bill_org else "", 8)
             pdf.set_text_color(*TEXT)
-            pdf.cell(right_col_w, 5, ln, border=0, new_x="LEFT", new_y="NEXT")
+            pdf.cell(col3_w, 5, ln, border=0, new_x="LEFT", new_y="NEXT")
+    y_after_bill = pdf.get_y()
 
-    # Right: Ship To (right half of right column)
-    ship_x = 19 + col_w + right_col_w
-    pdf.set_xy(ship_x, y_info)
-    pdf.set_font("Helvetica", "B", 8)
-    pdf.set_text_color(*MUTED)
-    pdf.cell(right_col_w, 5.5, "Ship To", border=0, new_x="LEFT", new_y="NEXT")
+    # --- Ship To ---
     ship_lines = [
         cust.get("orgName", ""),
         cust.get("contactName", ""),
         addr1,
         ", ".join(filter(None, [city, f"{state_v} {zip_v}".strip()])),
     ]
+    pdf.set_xy(ship_x, y_info)
+    pdf.set_font("Helvetica", "B", 7)
+    pdf.set_text_color(*MUTED)
+    pdf.cell(col3_w, 5.5, "SHIP TO", border=0, new_x="LEFT", new_y="NEXT")
     for ln in ship_lines:
         if ln:
             pdf.set_x(ship_x)
             pdf.set_font("Helvetica", "B" if ln == cust.get("orgName", "") else "", 8)
             pdf.set_text_color(*TEXT)
-            pdf.cell(right_col_w, 5, ln, border=0, new_x="LEFT", new_y="NEXT")
+            pdf.cell(col3_w, 5, ln, border=0, new_x="LEFT", new_y="NEXT")
+    y_after_ship = pdf.get_y()
 
-    pdf.set_y(max(y_after_details, pdf.get_y()) + 3)
+    # --- Quote / Order Details ---
+    def meta_kv(label, value):
+        pdf.set_font("Helvetica", "B", 7)
+        pdf.set_text_color(*MUTED)
+        pdf.cell(col3_w, 5, label.upper(), border=0, new_x="LEFT", new_y="NEXT")
+        pdf.set_x(meta_x)
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*TEXT)
+        pdf.cell(col3_w, 5, str(value), border=0, new_x="LEFT", new_y="NEXT")
+        pdf.set_x(meta_x)
+        pdf.ln(1)
+
+    pdf.set_xy(meta_x, y_info)
+    if doc_type == "order":
+        meta_kv("Order Number", q_number)
+        meta_kv("Order Date",   q_date)
+        meta_kv("Terms",        "Net 30")
+        if q_po:
+            meta_kv("PO #", q_po)
+    else:
+        meta_kv("Quote Date",   q_date)
+        if q_expiry:
+            meta_kv("Expiry Date", q_expiry)
+        if q_po:
+            meta_kv("PO #", q_po)
+    y_after_meta = pdf.get_y()
+
+    pdf.set_y(max(y_after_bill, y_after_ship, y_after_meta) + 4)
 
     # Validity note
     pdf.ln(2)
