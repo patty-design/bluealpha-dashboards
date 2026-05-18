@@ -968,9 +968,12 @@ function render() {
 
   // Badges
   if (q.isAccepted) {
-    const label = q.soNumber ? `✓ Order Accepted — ${q.soNumber}` : '✓ Order Accepted';
-    document.getElementById('badges').insertAdjacentHTML('beforeend',
-      `<span class="badge badge-success">${escHtml(label)}</span>`);
+    // Only show the "Order Accepted" badge on quote view — on sales order view it's redundant
+    if (!window.viewingAsOrder) {
+      const label = q.soNumber ? `✓ Order Accepted — ${q.soNumber}` : '✓ Order Accepted';
+      document.getElementById('badges').insertAdjacentHTML('beforeend',
+        `<span class="badge badge-success">${escHtml(label)}</span>`);
+    }
   }
 
   // Meta details (right column)
