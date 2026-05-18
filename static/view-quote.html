@@ -769,8 +769,8 @@ if (window.self !== window.top) {
             <tr>
               <th>Description</th>
               <th class="center">Qty</th>
-              <th class="right">Unit Price</th>
-              <th class="right" id="thTotal">Total</th>
+              <th class="center">Unit Price</th>
+              <th class="center" id="thTotal">Total</th>
               <th id="thRemove" style="width:40px;"></th>
             </tr>
           </thead>
@@ -1067,16 +1067,16 @@ function renderItemsTable() {
           <input type="number" class="qty-input" min="1" value="${item.qty}"
                  data-idx="${i}" onchange="onQtyChange(this)">
         </td>
-        <td class="right muted">$${item.unitPrice.toFixed(2)}</td>
-        <td class="right" id="vLineTotal_${i}">$${lineTotal}</td>
+        <td class="center muted">$${item.unitPrice.toFixed(2)}</td>
+        <td class="center" id="vLineTotal_${i}">$${lineTotal}</td>
         <td style="text-align:center;"><button class="btn-remove" onclick="removeViewItem(${i})" title="Remove">✕</button></td>
       `;
     } else {
       tr.innerHTML = `
         <td>${escHtml(item.name)}</td>
         <td class="center">${item.qty}</td>
-        <td class="right muted">$${item.unitPrice.toFixed(2)}</td>
-        <td class="right">$${lineTotal}</td>
+        <td class="center muted">$${item.unitPrice.toFixed(2)}</td>
+        <td class="center">$${lineTotal}</td>
         <td></td>
       `;
     }
