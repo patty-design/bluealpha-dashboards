@@ -1426,24 +1426,30 @@ async function goStep2() {
   // Pre-fill form with account info (only once per session)
   if (!_profileLoaded) {
     try {
-      const r = await fetch('/api/portal/profile', { credentials: 'same-origin' });
+      // Use account-info (same data as Team tab) for shipping fields
+      const r = await fetch('/api/portal/account-info', { credentials: 'same-origin' });
       if (r.ok) {
-        const { profile } = await r.json();
-        if (profile && profile.email) {
-          _profileCustomerId = profile.customerId || null;
+        const { info } = await r.json();
+        if (info) {
           const set = (id, val) => { if (val) document.getElementById(id).value = val; };
-          set('f_org',   profile.orgName);
-          set('f_name',  profile.contactName);
-          set('f_email', profile.email);
-          set('f_phone', profile.phone);
-          set('f_addr1', profile.addr1);
-          set('f_city',  profile.city);
-          set('f_state', profile.state);
-          set('f_zip',   profile.zip);
-          _profileSnapshot = { ...profile };
+          set('f_org',   info.shipOrg);
+          set('f_name',  info.shipName);
+          set('f_email', info.shipEmail);
+          set('f_phone', info.shipPhone);
+          set('f_addr1', info.shipAddr1);
+          set('f_addr2', info.shipAddr2);
+          set('f_city',  info.shipCity);
+          set('f_state', info.shipState);
+          set('f_zip',   info.shipZip);
         }
       }
-    } catch(e) { /* not logged in or no profile — silent */ }
+      // Also grab customerId from profile
+      const pr = await fetch('/api/portal/profile', { credentials: 'same-origin' });
+      if (pr.ok) {
+        const { profile } = await pr.json();
+        if (profile) { _profileCustomerId = profile.customerId || null; _profileSnapshot = profile; }
+      }
+    } catch(e) { /* not logged in or no account info — silent */ }
     _profileLoaded = true;
   }
 }
