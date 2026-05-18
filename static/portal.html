@@ -332,7 +332,7 @@
     <!-- View Quote Panel (not a nav tab — shown when View → is clicked) -->
     <div class="tab-panel" id="tab-view-quote">
       <div style="margin-bottom:12px;">
-        <button id="viewBackBtn" onclick="closeViewQuote()" style="background:none;border:none;cursor:pointer;color:var(--navy);font-size:0.9rem;font-weight:600;display:flex;align-items:center;gap:6px;padding:0;">
+        <button id="viewBackBtn" onclick="closeViewQuoteConfirm()" style="background:none;border:none;cursor:pointer;color:var(--navy);font-size:0.9rem;font-weight:600;display:flex;align-items:center;gap:6px;padding:0;">
           ← Back to Quotes
         </button>
       </div>
@@ -482,19 +482,56 @@
     let accountInfoLoaded = false;
     let quoteBuilderDirty = false; // true after a quote is submitted — reload iframe on next visit
 
-    // Tab switching
+    // ── Central pending-changes check ────────────────────────────────────────
+    function portalPendingChanges() {
+      // 1. View-quote iframe (unsaved edits or item selected but not added)
+      const vqPanel = document.getElementById('tab-view-quote');
+      const vqFrame = document.getElementById('viewQuoteFrame');
+      if (vqPanel && vqPanel.classList.contains('active') && vqFrame && vqFrame.contentWindow) {
+        try {
+          const cw = vqFrame.contentWindow;
+          if (cw.dirty || cw.pendingAddSelection)
+            return 'You have unsaved changes on this quote. Leave without saving?';
+        } catch(_) {}
+      }
+
+      // 2. New Quote tab — any "Add to Quote" button is enabled (options chosen, not yet added)
+      const qbPanel = document.getElementById('tab-new-quote');
+      const qbFrame = document.getElementById('quoteBuilderFrame');
+      if (qbPanel && qbPanel.classList.contains('active') && qbFrame && qbFrame.contentWindow) {
+        try {
+          const btn = qbFrame.contentWindow.document.querySelector('.btn-add-inline:not([disabled])');
+          if (btn) return 'You have product options selected that haven\'t been added to your quote yet. Leave without adding?';
+        } catch(_) {}
+      }
+
+      // 3. Team tab — account info edit form is open
+      const accountEdit = document.getElementById('accountInfoEdit');
+      if (accountEdit && accountEdit.style.display !== 'none')
+        return 'You have unsaved changes to your account info. Leave without saving?';
+
+      // 4. Team tab — new team member form is fully filled in but not sent
+      const fn = (document.getElementById('newFirstName')?.value || '').trim();
+      const ln = (document.getElementById('newLastName')?.value  || '').trim();
+      const em = (document.getElementById('newEmail')?.value     || '').trim();
+      if (fn && ln && em)
+        return 'You have team member info that hasn\'t been sent yet. Leave without sending the invite?';
+
+      return null;
+    }
+
+    // Browser refresh / page navigation warning
+    window.addEventListener('beforeunload', e => {
+      const msg = portalPendingChanges();
+      if (msg) { e.preventDefault(); e.returnValue = msg; }
+    });
+
+    // ── Tab switching ─────────────────────────────────────────────────────────
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
-        // If the view-quote panel is open and has unsaved changes, confirm before leaving
-        const _vqPanel = document.getElementById('tab-view-quote');
-        const _vqFrame = document.getElementById('viewQuoteFrame');
-        if (_vqPanel && _vqPanel.classList.contains('active') && _vqFrame && _vqFrame.contentWindow) {
-          const _cw = _vqFrame.contentWindow;
-          if (_cw.dirty || _cw.pendingAddSelection) {
-            if (!confirm('You have unsaved changes. Leave this quote without saving?')) return;
-            _clearViewQuoteFlags();  // user confirmed — clear so no double-warning
-          }
-        }
+        const msg = portalPendingChanges();
+        if (msg && !confirm(msg)) return;
+        _clearViewQuoteFlags();  // safe to call even if not in view-quote
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
         tab.classList.add('active');
@@ -1094,6 +1131,12 @@
     frame.style.height = '600px';
     document.getElementById('tab-view-quote').classList.add('active');
     window.scrollTo(0, 0);
+  }
+
+  function closeViewQuoteConfirm() {
+    const msg = portalPendingChanges();
+    if (msg && !confirm(msg)) return;
+    closeViewQuote();
   }
 
   function closeViewQuote() {

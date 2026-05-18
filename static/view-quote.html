@@ -906,12 +906,16 @@ function revertChanges() {
   renderItemsTable();
 }
 
-window.addEventListener('beforeunload', e => {
-  if (dirty || pendingAddSelection) {
-    e.preventDefault();
-    e.returnValue = 'You have unsaved changes. Leave without saving?';
-  }
-});
+// Only handle beforeunload directly when standalone — when in the portal iframe
+// the portal's own beforeunload covers this to avoid double dialogs.
+if (window.self === window.top) {
+  window.addEventListener('beforeunload', e => {
+    if (dirty || pendingAddSelection) {
+      e.preventDefault();
+      e.returnValue = 'You have unsaved changes. Leave without saving?';
+    }
+  });
+}
 
 // ─── Load ────────────────────────────────────────────────────────────────────
 (async function load() {
