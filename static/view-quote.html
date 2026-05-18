@@ -785,7 +785,7 @@ if (window.self !== window.top) {
             <span class="val" id="vShipping">$0.00</span>
           </div>
           <div class="totals-row totals-final">
-            <span>Total Due</span>
+            <span id="totalLabel">Total</span>
             <span class="val" id="vTotal">$0.00</span>
           </div>
         </div>
@@ -954,6 +954,10 @@ function render() {
   }
 
   document.getElementById('quoteOrg').textContent = q.customer?.orgName || '';
+  if (window.viewingAsOrder) {
+    const lbl = document.getElementById('totalLabel');
+    if (lbl) lbl.textContent = 'Total Due';
+  }
 
   // Badges
   if (q.isAccepted) {
