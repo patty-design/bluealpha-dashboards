@@ -693,12 +693,9 @@ if (window.self !== window.top) {
 
       <!-- Header band -->
       <div class="doc-head">
-        <div>
+        <div class="doc-head-right" style="margin-left:auto;">
           <div class="doc-type" id="docTypeLabel">QUOTE</div>
           <div class="doc-num"  id="quoteNumber"></div>
-        </div>
-        <div class="doc-head-right">
-          <div class="doc-org"    id="quoteOrg"></div>
           <div class="doc-badges" id="badges"></div>
         </div>
       </div>
@@ -963,7 +960,7 @@ function render() {
     document.getElementById('quoteNumber').appendChild(invLink);
   }
 
-  document.getElementById('quoteOrg').textContent = q.customer?.orgName || '';
+  // quoteOrg removed from header — company name no longer shown in band
   if (window.viewingAsOrder) {
     const lbl = document.getElementById('totalLabel');
     if (lbl) lbl.textContent = 'Total Due';
