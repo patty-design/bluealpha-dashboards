@@ -4659,6 +4659,8 @@ def _catalog_response(data, extra_headers=None):
     """Return a gzip-compressed JSON response for the catalog."""
     import gzip as _gzip
     c = cors()
+    # Never let the browser cache the catalog — we manage freshness server-side
+    c["Cache-Control"] = "no-store"
     body = json.dumps(data).encode("utf-8")
     accept = request.headers.get("Accept-Encoding", "")
     if "gzip" in accept:
