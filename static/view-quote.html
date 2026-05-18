@@ -28,30 +28,38 @@
       min-height: 100vh;
     }
 
-    /* ── Header ── */
+    /* ── Page header ── */
     header {
       background: var(--navy);
-      padding: 18px 24px;
+      padding: 16px 24px;
       display: flex;
       align-items: center;
-      gap: 18px;
+      gap: 16px;
     }
-    header img { height: 44px; width: auto; filter: brightness(0) invert(1); }
-    .header-divider { width: 2px; height: 36px; background: var(--red); border-radius: 2px; }
+    header img { height: 40px; width: auto; filter: brightness(0) invert(1); }
+    .header-divider { width: 2px; height: 32px; background: var(--red); border-radius: 2px; }
     .header-title {
       font-family: 'Montserrat', sans-serif;
-      font-size: 1rem;
+      font-size: 0.85rem;
       font-weight: 700;
-      color: rgba(255,255,255,0.75);
+      color: rgba(255,255,255,0.65);
       text-transform: uppercase;
       letter-spacing: 3px;
     }
+    #backLink {
+      margin-left: auto;
+      color: rgba(255,255,255,0.75);
+      text-decoration: none;
+      font-size: 0.85rem;
+      display: none;
+    }
+    #backLink:hover { color: #fff; }
 
     /* ── Container ── */
     .container {
-      max-width: 760px;
-      margin: 16px auto;
-      padding: 0 20px 60px;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
     }
 
     /* ── Spinner ── */
@@ -62,28 +70,27 @@
     }
     .spin-lg {
       display: inline-block;
-      width: 40px; height: 40px;
-      border: 4px solid var(--border);
+      width: 36px; height: 36px;
+      border: 3px solid var(--border);
       border-top-color: var(--navy);
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Error state ── */
+    /* ── Error ── */
     .error-card {
       background: var(--white);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 10px;
       padding: 48px 32px;
       text-align: center;
       box-shadow: 0 2px 12px rgba(0,0,0,0.06);
     }
     .error-card h2 {
       font-family: 'Montserrat', sans-serif;
-      font-size: 1.3rem;
-      color: var(--text);
+      font-size: 1.25rem;
       margin-bottom: 10px;
     }
     .error-card p { color: var(--muted); line-height: 1.6; }
@@ -91,159 +98,286 @@
     /* ── Banners ── */
     .banner {
       border-radius: 8px;
-      padding: 14px 20px;
-      font-size: 0.93rem;
+      padding: 12px 18px;
+      font-size: 0.9rem;
       line-height: 1.55;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
     .banner-success { background: #edf7f1; border: 1px solid #a3d9b8; color: #145228; }
     .banner-error   { background: #fff0f0; border: 1px solid #f5c2c2; color: #7a1515; }
     .banner-warning { background: #fff8ed; border: 1px solid #f5dca0; color: #7a4e00; }
 
-    /* ── Card ── */
-    .card {
-      background: var(--white);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 28px 32px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-      margin-bottom: 20px;
-    }
-
-    /* ── Info card ── */
-    .quote-number {
-      font-family: 'Montserrat', sans-serif;
-      font-size: 1.8rem;
-      font-weight: 800;
-      color: var(--navy);
-      margin-bottom: 4px;
-    }
-    .quote-org {
-      font-size: 1rem;
-      font-weight: 700;
-      color: var(--text);
+    /* ── Toolbar (PDF download) ── */
+    .doc-toolbar {
+      display: flex;
+      justify-content: flex-end;
       margin-bottom: 10px;
     }
-    .meta-row {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      margin-bottom: 14px;
-    }
-    .meta-item {
-      font-size: 0.88rem;
-      color: var(--muted);
-    }
-    .meta-item strong { color: var(--text); }
-    .meta-item.warn  { color: var(--warning); font-weight: 700; }
-    .meta-item.exp   { color: var(--red); font-weight: 700; }
-
-    .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-    .badge {
-      display: inline-block;
-      border-radius: 20px;
-      padding: 4px 14px;
-      font-size: 0.8rem;
-      font-weight: 700;
-      letter-spacing: 0.3px;
-    }
-    .badge-navy    { background: var(--navy); color: white; }
-    .badge-success { background: #edf7f1; border: 1px solid #a3d9b8; color: #145228; }
-
-    /* ── Section title ── */
-    .section-title {
-      font-family: 'Montserrat', sans-serif;
-      font-size: 1rem;
-      font-weight: 700;
-      color: var(--navy);
-      margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .section-count {
-      font-size: 0.82rem;
-      font-weight: 700;
-      color: var(--muted);
-      background: var(--light);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 2px 10px;
-    }
-
-    /* ── Items table ── */
-    .items-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.88rem;
-    }
-    .items-table thead tr {
+    .btn-pdf {
       background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 7px 14px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
     }
-    .items-table thead {
-      border-bottom: 2px solid #1B2438;
+    .btn-pdf:hover { border-color: var(--navy); color: var(--navy); }
+
+    /* ── Document card ── */
+    .doc-wrap {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+      margin-bottom: 16px;
     }
-    .items-table th {
-      text-align: left;
-      font-size: 0.72rem;
+
+    /* Navy header band */
+    .doc-head {
+      background: var(--navy);
+      padding: 22px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+    .doc-type {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: 2px;
+    }
+    .doc-num {
+      font-size: 0.88rem;
+      color: #adc4e0;
+      margin-top: 5px;
+    }
+    .doc-head-right {
+      text-align: right;
+    }
+    .doc-org {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 8px;
+    }
+    .doc-badges {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    /* Info grid: Bill To | Ship To | Details */
+    .doc-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      border-bottom: 1px solid var(--border);
+    }
+    .doc-info-col {
+      padding: 20px 24px;
+      border-right: 1px solid var(--border);
+    }
+    .doc-info-col:last-child { border-right: none; }
+
+    .addr-title {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      font-weight: 700;
+      font-family: 'Montserrat', sans-serif;
+      margin-bottom: 8px;
+    }
+    .addr-line {
+      font-size: 0.875rem;
+      color: var(--text);
+      line-height: 1.5;
+      margin-bottom: 2px;
+    }
+    .addr-line.bold { font-weight: 700; }
+
+    .meta-label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-weight: 700;
+      font-family: 'Montserrat', sans-serif;
+      margin-bottom: 2px;
+      margin-top: 10px;
+    }
+    .meta-label:first-child { margin-top: 0; }
+    .meta-value {
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+
+    /* Edit address button */
+    #editAddressBtn {
+      display: none;
+      margin-top: 12px;
+    }
+
+    /* Inline address edit */
+    .addr-edit-wrap {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--light);
+    }
+    .addr-edit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    .addr-edit-section-title {
+      font-size: 0.75rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.06em;
       color: var(--muted);
-      padding: 10px 16px;
+      margin-bottom: 12px;
+      font-family: 'Montserrat', sans-serif;
     }
-    .items-table th.right { text-align: right; }
-    .items-table td {
-      padding: 10px 16px;
+    .addr-edit-field {
+      margin-bottom: 10px;
+    }
+    .addr-edit-field label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .addr-edit-field input {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 8px 10px;
+      font-family: 'Lato', sans-serif;
+      font-size: 0.875rem;
+      color: var(--text);
+      outline: none;
+    }
+    .addr-edit-field input:focus {
+      border-color: var(--navy);
+      box-shadow: 0 0 0 2px rgba(27,36,56,0.08);
+    }
+    .addr-edit-actions {
+      margin-top: 14px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    /* Items table */
+    .doc-items { }
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+    .items-table thead tr {
       border-bottom: 1px solid var(--border);
+      background: #f9fafb;
+    }
+    .items-table th {
+      text-align: left;
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      padding: 10px 16px;
+      font-family: 'Montserrat', sans-serif;
+    }
+    .items-table th:first-child { padding-left: 28px; }
+    .items-table th:last-child  { padding-right: 28px; }
+    .items-table th.right { text-align: right; }
+
+    .items-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #f0f2f5;
       vertical-align: middle;
     }
-    .items-table td.right { text-align: right; color: var(--text); }
+    .items-table td:first-child { padding-left: 28px; }
+    .items-table td:last-child  { padding-right: 28px; }
+    .items-table td.right { text-align: right; }
     .items-table td.muted { color: var(--muted); }
-    .items-table tr:last-child td { border-bottom: none; }
+    .items-table tbody tr:last-child td { border-bottom: none; }
+    .items-table tbody tr:hover { background: #fafbfc; }
 
-    /* ── Shared address/meta classes (match view-invoice.html exactly) ── */
-    .addr-title { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em; color:#8a99aa; font-weight:700; margin:0 0 7px; font-family:'Montserrat',sans-serif; }
-    .addr-line  { font-size:0.88rem; color:#1a2633; margin:0 0 3px; line-height:1.45; }
-    .addr-line.bold { font-weight:700; }
-    .meta-label { margin:0 0 2px; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.06em; color:#8a99aa; font-weight:700; font-family:'Montserrat',sans-serif; }
-    .meta-value { margin:0 0 10px; font-size:0.9rem; color:#1a2633; }
-
+    /* Qty input */
     .qty-input {
-      width: 70px;
-      padding: 6px 8px;
+      width: 64px;
+      padding: 5px 8px;
       border: 1px solid var(--border);
       border-radius: 5px;
       font-family: 'Lato', sans-serif;
-      font-size: 0.9rem;
+      font-size: 0.875rem;
       text-align: center;
       outline: none;
+      color: var(--text);
     }
     .qty-input:focus {
       border-color: var(--navy);
-      box-shadow: 0 0 0 2px rgba(0,58,108,0.08);
+      box-shadow: 0 0 0 2px rgba(27,36,56,0.08);
     }
 
+    /* Remove button */
     .btn-remove {
       background: none;
       border: none;
-      color: var(--muted);
+      color: #ccd3db;
       cursor: pointer;
-      font-size: 1rem;
-      padding: 4px 6px;
+      font-size: 0.9rem;
+      padding: 4px 8px;
       border-radius: 4px;
       transition: color 0.15s, background 0.15s;
+      line-height: 1;
     }
     .btn-remove:hover { color: var(--red); background: #fff0f0; }
 
-    /* ── Add item expander ── */
+    /* Totals */
+    .totals-wrap {
+      padding: 14px 28px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0;
+      border-top: 1px solid var(--border);
+    }
+    .totals-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 40px;
+      font-size: 0.875rem;
+      color: var(--muted);
+      padding: 4px 0;
+      min-width: 220px;
+    }
+    .totals-row .val { text-align: right; }
+    .totals-final {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      border-top: 2px solid var(--navy);
+      margin-top: 6px;
+      padding-top: 8px;
+    }
+
+    /* ── Add item panel ── */
+    .add-item-section { margin-top: 4px; }
     .add-item-toggle {
-      margin-top: 16px;
       display: inline-flex;
       align-items: center;
       gap: 6px;
       color: var(--navy);
-      font-size: 0.88rem;
+      font-size: 0.875rem;
       font-weight: 700;
       cursor: pointer;
       background: none;
@@ -253,39 +387,34 @@
     .add-item-toggle:hover { text-decoration: underline; }
 
     .add-item-panel {
-      margin-top: 16px;
-      padding: 16px;
-      background: var(--light);
+      margin-top: 12px;
+      padding: 16px 20px;
+      background: var(--white);
       border: 1px solid var(--border);
-      border-radius: 6px;
+      border-radius: 8px;
     }
-    .add-item-panel .selector-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr 80px auto;
-      gap: 10px;
-      align-items: end;
+    .v-add-wrap { display: flex; flex-direction: column; gap: 0; }
+    .v-add-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 0;
     }
-    @media (max-width: 600px) {
-      .add-item-panel .selector-grid { grid-template-columns: 1fr 1fr; }
-      .add-item-panel .selector-grid .btn-add { grid-column: 1 / -1; }
+    .v-add-row label {
+      width: 130px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      flex-shrink: 0;
+      font-weight: 600;
     }
-    .add-item-panel label {
-      display: block;
-      font-size: 0.8rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--text);
-      margin-bottom: 5px;
-    }
+    .v-add-row select { flex: 1; max-width: 320px; }
     .add-item-panel select,
     .add-item-panel input[type="number"] {
-      width: 100%;
       border: 1px solid var(--border);
       border-radius: 5px;
-      padding: 9px 12px;
+      padding: 8px 10px;
       font-family: 'Lato', sans-serif;
-      font-size: 0.9rem;
+      font-size: 0.875rem;
       color: var(--text);
       background: var(--white);
       outline: none;
@@ -293,85 +422,107 @@
     .add-item-panel select:focus,
     .add-item-panel input:focus {
       border-color: var(--navy);
-      box-shadow: 0 0 0 2px rgba(0,58,108,0.08);
+      box-shadow: 0 0 0 2px rgba(27,36,56,0.08);
     }
     .add-item-panel select:disabled { background: #f0f2f5; color: var(--muted); }
 
-    /* ── Totals ── */
-    .totals-block { margin-top: 16px; }
-    .totals-row {
-      display: flex;
-      justify-content: flex-end;
-      gap: 24px;
-      font-size: 0.9rem;
-      color: var(--muted);
-      margin-bottom: 6px;
-    }
-    .totals-row.total-final {
-      font-size: 1rem;
-      font-weight: 700;
-      color: var(--text);
-      border-top: 1px solid var(--border);
-      padding-top: 8px;
-      margin-top: 4px;
-    }
-    .totals-row .val { min-width: 90px; text-align: right; }
-
-    /* ── Save button ── */
+    /* ── Save row ── */
     .save-row {
       display: flex;
       align-items: center;
-      gap: 16px;
-      margin-top: 20px;
+      gap: 12px;
+      margin-top: 12px;
     }
     .save-confirm {
-      font-size: 0.88rem;
+      font-size: 0.875rem;
       color: var(--success);
       font-weight: 700;
       display: none;
     }
 
     /* ── Notes card ── */
+    .notes-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 20px;
+      margin-top: 16px;
+      display: flex;
+      gap: 12px;
+      align-items: baseline;
+    }
+    .notes-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      white-space: nowrap;
+      font-family: 'Montserrat', sans-serif;
+    }
     .notes-text {
+      font-size: 0.875rem;
       color: var(--text);
-      line-height: 1.65;
-      font-size: 0.93rem;
+      line-height: 1.6;
       white-space: pre-wrap;
     }
 
-    /* ── Action buttons ── */
+    /* ── Actions ── */
     .actions {
       display: flex;
-      gap: 12px;
+      gap: 10px;
       flex-wrap: wrap;
-      margin-top: 4px;
+      margin-top: 16px;
     }
 
     /* ── Buttons ── */
     .btn {
       display: inline-block;
-      padding: 12px 24px;
+      padding: 10px 22px;
       border-radius: 6px;
       font-family: 'Montserrat', sans-serif;
-      font-size: 0.9rem;
+      font-size: 0.875rem;
       font-weight: 700;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.4px;
       cursor: pointer;
       border: none;
       transition: opacity 0.2s, transform 0.1s;
       text-decoration: none;
     }
-    .btn:hover { opacity: 0.88; }
-    .btn:active { transform: scale(0.98); }
+    .btn:hover   { opacity: 0.87; }
+    .btn:active  { transform: scale(0.98); }
     .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
-    .btn-primary { background: var(--navy); color: var(--white); }
-    .btn-danger  { background: var(--red);  color: var(--white); }
+    .btn-primary   { background: var(--navy); color: #fff; }
+    .btn-danger    { background: var(--red);  color: #fff; }
     .btn-secondary {
       background: transparent;
       color: var(--navy);
       border: 1.5px solid var(--navy);
     }
-    .btn-add { background: var(--navy); color: var(--white); padding: 9px 16px; }
+    .btn-add {
+      background: var(--navy);
+      color: #fff;
+      padding: 8px 16px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .btn-sm { padding: 6px 14px; font-size: 0.8rem; }
+
+    /* ── Badge ── */
+    .badge {
+      display: inline-block;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+    .badge-success { background: #edf7f1; border: 1px solid #a3d9b8; color: #145228; }
+    .badge-navy    { background: var(--navy); color: #fff; }
 
     /* ── Modal ── */
     .modal-overlay {
@@ -383,30 +534,26 @@
     .modal {
       background: var(--white);
       border-radius: 10px;
-      padding: 36px 32px;
+      padding: 32px 28px;
       max-width: 460px;
-      width: 90%;
+      width: 92%;
       box-shadow: 0 8px 32px rgba(0,0,0,0.18);
     }
     .modal h2 {
       font-family: 'Montserrat', sans-serif;
-      font-size: 1.2rem;
+      font-size: 1.15rem;
       font-weight: 800;
       color: var(--navy);
       margin-bottom: 12px;
     }
-    .modal p {
-      color: var(--muted);
-      font-size: 0.92rem;
-      line-height: 1.6;
-      margin-bottom: 28px;
-    }
-    .modal-btns { display: flex; gap: 12px; }
+    .modal p { color: var(--muted); font-size: 0.9rem; line-height: 1.6; margin-bottom: 24px; }
+    .modal-btns { display: flex; gap: 10px; }
     .modal-btns .btn { flex: 1; text-align: center; }
 
+    /* ── Spinner (inline) ── */
     .spinner-sm {
       display: inline-block;
-      width: 14px; height: 14px;
+      width: 13px; height: 13px;
       border: 2px solid rgba(255,255,255,0.4);
       border-top-color: white;
       border-radius: 50%;
@@ -415,15 +562,27 @@
       vertical-align: middle;
     }
 
-    .v-add-wrap { display:flex; flex-direction:column; gap:0; }
-    .v-add-row { display:flex; align-items:center; gap:12px; padding:6px 0; }
-    .v-add-row label { width:130px; font-size:0.82rem; color:var(--muted); flex-shrink:0; font-weight:600; }
-    .v-add-row select { flex:1; max-width:320px; }
-
+    /* ── Utilities ── */
     .hidden { display: none !important; }
 
-    @media (max-width: 480px) {
-      .card { padding: 20px 16px; }
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      .doc-info {
+        grid-template-columns: 1fr;
+      }
+      .doc-info-col {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 16px 20px;
+      }
+      .doc-info-col:last-child { border-bottom: none; }
+      .doc-head { padding: 18px 20px; }
+      .items-table th:first-child,
+      .items-table td:first-child { padding-left: 20px; }
+      .items-table th:last-child,
+      .items-table td:last-child  { padding-right: 20px; }
+      .totals-wrap { padding: 12px 20px 16px; }
+      .addr-edit-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -435,9 +594,10 @@
        onerror="this.onerror=null;this.src='/static/ba-logo.jpg'">
   <div class="header-divider"></div>
   <div class="header-title" id="headerTitle">Quote Portal</div>
-  <div style="flex:1;"></div>
-  <a id="backLink" href="/portal" style="display:none;color:#fff;text-decoration:none;font-size:0.88rem;opacity:0.85;">← Back to Portal</a>
+  <a id="backLink" href="/portal">← Back to Portal</a>
 </header>
+
+<!-- Back link / portal detection -->
 <script>
 (function(){
   const params = new URLSearchParams(window.location.search);
@@ -470,6 +630,7 @@
 })();
 </script>
 
+<!-- Portal iframe: hide page header, notify parent of height -->
 <script>
 if (window.self !== window.top) {
   document.getElementById('vqHeader').style.display = 'none';
@@ -501,18 +662,18 @@ if (window.self !== window.top) {
   <!-- Loaded -->
   <div id="stateLoaded" class="hidden">
 
-    <!-- Top banners -->
-    <div id="bannerAccepted" class="banner banner-success hidden"></div>
-    <div id="bannerExpired"  class="banner banner-error   hidden">
+    <!-- Status banners -->
+    <div id="bannerAccepted"  class="banner banner-success hidden"></div>
+    <div id="bannerExpired"   class="banner banner-error   hidden">
       This quote has expired. You can request an updated quote below, or contact us at
       <a href="mailto:info@bluealpha.us" style="color:inherit;font-weight:700;">info@bluealpha.us</a> or 678-961-3304.
     </div>
-    <div id="bannerSuccess"  class="banner banner-success hidden"></div>
+    <div id="bannerSuccess"   class="banner banner-success hidden"></div>
     <div id="bannerDuplicate" class="banner banner-success hidden"></div>
 
-    <!-- PDF download — above header, right-aligned, minimal space -->
-    <div id="pdfBtnRow" style="margin-bottom:6px;display:flex;justify-content:flex-end;">
-      <button id="pdfBtn" onclick="downloadDoc()" style="background:#1B2438;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:0.82rem;font-weight:700;cursor:pointer;">↓ Download Quote</button>
+    <!-- Toolbar: PDF download -->
+    <div class="doc-toolbar">
+      <button id="pdfBtn" class="btn-pdf" onclick="downloadDoc()">↓ Download Quote</button>
     </div>
     <script>
     function downloadDoc() {
@@ -521,106 +682,117 @@ if (window.self !== window.top) {
     }
     if (window.viewingAsOrder) {
       const btn = document.getElementById('pdfBtn');
-      if (btn) btn.innerHTML = '↓ Download Sales Order';
+      if (btn) btn.textContent = '↓ Download Sales Order';
     }
     </script>
 
-    <!-- Upper box: header + meta -->
-    <div style="border:2px solid #1B2438;border-radius:10px;overflow:hidden;margin-bottom:12px;">
+    <!-- ── Quote document ── -->
+    <div class="doc-wrap">
 
-    <!-- Doc header bar -->
-    <div style="background:#1B2438;padding:20px 28px;display:flex;align-items:flex-start;justify-content:space-between;">
-      <div>
-        <div id="docTypeLabel" style="color:#fff;font-size:1.3rem;font-weight:800;letter-spacing:1px;margin-bottom:3px;">QUOTE</div>
-        <div id="quoteNumber" style="color:#adc4e0;font-size:0.9rem;"></div>
+      <!-- Header band -->
+      <div class="doc-head">
+        <div>
+          <div class="doc-type" id="docTypeLabel">QUOTE</div>
+          <div class="doc-num"  id="quoteNumber"></div>
+        </div>
+        <div class="doc-head-right">
+          <div class="doc-org"    id="quoteOrg"></div>
+          <div class="doc-badges" id="badges"></div>
+        </div>
       </div>
-      <div style="text-align:right;">
-        <div id="quoteOrg" style="color:#adc4e0;font-size:0.85rem;font-weight:600;"></div>
-        <div id="badges" style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"></div>
-      </div>
-    </div>
 
-    <!-- Meta section: Bill To + Details -->
-    <div id="customerCard" style="background:#fff;">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;">
-        <div style="padding:18px 28px;border-right:1px solid #eee;">
+      <!-- Info grid: Bill To | Ship To | Details -->
+      <div class="doc-info" id="customerCard">
+        <div class="doc-info-col">
           <div id="custInfo"></div>
-          <button id="editAddressBtn" class="btn btn-secondary" style="display:none;padding:4px 10px;font-size:0.78rem;margin-top:10px;" onclick="openAddressEdit()">Edit Addresses</button>
+          <button id="editAddressBtn" class="btn btn-secondary btn-sm" onclick="openAddressEdit()">Edit Addresses</button>
         </div>
-        <div style="padding:18px 28px;border-right:1px solid #eee;">
-          <div id="shipInfo"></div>
-        </div>
-        <div style="padding:18px 28px;">
-          <div id="metaRow"></div>
-        </div>
+        <div class="doc-info-col" id="shipInfo"></div>
+        <div class="doc-info-col" id="metaRow"></div>
       </div>
-      <!-- Inline address edit form -->
-      <div id="addressEditForm" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+
+      <!-- Inline address edit (hidden by default) -->
+      <div id="addressEditForm" class="addr-edit-wrap" style="display:none;">
+        <div class="addr-edit-grid">
           <div>
-            <div style="font-weight:600;font-size:0.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Bill To</div>
-            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:2px;">Organization</label>
-            <input type="text" id="ae_billOrg" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
-            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:2px;">Contact Name</label>
-            <input type="text" id="ae_billName" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
-            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:2px;">Address Line 1</label>
-            <input type="text" id="ae_billAddr1" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
-            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:2px;">Address Line 2</label>
-            <input type="text" id="ae_billAddr2" style="width:100%;box-sizing:border-box;">
+            <div class="addr-edit-section-title">Bill To</div>
+            <div class="addr-edit-field">
+              <label>Organization</label>
+              <input type="text" id="ae_billOrg">
+            </div>
+            <div class="addr-edit-field">
+              <label>Contact Name</label>
+              <input type="text" id="ae_billName">
+            </div>
+            <div class="addr-edit-field">
+              <label>Address Line 1</label>
+              <input type="text" id="ae_billAddr1">
+            </div>
+            <div class="addr-edit-field">
+              <label>Address Line 2</label>
+              <input type="text" id="ae_billAddr2">
+            </div>
           </div>
           <div>
-            <div style="font-weight:600;font-size:0.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Ship To</div>
-            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:2px;">Organization</label>
-            <input type="text" id="ae_shipOrg" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
-            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:2px;">Contact Name</label>
-            <input type="text" id="ae_shipName" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
-            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:2px;">Address Line 1</label>
-            <input type="text" id="ae_shipAddr1" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
-            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:2px;">City, State ZIP</label>
-            <input type="text" id="ae_shipLine2" placeholder="e.g. Atlanta, GA 30301" style="width:100%;box-sizing:border-box;">
+            <div class="addr-edit-section-title">Ship To</div>
+            <div class="addr-edit-field">
+              <label>Organization</label>
+              <input type="text" id="ae_shipOrg">
+            </div>
+            <div class="addr-edit-field">
+              <label>Contact Name</label>
+              <input type="text" id="ae_shipName">
+            </div>
+            <div class="addr-edit-field">
+              <label>Address Line 1</label>
+              <input type="text" id="ae_shipAddr1">
+            </div>
+            <div class="addr-edit-field">
+              <label>City, State ZIP</label>
+              <input type="text" id="ae_shipLine2" placeholder="e.g. Atlanta, GA 30301">
+            </div>
           </div>
         </div>
-        <div style="margin-top:14px;display:flex;gap:10px;align-items:center;">
-          <button class="btn btn-primary" onclick="saveAddressEdit()" id="saveAddrBtn">Save</button>
-          <button class="btn btn-secondary" onclick="cancelAddressEdit()">Cancel</button>
-          <span id="addrSaveMsg" style="font-size:0.84rem;color:var(--muted);"></span>
-        </div>
-      </div>
-    </div><!-- /customerCard -->
-    </div><!-- /upper box -->
-
-    <!-- Items -->
-    <div style="border:2px solid #1B2438;border-radius:10px;overflow:hidden;">
-      <table class="items-table" id="itemsTable" style="margin:0;">
-        <thead>
-          <tr>
-            <th style="padding-left:28px;">Description</th>
-            <th class="right">Qty</th>
-            <th class="right">Unit Price</th>
-            <th class="right" style="padding-right:28px;" id="thTotal">Total</th>
-            <th id="thRemove" style="width:36px;"></th>
-          </tr>
-        </thead>
-        <tbody id="itemsTbody"></tbody>
-      </table>
-
-      <!-- Totals (inside the box) -->
-      <div style="display:flex;justify-content:flex-end;padding:10px 28px 14px;">
-        <div style="min-width:240px;border-top:2px solid #1B2438;padding-top:8px;">
-          <div id="vRowShipping" class="hidden" style="display:flex;justify-content:space-between;padding-bottom:6px;font-size:0.88rem;color:#555;">
-            <span>Shipping</span><span id="vShipping">$0.00</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:1rem;font-weight:700;color:#1B2438;">
-            <span>Total Due</span><span id="vTotal">$0.00</span>
-          </div>
+        <div class="addr-edit-actions">
+          <button class="btn btn-primary btn-sm" onclick="saveAddressEdit()" id="saveAddrBtn">Save</button>
+          <button class="btn btn-secondary btn-sm" onclick="cancelAddressEdit()">Cancel</button>
+          <span id="addrSaveMsg" style="font-size:0.83rem;color:var(--muted);"></span>
         </div>
       </div>
-      <span id="vSubtotal" style="display:none;">$0.00</span>
 
-    </div><!-- /items card -->
+      <!-- Line items -->
+      <div class="doc-items">
+        <table class="items-table" id="itemsTable">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th class="right">Qty</th>
+              <th class="right">Unit Price</th>
+              <th class="right" id="thTotal">Total</th>
+              <th id="thRemove" style="width:40px;"></th>
+            </tr>
+          </thead>
+          <tbody id="itemsTbody"></tbody>
+        </table>
 
-    <!-- Add item + Save (outside the box, editable mode only) -->
-    <div id="addItemSection" style="margin-top:4px;">
+        <!-- Totals -->
+        <div class="totals-wrap">
+          <span id="vSubtotal" style="display:none;"></span>
+          <div id="vRowShipping" class="totals-row hidden">
+            <span>Shipping</span>
+            <span class="val" id="vShipping">$0.00</span>
+          </div>
+          <div class="totals-row totals-final">
+            <span>Total Due</span>
+            <span class="val" id="vTotal">$0.00</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /.doc-wrap -->
+
+    <!-- Add item (editable mode only) -->
+    <div id="addItemSection" class="add-item-section hidden">
       <button class="add-item-toggle" onclick="toggleAddItem()">+ Add another item</button>
       <div id="addItemPanel" class="add-item-panel hidden">
         <div class="v-add-wrap">
@@ -648,49 +820,48 @@ if (window.self !== window.top) {
             <label>Qty</label>
             <div style="display:flex;gap:8px;align-items:center;">
               <input type="number" id="vQty" min="1" value="1" style="width:70px;">
-              <button class="btn btn-add" onclick="vDoAdd()">Add</button>
+              <button class="btn-add" onclick="vDoAdd()">Add</button>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="save-row" id="saveRow" style="margin-top:8px;">
+    <!-- Save / Revert -->
+    <div class="save-row hidden" id="saveRow">
       <button class="btn btn-primary" id="btnSave" onclick="saveChanges()">Save Changes</button>
       <button class="btn btn-secondary" id="btnRevert" onclick="revertChanges()" style="display:none;">Revert</button>
       <span class="save-confirm" id="saveConfirm">✓ Changes saved</span>
     </div>
 
-    <!-- Notes card -->
-    <div class="card hidden" id="notesCard" style="padding:10px 16px;display:flex;align-items:baseline;gap:10px;">
-      <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8a99aa;white-space:nowrap;">Notes</span>
-      <span class="notes-text" id="notesText" style="font-size:0.88rem;color:#1a2633;"></span>
+    <!-- Notes -->
+    <div class="notes-card hidden" id="notesCard">
+      <div class="notes-label">Notes</div>
+      <div class="notes-text" id="notesText"></div>
     </div>
 
-    <!-- Actions -->
-    <div class="actions" id="actionsBar">
-      <!-- populated by JS -->
-    </div>
+    <!-- Action buttons -->
+    <div class="actions" id="actionsBar"></div>
 
   </div><!-- /stateLoaded -->
 
-</div>
+</div><!-- /container -->
 
 <!-- Accept modal -->
 <div class="modal-overlay hidden" id="acceptModal">
-  <div class="modal" style="max-width:460px;width:95%;">
+  <div class="modal">
     <h2>Confirm Your Order</h2>
 
     <!-- Quote summary -->
-    <div id="modalSummary" style="background:var(--light);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:0.88rem;">
-    </div>
+    <div id="modalSummary" style="background:var(--light);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:0.875rem;"></div>
 
     <!-- Terms checkbox -->
-    <div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:16px;background:#f9f9f7;">
+    <div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:20px;background:#f9f9f7;">
       <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
-        <input type="checkbox" id="termsCheckbox" onchange="document.getElementById('btnConfirmOrder').disabled = !this.checked;"
+        <input type="checkbox" id="termsCheckbox"
+               onchange="document.getElementById('btnConfirmOrder').disabled = !this.checked;"
                style="margin-top:3px;flex-shrink:0;width:16px;height:16px;cursor:pointer;">
-        <span style="font-size:0.84rem;color:var(--muted);line-height:1.5;">
+        <span style="font-size:0.83rem;color:var(--muted);line-height:1.55;">
           By accepting this quote, I agree to Blue Alpha's purchase terms: payment is due Net 30 from date of invoice. Overdue balances accrue a 1.5% monthly late fee. Non-payment may result in credit hold, referral to collections, and recovery of collection costs including attorney's fees. Accepted quotes are binding purchase orders. Products are eligible for return or exchange within 30 days of delivery.
         </span>
       </label>
@@ -698,7 +869,7 @@ if (window.self !== window.top) {
 
     <div class="modal-btns">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-danger" id="btnConfirmOrder" onclick="confirmOrder()" disabled>Place Order</button>
+      <button class="btn btn-danger"    id="btnConfirmOrder" onclick="confirmOrder()" disabled>Place Order</button>
     </div>
   </div>
 </div>
@@ -707,12 +878,12 @@ if (window.self !== window.top) {
 // ─── State ───────────────────────────────────────────────────────────────────
 const recordId    = window.location.pathname.split('/').pop();
 let   quoteData   = null;
-let   portalUser  = null;  // fetched from /api/portal/me if a portal session exists
-let   catalog   = null;
+let   portalUser  = null;
+let   catalog     = null;
 let   catalogLoaded = false;
-let   editItems  = [];  // working copy of line items when in edit mode
-let   savedItems = [];  // snapshot of last-saved state for revert
-let   dirty      = false;  // true when there are unsaved changes
+let   editItems   = [];
+let   savedItems  = [];
+let   dirty       = false;
 
 function markDirty() {
   dirty = true;
@@ -741,18 +912,15 @@ window.addEventListener('beforeunload', e => {
 
 // ─── Load ────────────────────────────────────────────────────────────────────
 (async function load() {
-  // Try to fetch portal user info (may fail if not logged in via portal — that's OK)
   try {
     const meResp = await fetch('/api/portal/me', { credentials: 'same-origin' });
-    if (meResp.ok) {
-      portalUser = await meResp.json();
-    }
+    if (meResp.ok) portalUser = await meResp.json();
   } catch (_) {}
 
   try {
     const r = await fetch(`/api/get-quote/${recordId}`);
     if (!r.ok) throw new Error('not found');
-    quoteData = await r.json();
+    quoteData  = await r.json();
     editItems  = quoteData.lineItems.map(i => ({ ...i }));
     savedItems = quoteData.lineItems.map(i => ({ ...i }));
     render();
@@ -769,7 +937,10 @@ function render() {
   document.getElementById('stateLoading').classList.add('hidden');
   document.getElementById('stateLoaded').classList.remove('hidden');
 
-  // Quote number & org
+  // Doc type + quote number
+  const dtLabel = document.getElementById('docTypeLabel');
+  if (dtLabel) dtLabel.textContent = window.viewingAsOrder ? 'SALES ORDER' : 'QUOTE';
+
   document.getElementById('quoteNumber').textContent = q.quoteNumber;
   if (window.viewingAsOrder && q.invRecordId) {
     const invLink = document.createElement('a');
@@ -779,51 +950,42 @@ function render() {
     document.getElementById('quoteNumber').appendChild(document.createElement('br'));
     document.getElementById('quoteNumber').appendChild(invLink);
   }
-  document.getElementById('quoteOrg').textContent    = q.customer?.orgName || '';
 
-  // Doc type label
-  const dtLabel = document.getElementById('docTypeLabel');
-  if (dtLabel) dtLabel.textContent = window.viewingAsOrder ? 'SALES ORDER' : 'QUOTE';
+  document.getElementById('quoteOrg').textContent = q.customer?.orgName || '';
 
-  // Meta details panel (right column — label + value pairs)
+  // Badges
+  if (q.isAccepted) {
+    const label = q.soNumber ? `✓ Order Accepted — ${q.soNumber}` : '✓ Order Accepted';
+    document.getElementById('badges').insertAdjacentHTML('beforeend',
+      `<span class="badge badge-success">${escHtml(label)}</span>`);
+  }
+
+  // Meta details (right column)
   function fmtDate(iso) {
     if (!iso) return '—';
     const [y, m, d] = iso.split('-').map(Number);
     return `${m}-${d}-${y}`;
   }
-
-  function metaKV(label, value, valueStyle) {
-    return `<p class="meta-label">${label}</p><p class="meta-value"${valueStyle?` style="${valueStyle}"`:''}>${value}</p>`;
+  function metaKV(label, value) {
+    return `<p class="meta-label">${label}</p><p class="meta-value">${value}</p>`;
   }
 
-  const metaRow = document.getElementById('metaRow');
-  metaRow.innerHTML = '';
   let metaHTML = '';
   const dateLabel = window.viewingAsOrder ? 'Order Date' : 'Quote Date';
   metaHTML += metaKV(dateLabel, fmtDate(q.date));
   if (q.expiryDate && !window.viewingAsOrder) {
     const daysLeft = daysBetween(new Date(), new Date(q.expiryDate));
     const expVal = q.isExpired
-      ? `<span style="color:#bd3333;font-weight:700;">EXPIRED</span>`
+      ? `<span style="color:var(--red);font-weight:700;">EXPIRED</span>`
       : daysLeft < 30
-        ? `<strong>${fmtDate(q.expiryDate)}</strong> <span style="color:#b87a00;">(${daysLeft}d left)</span>`
-        : `<strong>${fmtDate(q.expiryDate)}</strong>`;
+        ? `${fmtDate(q.expiryDate)} <span style="color:#b87a00;font-size:0.82rem;">(${daysLeft}d left)</span>`
+        : fmtDate(q.expiryDate);
     metaHTML += metaKV('Expiry Date', expVal);
   }
   if (!window.viewingAsOrder) metaHTML += metaKV('Terms', 'Net 30');
   if (q.poNumber) metaHTML += metaKV('PO #', escHtml(q.poNumber));
-  metaRow.innerHTML = metaHTML;
+  document.getElementById('metaRow').innerHTML = metaHTML;
 
-  // Badges in header
-  const badges = document.getElementById('badges');
-  if (q.isAccepted) {
-    const soNumber = q.soNumber || '';
-    const label = soNumber ? `✓ Order Accepted — ${soNumber}` : '✓ Order Accepted';
-    badges.insertAdjacentHTML('beforeend',
-      `<span class="badge badge-success">${escHtml(label)}</span>`);
-  }
-
-  // Customer info
   renderCustomer();
   renderQuoteDetails();
 }
@@ -834,7 +996,7 @@ function renderCustomer() {
   function addrBlock(title, lines) {
     let html = `<div class="addr-title">${title}</div>`;
     lines.filter(Boolean).forEach((ln, i) => {
-      html += `<p class="addr-line${i===0?' bold':''}">${escHtml(ln)}</p>`;
+      html += `<p class="addr-line${i === 0 ? ' bold' : ''}">${escHtml(ln)}</p>`;
     });
     return html;
   }
@@ -856,13 +1018,8 @@ function renderCustomer() {
 function renderQuoteDetails() {
   const q = quoteData;
 
-  // Status banners
-  if (false && q.isAccepted && !window.viewingAsOrder) {
-    const soLabel = q.soNumber ? `Order ${q.soNumber} is in progress.` : 'Your order is in progress.';
-    document.getElementById('bannerAccepted').textContent =
-      `This quote has been accepted. ${soLabel}`;
-    document.getElementById('bannerAccepted').classList.remove('hidden');
-  } else if (q.isExpired) {
+  // Banners
+  if (q.isExpired && !q.isAccepted) {
     document.getElementById('bannerExpired').classList.remove('hidden');
   }
 
@@ -872,22 +1029,19 @@ function renderQuoteDetails() {
     document.getElementById('notesText').textContent = q.notes;
   }
 
-  // Render table
   renderItemsTable();
 
-  // Edit controls visibility — only users who can create quotes may edit line items
+  // Edit controls
   const canEdit = !portalUser || portalUser.canCreateQuote !== false;
   const editable = !q.isAccepted && !q.isExpired && canEdit;
   document.getElementById('addItemSection').classList.toggle('hidden', !editable);
   document.getElementById('saveRow').classList.toggle('hidden', !editable);
-  document.getElementById('thRemove').textContent = editable ? '' : '';
 
-  // Show Edit Addresses button for users with create_quote permission (not on order view)
+  // Edit addresses button
   if (portalUser && portalUser.canCreateQuote !== false && !window.viewingAsOrder) {
     document.getElementById('editAddressBtn').style.display = '';
   }
 
-  // Actions bar
   buildActions(editable);
 }
 
@@ -895,9 +1049,6 @@ function renderItemsTable() {
   const q = quoteData;
   const canEdit = !portalUser || portalUser.canCreateQuote !== false;
   const editable = !q.isAccepted && !q.isExpired && canEdit;
-
-  const _ic = document.getElementById('itemCount');
-  if (_ic) _ic.textContent = editItems.length;
 
   const tbody = document.getElementById('itemsTbody');
   tbody.innerHTML = '';
@@ -909,22 +1060,22 @@ function renderItemsTable() {
 
     if (editable) {
       tr.innerHTML = `
-        <td style="padding-left:28px;">${escHtml(item.name)}</td>
+        <td>${escHtml(item.name)}</td>
         <td class="right">
           <input type="number" class="qty-input" min="1" value="${item.qty}"
                  data-idx="${i}" onchange="onQtyChange(this)">
         </td>
         <td class="right muted">$${item.unitPrice.toFixed(2)}</td>
-        <td class="right" id="vLineTotal_${i}" style="padding-right:28px;">$${lineTotal}</td>
-        <td style="padding:0;width:36px;"><button class="btn-remove" onclick="removeViewItem(${i})" title="Remove">✕</button></td>
+        <td class="right" id="vLineTotal_${i}">$${lineTotal}</td>
+        <td style="text-align:center;"><button class="btn-remove" onclick="removeViewItem(${i})" title="Remove">✕</button></td>
       `;
     } else {
       tr.innerHTML = `
-        <td style="padding-left:28px;">${escHtml(item.name)}</td>
+        <td>${escHtml(item.name)}</td>
         <td class="right">${item.qty}</td>
         <td class="right muted">$${item.unitPrice.toFixed(2)}</td>
-        <td class="right" style="padding-right:28px;">$${lineTotal}</td>
-        <td style="padding:0;"></td>
+        <td class="right">$${lineTotal}</td>
+        <td></td>
       `;
     }
     tbody.appendChild(tr);
@@ -992,13 +1143,11 @@ async function saveAddressEdit() {
     });
     const data = await r.json();
     if (!data.ok) throw new Error(data.error || 'Failed');
-    // Update local quoteData so display refreshes
     const c = quoteData.customer;
     c.billToOrg = payload.billOrg; c.billToName = payload.billName;
     c.billToAddr1 = payload.billAddr1; c.billToAddr2 = payload.billAddr2;
     c.orgName = payload.shipOrg; c.contactName = payload.shipName;
     c.address1 = payload.shipAddr1;
-    // Parse city/state/zip from line2
     const parts = payload.shipLine2.split(',').map(s => s.trim());
     c.city = parts[0] || '';
     const stateZip = (parts[1] || '').trim().split(/\s+/);
@@ -1019,7 +1168,6 @@ function buildActions(editable) {
 
   if (q.isAccepted) {
     if (window.viewingAsOrder) {
-      // Order view: show Reorder button only
       if (portalUser && portalUser.canCreateQuote !== false) {
         const reorderBtn = document.createElement('button');
         reorderBtn.className   = 'btn btn-primary';
@@ -1029,11 +1177,10 @@ function buildActions(editable) {
         bar.appendChild(reorderBtn);
         const conf = document.createElement('span');
         conf.id = 'duplicateConfirm';
-        conf.style.cssText = 'display:none;margin-left:12px;color:#1a7a3c;font-size:0.88rem;';
+        conf.style.cssText = 'display:none;margin-left:12px;color:var(--success);font-size:0.875rem;';
         bar.appendChild(conf);
       }
     } else if (portalUser) {
-      // Accepted: allow duplicate (reorder) and remove — but no accept button
       if (portalUser.canCreateQuote !== false) {
         const dupBtn = document.createElement('button');
         dupBtn.className   = 'btn btn-primary';
@@ -1043,10 +1190,9 @@ function buildActions(editable) {
         bar.appendChild(dupBtn);
         const conf = document.createElement('span');
         conf.id = 'duplicateConfirm';
-        conf.style.cssText = 'display:none;margin-left:12px;color:#1a7a3c;font-size:0.88rem;';
+        conf.style.cssText = 'display:none;margin-left:12px;color:var(--success);font-size:0.875rem;';
         bar.appendChild(conf);
-      }
-      if (portalUser.canCreateQuote !== false) {
+
         const removeBtn = document.createElement('button');
         removeBtn.className   = 'btn btn-secondary';
         removeBtn.textContent = 'Remove Quote';
@@ -1056,7 +1202,6 @@ function buildActions(editable) {
     }
 
   } else if (q.isExpired && !q.isAccepted) {
-    // Expired: only show portal actions if user is logged in via portal session
     if (portalUser) {
       if (portalUser.canCreateQuote !== false) {
         const updateBtn = document.createElement('button');
@@ -1065,10 +1210,7 @@ function buildActions(editable) {
         updateBtn.textContent = 'Request Updated Quote';
         updateBtn.onclick     = requestUpdatedQuote;
         bar.appendChild(updateBtn);
-      }
 
-      // "Remove Quote" — hide from customer view (Quotes Only+ only)
-      if (portalUser.canCreateQuote !== false) {
         const removeBtn = document.createElement('button');
         removeBtn.className   = 'btn btn-secondary';
         removeBtn.textContent = 'Remove Quote';
@@ -1078,9 +1220,7 @@ function buildActions(editable) {
     }
 
   } else if (editable) {
-    // Not expired, not accepted: show Accept button (gated by role)
     if (portalUser) {
-      // User is logged in via portal session
       if (portalUser.canAcceptQuote !== false) {
         const acceptBtn = document.createElement('button');
         acceptBtn.className   = 'btn btn-danger';
@@ -1089,13 +1229,11 @@ function buildActions(editable) {
         acceptBtn.onclick     = openModal;
         bar.appendChild(acceptBtn);
       } else {
-        // Insufficient role — show informational message
         const infoEl = document.createElement('p');
         infoEl.style.cssText = 'color:var(--muted);font-size:0.9rem;';
         infoEl.textContent = 'Contact your account manager to accept this quote.';
         bar.appendChild(infoEl);
       }
-      // Duplicate button for users with create-quote permission
       if (portalUser.canCreateQuote !== false) {
         const dupBtn = document.createElement('button');
         dupBtn.className   = 'btn btn-secondary';
@@ -1105,11 +1243,9 @@ function buildActions(editable) {
         bar.appendChild(dupBtn);
         const conf = document.createElement('span');
         conf.id = 'duplicateConfirm';
-        conf.style.cssText = 'display:none;margin-left:12px;color:#1a7a3c;font-size:0.88rem;';
+        conf.style.cssText = 'display:none;margin-left:12px;color:var(--success);font-size:0.875rem;';
         bar.appendChild(conf);
-      }
-      // Remove Quote — available on all open quotes
-      if (portalUser.canCreateQuote !== false) {
+
         const removeBtn = document.createElement('button');
         removeBtn.className   = 'btn btn-secondary';
         removeBtn.textContent = 'Remove Quote';
@@ -1117,7 +1253,6 @@ function buildActions(editable) {
         bar.appendChild(removeBtn);
       }
     } else {
-      // No portal session (customer clicking emailed link) — show Accept button normally
       const acceptBtn = document.createElement('button');
       acceptBtn.className   = 'btn btn-danger';
       acceptBtn.id          = 'btnAccept';
@@ -1131,8 +1266,7 @@ function buildActions(editable) {
 async function duplicateThisQuote() {
   const btn  = document.getElementById('btnDuplicate');
   const conf = document.getElementById('duplicateConfirm');
-  btn.disabled = true;
-  btn.textContent = '…';
+  btn.disabled = true; btn.textContent = '…';
   try {
     const r = await fetch(`/api/portal/duplicate-quote/${recordId}`, {
       method: 'POST', credentials: 'same-origin',
@@ -1140,23 +1274,18 @@ async function duplicateThisQuote() {
     const data = await r.json();
     if (data.success || data.ok) {
       const newId = data.recordId || data.newRecordId;
-      if (newId) {
-        window.location.href = '/view-quote/' + newId;
-        return;
-      }
+      if (newId) { window.location.href = '/view-quote/' + newId; return; }
       btn.textContent = 'Duplicate Quote';
       btn.disabled = false;
       conf.textContent = `✓ ${data.quoteNumber || data.newQuoteNumber} created`;
       conf.style.display = 'inline';
       setTimeout(() => { conf.style.display = 'none'; }, 5000);
     } else {
-      btn.disabled = false;
-      btn.textContent = 'Duplicate Quote';
+      btn.disabled = false; btn.textContent = 'Duplicate Quote';
       alert('Error: ' + (data.error || 'Could not duplicate quote.'));
     }
   } catch(e) {
-    btn.disabled = false;
-    btn.textContent = 'Duplicate Quote';
+    btn.disabled = false; btn.textContent = 'Duplicate Quote';
     alert('Network error: ' + e.message);
   }
 }
@@ -1166,8 +1295,7 @@ async function requestUpdatedQuote() {
   if (btn) { btn.disabled = true; btn.textContent = 'Requesting…'; }
   try {
     const r = await fetch(`/api/portal/duplicate-quote/${recordId}`, {
-      method: 'POST',
-      credentials: 'same-origin',
+      method: 'POST', credentials: 'same-origin',
     });
     const data = await r.json();
     if (data.ok) {
@@ -1189,14 +1317,12 @@ async function hideQuote() {
   if (!confirm('Remove this quote from your portal view? This cannot be undone.')) return;
   try {
     const r = await fetch(`/api/portal/hide-quote/${recordId}`, {
-      method: 'POST',
-      credentials: 'same-origin',
+      method: 'POST', credentials: 'same-origin',
     });
     const data = await r.json();
     if (data.ok) {
-      // Navigate back to portal
       if (window.self !== window.top) {
-        window.parent.postMessage({ type: 'quoteSubmitted' }, '*'); // reuse to trigger reload
+        window.parent.postMessage({ type: 'quoteSubmitted' }, '*');
       } else {
         window.location.href = '/portal';
       }
@@ -1235,9 +1361,7 @@ let addItemOpen = false;
 async function toggleAddItem() {
   addItemOpen = !addItemOpen;
   document.getElementById('addItemPanel').classList.toggle('hidden', !addItemOpen);
-  if (addItemOpen && !catalogLoaded) {
-    await loadCatalog();
-  }
+  if (addItemOpen && !catalogLoaded) await loadCatalog();
 }
 
 async function loadCatalog() {
@@ -1246,14 +1370,12 @@ async function loadCatalog() {
     if (!r.ok) throw new Error();
     catalog = await r.json();
     catalogLoaded = true;
-    // Populate product dropdown
     const prodSel = document.getElementById('vProd');
     if (prodSel) {
       prodSel.innerHTML = '<option value="">Select a product\u2026</option>';
       for (const p of catalog.parents) {
         const o = document.createElement('option');
-        o.value = p.id;
-        o.textContent = p.name;
+        o.value = p.id; o.textContent = p.name;
         prodSel.appendChild(o);
       }
     }
@@ -1302,7 +1424,6 @@ function vOnColor() {
     document.getElementById('vSize').dataset.autoName = sizes[0][1];
     vOnSize(sizes[0][0]);
   } else {
-    // No sizes for this product — skip straight to fvar/addon/qty
     document.getElementById('vSize').dataset.autoId = '';
     vOnSize('');
   }
@@ -1340,8 +1461,7 @@ function vOnFvar(forcedFvarId) {
   const sizeId   = sizeEl.dataset.autoId || sizeEl.value || '';
   const fvarId   = forcedFvarId !== undefined ? forcedFvarId : document.getElementById('vFvar').value;
   vResetFrom('addon');
-  const addonMap = {};
-  let hasBase = false;
+  const addonMap = {}; let hasBase = false;
   for (const sku of catalog.skus) {
     if (sku.parentId===parentId && sku.colorId===colorId &&
         (!sizeId || sku.sizeId===sizeId) &&
@@ -1416,7 +1536,6 @@ function vDoAdd() {
   markDirty();
   renderItemsTable();
 
-  // Reset
   document.getElementById('vProd').value = '';
   vResetFrom('color');
   document.getElementById('vQty').value = 1;
@@ -1424,10 +1543,10 @@ function vDoAdd() {
 
 // ─── Save changes ─────────────────────────────────────────────────────────────
 async function saveChanges() {
-  const btn      = document.getElementById('btnSave');
-  const confirm  = document.getElementById('saveConfirm');
-  btn.disabled   = true;
-  btn.innerHTML  = '<span class="spinner-sm"></span>Saving…';
+  const btn     = document.getElementById('btnSave');
+  const confirm = document.getElementById('saveConfirm');
+  btn.disabled  = true;
+  btn.innerHTML = '<span class="spinner-sm"></span>Saving…';
   confirm.style.display = 'none';
 
   try {
@@ -1463,16 +1582,14 @@ function openModal() {
     alert('You have unsaved changes. Please click "Save Changes" before accepting the quote.');
     return;
   }
-  // Build quote summary
   const q = quoteData;
-  const c = q.customer || {};
   const items = q.lineItems || [];
   const totalQty = items.reduce((s, i) => s + (parseInt(i.qty) || 0), 0);
   const totalAmt = items.reduce((s, i) => s + ((parseFloat(i.unitPrice) || 0) * (parseInt(i.qty) || 0)), 0);
   function fmtMoney(n) { return '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
   let rows = items.map(i => {
     const amt = (parseFloat(i.unitPrice) || 0) * (parseInt(i.qty) || 0);
-    return `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border);">
+    return `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">
       <span style="color:var(--text);">${escHtml(i.name || '')} <span style="color:var(--muted);">×${i.qty}</span></span>
       <span style="font-weight:600;">${fmtMoney(amt)}</span>
     </div>`;
@@ -1484,7 +1601,6 @@ function openModal() {
       <span>${totalQty} item${totalQty !== 1 ? 's' : ''}</span>
       <span>${fmtMoney(totalAmt)}</span>
     </div>`;
-  // Reset terms checkbox
   const cb = document.getElementById('termsCheckbox');
   if (cb) { cb.checked = false; document.getElementById('btnConfirmOrder').disabled = true; }
   document.getElementById('acceptModal').classList.remove('hidden');
@@ -1505,7 +1621,6 @@ async function confirmOrder() {
     const data = await r.json();
     if (!r.ok || !data.success) throw new Error(data.error || 'Failed to accept');
     closeModal();
-    // Navigate to Our Orders tab
     setTimeout(() => {
       if (window.self !== window.top) {
         window.parent.postMessage({ type: 'quoteAccepted' }, '*');
@@ -1520,13 +1635,6 @@ async function confirmOrder() {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-function makeMetaItem(html) {
-  const el = document.createElement('div');
-  el.className = 'meta-item';
-  el.innerHTML = html;
-  return el;
-}
-
 function daysBetween(d1, d2) {
   return Math.ceil((d2 - d1) / (1000*60*60*24));
 }
