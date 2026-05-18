@@ -5279,10 +5279,10 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
     pdf.set_text_color(*NAVY)
     pdf.cell(right_w, 12, _doc_label, align="R", new_x="LMARGIN", new_y="NEXT")
 
-    pdf.set_xy(right_x, pdf.get_y())
-    pdf.set_font("Helvetica", "", 9)
-    pdf.set_text_color(*MUTED)
-    pdf.cell(right_w, 5, q_number, align="R", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_xy(right_x, pdf.get_y() + 1)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(*NAVY)
+    pdf.cell(right_w, 6, f"#{q_number}", align="R", new_x="LMARGIN", new_y="NEXT")
 
     # Move cursor below header block
     pdf.set_y(max(pdf.get_y(), LOGO_TOP + LOGO_W * 0.39 + 2))  # logo aspect ~0.45h/w
@@ -5392,6 +5392,7 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
 
     pdf.set_font("Helvetica", "", 8)
     for idx, item in enumerate(line_items):
+        pdf.set_font("Helvetica", "", 8)   # force-reset each row — prevents state bleed
         pdf.set_text_color(*TEXT)
         line_total = item["qty"] * item["unitPrice"]
         sku_val   = item.get("skuId", "")
