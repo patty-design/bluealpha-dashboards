@@ -2,289 +2,612 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Invoice — Blue Alpha</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blue Alpha — View Invoice</title>
+  <link rel="icon" href="https://www.bluealphabelts.com/wp-content/uploads/2019/05/cropped-BAG-FAV-32x32.png">
   <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after { box-sizing: border-box; }
-    body { margin: 0; padding: 0; background: #f5f7fa; font-family: 'Lato', 'Helvetica Neue', Arial, sans-serif; color: #1a2633; }
-    .page-header {
-      background: #1B2438; padding: 18px 32px;
-      display: flex; align-items: center; justify-content: space-between;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:    #1B2438;
+      --red:     #ae0000;
+      --light:   #f5f7fa;
+      --border:  #dde3ea;
+      --text:    #1a2633;
+      --muted:   #6b7a8d;
+      --white:   #ffffff;
+      --success: #1a7a3c;
+      --warning: #b45309;
     }
-    .page-header .brand { color: #fff; font-size: 18px; font-weight: 800; letter-spacing: 2px; }
-    .page-header .back  { color: #adc4e0; font-size: 0.85rem; text-decoration: none; }
-    .page-header .back:hover { color: #fff; }
-    .container { max-width: 760px; margin: 16px auto; padding: 0 20px 60px; }
 
-    /* invoiceCard is a transparent wrapper — the inner boxes carry their own borders */
-    #invoiceCard { background: transparent; box-shadow: none; border-radius: 0; overflow: visible; padding: 0; }
+    body {
+      font-family: 'Lato', sans-serif;
+      background: var(--light);
+      color: var(--text);
+      min-height: 100vh;
+    }
 
-    /* Invoice header bar */
-    .inv-header { background: #1B2438; padding: 20px 28px; display: flex; align-items: flex-start; justify-content: space-between; }
-    .inv-header .title { color: #fff; }
-    .inv-header .title h1 { margin: 0 0 3px; font-size: 1.3rem; font-weight: 800; letter-spacing: 1px; font-family: 'Montserrat', sans-serif; }
-    .inv-header .title .inv-num { color: #adc4e0; font-size: 0.9rem; }
+    /* ── Page header ── */
+    header {
+      background: var(--navy);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    header img { height: 40px; width: auto; filter: brightness(0) invert(1); }
+    .header-divider { width: 2px; height: 32px; background: var(--red); border-radius: 2px; }
+    .header-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.65);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
 
-    /* Meta grid — 3 columns: Bill To | Ship To | Details */
-    .meta-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; background: #fff; }
-    .meta-block { padding: 18px 28px; }
-    .meta-block + .meta-block { border-left: 1px solid #eee; }
-    /* Label+value pairs (details column) */
-    .meta-label { margin: 0 0 2px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #8a99aa; font-weight: 700; font-family: 'Montserrat', sans-serif; }
-    .meta-value { margin: 0 0 10px; font-size: 0.9rem; color: #1a2633; }
-    /* Address labels + lines */
-    .addr-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #8a99aa; font-weight: 700; margin: 0 0 7px; font-family: 'Montserrat', sans-serif; }
-    .addr-line  { font-size: 0.88rem; color: #1a2633; margin: 0 0 3px; line-height: 1.45; }
+    /* ── Container ── */
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
+    }
 
-    /* Line items table */
-    table.items { width: 100%; border-collapse: collapse; }
-    table.items thead tr { background: transparent; }
-    table.items thead { border-bottom: 2px solid #1B2438; }
-    table.items thead th { padding: 10px 16px; color: #8a99aa; font-size: 0.72rem; text-transform: uppercase;
-                            letter-spacing: 0.06em; font-weight: 700; text-align: left; font-family: 'Montserrat', sans-serif; }
-    table.items thead th:first-child { padding-left: 28px; }
-    table.items thead th:last-child  { padding-right: 28px; }
-    table.items thead th.right { text-align: right; }
-    table.items thead th.center { text-align: center; }
-    table.items tbody tr { border-bottom: 1px solid #eee; }
-    table.items tbody tr:last-child { border-bottom: none; }
-    table.items tbody td { padding: 10px 16px; font-size: 0.88rem; color: #1a2633; }
-    table.items tbody td:first-child { padding-left: 28px; }
-    table.items tbody td:last-child  { padding-right: 28px; }
-    table.items tbody td.right { text-align: right; }
-    table.items tbody td.center { text-align: center; }
+    /* ── Back button row ── */
+    #backBtnRow {
+      margin-bottom: 10px;
+    }
+    .btn-back {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--navy);
+      font-family: 'Lato', sans-serif;
+      font-size: 0.875rem;
+      font-weight: 600;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .btn-back:hover { text-decoration: underline; }
 
-    /* Totals row */
-    .totals-row { display: flex; justify-content: flex-end; padding: 10px 28px 14px; }
-    .totals-box { min-width: 240px; border-top: 2px solid #1B2438; padding-top: 8px;
-                  display: flex; justify-content: space-between; font-size: 1rem; font-weight: 700; color: #1B2438; }
+    /* ── Spinner ── */
+    .loading-state {
+      text-align: center;
+      padding: 80px 0;
+      color: var(--muted);
+    }
+    .spin-lg {
+      display: inline-block;
+      width: 36px; height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--navy);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 14px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Footer note */
-    .inv-footer { padding: 20px 28px; background: #f5f7fa; border-top: 1px solid #eee;
-                   font-size: 0.78rem; color: #8a99aa; line-height: 1.6; }
-    .inv-footer strong { color: #BD3333; }
+    /* ── Error ── */
+    .error-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 48px 32px;
+      text-align: center;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+    .error-card h2 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.25rem;
+      margin-bottom: 10px;
+    }
+    .error-card p { color: var(--muted); line-height: 1.6; }
 
-    /* States */
-    .loading { text-align: center; padding: 80px 20px; color: #8a99aa; font-size: 0.95rem; }
-    .error-box { text-align: center; padding: 60px 20px; }
-    .error-box h2 { font-size: 1.1rem; color: #1a2633; margin: 0 0 8px; }
-    .error-box p  { color: #8a99aa; font-size: 0.9rem; margin: 0; }
+    /* ── Toolbar (PDF download) ── */
+    .doc-toolbar {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 10px;
+    }
+    .btn-pdf {
+      background: transparent;
+      border: 1.5px solid var(--navy);
+      color: var(--navy);
+      border-radius: 6px;
+      padding: 7px 16px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-pdf:hover { background: var(--navy); color: #fff; }
 
-    @media (max-width: 560px) {
-      .meta-grid { grid-template-columns: 1fr; }
-      .meta-block + .meta-block { border-left: none; border-top: 1px solid #eee; }
-      .inv-header { flex-direction: column; gap: 10px; }
-      .meta-block, .totals-row, .inv-footer { padding-left: 16px; padding-right: 16px; }
+    /* ── Document card ── */
+    .doc-wrap {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+      margin-bottom: 16px;
+    }
+
+    /* Navy header band */
+    .doc-head {
+      background: var(--navy);
+      padding: 22px 28px;
+      display: flex;
+      justify-content: flex-end;
+      align-items: flex-start;
+    }
+    .doc-type {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: 2px;
+    }
+    .doc-num {
+      font-size: 0.88rem;
+      color: #adc4e0;
+      margin-top: 5px;
+      text-align: right;
+    }
+
+    /* Info grid: Bill To | Ship To | Invoice Details */
+    .doc-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      border-bottom: 1px solid var(--border);
+    }
+    .doc-info-col {
+      padding: 20px 24px;
+      border-right: 1px solid var(--border);
+    }
+    .doc-info-col:last-child { border-right: none; }
+
+    .addr-title {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      font-weight: 700;
+      font-family: 'Montserrat', sans-serif;
+      margin-bottom: 8px;
+    }
+    .addr-line {
+      font-size: 0.875rem;
+      color: var(--text);
+      line-height: 1.5;
+      margin-bottom: 2px;
+    }
+    .addr-line.bold { font-weight: 700; }
+
+    .meta-label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-weight: 700;
+      font-family: 'Montserrat', sans-serif;
+      margin-bottom: 2px;
+      margin-top: 10px;
+    }
+    .meta-label:first-child { margin-top: 0; }
+    .meta-value {
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+
+    /* Items table */
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+    .items-table thead tr {
+      border-bottom: 1px solid var(--border);
+      background: #f9fafb;
+    }
+    .items-table th {
+      text-align: left;
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      padding: 10px 16px;
+      font-family: 'Montserrat', sans-serif;
+    }
+    .items-table th:first-child { padding-left: 28px; }
+    .items-table th:last-child  { padding-right: 28px; }
+    .items-table th.right  { text-align: right; }
+    .items-table th.center { text-align: center; }
+
+    .items-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #f0f2f5;
+      vertical-align: middle;
+    }
+    .items-table td:first-child { padding-left: 28px; }
+    .items-table td:last-child  { padding-right: 28px; }
+    .items-table td.right  { text-align: right; }
+    .items-table td.center { text-align: center; }
+    .items-table td.muted  { color: var(--muted); }
+    .items-table tbody tr:last-child td { border-bottom: none; }
+    .items-table tbody tr:hover { background: #fafbfc; }
+
+    /* Totals */
+    .totals-wrap {
+      padding: 14px 28px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      border-top: 1px solid var(--border);
+    }
+    .totals-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 40px;
+      font-size: 0.875rem;
+      color: var(--muted);
+      padding: 4px 0;
+      min-width: 220px;
+    }
+    .totals-row .val { text-align: right; }
+    .totals-final {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      border-top: 2px solid var(--navy);
+      margin-top: 6px;
+      padding-top: 8px;
+    }
+
+    /* Payment section */
+    .payment-section {
+      padding: 18px 28px;
+      border-top: 1px solid var(--border);
+      background: #f9fafb;
+    }
+    .payment-heading {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .payment-btns {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .pay-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 10px 20px;
+      border-radius: 7px;
+      font-family: 'Lato', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+    .pay-pill:hover { opacity: 0.85; }
+    .pay-pill-cc  { background: var(--navy); color: #fff; }
+    .pay-pill-ach { background: #5B7FA0;     color: #fff; }
+    .paid-badge {
+      background: #1a7a3c;
+      color: #fff;
+      font-size: 0.7rem;
+      padding: 2px 7px;
+      border-radius: 10px;
+      margin-left: 4px;
+    }
+
+    /* Invoice footer */
+    .inv-footer {
+      padding: 16px 28px;
+      border-top: 1px solid var(--border);
+      font-size: 0.78rem;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+    .inv-footer a { color: var(--navy); }
+
+    /* ── Utilities ── */
+    .hidden { display: none !important; }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      .doc-info {
+        grid-template-columns: 1fr;
+      }
+      .doc-info-col {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 16px 20px;
+      }
+      .doc-info-col:last-child { border-bottom: none; }
+      .doc-head { padding: 18px 20px; }
+      .items-table th:first-child,
+      .items-table td:first-child { padding-left: 20px; }
+      .items-table th:last-child,
+      .items-table td:last-child  { padding-right: 20px; }
+      .totals-wrap { padding: 12px 20px 16px; }
     }
   </style>
 </head>
 <body>
-  <div class="page-header" id="pageHeader">
-    <span class="brand">BLUE ALPHA</span>
-    <span></span>
+
+<header id="viHeader">
+  <img src="https://www.bluealphabelts.com/wp-content/uploads/2019/05/Blue-Alpha-Logo-White.png"
+       alt="Blue Alpha"
+       onerror="this.onerror=null;this.src='/static/ba-logo.jpg'">
+  <div class="header-divider"></div>
+  <div class="header-title">Invoice Portal</div>
+</header>
+
+<!-- Portal iframe: hide page header + back button row, notify parent of height -->
+<script>
+const inPortal = window.self !== window.top;
+if (inPortal) {
+  document.getElementById('viHeader').style.display = 'none';
+  document.addEventListener('DOMContentLoaded', function() {
+    const r = document.getElementById('backBtnRow');
+    if (r) r.style.display = 'none';
+  });
+}
+function _notifyVIHeight() {
+  if (inPortal) {
+    window.parent.postMessage({ type: 'viewInvoiceHeight', height: document.body.scrollHeight }, '*');
+  }
+}
+if (inPortal) {
+  window.addEventListener('load', _notifyVIHeight);
+  new MutationObserver(_notifyVIHeight).observe(document.body, { childList: true, subtree: true, attributes: true });
+}
+</script>
+
+<div class="container">
+
+  <!-- Back button row (hidden in portal iframe) -->
+  <div id="backBtnRow">
+    <button class="btn-back" onclick="goBack()">← Back to Invoices</button>
   </div>
 
-  <div class="container">
-    <div id="backBtnRow" style="margin-bottom:12px;">
-      <button id="backBtn" onclick="goBack()" style="background:none;border:none;cursor:pointer;color:#1B2438;font-size:0.9rem;font-weight:600;display:flex;align-items:center;gap:6px;padding:0;">
-        ← Back to Invoices
-      </button>
-    </div>
-    <div style="margin-bottom:6px;display:flex;justify-content:flex-end;">
-      <button id="downloadBtn" onclick="downloadInvoice()" style="background:#1B2438;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:0.82rem;font-weight:700;cursor:pointer;">
-        ↓ Download Invoice
-      </button>
-    </div>
-    <div class="card" id="invoiceCard">
-      <div class="loading">Loading invoice…</div>
+  <!-- Loading -->
+  <div id="stateLoading" class="loading-state">
+    <div class="spin-lg"></div>
+    <div>Loading invoice…</div>
+  </div>
+
+  <!-- Error -->
+  <div id="stateError" class="hidden">
+    <div class="error-card">
+      <h2>Invoice Not Found</h2>
+      <p>We couldn't find this invoice. The link may be invalid or expired.<br>
+         Please contact us at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or 678-961-3304.</p>
     </div>
   </div>
 
-  <script>
-    const recordId = location.pathname.split('/').pop();
-    const inPortal = window.self !== window.top;
+  <!-- Loaded -->
+  <div id="stateLoaded" class="hidden">
 
-    // Hide header + back button when inside portal iframe (portal provides its own back button)
-    if (inPortal) {
-      document.getElementById('pageHeader').style.display = 'none';
-      document.getElementById('backBtnRow').style.display = 'none';
-    }
+    <!-- Toolbar: PDF download -->
+    <div class="doc-toolbar">
+      <button class="btn-pdf" onclick="downloadPdf()">↓ Download PDF</button>
+    </div>
 
-    function goBack() {
-      if (inPortal) {
-        window.parent.postMessage({ type: 'closeViewInvoice' }, '*');
-      } else {
-        history.back();
-      }
-    }
+    <!-- ── Invoice document ── -->
+    <div class="doc-wrap">
 
-    function reportHeight() {
-      if (inPortal) {
-        window.parent.postMessage({ type: 'viewInvoiceHeight', height: document.body.scrollHeight }, '*');
-      }
-    }
+      <!-- Header band -->
+      <div class="doc-head">
+        <div style="text-align:right;">
+          <div class="doc-type">INVOICE</div>
+          <div class="doc-num" id="invNumber"></div>
+        </div>
+      </div>
 
-    function downloadInvoice() {
-      const btn = document.getElementById('downloadBtn');
-      if (btn) { btn.disabled = true; btn.textContent = 'Downloading…'; }
-      const a = document.createElement('a');
-      a.href = '/invoice-pdf/' + recordId;
-      a.download = '';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => {
-        if (btn) { btn.disabled = false; btn.textContent = '⬇ Download PDF'; }
-      }, 2000);
-    }
+      <!-- Info grid: Bill To | Ship To | Invoice Details -->
+      <div class="doc-info">
+        <div class="doc-info-col" id="billToCol"></div>
+        <div class="doc-info-col" id="shipToCol"></div>
+        <div class="doc-info-col" id="detailsCol"></div>
+      </div>
 
-    function fmt(s) {
-      if (!s) return '—';
-      try { return new Date(s + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }); }
-      catch { return s; }
-    }
-    function esc(s) {
-      return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-    function money(n) {
-      return '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
+      <!-- Line items -->
+      <div class="doc-items">
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th class="center">QTY</th>
+              <th class="right">Unit Price</th>
+              <th class="right">Total</th>
+            </tr>
+          </thead>
+          <tbody id="itemsTbody"></tbody>
+        </table>
 
-    async function load() {
-      const card = document.getElementById('invoiceCard');
-      try {
-        const resp = await fetch(`/api/invoice-detail/${recordId}`);
-        if (!resp.ok) {
-          const d = await resp.json().catch(() => ({}));
-          card.innerHTML = `<div class="error-box"><h2>Invoice Not Found</h2><p>${esc(d.error || 'This invoice could not be loaded.')}</p></div>`;
-          return;
-        }
-        const inv = await resp.json();
-        document.title = `${esc(inv.invNumber)} — Blue Alpha Invoice`;
-
-        // Due date = invoice date + 30 days
-        let dueDate = '—';
-        if (inv.date) {
-          try {
-            const d = new Date(inv.date + 'T12:00:00');
-            d.setDate(d.getDate() + 30);
-            dueDate = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-          } catch {}
-        }
-
-        // Line items rows
-        const liRows = (inv.lineItems || []).map(li => `
-          <tr>
-            <td>${esc(li.name)}</td>
-            <td class="center">${li.qty}</td>
-            <td class="right">${money(li.unit_price)}</td>
-            <td class="right">${money(li.total)}</td>
-          </tr>
-        `).join('');
-
-        // Tracking link
-        const tn = (inv.tracking || '').trim();
-        let trackingHtml = tn ? tn : '—';
-        if (tn) {
-          const url = /^1Z/i.test(tn.replace(/\s/g,''))
-            ? `https://www.ups.com/track?tracknum=${encodeURIComponent(tn)}`
-            : `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(tn)}`;
-          trackingHtml = `<a href="${url}" target="_blank" rel="noopener" style="color:#1B2438;">${esc(tn)}</a>`;
-        }
-
-        // Address helpers
-        function addrBlock(title, lines) {
-          let html = `<div class="addr-title">${title}</div>`;
-          lines.filter(Boolean).forEach((ln, i) => {
-            html += `<p class="addr-line"${i===0?' style="font-weight:700;"':''}>${esc(ln)}</p>`;
-          });
-          return html;
-        }
-        function kv(label, value) {
-          return `<p class="meta-label">${label}</p><p class="meta-value">${value}</p>`;
-        }
-
-        const billLines = [inv.orgName, inv.contact, inv.addr1, inv.addr2];
-        const shipLines = [inv.shipOrg, inv.shipName, inv.shipAddr1, inv.shipAddr2];
-
-        card.innerHTML = `
-          <div style="border:2px solid #1B2438;border-radius:10px;overflow:hidden;margin-bottom:12px;">
-          <div class="inv-header">
-            <div class="title">
-              <h1>INVOICE</h1>
-              <div class="inv-num">${esc(inv.invNumber)}</div>
-            </div>
-            <div style="text-align:right;">
-              <div style="color:#adc4e0;font-size:0.85rem;font-weight:600;">${esc(inv.orgName || '')}</div>
-            </div>
+        <!-- Totals -->
+        <div class="totals-wrap">
+          <div class="totals-row totals-final">
+            <span>Total Due</span>
+            <span class="val" id="vTotal">$0.00</span>
           </div>
+        </div>
+      </div>
 
-          <div class="meta-grid">
-            <div class="meta-block">${addrBlock('Bill To', billLines)}</div>
-            <div class="meta-block">${addrBlock('Ship To', shipLines)}</div>
-            <div class="meta-block">
-              ${inv.soNumber ? kv('Sales Order', inv.soNumber) : ''}
-              ${kv('Invoice Date', fmt(inv.date))}
-              ${kv('Due Date', dueDate)}
-              ${inv.poNumber ? kv('PO #', esc(inv.poNumber)) : ''}
-              ${inv.shipDate ? kv('Ship Date', fmt(inv.shipDate)) : ''}
-              ${inv.tracking ? kv('Tracking', trackingHtml) : ''}
-            </div>
-          </div>
-          </div><!-- /upper box -->
+      <!-- Payment section (shown only when Stripe links present) -->
+      <div id="paymentSection" class="payment-section hidden">
+        <div class="payment-heading">Pay Online</div>
+        <div class="payment-btns" id="paymentBtns"></div>
+      </div>
 
-          <div style="border:2px solid #1B2438;border-radius:10px;overflow:hidden;">
-            <table class="items">
-              <thead>
-                <tr>
-                  <th>Description</th>
-                  <th class="center">Qty</th>
-                  <th class="right">Unit Price</th>
-                  <th class="right">Total</th>
-                </tr>
-              </thead>
-              <tbody>${liRows || '<tr><td colspan="4" style="text-align:center;color:#aaa;padding:20px 28px;">No line items</td></tr>'}</tbody>
-            </table>
-            <div class="totals-row">
-              <div class="totals-box">
-                <span>Total Due</span>
-                <span>${money(inv.subtotal)}</span>
-              </div>
-            </div>
-          </div><!-- /items card -->
+      <!-- Footer -->
+      <div class="inv-footer">
+        Payment terms: Net 30 from invoice date. A 1.5% monthly late fee applies to unpaid balances after 30 days.
+        Questions? Contact us at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or 678-961-3304.
+      </div>
 
-          ${(inv.stripeCcUrl || inv.stripeAchUrl) ? `
-          <div id="paymentSection" style="padding:20px 28px;border-top:1px solid #eee;background:#f9fafb;">
-            <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#8a99aa;margin-bottom:12px;">Pay Online</div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-              ${inv.stripeCcUrl ? `
-                <a href="${inv.stripeCcUrl}" target="_blank" rel="noopener"
-                  style="display:inline-flex;align-items:center;gap:7px;background:#1B2438;color:#fff;padding:10px 20px;border-radius:7px;font-size:0.88rem;font-weight:700;text-decoration:none;">
-                  💳 Pay by Credit Card
-                  ${inv.stripeCcStatus === 'Paid' ? '<span style="background:#1a7a3c;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:10px;margin-left:4px;">PAID</span>' : ''}
-                </a>` : ''}
-              ${inv.stripeAchUrl ? `
-                <a href="${inv.stripeAchUrl}" target="_blank" rel="noopener"
-                  style="display:inline-flex;align-items:center;gap:7px;background:#5B7FA0;color:#fff;padding:10px 20px;border-radius:7px;font-size:0.88rem;font-weight:700;text-decoration:none;">
-                  🏦 Pay by ACH / Bank Transfer
-                  ${inv.stripeAchStatus === 'Paid' ? '<span style="background:#1a7a3c;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:10px;margin-left:4px;">PAID</span>' : ''}
-                </a>` : ''}
-            </div>
-          </div>` : ''}
+    </div><!-- /.doc-wrap -->
 
-          <div class="inv-footer">
-            Payment terms: Net 30 from invoice date. <strong>A 1.5% monthly late fee applies to unpaid balances after 30 days.</strong><br>
-            Questions? Contact us at <a href="mailto:info@bluealpha.us" style="color:#1B2438;">info@bluealpha.us</a> or 678-961-3304.
-          </div>
-        `;
-      } catch (e) {
-        card.innerHTML = `<div class="error-box"><h2>Error</h2><p>${esc(e.message)}</p></div>`;
-      }
-      setTimeout(reportHeight, 100);
+  </div><!-- /stateLoaded -->
+
+</div><!-- /container -->
+
+<script>
+const recordId = window.location.pathname.split('/').pop();
+
+function goBack() {
+  if (inPortal) {
+    window.parent.postMessage({ type: 'closeViewInvoice' }, '*');
+  } else {
+    history.back();
+  }
+}
+
+function downloadPdf() {
+  window.open('/invoice-pdf/' + recordId);
+}
+
+function escHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  try {
+    const [y, m, d] = iso.split('-').map(Number);
+    return `${m}-${d}-${y}`;
+  } catch { return iso; }
+}
+
+function dueDateStr(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso + 'T12:00:00');
+    d.setDate(d.getDate() + 30);
+    return `${d.getMonth() + 1}-${d.getDate()}-${d.getFullYear()}`;
+  } catch { return '—'; }
+}
+
+function money(n) {
+  return '$' + parseFloat(n || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function addrBlock(title, lines) {
+  let html = `<div class="addr-title">${title}</div>`;
+  lines.filter(Boolean).forEach((ln, i) => {
+    html += `<p class="addr-line${i === 0 ? ' bold' : ''}">${escHtml(ln)}</p>`;
+  });
+  return html;
+}
+
+function metaKV(label, value) {
+  return `<p class="meta-label">${label}</p><p class="meta-value">${value}</p>`;
+}
+
+(async function load() {
+  try {
+    const r = await fetch(`/api/invoice-detail/${recordId}`);
+    if (!r.ok) throw new Error('not found');
+    const inv = await r.json();
+    render(inv);
+  } catch(e) {
+    document.getElementById('stateLoading').classList.add('hidden');
+    document.getElementById('stateError').classList.remove('hidden');
+    _notifyVIHeight();
+  }
+})();
+
+function render(inv) {
+  document.title = `${inv.invNumber || 'Invoice'} — Blue Alpha`;
+
+  // Header band: invoice number
+  document.getElementById('invNumber').textContent = inv.invNumber || '';
+
+  // Bill To
+  document.getElementById('billToCol').innerHTML =
+    addrBlock('Bill To', [inv.orgName, inv.contact, inv.addr1, inv.addr2]);
+
+  // Ship To
+  document.getElementById('shipToCol').innerHTML =
+    addrBlock('Ship To', [inv.shipOrg, inv.shipName, inv.shipAddr1, inv.shipAddr2]);
+
+  // Invoice Details
+  let detHTML = '';
+  detHTML += metaKV('Invoice #', escHtml(inv.invNumber || '—'));
+  if (inv.soNumber) detHTML += metaKV('Sales Order #', escHtml(inv.soNumber));
+  detHTML += metaKV('Invoice Date', fmtDate(inv.date));
+  detHTML += metaKV('Due Date', dueDateStr(inv.date));
+  if (inv.poNumber) detHTML += metaKV('PO #', escHtml(inv.poNumber));
+  if (inv.shipDate) detHTML += metaKV('Ship Date', fmtDate(inv.shipDate));
+  if (inv.tracking) {
+    const tn = inv.tracking.trim();
+    const url = /^1Z/i.test(tn.replace(/\s/g, ''))
+      ? `https://www.ups.com/track?tracknum=${encodeURIComponent(tn)}`
+      : `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(tn)}`;
+    detHTML += metaKV('Tracking', `<a href="${url}" target="_blank" rel="noopener" style="color:var(--navy);">${escHtml(tn)}</a>`);
+  }
+  document.getElementById('detailsCol').innerHTML = detHTML;
+
+  // Line items
+  const tbody = document.getElementById('itemsTbody');
+  tbody.innerHTML = '';
+  (inv.lineItems || []).forEach(item => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escHtml(item.name)}</td>
+      <td class="center">${item.qty}</td>
+      <td class="right muted">${money(item.unit_price)}</td>
+      <td class="right">${money(item.total)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Total Due
+  document.getElementById('vTotal').textContent = money(inv.subtotal);
+
+  // Payment section
+  if (inv.stripeCcUrl || inv.stripeAchUrl) {
+    document.getElementById('paymentSection').classList.remove('hidden');
+    const btns = document.getElementById('paymentBtns');
+    if (inv.stripeCcUrl) {
+      const paid = inv.stripeCcStatus === 'Paid'
+        ? '<span class="paid-badge">PAID</span>' : '';
+      btns.insertAdjacentHTML('beforeend',
+        `<a href="${escHtml(inv.stripeCcUrl)}" target="_blank" rel="noopener" class="pay-pill pay-pill-cc">
+          💳 Pay by Credit Card${paid}
+        </a>`);
     }
+    if (inv.stripeAchUrl) {
+      const paid = inv.stripeAchStatus === 'Paid'
+        ? '<span class="paid-badge">PAID</span>' : '';
+      btns.insertAdjacentHTML('beforeend',
+        `<a href="${escHtml(inv.stripeAchUrl)}" target="_blank" rel="noopener" class="pay-pill pay-pill-ach">
+          🏦 Pay by ACH / Bank Transfer${paid}
+        </a>`);
+    }
+  }
 
-    load();
-  </script>
+  document.getElementById('stateLoading').classList.add('hidden');
+  document.getElementById('stateLoaded').classList.remove('hidden');
+  setTimeout(_notifyVIHeight, 100);
+}
+</script>
 </body>
 </html>

@@ -5604,7 +5604,7 @@ def order_pdf(record_id):
 
 
 def _build_invoice_pdf_bytes(inv):
-    """Generate PDF bytes for an invoice dict (matching quote/SO style)."""
+    """Generate PDF bytes for an invoice matching the quote/SO PDF style."""
     import os, tempfile
     from fpdf import FPDF
 
@@ -5623,25 +5623,22 @@ def _build_invoice_pdf_bytes(inv):
         except Exception:
             return ""
 
-    inv_number  = inv.get("invNumber", "")
-    so_number   = inv.get("soNumber", "")
-    date_str    = inv.get("date", "")
-    po_number   = inv.get("poNumber", "")
-    org_name    = inv.get("orgName", "")
-    contact     = inv.get("contact", "")
-    email       = inv.get("email", "")
-    addr1       = inv.get("addr1", "")
-    addr2       = inv.get("addr2", "")
-    tracking    = inv.get("tracking", "")
-    ship_date   = inv.get("shipDate", "")
-    ship_org    = inv.get("shipOrg", "")
-    ship_name   = inv.get("shipName", "")
-    ship_addr1  = inv.get("shipAddr1", "")
-    ship_addr2  = inv.get("shipAddr2", "")
-    line_items  = inv.get("lineItems", [])
-    subtotal    = inv.get("subtotal", 0.0)
-    cc_url      = inv.get("stripeCcUrl", "")
-    ach_url     = inv.get("stripeAchUrl", "")
+    inv_number = inv.get("invNumber", "")
+    so_number  = inv.get("soNumber", "")
+    date_str   = inv.get("date", "")
+    po_number  = inv.get("poNumber", "")
+    org_name   = inv.get("orgName", "")
+    contact    = inv.get("contact", "")
+    addr1      = inv.get("addr1", "")
+    addr2      = inv.get("addr2", "")
+    ship_org   = inv.get("shipOrg", "")
+    ship_name  = inv.get("shipName", "")
+    ship_addr1 = inv.get("shipAddr1", "")
+    ship_addr2 = inv.get("shipAddr2", "")
+    tracking   = inv.get("tracking", "")
+    ship_date  = inv.get("shipDate", "")
+    line_items = inv.get("lineItems", [])
+    subtotal   = inv.get("subtotal", 0.0)
 
     _static_dir    = os.path.dirname(os.path.abspath(__file__))
     logo_local_ref = None
@@ -5679,119 +5676,156 @@ def _build_invoice_pdf_bytes(inv):
     pdf.set_auto_page_break(auto=True, margin=25)
     pdf.add_page()
 
-    W     = 177.0
+    W     = 177.0   # usable width (215.9mm - 2×19mm margins)
     NAVY  = (27,  36,  56)
     MUTED = (107, 122, 141)
     TEXT  = (26,  38,  51)
     LG    = (245, 247, 250)
     BD    = (221, 227, 234)
-    RED   = (189,  51,  51)
 
-    LOGO_W, LOGO_TOP = 58.0, 13.0
+    # ── Logo (top-left) — same constants as quote PDF ─────────────────
+    LOGO_TOP           = 13.0          # mm from top of page
+    LOGO_W             = 40.0          # fixed logo width in mm
+    _PIXEL_ASPECT      = 726 / 1600    # image h/w ratio (ba-logo-white-bg.jpg)
+    _LOGO_CONTENT_FRAC = 708 / 726     # fraction of image height containing real content
+    _logo_h            = LOGO_W * _PIXEL_ASPECT                    # rendered height in mm
+    HEADER_BOTTOM      = LOGO_TOP + _logo_h * _LOGO_CONTENT_FRAC   # visual logo bottom — anchor for all 3 elements
+
     logo_file = logo_local_ref
-    if not logo_file:
-        import urllib.request
-        _tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-        try:
-            urllib.request.urlretrieve(
-                "https://www.bluealphabelts.com/wp-content/uploads/2024/04/logo-1.png", _tmp.name)
-            logo_file = _tmp.name
-        except Exception:
-            logo_file = None
+    logo_tmp  = None
     try:
-        if logo_file:
-            pdf.image(logo_file, x=19, y=LOGO_TOP, w=LOGO_W, h=_logo_h)
+        if not logo_file:
+            import urllib.request
+            logo_tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+            urllib.request.urlretrieve(
+                "https://www.bluealphabelts.com/wp-content/uploads/2024/04/logo-1.png", logo_tmp.name)
+            logo_file = logo_tmp.name
+        pdf.image(logo_file, x=19, y=LOGO_TOP, w=LOGO_W, h=_logo_h)
     except Exception:
         pdf.set_xy(19, LOGO_TOP)
         pdf.set_font("Helvetica", "B", 18)
         pdf.set_text_color(*NAVY)
         pdf.cell(LOGO_W, 10, "BLUE ALPHA", border=0)
+    finally:
+        if logo_tmp:
+            try: os.unlink(logo_tmp.name)
+            except Exception: pass
 
-    right_x = 19 + W * 0.55
-    right_w = W * 0.45
-    pdf.set_xy(right_x, LOGO_TOP)
+    # ── Middle: company address (bottom-aligned to HEADER_BOTTOM) ─────
+    mid_x = 19 + LOGO_W + 6
+    mid_w = W * 0.36
+    addr_lines = [
+        ("Blue Alpha",       True),
+        ("35 Andrew St.",    False),
+        ("Newnan, GA 30263", False),
+    ]
+    addr_line_h = 4.5
+    addr_y = HEADER_BOTTOM - len(addr_lines) * addr_line_h
+    for cline, bold in addr_lines:
+        pdf.set_xy(mid_x, addr_y)
+        pdf.set_font("Helvetica", "B" if bold else "", 8)
+        pdf.set_text_color(*TEXT if bold else MUTED)
+        pdf.cell(mid_w, addr_line_h, cline, border=0, new_x="LMARGIN", new_y="NEXT")
+        addr_y += addr_line_h
+
+    # ── Right: "INVOICE" heading + invoice number (pinned to HEADER_BOTTOM) ──
+    right_x = 19 + W * 0.62
+    right_w = W * 0.38
+
+    _num_cell_h  = 5.5
+    _inv_cell_h  = 12.0
+    _inv_gap     = 1.0
+    _inv_start   = HEADER_BOTTOM - _num_cell_h - _inv_gap - _inv_cell_h
+
+    pdf.set_xy(right_x, _inv_start)
     pdf.set_font("Helvetica", "B", 28)
     pdf.set_text_color(*NAVY)
-    pdf.cell(right_w, 12, "INVOICE", align="R", new_x="LMARGIN", new_y="NEXT")
-    for cline, bold, size in [
-        ("Blue Alpha",        True,  8),
-        ("35 Andrew St.",     False, 8),
-        ("Newnan, GA 30263",  False, 8),
-        ("678-961-3304",      False, 8),
-        ("info@bluealpha.us", False, 8),
-    ]:
-        pdf.set_xy(right_x, pdf.get_y())
-        pdf.set_font("Helvetica", "B" if bold else "", size)
-        pdf.set_text_color(*TEXT if bold else MUTED)
-        pdf.cell(right_w, 4.5, cline, align="R", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(right_w, _inv_cell_h, "INVOICE", align="R", new_x="LMARGIN", new_y="NEXT")
 
-    pdf.set_y(max(pdf.get_y(), LOGO_TOP + LOGO_W * 0.39 + 2))
+    pdf.set_xy(right_x, HEADER_BOTTOM - _num_cell_h)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(*NAVY)
+    pdf.cell(right_w, _num_cell_h, f"#{inv_number}", align="R", new_x="LMARGIN", new_y="NEXT")
+
+    # Move cursor below header block
+    pdf.set_y(HEADER_BOTTOM + 4)
+
+    # Navy divider
     pdf.set_draw_color(*NAVY)
     pdf.set_line_width(0.7)
     pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
     pdf.ln(5)
 
+    # ── Bill To | Ship To | Invoice Details (3 equal columns) ────────
     y_info = pdf.get_y()
-    col_w  = W / 2
+    col3_w = W / 3.0
+    bill_x = 19
+    ship_x = 19 + col3_w
+    meta_x = 19 + col3_w * 2
 
-    def kv(label, value):
-        pdf.set_font("Helvetica", "B", 8)
-        pdf.set_text_color(*MUTED)
-        pdf.cell(38, 5.5, label, border=0)
-        pdf.set_font("Helvetica", "", 8)
-        pdf.set_text_color(*TEXT)
-        pdf.cell(col_w - 38, 5.5, str(value), border=0, new_x="LMARGIN", new_y="NEXT")
-
-    kv("Invoice Number:", inv_number)
-    kv("Invoice Date:",   _fmt_date(date_str))
-    kv("Due Date (Net 30):", _due_date(date_str))
-    if so_number:
-        kv("Sales Order:", so_number)
-    if po_number:
-        kv("PO #:", po_number)
-    if ship_date:
-        kv("Ship Date:", _fmt_date(ship_date))
-    if tracking:
-        kv("Tracking #:", tracking)
-
-    y_after_details = pdf.get_y()
-
-    right_col_w = col_w / 2
-
-    # Bill To (left half of right column)
-    bill_x = 19 + col_w
+    # --- Bill To ---
     pdf.set_xy(bill_x, y_info)
-    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_font("Helvetica", "B", 7)
     pdf.set_text_color(*MUTED)
-    pdf.cell(right_col_w, 5.5, "Bill To", border=0, new_x="LEFT", new_y="NEXT")
-    for ln in [org_name, contact, email, addr1, addr2]:
+    pdf.cell(col3_w, 5.5, "BILL TO", border=0, new_x="LEFT", new_y="NEXT")
+    for ln in [org_name, contact, addr1, addr2]:
         if ln:
             pdf.set_x(bill_x)
             pdf.set_font("Helvetica", "B" if ln == org_name else "", 8)
             pdf.set_text_color(*TEXT)
-            pdf.cell(right_col_w, 5, ln, border=0, new_x="LEFT", new_y="NEXT")
+            pdf.cell(col3_w, 5, ln, border=0, new_x="LEFT", new_y="NEXT")
+    y_after_bill = pdf.get_y()
 
-    # Ship To (right half of right column)
-    ship_x = bill_x + right_col_w
+    # --- Ship To ---
     pdf.set_xy(ship_x, y_info)
-    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_font("Helvetica", "B", 7)
     pdf.set_text_color(*MUTED)
-    pdf.cell(right_col_w, 5.5, "Ship To", border=0, new_x="LEFT", new_y="NEXT")
+    pdf.cell(col3_w, 5.5, "SHIP TO", border=0, new_x="LEFT", new_y="NEXT")
     for ln in [ship_org, ship_name, ship_addr1, ship_addr2]:
         if ln:
             pdf.set_x(ship_x)
             pdf.set_font("Helvetica", "B" if ln == ship_org else "", 8)
             pdf.set_text_color(*TEXT)
-            pdf.cell(right_col_w, 5, ln, border=0, new_x="LEFT", new_y="NEXT")
+            pdf.cell(col3_w, 5, ln, border=0, new_x="LEFT", new_y="NEXT")
+    y_after_ship = pdf.get_y()
 
-    pdf.set_y(max(y_after_details, pdf.get_y()) + 4)
+    # --- Invoice Details ---
+    def meta_kv(label, value):
+        pdf.set_x(meta_x)
+        pdf.set_font("Helvetica", "B", 7)
+        pdf.set_text_color(*MUTED)
+        pdf.cell(col3_w, 5, label.upper(), border=0, new_x="LEFT", new_y="NEXT")
+        pdf.set_x(meta_x)
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*TEXT)
+        pdf.cell(col3_w, 5, str(value), border=0, new_x="LEFT", new_y="NEXT")
+        pdf.set_x(meta_x)
+        pdf.set_y(pdf.get_y() + 1)
+
+    pdf.set_xy(meta_x, y_info)
+    meta_kv("Invoice #",    inv_number)
+    if so_number:
+        meta_kv("Sales Order #", so_number)
+    meta_kv("Invoice Date", _fmt_date(date_str))
+    meta_kv("Due Date",     _due_date(date_str))
+    if po_number:
+        meta_kv("PO #", po_number)
+    if ship_date:
+        meta_kv("Ship Date", _fmt_date(ship_date))
+    if tracking:
+        meta_kv("Tracking #", tracking)
+    y_after_meta = pdf.get_y()
+
+    pdf.set_y(max(y_after_bill, y_after_ship, y_after_meta) + 4)
+    pdf.ln(2)
 
     # ── Line items table ──────────────────────────────────────────────
-    name_w = W - 14 - 28 - 28
-    col_widths = [name_w, 14, 28, 28]
+    name_w     = W - 14 - 25 - 25
+    col_widths = [name_w, 14, 25, 25]
     headers    = ["DESCRIPTION", "QTY", "UNIT PRICE", "TOTAL"]
-    aligns     = ["L",           "R",   "R",          "R"]
-    row_h      = 7
+    aligns     = ["L",           "C",   "R",          "R"    ]
+    row_h      = 7    # minimum row height
+    line_h     = 4.5  # tighter line height inside wrapped descriptions
 
     pdf.set_fill_color(*NAVY)
     pdf.set_text_color(255, 255, 255)
@@ -5800,83 +5834,122 @@ def _build_invoice_pdf_bytes(inv):
         pdf.cell(w, row_h, h, border=0, align=a, fill=True)
     pdf.ln()
 
+    def _redraw_table_header():
+        pdf.set_fill_color(*NAVY)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 8)
+        for w, h, a in zip(col_widths, headers, aligns):
+            pdf.cell(w, row_h, h, border=0, align=a, fill=True)
+        pdf.ln()
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*TEXT)
+
     pdf.set_font("Helvetica", "", 8)
     for idx, item in enumerate(line_items):
-        pdf.set_fill_color(*LG)
+        pdf.set_font("Helvetica", "", 8)   # force-reset each row — prevents state bleed
         pdf.set_text_color(*TEXT)
-        row_data = [
-            item.get("name", ""),
-            str(int(item.get("qty", 0))),
-            f"${float(item.get('unit_price', 0)):.2f}",
-            f"${float(item.get('total', 0)):.2f}",
-        ]
-        for w, cell_val, a in zip(col_widths, row_data, aligns):
-            pdf.cell(w, row_h, cell_val, border=0, align=a, fill=(idx % 2 == 0))
-        pdf.ln()
+        name_val  = item.get("name", "")
+        qty_val   = str(int(item.get("qty", 0)))
+        price_val = f"${float(item.get('unit_price', 0)):.2f}"
+        total_val = f"${float(item.get('total', 0)):.2f}"
+        fill_row  = idx % 2 == 0
+
+        row_y = pdf.get_y()
+
+        # ── Step 1: measure actual text height (auto-break off so we don't flip pages) ──
+        pdf.set_auto_page_break(auto=False)
+        pdf.set_xy(19, row_y)
+        pdf.multi_cell(name_w, line_h, name_val, border=0, align="L")
+        text_height  = pdf.get_y() - row_y
+        pdf.set_auto_page_break(auto=True, margin=25)
+
+        num_lines    = max(1, round(text_height / line_h))
+        actual_row_h = num_lines * row_h
+        actual_end_y = row_y + actual_row_h
+        desc_y       = row_y + (actual_row_h - text_height) / 2  # vertical center
+
+        # ── Step 2: page break if this row overruns the trigger ──
+        if actual_end_y > pdf.page_break_trigger:
+            pdf.add_page()
+            _redraw_table_header()
+            row_y = pdf.get_y()
+            # Re-measure on new page
+            pdf.set_auto_page_break(auto=False)
+            pdf.set_xy(19, row_y)
+            pdf.multi_cell(name_w, line_h, name_val, border=0, align="L")
+            text_height  = pdf.get_y() - row_y
+            pdf.set_auto_page_break(auto=True, margin=25)
+            num_lines    = max(1, round(text_height / line_h))
+            actual_row_h = num_lines * row_h
+            actual_end_y = row_y + actual_row_h
+            desc_y       = row_y + (actual_row_h - text_height) / 2
+
+        # ── Step 3: background rect (white for non-fill rows, light-gray for fill rows) ──
+        pdf.set_fill_color(*(LG if fill_row else (255, 255, 255)))
+        pdf.rect(19, row_y, W, actual_row_h, style="F")
+
+        # ── Step 4: re-render description at vertically-centered position ──
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*TEXT)
+        pdf.set_xy(19, desc_y)
+        pdf.multi_cell(name_w, line_h, name_val, border=0, align="L")
+
+        # ── Step 5: numeric columns (full row height) ──
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*TEXT)
+        pdf.set_xy(19 + name_w, row_y)
+        pdf.cell(col_widths[1], actual_row_h, qty_val,   border=0, align="C")
+        pdf.cell(col_widths[2], actual_row_h, price_val, border=0, align="R")
+        pdf.cell(col_widths[3], actual_row_h, total_val, border=0, align="R")
+
+        pdf.set_y(actual_end_y)
 
     pdf.ln(3)
 
     # ── Totals ────────────────────────────────────────────────────────
     def totals_row(label, value, bold=False):
         pdf.set_font("Helvetica", "B" if bold else "", 9)
-        pdf.cell(W - 56, 6, "", border=0)
+        pdf.cell(W - 50, 6, "", border=0)
         pdf.set_text_color(*TEXT if bold else MUTED)
-        pdf.cell(28, 6, label, border=0, align="R")
+        pdf.cell(25, 6, label, border=0, align="R")
         pdf.set_text_color(*TEXT)
-        pdf.cell(28, 6, value, border=0, align="R", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(25, 6, value, border=0, align="R", new_x="LMARGIN", new_y="NEXT")
 
     y_rule = pdf.get_y()
     pdf.set_draw_color(*NAVY)
     pdf.set_line_width(0.4)
-    pdf.line(19 + W - 56, y_rule, 19 + W, y_rule)
+    pdf.line(19 + W - 50, y_rule, 19 + W, y_rule)
     pdf.ln(1)
     totals_row("Total Due", f"${subtotal:.2f}", bold=True)
     pdf.ln(5)
 
-    # ── Footer ────────────────────────────────────────────────────────
-    PAGE_H     = 279.4
-    BOT_MARGIN = 6
-    has_stripe = bool(cc_url or ach_url)
-    footer_h   = 28 + (14 if has_stripe else 0)
+    # ── Footer pinned to bottom of current page ───────────────────────
+    PAGE_H     = 279.4   # letter height in mm
+    BOT_MARGIN = 6       # mm from bottom for footer start
+    footer_h   = 20
     footer_y   = PAGE_H - BOT_MARGIN - footer_h
     if pdf.get_y() < footer_y:
         pdf.set_y(footer_y)
     pdf.set_auto_page_break(auto=False)
 
+    # Footer divider
     pdf.set_draw_color(*BD)
     pdf.set_line_width(0.3)
     pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
     pdf.ln(2)
-
-    if has_stripe:
-        pdf.set_font("Helvetica", "B", 8)
-        pdf.set_text_color(*NAVY)
-        pdf.cell(W, 5, "Pay Online:", border=0, new_x="LMARGIN", new_y="NEXT")
-        pdf.set_font("Helvetica", "", 8)
-        if cc_url:
-            pdf.set_x(19)
-            pdf.set_text_color(*MUTED)
-            pdf.write(5, "Credit Card: ")
-            pdf.set_text_color(91, 127, 160)
-            pdf.set_font("Helvetica", "U", 8)
-            pdf.write(5, cc_url, link=cc_url)
-            pdf.set_font("Helvetica", "", 8)
-            pdf.ln(5)
-        if ach_url:
-            pdf.set_x(19)
-            pdf.set_text_color(*MUTED)
-            pdf.write(5, "ACH/Bank Transfer: ")
-            pdf.set_text_color(91, 127, 160)
-            pdf.set_font("Helvetica", "U", 8)
-            pdf.write(5, ach_url, link=ach_url)
-            pdf.set_font("Helvetica", "", 8)
-            pdf.ln(6)
-
     pdf.set_font("Helvetica", "", 7.5)
     pdf.set_text_color(*MUTED)
-    pdf.cell(W, 4.5, "Payment terms: Net 30 from invoice date. A 1.5% monthly late fee applies to unpaid balances after 30 days.", border=0, new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(1)
-    pdf.cell(W, 4.5, "Questions? Contact us at info@bluealpha.us or 678-961-3304.", border=0, new_x="LMARGIN", new_y="NEXT")
+
+    # Line 1
+    pdf.write(4.5, "Questions about this invoice? Contact us at info@bluealpha.us or 678-961-3304.")
+    pdf.ln(5)
+
+    # Line 2
+    pdf.set_font("Helvetica", "", 7.5)
+    pdf.set_text_color(*MUTED)
+    pdf.cell(W, 4.5,
+        "Payment terms are Net 30 from invoice date. A 1.5% monthly late fee applies after 30 days.",
+        border=0, new_x="LMARGIN", new_y="NEXT")
 
     return bytes(pdf.output())
 
