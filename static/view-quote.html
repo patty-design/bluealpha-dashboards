@@ -1659,14 +1659,14 @@ async function saveChanges() {
     const data = await r.json();
     if (!r.ok || !data.success) throw new Error(data.error || 'Save failed');
     savedItems = editItems.map(i => ({ ...i }));
-    markClean();
+    markClean();  // disables btnSave
+    btn.textContent = 'Save Changes';
     confirm.style.display = 'inline';
     setTimeout(() => { confirm.style.display = 'none'; }, 3000);
   } catch(e) {
-    alert('Save failed: ' + e.message);
-  } finally {
     btn.disabled = false;
     btn.textContent = 'Save Changes';
+    alert('Save failed: ' + e.message);
   }
 }
 

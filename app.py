@@ -4943,26 +4943,28 @@ def update_quote(record_id):
         if mo_fields.get("MO Is Approved"):
             return Response(json.dumps({"error": "Quote already accepted"}), status=400, headers=c, mimetype="application/json")
 
-        # Delete existing line items using IDs stored on the MO record (formula
-        # filter via ARRAYJOIN doesn't return record IDs, so would miss all items)
+        # Delete existing line items in batches of 10 (Airtable limit)
         existing_li_ids = mo_fields.get("MO Line Items", [])
-        for li_id in existing_li_ids:
+        for i in range(0, len(existing_li_ids), 10):
+            batch = existing_li_ids[i:i+10]
+            params = "&".join(f"records[]={lid}" for lid in batch)
             req_lib.delete(
-                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
-                headers=at_headers(write_token), timeout=10,
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}?{params}",
+                headers=at_headers(write_token), timeout=15,
             )
 
-        # Create new line items
-        for item in items:
+        # Create new line items in batches of 10
+        for i in range(0, len(items), 10):
+            batch = items[i:i+10]
             li_r = req_lib.post(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}",
                 headers={**at_headers(write_token), "Content-Type": "application/json"},
-                json={"fields": {
+                json={"records": [{"fields": {
                     "Manual Order": [record_id],
                     "Product SKU":  [item["skuRecordId"]],
                     "Qty.":         int(item["qty"]),
                     "Confirmed Unit Price": float(item["unitPrice"]),
-                }},
+                }} for item in batch]},
                 timeout=15,
             )
             li_r.raise_for_status()
