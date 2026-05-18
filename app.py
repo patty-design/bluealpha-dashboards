@@ -5405,15 +5405,19 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
 
         row_y = pdf.get_y()
 
-        # ── Step 1: render description with auto-break OFF to measure real height ──
+        # ── Step 1: measure actual text height (auto-break off so we don't flip pages) ──
         pdf.set_auto_page_break(auto=False)
         pdf.set_xy(19 + sku_w, row_y)
         pdf.multi_cell(name_w, line_h, name_val, border=0, align="L")
-        actual_end_y  = pdf.get_y()
-        # Enforce minimum row height (single-line items need the same spacing as the gap between items)
-        actual_row_h  = max(actual_end_y - row_y, row_h)
-        actual_end_y  = row_y + actual_row_h
+        text_height  = pdf.get_y() - row_y
         pdf.set_auto_page_break(auto=True, margin=25)
+
+        # Row height = num_lines × row_h (keeps original item spacing)
+        # Text is vertically centered within the taller row
+        num_lines    = max(1, round(text_height / line_h))
+        actual_row_h = num_lines * row_h
+        actual_end_y = row_y + actual_row_h
+        desc_y       = row_y + (actual_row_h - text_height) / 2  # vertical center
 
         # ── Step 2: page break if this row overruns the trigger ──
         if actual_end_y > pdf.page_break_trigger:
@@ -5424,20 +5428,27 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
             pdf.set_auto_page_break(auto=False)
             pdf.set_xy(19 + sku_w, row_y)
             pdf.multi_cell(name_w, line_h, name_val, border=0, align="L")
-            actual_end_y = pdf.get_y()
-            actual_row_h = max(actual_end_y - row_y, row_h)
-            actual_end_y = row_y + actual_row_h
+            text_height  = pdf.get_y() - row_y
             pdf.set_auto_page_break(auto=True, margin=25)
+            num_lines    = max(1, round(text_height / line_h))
+            actual_row_h = num_lines * row_h
+            actual_end_y = row_y + actual_row_h
+            desc_y       = row_y + (actual_row_h - text_height) / 2
 
-        # ── Step 3: draw background rect with correct height (covers step-1 text) ──
-        # ── Step 4: re-render description on top of background (filled rows only) ──
-        if fill_row:
-            pdf.set_fill_color(*LG)
-            pdf.rect(19, row_y, W, actual_row_h, style="F")
-            pdf.set_xy(19 + sku_w, row_y)
-            pdf.multi_cell(name_w, line_h, name_val, border=0, align="L")
+        # ── Step 3: background rect covers the measurement render for all rows ──
+        #    (white for non-fill rows, light-gray for fill rows)
+        pdf.set_fill_color(*(LG if fill_row else (255, 255, 255)))
+        pdf.rect(19, row_y, W, actual_row_h, style="F")
 
-        # ── Step 5: SKU + numeric columns (pinned to row_y, full row height) ──
+        # ── Step 4: re-render description at vertically-centered position ──
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*TEXT)
+        pdf.set_xy(19 + sku_w, desc_y)
+        pdf.multi_cell(name_w, line_h, name_val, border=0, align="L")
+
+        # ── Step 5: SKU + numeric columns (full row height) ──
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*TEXT)
         pdf.set_xy(19, row_y)
         pdf.cell(sku_w, actual_row_h, sku_val, border=0, align="L")
 
