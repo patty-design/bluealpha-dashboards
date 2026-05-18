@@ -6533,35 +6533,49 @@ def portal_me(user):
 @app.route("/api/portal/profile", methods=["GET", "OPTIONS"])
 @portal_login_required
 def portal_profile(user):
-    """Return profile info for the logged-in user (their own record, not the parent company)."""
+    """Return profile for the logged-in user.
+    Personal info (name/email) comes from user_id (their own record).
+    Company/address info comes from customer_id (parent account record).
+    For primary users these are the same record.
+    """
     if request.method == "OPTIONS":
         return Response("", headers={**cors(), "Access-Control-Allow-Methods": "GET"})
     c = cors()
-    # Use user_id (the logged-in person's own record) not customer_id (parent company).
-    # For primary users they're the same; for sub-users this returns their own name/email.
-    user_id = user.get("user_id") or user.get("customer_id", "")
+    user_id     = user.get("user_id") or user.get("customer_id", "")
+    customer_id = user.get("customer_id", "")
     if not user_id:
         return Response(json.dumps({"profile": {}}), headers=c, mimetype="application/json")
     try:
         read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-        cr = req_lib.get(
+        # Fetch user's own record for personal info
+        ur = req_lib.get(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{user_id}",
-            headers=at_headers(read_token),
-            timeout=10,
+            headers=at_headers(read_token), timeout=10,
         )
-        if cr.status_code != 200:
+        if ur.status_code != 200:
             return Response(json.dumps({"profile": {}}), headers=c, mimetype="application/json")
-        f = cr.json().get("fields", {})
+        uf = ur.json().get("fields", {})
+
+        # For sub-users, also fetch parent company record for address/org info
+        cf = uf  # default: same record (primary users)
+        if customer_id and customer_id != user_id:
+            cr = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
+                headers=at_headers(read_token), timeout=10,
+            )
+            if cr.status_code == 200:
+                cf = cr.json().get("fields", {})
+
         profile = {
             "customerId":  customer_id,
-            "orgName":     f.get("Organization Name", ""),
-            "contactName": f.get("Main Contact Name", ""),
-            "email":       f.get("Main Contact Email", ""),
-            "phone":       f.get("Main Contact Phone #", ""),
-            "addr1":       f.get("Customer Address (Line 1)", ""),
-            "city":        f.get("Customer City", ""),
-            "state":       f.get("Customer State", ""),
-            "zip":         f.get("Customer Zip Code", ""),
+            "contactName": uf.get("Main Contact Name", ""),   # personal — from user record
+            "email":       uf.get("Main Contact Email", ""),  # personal — from user record
+            "orgName":     cf.get("Organization Name", ""),   # company  — from parent record
+            "phone":       cf.get("Main Contact Phone #", ""),
+            "addr1":       cf.get("Customer Address (Line 1)", ""),
+            "city":        cf.get("Customer City", ""),
+            "state":       cf.get("Customer State", ""),
+            "zip":         cf.get("Customer Zip Code", ""),
         }
         return Response(json.dumps({"profile": profile}), headers=c, mimetype="application/json")
     except Exception as e:
