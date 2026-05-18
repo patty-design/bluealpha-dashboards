@@ -5370,9 +5370,18 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
         pdf.cell(w, row_h, h, border=0, align=a, fill=True)
     pdf.ln()
 
+    def _redraw_table_header():
+        pdf.set_fill_color(*NAVY)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 8)
+        for w, h, a in zip(col_widths, headers, aligns):
+            pdf.cell(w, row_h, h, border=0, align=a, fill=True)
+        pdf.ln()
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*TEXT)
+
     pdf.set_font("Helvetica", "", 8)
     for idx, item in enumerate(line_items):
-        pdf.set_fill_color(*LG)
         pdf.set_text_color(*TEXT)
         line_total = item["qty"] * item["unitPrice"]
         sku_val   = item.get("skuId", "")
@@ -5380,55 +5389,50 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
         qty_val   = str(item["qty"])
         price_val = f"${item['unitPrice']:.2f}"
         total_val = f"${line_total:.2f}"
-
-        # Measure how many lines the description needs
-        words = name_val.split(" ")
-        desc_lines, line_buf = 1, ""
-        for word in words:
-            test = (line_buf + " " + word).strip() if line_buf else word
-            if pdf.get_string_width(test) <= name_w:
-                line_buf = test
-            else:
-                desc_lines += 1
-                line_buf = word
-        row_h_actual = row_h * desc_lines
-
-        # Page break if needed
-        if pdf.get_y() + row_h_actual > pdf.page_break_trigger:
-            pdf.add_page()
-            # Redraw table header on new page
-            pdf.set_fill_color(*NAVY)
-            pdf.set_text_color(255, 255, 255)
-            pdf.set_font("Helvetica", "B", 8)
-            for w, h, a in zip(col_widths, headers, aligns):
-                pdf.cell(w, row_h, h, border=0, align=a, fill=True)
-            pdf.ln()
-            pdf.set_font("Helvetica", "", 8)
-            pdf.set_text_color(*TEXT)
+        fill_row  = idx % 2 == 0
 
         row_y = pdf.get_y()
-        fill_row = idx % 2 == 0
 
-        # Draw row background
+        # ── Step 1: render description with auto-break OFF to measure real height ──
+        pdf.set_auto_page_break(auto=False)
+        pdf.set_xy(19 + sku_w, row_y)
+        pdf.multi_cell(name_w, row_h, name_val, border=0, align="L")
+        actual_end_y  = pdf.get_y()
+        actual_row_h  = actual_end_y - row_y
+        pdf.set_auto_page_break(auto=True, margin=25)
+
+        # ── Step 2: page break if this row overruns the trigger ──
+        if actual_end_y > pdf.page_break_trigger:
+            pdf.add_page()
+            _redraw_table_header()
+            row_y = pdf.get_y()
+            # Re-measure on new page
+            pdf.set_auto_page_break(auto=False)
+            pdf.set_xy(19 + sku_w, row_y)
+            pdf.multi_cell(name_w, row_h, name_val, border=0, align="L")
+            actual_end_y = pdf.get_y()
+            actual_row_h = actual_end_y - row_y
+            pdf.set_auto_page_break(auto=True, margin=25)
+
+        # ── Step 3: draw background rect with correct height (covers step-1 text) ──
         if fill_row:
             pdf.set_fill_color(*LG)
-            pdf.rect(19, row_y, W, row_h_actual, style="F")
+            pdf.rect(19, row_y, W, actual_row_h, style="F")
 
-        # SKU cell (full row height, vertically top-aligned)
-        pdf.set_xy(19, row_y)
-        pdf.cell(sku_w, row_h_actual, sku_val, border=0, align="L")
-
-        # Description — multi_cell handles wrapping
+        # ── Step 4: re-render description on top of background ──
         pdf.set_xy(19 + sku_w, row_y)
         pdf.multi_cell(name_w, row_h, name_val, border=0, align="L")
 
-        # QTY / Unit Price / Total — back to row_y
-        pdf.set_xy(19 + sku_w + name_w, row_y)
-        pdf.cell(col_widths[2], row_h_actual, qty_val,   border=0, align="R")
-        pdf.cell(col_widths[3], row_h_actual, price_val, border=0, align="R")
-        pdf.cell(col_widths[4], row_h_actual, total_val, border=0, align="R")
+        # ── Step 5: SKU + numeric columns (pinned to row_y, full row height) ──
+        pdf.set_xy(19, row_y)
+        pdf.cell(sku_w, actual_row_h, sku_val, border=0, align="L")
 
-        pdf.set_y(row_y + row_h_actual)
+        pdf.set_xy(19 + sku_w + name_w, row_y)
+        pdf.cell(col_widths[2], actual_row_h, qty_val,   border=0, align="R")
+        pdf.cell(col_widths[3], actual_row_h, price_val, border=0, align="R")
+        pdf.cell(col_widths[4], actual_row_h, total_val, border=0, align="R")
+
+        pdf.set_y(actual_end_y)
 
     pdf.ln(3)
 
