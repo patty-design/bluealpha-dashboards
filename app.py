@@ -4462,7 +4462,6 @@ _EXCLUDED_FEATURE_VARS_GLOBAL = {
 
 # Add-ons to exclude globally (lowercase add-on names)
 _EXCLUDED_ADDONS_GLOBAL = {
-    "easy tape",
     "one wrap",
 }
 
