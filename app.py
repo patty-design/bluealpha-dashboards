@@ -5374,16 +5374,60 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
         pdf.set_fill_color(*LG)
         pdf.set_text_color(*TEXT)
         line_total = item["qty"] * item["unitPrice"]
-        row_data = [
-            item.get("skuId", ""),
-            item.get("name", ""),
-            str(item["qty"]),
-            f"${item['unitPrice']:.2f}",
-            f"${line_total:.2f}",
-        ]
-        for w, cell_val, a in zip(col_widths, row_data, aligns):
-            pdf.cell(w, row_h, cell_val, border=0, align=a, fill=(idx % 2 == 0))
-        pdf.ln()
+        sku_val   = item.get("skuId", "")
+        name_val  = item.get("name", "")
+        qty_val   = str(item["qty"])
+        price_val = f"${item['unitPrice']:.2f}"
+        total_val = f"${line_total:.2f}"
+
+        # Measure how many lines the description needs
+        words = name_val.split(" ")
+        desc_lines, line_buf = 1, ""
+        for word in words:
+            test = (line_buf + " " + word).strip() if line_buf else word
+            if pdf.get_string_width(test) <= name_w:
+                line_buf = test
+            else:
+                desc_lines += 1
+                line_buf = word
+        row_h_actual = row_h * desc_lines
+
+        # Page break if needed
+        if pdf.get_y() + row_h_actual > pdf.page_break_trigger:
+            pdf.add_page()
+            # Redraw table header on new page
+            pdf.set_fill_color(*NAVY)
+            pdf.set_text_color(255, 255, 255)
+            pdf.set_font("Helvetica", "B", 8)
+            for w, h, a in zip(col_widths, headers, aligns):
+                pdf.cell(w, row_h, h, border=0, align=a, fill=True)
+            pdf.ln()
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_text_color(*TEXT)
+
+        row_y = pdf.get_y()
+        fill_row = idx % 2 == 0
+
+        # Draw row background
+        if fill_row:
+            pdf.set_fill_color(*LG)
+            pdf.rect(19, row_y, W, row_h_actual, style="F")
+
+        # SKU cell (full row height, vertically top-aligned)
+        pdf.set_xy(19, row_y)
+        pdf.cell(sku_w, row_h_actual, sku_val, border=0, align="L")
+
+        # Description — multi_cell handles wrapping
+        pdf.set_xy(19 + sku_w, row_y)
+        pdf.multi_cell(name_w, row_h, name_val, border=0, align="L")
+
+        # QTY / Unit Price / Total — back to row_y
+        pdf.set_xy(19 + sku_w + name_w, row_y)
+        pdf.cell(col_widths[2], row_h_actual, qty_val,   border=0, align="R")
+        pdf.cell(col_widths[3], row_h_actual, price_val, border=0, align="R")
+        pdf.cell(col_widths[4], row_h_actual, total_val, border=0, align="R")
+
+        pdf.set_y(row_y + row_h_actual)
 
     pdf.ln(3)
 
