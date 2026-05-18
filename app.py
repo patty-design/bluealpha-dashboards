@@ -5528,12 +5528,12 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
 
     # Line 1: payment terms / order confirmation
     if doc_type == "order":
-        pdf.write(4.5, "Thank you for your order. Payment terms are Net 30 from date of invoice.  ")
+        pdf.write(4.5, "Thank you for your order. ")
         if portal_link:
             pdf.write(4.5, "View your order at ")
             pdf.set_text_color(91, 127, 160)
             pdf.set_font("Helvetica", "U", 7.5)
-            pdf.write(4.5, "your Blue Alpha Portal", link=portal_link)
+            pdf.write(4.5, "the Blue Alpha Portal", link=portal_link)
             pdf.set_font("Helvetica", "", 7.5)
             pdf.set_text_color(*MUTED)
             pdf.write(4.5, ".")
