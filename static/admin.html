@@ -360,6 +360,7 @@
           <div class="users-section">
             <h3>Product Catalog</h3>
             <p style="font-size:0.85rem;color:#666;margin-bottom:14px;">The portal catalog refreshes automatically every 30 minutes. Use this to pick up Airtable changes immediately.</p>
+            <p id="catalogLastUpdated" style="font-size:0.82rem;color:#888;margin-bottom:12px;"></p>
             <div id="refreshCatalogMsg"></div>
             <button class="btn btn-outline" onclick="doRefreshCatalog()">🔄 Refresh Catalog Now</button>
           </div>
@@ -774,6 +775,25 @@
       }
     }
 
+    function _setCatalogTs(ts) {
+      const el = document.getElementById('catalogLastUpdated');
+      if (!el || !ts) return;
+      const d = new Date(ts * 1000);
+      el.textContent = 'Last updated: ' + d.toLocaleString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: '2-digit', hour12: true
+      });
+    }
+
+    // Load current catalog timestamp on page load
+    (async () => {
+      try {
+        const r = await fetch('/api/quote-catalog');
+        const d = await r.json();
+        if (d.ts) _setCatalogTs(d.ts);
+      } catch(_) {}
+    })();
+
     async function doRefreshCatalog() {
       const btn = document.querySelector('[onclick="doRefreshCatalog()"]');
       const msg = document.getElementById('refreshCatalogMsg');
@@ -785,6 +805,7 @@
         const d = await r.json();
         if (d.ok) {
           msg.innerHTML = `<div style="color:#1a7a3c;font-size:0.85rem;margin-bottom:10px;">✅ Catalog updated — ${d.parents} products, ${d.skus} SKUs.</div>`;
+          _setCatalogTs(d.ts);
         } else {
           msg.innerHTML = `<div style="color:var(--red);font-size:0.85rem;margin-bottom:10px;">❌ Refresh failed: ${d.error}</div>`;
         }

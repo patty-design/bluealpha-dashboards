@@ -4649,7 +4649,7 @@ def admin_refresh_catalog():
         _CATALOG_CACHE["data"] = result
         _CATALOG_CACHE["ts"]   = _time.time()
         _CATALOG_REFRESHING = False
-        return Response(json.dumps({"ok": True, "parents": len(result["parents"]), "skus": len(result["skus"])}),
+        return Response(json.dumps({"ok": True, "parents": len(result["parents"]), "skus": len(result["skus"]), "ts": _CATALOG_CACHE["ts"]}),
                         mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"ok": False, "error": str(e)}), status=500, mimetype="application/json")
@@ -4679,14 +4679,14 @@ def quote_catalog():
 
     # Fresh cache — serve immediately
     if _CATALOG_CACHE["data"] and (now - _CATALOG_CACHE["ts"]) < _CATALOG_TTL:
-        return _catalog_response(_CATALOG_CACHE["data"])
+        return _catalog_response({**_CATALOG_CACHE["data"], "ts": _CATALOG_CACHE["ts"]})
 
     # Stale cache — serve instantly and kick off a background refresh
     if _CATALOG_CACHE["data"]:
         if not _CATALOG_REFRESHING:
             _CATALOG_REFRESHING = True
             threading.Thread(target=_refresh_catalog_bg, daemon=True).start()
-        return _catalog_response(_CATALOG_CACHE["data"])
+        return _catalog_response({**_CATALOG_CACHE["data"], "ts": _CATALOG_CACHE["ts"]})
 
     # No cache yet — kick off background build if not already running, return loading state
     if not _CATALOG_REFRESHING:
