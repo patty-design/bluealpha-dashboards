@@ -5019,7 +5019,8 @@ def accept_quote(record_id):
                             status=500, headers=c, mimetype="application/json")
         so_record_id = so_r.json()["id"]
 
-        # Update customer billing address if provided
+        # Update customer address only (never org name or contact name — those are shared
+        # across all documents and Chrome autofill can corrupt them)
         if billing and customer_id:
             bill_line1 = billing.get("addr1", "")
             if billing.get("addr2"):
@@ -5031,8 +5032,6 @@ def accept_quote(record_id):
             if city_ and state_:
                 bill_line2 = f"{city_}, {state_} {zip_}".strip()
             cust_update = {}
-            if billing.get("org"):   cust_update["Organization Name"] = billing["org"]
-            if billing.get("name"):  cust_update["Main Contact Name"] = billing["name"]
             if bill_line1: cust_update["Customer Address (Line 1)"] = bill_line1
             if bill_line2: cust_update["Customer Address (Line 2)"] = bill_line2
             if cust_update:
