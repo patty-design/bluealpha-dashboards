@@ -6460,17 +6460,19 @@ def portal_me(user):
 @app.route("/api/portal/profile", methods=["GET", "OPTIONS"])
 @portal_login_required
 def portal_profile(user):
-    """Return full contact/address info for the logged-in customer."""
+    """Return profile info for the logged-in user (their own record, not the parent company)."""
     if request.method == "OPTIONS":
         return Response("", headers={**cors(), "Access-Control-Allow-Methods": "GET"})
     c = cors()
-    customer_id = user.get("customer_id", "")
-    if not customer_id:
+    # Use user_id (the logged-in person's own record) not customer_id (parent company).
+    # For primary users they're the same; for sub-users this returns their own name/email.
+    user_id = user.get("user_id") or user.get("customer_id", "")
+    if not user_id:
         return Response(json.dumps({"profile": {}}), headers=c, mimetype="application/json")
     try:
         read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
         cr = req_lib.get(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{user_id}",
             headers=at_headers(read_token),
             timeout=10,
         )
@@ -6497,12 +6499,12 @@ def portal_profile(user):
 @app.route("/api/portal/update-profile", methods=["POST", "OPTIONS"])
 @portal_login_required
 def portal_update_profile(user):
-    """Update the logged-in customer's contact/address info in Airtable."""
+    """Update the logged-in user's own contact info in Airtable (their record, not parent company)."""
     if request.method == "OPTIONS":
         return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
     c = cors()
-    customer_id = user.get("customer_id", "")
-    if not customer_id:
+    user_id = user.get("user_id") or user.get("customer_id", "")
+    if not user_id:
         return Response(json.dumps({"error": "Not authenticated"}), status=401, headers=c, mimetype="application/json")
     data = request.get_json() or {}
     def pack(city, state, zip_code):
@@ -6524,7 +6526,7 @@ def portal_update_profile(user):
     try:
         write_token = APPLY_WRITE_TOKEN or RETURNS_WRITE_TOKEN
         pr = req_lib.patch(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{user_id}",
             headers={**at_headers(write_token), "Content-Type": "application/json"},
             json={"fields": fields},
             timeout=15,
