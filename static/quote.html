@@ -1266,7 +1266,7 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredA
   if (!_dbgEl) { _dbgEl = document.createElement('div'); _dbgEl.id = 'addondbg_' + parentId; _dbgEl.style.cssText='font-size:11px;color:#c00;padding:2px 0'; addonRow.after(_dbgEl); }
   const _dbgParentSkus = catalog.skus.filter(s => s.parentId === parentId);
   const _dbgColorSkus  = _dbgParentSkus.filter(s => s.colorId === colorId);
-  _dbgEl.innerHTML = `[debug] total skus=${catalog.skus.length} | for parent=${_dbgParentSkus.length} | for color=${_dbgColorSkus.length} | addons found=${addons.length}: ${addons.map(([,n])=>n).join(', ')}<br>color skus: ${_dbgColorSkus.map(s=>'addon='+s.addonName+'(sz='+s.sizeId+')').join(' / ')}`;
+  _dbgEl.innerHTML = `[debug] total skus=${catalog.skus.length} | for parent=${_dbgParentSkus.length} | for color=${_dbgColorSkus.length} | addons found=${addons.length}: ${addons.map(([,n])=>n).join(', ')}<br>color skus: ${_dbgColorSkus.map(s=>'addonId='+JSON.stringify(s.addonId)+'|addonName='+JSON.stringify(s.addonName)+'|sz='+JSON.stringify(s.sizeId)).join('<br>')} | sizeId filter=` + JSON.stringify(sizeId);
   const _descEl = document.getElementById('pdesc_' + parentId);
   if (_descEl) _descEl.classList.remove('hidden');
   // Trigger price update now that add-on value is set
