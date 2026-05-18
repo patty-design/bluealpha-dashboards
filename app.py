@@ -7343,8 +7343,8 @@ def portal_duplicate_quote(user, record_id):
                             headers=c, mimetype="application/json")
         mo     = r.json()
         fields = mo.get("fields", {})
-        if fields.get("Order Type") != "Quote":
-            return Response(json.dumps({"error": "Not a quote"}), status=400,
+        if fields.get("Order Type") not in ("Quote", "Sales Order"):
+            return Response(json.dumps({"error": "Not a quote or order"}), status=400,
                             headers=c, mimetype="application/json")
         cust_ids = fields.get("Customer", [])
         if customer_id not in cust_ids:
