@@ -484,39 +484,50 @@
 
     // ── Central pending-changes check ────────────────────────────────────────
     function portalPendingChanges() {
-      // 1. View-quote iframe (unsaved edits or item selected but not added)
-      const vqPanel = document.getElementById('tab-view-quote');
-      const vqFrame = document.getElementById('viewQuoteFrame');
-      if (vqPanel && vqPanel.classList.contains('active') && vqFrame && vqFrame.contentWindow) {
-        try {
-          const cw = vqFrame.contentWindow;
-          if (cw.dirty || cw.pendingAddSelection)
-            return 'You have unsaved changes on this quote. Leave without saving?';
-        } catch(_) {}
+      // Only check what's relevant to the currently visible panel.
+      // This prevents false positives from autofill, background state, etc.
+      const activePanel = document.querySelector('.tab-panel.active');
+      const pid = activePanel ? activePanel.id : '';
+
+      // View-quote overlay (a quote or order is open for viewing/editing)
+      if (pid === 'tab-view-quote') {
+        const vqFrame = document.getElementById('viewQuoteFrame');
+        if (vqFrame && vqFrame.contentWindow) {
+          try {
+            const cw = vqFrame.contentWindow;
+            if (cw.dirty || cw.pendingAddSelection)
+              return 'You have unsaved changes on this quote. Leave without saving?';
+          } catch(_) {}
+        }
+        return null;
       }
 
-      // 2. New Quote tab — any "Add to Quote" button is enabled (options chosen, not yet added)
-      const qbPanel = document.getElementById('tab-new-quote');
-      const qbFrame = document.getElementById('quoteBuilderFrame');
-      if (qbPanel && qbPanel.classList.contains('active') && qbFrame && qbFrame.contentWindow) {
-        try {
-          const btn = qbFrame.contentWindow.document.querySelector('.btn-add-inline:not([disabled])');
-          if (btn) return 'You have product options selected that haven\'t been added to your quote yet. Leave without adding?';
-        } catch(_) {}
+      // New Quote tab — any "Add to Quote" button is enabled (options chosen, not yet added)
+      if (pid === 'tab-new-quote') {
+        const qbFrame = document.getElementById('quoteBuilderFrame');
+        if (qbFrame && qbFrame.contentWindow) {
+          try {
+            const btn = qbFrame.contentWindow.document.querySelector('.btn-add-inline:not([disabled])');
+            if (btn) return 'You have product options selected that haven\'t been added to your quote yet. Leave without adding?';
+          } catch(_) {}
+        }
+        return null;
       }
 
-      // 3. Team tab — account info edit form is open
-      const accountEdit = document.getElementById('accountInfoEdit');
-      if (accountEdit && accountEdit.style.display !== 'none')
-        return 'You have unsaved changes to your account info. Leave without saving?';
+      // Team tab — account info edit open OR new member form fully filled
+      if (pid === 'tab-team') {
+        const accountEdit = document.getElementById('accountInfoEdit');
+        if (accountEdit && accountEdit.style.display !== 'none')
+          return 'You have unsaved changes to your account info. Leave without saving?';
+        const fn = (document.getElementById('newFirstName')?.value || '').trim();
+        const ln = (document.getElementById('newLastName')?.value  || '').trim();
+        const em = (document.getElementById('newEmail')?.value     || '').trim();
+        if (fn && ln && em)
+          return 'You have team member info that hasn\'t been sent yet. Leave without sending the invite?';
+        return null;
+      }
 
-      // 4. Team tab — new team member form is fully filled in but not sent
-      const fn = (document.getElementById('newFirstName')?.value || '').trim();
-      const ln = (document.getElementById('newLastName')?.value  || '').trim();
-      const em = (document.getElementById('newEmail')?.value     || '').trim();
-      if (fn && ln && em)
-        return 'You have team member info that hasn\'t been sent yet. Leave without sending the invite?';
-
+      // All other tabs (Our Quotes, Our Orders, Invoices, Shipped) — nothing to warn about
       return null;
     }
 
@@ -1107,7 +1118,15 @@
     }
   }
 
+  function _viewQuoteFrameHasChanges() {
+    const f = document.getElementById('viewQuoteFrame');
+    if (!f || !f.src || f.src === 'about:blank' || f.src === '') return false;
+    try { return !!(f.contentWindow && (f.contentWindow.dirty || f.contentWindow.pendingAddSelection)); } catch(_) { return false; }
+  }
+
   function openViewQuote(recordId) {
+    if (_viewQuoteFrameHasChanges() &&
+        !confirm('This quote has unsaved changes. Leave without saving?')) return;
     _clearViewQuoteFlags();
     _viewReturnTab = 'our-quotes';
     document.getElementById('viewBackBtn').textContent = '← Back to Quotes';
@@ -1121,6 +1140,8 @@
   }
 
   function openViewOrder(recordId) {
+    if (_viewQuoteFrameHasChanges() &&
+        !confirm('This quote has unsaved changes. Leave without saving?')) return;
     _clearViewQuoteFlags();
     _viewReturnTab = 'our-orders';
     document.getElementById('viewBackBtn').textContent = '← Back to Orders';
