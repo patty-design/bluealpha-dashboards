@@ -1141,16 +1141,11 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredA
 
   const addonMap = {};
   let hasBase = false;
-  const _dbgLoop = [];
   for (const sku of catalog.skus) {
-    if (sku.parentId === parentId && sku.colorId === colorId) {
-      const _szMatch = sku.sizeId === sizeId;
-      const _fvMatch = featureVarId ? sku.featureVarId === featureVarId : true;
-      _dbgLoop.push(`sz=${JSON.stringify(sku.sizeId)}===${JSON.stringify(sizeId)}:${_szMatch} fv=${JSON.stringify(sku.featureVarId)}===${JSON.stringify(featureVarId)}:${_fvMatch} addon=${sku.addonName}`);
-      if (_szMatch && _fvMatch) {
-        if (sku.addonId && sku.addonName) addonMap[sku.addonId] = sku.addonName;
-        else hasBase = true;
-      }
+    if (sku.parentId === parentId && sku.colorId === colorId && sku.sizeId === sizeId &&
+        (featureVarId ? sku.featureVarId === featureVarId : true)) {
+      if (sku.addonId && sku.addonName) addonMap[sku.addonId] = sku.addonName;
+      else hasBase = true;
     }
   }
 
@@ -1265,13 +1260,6 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredA
     }
   }
   addonSel.value = defaultVal;
-  addonRow.classList.remove('hidden');
-  // DEBUG: show what options were found
-  let _dbgEl = document.getElementById('addondbg_' + parentId);
-  if (!_dbgEl) { _dbgEl = document.createElement('div'); _dbgEl.id = 'addondbg_' + parentId; _dbgEl.style.cssText='font-size:11px;color:#c00;padding:2px 0'; addonRow.after(_dbgEl); }
-  const _dbgParentSkus = catalog.skus.filter(s => s.parentId === parentId);
-  const _dbgColorSkus  = _dbgParentSkus.filter(s => s.colorId === colorId);
-  _dbgEl.innerHTML = `[debug] addons found=${addons.length} | hasBase=${hasBase} | addonMapKeys=${Object.keys(addonMap).length}<br>` + _dbgLoop.join('<br>');
   const _descEl = document.getElementById('pdesc_' + parentId);
   if (_descEl) _descEl.classList.remove('hidden');
   // Trigger price update now that add-on value is set

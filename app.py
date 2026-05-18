@@ -4458,6 +4458,7 @@ _EXCLUDED_PARENTS = {
 # Feature variations to exclude globally (lowercase)
 _EXCLUDED_FEATURE_VARS_GLOBAL = {
     "base only (-onb)",
+    "molle mount",   # Internal SKU flag — not a user-visible variation; breaks add-on matching
 }
 
 # Add-ons to exclude globally (lowercase add-on names)
