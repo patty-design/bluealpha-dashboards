@@ -675,7 +675,7 @@ if (window.self !== window.top) {
 
     <!-- Toolbar: PDF download -->
     <div class="doc-toolbar">
-      <button id="pdfBtn" class="btn-pdf" onclick="downloadDoc()">↓ Download Quote</button>
+      <button id="pdfBtn" class="btn-pdf" onclick="downloadDoc()">↓ Download PDF</button>
     </div>
     <script>
     function downloadDoc() {
@@ -684,7 +684,7 @@ if (window.self !== window.top) {
     }
     if (window.viewingAsOrder) {
       const btn = document.getElementById('pdfBtn');
-      if (btn) btn.textContent = '↓ Download Sales Order';
+      if (btn) btn.textContent = '↓ Download PDF';
     }
     </script>
 
