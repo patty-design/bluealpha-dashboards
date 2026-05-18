@@ -5527,11 +5527,10 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
             pdf.set_text_color(*MUTED)
             pdf.write(4.5, ".")
     else:
-        pdf.write(4.5, "Payment terms are Net 30 upon acceptance.  ")
-        pdf.write(4.5, "To accept this quote, ")
+        pdf.write(4.5, "Ready to place your order? ")
         pdf.set_text_color(91, 127, 160)   # Steel Blue
         pdf.set_font("Helvetica", "U", 7.5)
-        pdf.write(4.5, "click here to view it in your Blue Alpha Quote Portal", link=portal_link)
+        pdf.write(4.5, "Accept this quote in your Blue Alpha Portal", link=portal_link)
         pdf.set_font("Helvetica", "", 7.5)
         pdf.set_text_color(*MUTED)
         pdf.write(4.5, ".")
