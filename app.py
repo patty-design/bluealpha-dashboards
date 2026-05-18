@@ -5252,27 +5252,37 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
             try: os.unlink(logo_tmp.name)
             except Exception: pass
 
-    # ── "QUOTE" heading + company info (top-right) ────────────────────
-    right_x = 19 + W * 0.55
-    right_w = W * 0.45
+    # ── Middle: company address ────────────────────────────────────────
+    mid_x = 19 + LOGO_W + 6
+    mid_w = W * 0.36
+    addr_y = LOGO_TOP + 2
+    for cline, bold, size in [
+        ("Blue Alpha",        True,  8),
+        ("35 Andrew St.",     False, 8),
+        ("Newnan, GA 30263",  False, 8),
+        ("678-961-3304",      False, 8),
+        ("info@bluealpha.us", False, 8),
+    ]:
+        pdf.set_xy(mid_x, addr_y)
+        pdf.set_font("Helvetica", "B" if bold else "", size)
+        pdf.set_text_color(*TEXT if bold else MUTED)
+        pdf.cell(mid_w, 4.5, cline, border=0, new_x="LMARGIN", new_y="NEXT")
+        addr_y += 4.5
 
+    # ── Right: doc type heading + quote/order number ───────────────────
+    right_x = 19 + W * 0.62
+    right_w = W * 0.38
+
+    _doc_label = "SALES ORDER" if doc_type == "order" else "QUOTE"
     pdf.set_xy(right_x, LOGO_TOP)
     pdf.set_font("Helvetica", "B", 28)
     pdf.set_text_color(*NAVY)
-    _doc_label = "SALES ORDER" if doc_type == "order" else "QUOTE"
     pdf.cell(right_w, 12, _doc_label, align="R", new_x="LMARGIN", new_y="NEXT")
 
-    for cline, bold, size in [
-        ("Blue Alpha",           True,  8),
-        ("35 Andrew St.",        False, 8),
-        ("Newnan, GA 30263",     False, 8),
-        ("678-961-3304",         False, 8),
-        ("info@bluealpha.us",    False, 8),
-    ]:
-        pdf.set_xy(right_x, pdf.get_y())
-        pdf.set_font("Helvetica", "B" if bold else "", size)
-        pdf.set_text_color(*TEXT if bold else MUTED)
-        pdf.cell(right_w, 4.5, cline, align="R", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_xy(right_x, pdf.get_y())
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(*MUTED)
+    pdf.cell(right_w, 5, q_number, align="R", new_x="LMARGIN", new_y="NEXT")
 
     # Move cursor below header block
     pdf.set_y(max(pdf.get_y(), LOGO_TOP + LOGO_W * 0.39 + 2))  # logo aspect ~0.45h/w
@@ -5343,7 +5353,6 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
         if q_po:
             meta_kv("PO #", q_po)
     else:
-        meta_kv("Quote Number", q_number)
         meta_kv("Quote Date",   q_date)
         if q_expiry:
             meta_kv("Expiry Date", q_expiry)
