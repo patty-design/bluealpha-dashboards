@@ -5220,7 +5220,7 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
     BD    = (221, 227, 234)
 
     # ── Logo (top-left) ───────────────────────────────────────────────
-    LOGO_W   = 42.0   # mm width to render logo — sized so logo/address/quote# all bottom-align at 32mm
+    LOGO_W   = 40.0   # mm width to render logo — sized so logo/address/quote# all bottom-align at 32mm
     LOGO_TOP = 13.0   # mm from top of page
     # Prefer transparent PNG; fall back to JPG, then URL download, then text
     _static    = os.path.dirname(os.path.abspath(__file__))
