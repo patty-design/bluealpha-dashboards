@@ -5262,7 +5262,7 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
     ]
     addr_line_h = 4.5
     # Position so the last line sits at the logo bottom
-    logo_bottom = LOGO_TOP + LOGO_W * 0.42
+    logo_bottom = LOGO_TOP + LOGO_W * 0.454  # exact aspect ratio of ba-logo-white-bg.jpg (726/1600)
     addr_y = logo_bottom - len(addr_lines) * addr_line_h
     for cline, bold in addr_lines:
         pdf.set_xy(mid_x, addr_y)
@@ -5287,7 +5287,7 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
     pdf.cell(right_w, 6, f"#{q_number}", align="R", new_x="LMARGIN", new_y="NEXT")
 
     # Move cursor below header block — addr_y tracks where address ended
-    pdf.set_y(max(addr_y, LOGO_TOP + LOGO_W * 0.42) + 7)  # 7mm breathing room before divider
+    pdf.set_y(max(addr_y, LOGO_TOP + LOGO_W * 0.454) + 7)  # 7mm breathing room before divider
 
     # Navy divider
     pdf.set_draw_color(*NAVY)
