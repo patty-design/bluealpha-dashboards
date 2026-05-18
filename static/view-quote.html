@@ -449,9 +449,6 @@
       border-radius: 8px;
       padding: 14px 20px;
       margin-top: 16px;
-      display: flex;
-      gap: 12px;
-      align-items: baseline;
     }
     .notes-label {
       font-size: 0.68rem;
@@ -461,7 +458,23 @@
       color: var(--muted);
       white-space: nowrap;
       font-family: 'Montserrat', sans-serif;
+      margin-bottom: 6px;
     }
+    .notes-textarea {
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 0.875rem;
+      color: var(--text);
+      line-height: 1.6;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      resize: vertical;
+      min-height: 64px;
+      font-family: inherit;
+      background: var(--bg);
+    }
+    .notes-textarea:focus { outline: none; border-color: var(--navy); }
     .notes-text {
       font-size: 0.875rem;
       color: var(--text);
@@ -838,9 +851,10 @@ if (window.self !== window.top) {
     </div>
 
     <!-- Notes -->
-    <div class="notes-card hidden" id="notesCard">
+    <div class="notes-card" id="notesCard">
       <div class="notes-label">Notes</div>
-      <div class="notes-text" id="notesText"></div>
+      <textarea class="notes-textarea" id="notesText" rows="3"
+        placeholder="Add notes for Blue Alpha…" oninput="onNotesInput()"></textarea>
     </div>
 
     <!-- Action buttons -->
@@ -886,6 +900,7 @@ let   catalog     = null;
 let   catalogLoaded = false;
 let   editItems   = [];
 let   savedItems  = [];
+let   savedNotes  = '';
 // Exposed on window so the portal parent can read them cross-frame (let doesn't create window props)
 window.dirty              = false;
 window.pendingAddSelection = false;
@@ -905,9 +920,21 @@ function markClean() {
   if (save) save.disabled = true;
 }
 
+function onNotesInput() {
+  const notesEl = document.getElementById('notesText');
+  if (notesEl && notesEl.value !== savedNotes) markDirty();
+  else if (notesEl && notesEl.value === savedNotes) {
+    // Notes reverted to saved — only go clean if items also unchanged
+    const itemsChanged = JSON.stringify(editItems) !== JSON.stringify(savedItems);
+    if (!itemsChanged) markClean();
+  }
+}
+
 function revertChanges() {
   if (!confirm('Discard your changes and revert to the last saved version?')) return;
   editItems = savedItems.map(i => ({ ...i }));
+  const notesEl = document.getElementById('notesText');
+  if (notesEl) notesEl.value = savedNotes;
   markClean();
   renderItemsTable();
 }
@@ -1046,12 +1073,13 @@ function renderQuoteDetails() {
     document.getElementById('bannerExpired').classList.remove('hidden');
   }
 
-  // Notes
-  if (q.notes) {
-    document.getElementById('notesCard').classList.remove('hidden');
-    document.getElementById('notesText').textContent = q.notes;
+  // Notes — always editable (unless accepted)
+  savedNotes = q.notes || '';
+  const notesEl = document.getElementById('notesText');
+  if (notesEl) {
+    notesEl.value = savedNotes;
+    if (isAccepted) { notesEl.disabled = true; notesEl.style.background = 'var(--bg)'; }
   }
-
   renderItemsTable();
 
   // Edit controls
@@ -1644,7 +1672,9 @@ async function saveChanges() {
   confirm.style.display = 'none';
 
   try {
+    const notesVal = document.getElementById('notesText')?.value ?? savedNotes;
     const payload = {
+      notes: notesVal,
       items: editItems.map(i => ({
         skuRecordId: i.skuRecordId,
         qty:         i.qty,
@@ -1659,6 +1689,7 @@ async function saveChanges() {
     const data = await r.json();
     if (!r.ok || !data.success) throw new Error(data.error || 'Save failed');
     savedItems = editItems.map(i => ({ ...i }));
+    savedNotes = notesVal;
     markClean();  // disables btnSave
     btn.textContent = 'Save Changes';
     confirm.style.display = 'inline';

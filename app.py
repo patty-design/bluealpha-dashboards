@@ -4928,6 +4928,7 @@ def update_quote(record_id):
     read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
     data = request.get_json() or {}
     items = data.get("items", [])
+    notes = (data.get("notes") or "").strip()
 
     try:
         # Verify it's a quote and not accepted
@@ -4969,6 +4970,14 @@ def update_quote(record_id):
             )
             li_r.raise_for_status()
 
+
+        # Save notes back to the MO record
+        req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": {"Notes from Customer": notes}},
+            timeout=10,
+        )
         return Response(json.dumps({"success": True}), headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
