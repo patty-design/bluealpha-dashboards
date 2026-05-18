@@ -5220,7 +5220,7 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
     BD    = (221, 227, 234)
 
     # ── Logo (top-left) ───────────────────────────────────────────────
-    LOGO_W   = 58.0   # mm width to render logo
+    LOGO_W   = 50.0   # mm width to render logo
     LOGO_TOP = 13.0   # mm from top of page
     # Prefer transparent PNG; fall back to JPG, then URL download, then text
     _static    = os.path.dirname(os.path.abspath(__file__))
@@ -5284,8 +5284,8 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
     pdf.set_text_color(*NAVY)
     pdf.cell(right_w, 6, f"#{q_number}", align="R", new_x="LMARGIN", new_y="NEXT")
 
-    # Move cursor below header block
-    pdf.set_y(max(pdf.get_y(), LOGO_TOP + LOGO_W * 0.39 + 2))  # logo aspect ~0.45h/w
+    # Move cursor below header block — addr_y tracks where address ended
+    pdf.set_y(max(addr_y, LOGO_TOP + LOGO_W * 0.42) + 7)  # 7mm breathing room before divider
 
     # Navy divider
     pdf.set_draw_color(*NAVY)
