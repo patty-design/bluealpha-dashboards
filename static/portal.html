@@ -676,8 +676,14 @@
           el.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg><p>No quotes yet</p></div>';
           return;
         }
+        // Sort: open first, then accepted, then expired; within each group largest quote # first
+        const statusOrder = q => q.is_accepted ? 1 : (q.is_expired ? 2 : 0);
+        const quoteNum    = q => parseInt((q.quote_number || '').replace(/\D/g, ''), 10) || 0;
+        const sorted = [...data.quotes].sort((a, b) =>
+          statusOrder(a) - statusOrder(b) || quoteNum(b) - quoteNum(a)
+        );
         el.innerHTML = '<table><thead><tr><th>Quote #</th><th>Date</th><th>Expiry</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>' +
-          data.quotes.map(q => {
+          sorted.map(q => {
             const expired  = q.is_expired;
             const accepted = q.is_accepted;
             const badge = accepted ? '<span class="badge badge-accepted">Accepted</span>'
