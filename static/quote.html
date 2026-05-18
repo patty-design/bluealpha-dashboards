@@ -636,7 +636,7 @@ let activeParent = null;   // currently-expanded parent product id
   let attempts = 0;
   while (true) {
     try {
-      const r = await fetch('/api/quote-catalog');
+      const r = await fetch('/api/quote-catalog?_=' + Date.now());
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const data = await r.json();
       if (data.loading) {
