@@ -11,6 +11,7 @@
     :root {
       --navy: #1B2438;
       --red:  #7B2318;
+      --green: #166534;
       --border: #d8dde6;
       --muted: #6b7280;
       --bg: #f4f6f9;
@@ -25,11 +26,24 @@
     .subtitle { font-size: 0.88rem; color: var(--muted); margin-bottom: 28px; }
     label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--navy);
             text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 5px; margin-top: 16px; }
-    input { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border);
+    .input-wrap { position: relative; }
+    .input-wrap input { width: 100%; padding: 10px 40px 10px 12px; border: 1.5px solid var(--border);
             border-radius: 7px; font-size: 0.95rem; font-family: inherit;
             transition: border-color 0.15s; }
-    input:focus { outline: none; border-color: var(--navy); }
-    .hint { font-size: 0.76rem; color: var(--muted); margin-top: 4px; }
+    .input-wrap input:focus { outline: none; border-color: var(--navy); }
+    input:not(.input-wrap input) { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border);
+            border-radius: 7px; font-size: 0.95rem; font-family: inherit;
+            transition: border-color 0.15s; }
+    input:not(.input-wrap input):focus { outline: none; border-color: var(--navy); }
+    .eye-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+               background: none; border: none; cursor: pointer; font-size: 1.1rem;
+               padding: 2px 4px; line-height: 1; color: var(--muted);
+               user-select: none; -webkit-user-select: none; }
+    .requirements { margin-top: 8px; font-size: 0.78rem; list-style: none; padding: 0; }
+    .requirements li { padding: 2px 0; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    .requirements li::before { content: '○'; font-size: 0.65rem; flex-shrink: 0; }
+    .requirements li.met { color: var(--green); }
+    .requirements li.met::before { content: '✓'; }
     .btn { display: block; width: 100%; margin-top: 24px; padding: 13px;
            background: var(--navy); color: #fff; border: none; border-radius: 7px;
            font-family: 'Montserrat', sans-serif; font-size: 0.95rem; font-weight: 700;
@@ -54,22 +68,67 @@
     <div id="msg" class="msg"></div>
     <div id="formWrap">
       <label for="username">Username</label>
-      <input type="text" id="username" autocomplete="username" placeholder="e.g. jsmith" spellcheck="false">
+      <input type="text" id="username" autocomplete="username" placeholder="e.g. jsmith" spellcheck="false"
+             oninput="this.value = this.value.toLowerCase()">
+      <ul class="requirements" id="unReqs">
+        <li id="req-un-len">3–32 characters</li>
+        <li id="req-un-chars">Letters, numbers, . _ - only (no spaces)</li>
+      </ul>
+
       <label for="password">Password</label>
-      <input type="password" id="password" autocomplete="new-password" placeholder="At least 8 characters">
-      <p class="hint">Minimum 8 characters.</p>
+      <div class="input-wrap">
+        <input type="password" id="password" autocomplete="new-password" placeholder="Create a password"
+               oninput="checkPwReqs()">
+        <button type="button" class="eye-btn" onclick="togglePw('password', this)" tabindex="-1">👁️</button>
+      </div>
+      <ul class="requirements" id="pwReqs">
+        <li id="req-len">At least 8 characters</li>
+      </ul>
+
       <label for="confirm">Confirm Password</label>
-      <input type="password" id="confirm" autocomplete="new-password" placeholder="Re-enter password">
+      <div class="input-wrap">
+        <input type="password" id="confirm" autocomplete="new-password" placeholder="Re-enter password"
+               oninput="checkPwReqs()">
+        <button type="button" class="eye-btn" onclick="togglePw('confirm', this)" tabindex="-1">👁️</button>
+      </div>
+      <ul class="requirements" style="margin-top:8px;">
+        <li id="req-match">Passwords match</li>
+      </ul>
+
       <button class="btn" id="submitBtn" onclick="doSetup()">Create My Account</button>
     </div>
   </div>
 
   <script>
-    // Extract token from URL path: /setup-account/<token>
     const _token = window.location.pathname.split('/setup-account/')[1] || '';
 
+    function togglePw(fieldId, btn) {
+      const inp = document.getElementById(fieldId);
+      const show = inp.type === 'password';
+      inp.type = show ? 'text' : 'password';
+      btn.textContent = show ? '🙈' : '👁️';
+    }
+
+    function checkPwReqs() {
+      const pw  = document.getElementById('password').value;
+      const conf = document.getElementById('confirm').value;
+      setReq('req-len',   pw.length >= 8);
+      setReq('req-match', pw.length > 0 && pw === conf);
+
+      const un = document.getElementById('username').value;
+      setReq('req-un-len',   un.length >= 3 && un.length <= 32);
+      setReq('req-un-chars', /^[a-z0-9._-]*$/.test(un) && un.length > 0);
+    }
+
+    function setReq(id, met) {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('met', met);
+    }
+
+    document.getElementById('username').addEventListener('input', checkPwReqs);
+
     async function doSetup() {
-      const username = document.getElementById('username').value.trim();
+      const username = document.getElementById('username').value.trim().toLowerCase();
       const password = document.getElementById('password').value;
       const confirm  = document.getElementById('confirm').value;
       const msg      = document.getElementById('msg');
@@ -78,11 +137,11 @@
       msg.className = 'msg';
       msg.textContent = '';
 
-      if (!username) { showErr('Please enter a username.'); return; }
-      if (!/^[a-z0-9._-]{3,32}$/.test(username)) {
-        showErr('Username must be 3–32 characters (letters, numbers, . _ - only).'); return;
-      }
-      if (password.length < 8) { showErr('Password must be at least 8 characters.'); return; }
+      if (!username)                              { showErr('Please enter a username.'); return; }
+      if (username.length < 3 || username.length > 32)
+                                                  { showErr('Username must be 3–32 characters.'); return; }
+      if (!/^[a-z0-9._-]+$/.test(username))      { showErr('Username can only contain lowercase letters, numbers, and . _ -'); return; }
+      if (password.length < 8)  { showErr('Password must be at least 8 characters.'); return; }
       if (password !== confirm) { showErr('Passwords do not match.'); return; }
 
       btn.disabled = true;
@@ -112,18 +171,15 @@
       }
     }
 
-    function showErr(msg) {
+    function showErr(text) {
       const el = document.getElementById('msg');
       el.className = 'msg error';
-      el.textContent = msg;
+      el.textContent = text;
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
-    // Allow Enter key
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Enter') doSetup();
-    });
+    document.addEventListener('keydown', e => { if (e.key === 'Enter') doSetup(); });
 
-    // If no token in URL, show error immediately
     if (!_token) {
       document.getElementById('msg').className = 'msg error';
       document.getElementById('msg').textContent = 'Invalid setup link. Please ask your admin to resend the invite.';
