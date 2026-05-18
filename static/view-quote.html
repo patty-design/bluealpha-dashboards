@@ -813,7 +813,11 @@ if (window.self !== window.top) {
           </div>
           <div class="v-add-row hidden" id="vAddonRow">
             <label>Add-on</label>
-            <select id="vAddon"><option value="">No add-on</option></select>
+            <select id="vAddon" onchange="vUpdatePrice()"><option value="">No add-on</option></select>
+          </div>
+          <div class="v-add-row hidden" id="vPriceRow">
+            <label>Unit Price</label>
+            <span id="vPrice" style="font-weight:600;color:var(--navy);">—</span>
           </div>
           <div class="v-add-row hidden" id="vQtyAddRow">
             <label>Qty</label>
@@ -1502,6 +1506,33 @@ function vOnFvar(forcedFvarId) {
   }
   document.getElementById('vQtyAddRow').classList.remove('hidden');
   window.pendingAddSelection = true;  // Add button is now visible — warn on refresh
+  vUpdatePrice();
+}
+
+function vUpdatePrice() {
+  const parentId = document.getElementById('vProd').value;
+  const colorId  = document.getElementById('vColor').value;
+  const sizeEl   = document.getElementById('vSize');
+  const sizeId   = sizeEl.dataset.autoId || sizeEl.value || '';
+  const fvarEl   = document.getElementById('vFvar');
+  const fvarId   = fvarEl.dataset.autoId !== undefined ? fvarEl.dataset.autoId : (fvarEl.value || '');
+  const addonId  = document.getElementById('vAddon').value || '';
+  const priceEl  = document.getElementById('vPrice');
+  const priceRow = document.getElementById('vPriceRow');
+  if (!priceEl || !priceRow) return;
+  const sku = catalog.skus.find(s =>
+    s.parentId===parentId && s.colorId===colorId &&
+    (!sizeId || s.sizeId===sizeId) &&
+    (!fvarId || s.featureVarId===fvarId) &&
+    (addonId ? s.addonId===addonId : (!s.addonId || document.getElementById('vAddonRow')?.classList.contains('hidden')))
+  );
+  if (sku && sku.price) {
+    priceEl.textContent = '$' + sku.price.toFixed(2);
+    priceRow.classList.remove('hidden');
+  } else {
+    priceEl.textContent = '—';
+    priceRow.classList.add('hidden');
+  }
 }
 
 function vResetFrom(level) {
@@ -1529,6 +1560,7 @@ function vResetFrom(level) {
   }
   if (idx <= 4) {
     document.getElementById('vQtyAddRow').classList.add('hidden');
+    document.getElementById('vPriceRow')?.classList.add('hidden');
   }
 }
 
