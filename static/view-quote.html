@@ -1570,6 +1570,9 @@ function vDoAdd() {
 
 // ─── Save changes ─────────────────────────────────────────────────────────────
 async function saveChanges() {
+  // If the add-item panel has a fully-selected item pending, add it first
+  if (window.pendingAddSelection) vDoAdd();
+
   const btn     = document.getElementById('btnSave');
   const confirm = document.getElementById('saveConfirm');
   btn.disabled  = true;
