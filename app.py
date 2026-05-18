@@ -5220,8 +5220,13 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
     BD    = (221, 227, 234)
 
     # ── Logo (top-left) ───────────────────────────────────────────────
-    LOGO_W   = 40.0   # mm width to render logo — sized so logo/address/quote# all bottom-align at 32mm
-    LOGO_TOP = 13.0   # mm from top of page
+    LOGO_TOP       = 13.0   # mm from top of page
+    HEADER_BOTTOM  = 32.0   # all header elements (logo, address, quote#) align at this y
+    # Logo sized so its visual content (97.5% of pixel height) lands exactly at HEADER_BOTTOM
+    _LOGO_CONTENT_FRAC = 708 / 726   # fraction of image height that contains real content
+    _PIXEL_ASPECT      = 726 / 1600  # image height / width
+    _logo_h  = (HEADER_BOTTOM - LOGO_TOP) / _LOGO_CONTENT_FRAC  # rendered height in mm
+    LOGO_W   = _logo_h / _PIXEL_ASPECT                           # rendered width in mm
     # Prefer transparent PNG; fall back to JPG, then URL download, then text
     _static    = os.path.dirname(os.path.abspath(__file__))
     logo_url   = "https://www.bluealphabelts.com/wp-content/uploads/2024/04/logo-1.png"
@@ -5240,7 +5245,7 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
             logo_tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
             urllib.request.urlretrieve(logo_url, logo_tmp.name)
             logo_file = logo_tmp.name
-        pdf.image(logo_file, x=19, y=LOGO_TOP, w=LOGO_W)
+        pdf.image(logo_file, x=19, y=LOGO_TOP, w=LOGO_W, h=_logo_h)
     except Exception:
         # Fallback: text logo
         pdf.set_xy(19, LOGO_TOP)
@@ -5262,8 +5267,7 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
     ]
     addr_line_h = 4.5
     # Position so the last line sits at the logo bottom
-    logo_bottom = LOGO_TOP + LOGO_W * 0.454  # exact aspect ratio of ba-logo-white-bg.jpg (726/1600)
-    addr_y = logo_bottom - len(addr_lines) * addr_line_h
+    addr_y = HEADER_BOTTOM - len(addr_lines) * addr_line_h  # bottom-align to HEADER_BOTTOM
     for cline, bold in addr_lines:
         pdf.set_xy(mid_x, addr_y)
         pdf.set_font("Helvetica", "B" if bold else "", 8)
@@ -5287,7 +5291,7 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
     pdf.cell(right_w, 6, f"#{q_number}", align="R", new_x="LMARGIN", new_y="NEXT")
 
     # Move cursor below header block — everything bottoms out at 32mm, tight gap before divider
-    pdf.set_y(max(addr_y, LOGO_TOP + LOGO_W * 0.454) + 4)
+    pdf.set_y(HEADER_BOTTOM + 4)  # tight gap after aligned header
 
     # Navy divider
     pdf.set_draw_color(*NAVY)
@@ -5691,7 +5695,7 @@ def _build_invoice_pdf_bytes(inv):
             logo_file = None
     try:
         if logo_file:
-            pdf.image(logo_file, x=19, y=LOGO_TOP, w=LOGO_W)
+            pdf.image(logo_file, x=19, y=LOGO_TOP, w=LOGO_W, h=_logo_h)
     except Exception:
         pdf.set_xy(19, LOGO_TOP)
         pdf.set_font("Helvetica", "B", 18)
