@@ -1251,6 +1251,9 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredA
       defaultVal = '';
     } else if (noneAddonId) {
       defaultVal = noneAddonId;
+    } else if (_addonOptional) {
+      // Optional add-ons with no explicit default → show "None" (blank option always present)
+      defaultVal = '';
     } else {
       defaultVal = addons[0][0];
     }
