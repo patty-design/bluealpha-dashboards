@@ -5533,7 +5533,7 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
         pdf.write(4.5, "Accept this quote in your Blue Alpha Portal", link=portal_link)
         pdf.set_font("Helvetica", "", 7.5)
         pdf.set_text_color(*MUTED)
-        pdf.write(4.5, ".")
+        pdf.write(4.5, "  Payment terms are Net 30 upon acceptance.")
     pdf.ln(5)
 
     # Line 2: questions
