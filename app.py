@@ -5255,19 +5255,21 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
     # ── Middle: company address ────────────────────────────────────────
     mid_x = 19 + LOGO_W + 6
     mid_w = W * 0.36
-    addr_y = LOGO_TOP + 2
-    for cline, bold, size in [
-        ("Blue Alpha",        True,  8),
-        ("35 Andrew St.",     False, 8),
-        ("Newnan, GA 30263",  False, 8),
-        ("678-961-3304",      False, 8),
-        ("info@bluealpha.us", False, 8),
-    ]:
+    addr_lines = [
+        ("Blue Alpha",       True),
+        ("35 Andrew St.",    False),
+        ("Newnan, GA 30263", False),
+    ]
+    addr_line_h = 4.5
+    # Position so the last line sits at the logo bottom
+    logo_bottom = LOGO_TOP + LOGO_W * 0.42
+    addr_y = logo_bottom - len(addr_lines) * addr_line_h
+    for cline, bold in addr_lines:
         pdf.set_xy(mid_x, addr_y)
-        pdf.set_font("Helvetica", "B" if bold else "", size)
+        pdf.set_font("Helvetica", "B" if bold else "", 8)
         pdf.set_text_color(*TEXT if bold else MUTED)
-        pdf.cell(mid_w, 4.5, cline, border=0, new_x="LMARGIN", new_y="NEXT")
-        addr_y += 4.5
+        pdf.cell(mid_w, addr_line_h, cline, border=0, new_x="LMARGIN", new_y="NEXT")
+        addr_y += addr_line_h
 
     # ── Right: doc type heading + quote/order number ───────────────────
     right_x = 19 + W * 0.62
