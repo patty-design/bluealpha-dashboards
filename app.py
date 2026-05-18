@@ -9459,7 +9459,8 @@ def portal_invoices(user):
         inv_records = at_get_all(
             MANUAL_ORDERS_TABLE_ID, read_token,
             fields=["Document ID", "Order ID", "Date", "MO Line Items",
-                    "Sales Order Status", "Go-to PDF", "Customer"],
+                    "Sales Order Status", "Go-to PDF", "Customer",
+                    "Stripe Invoice Status (CC)", "Stripe Invoice Status (ACH)"],
             formula='{Order Type}="Invoice"',
         )
         # Filter to this customer
@@ -9501,6 +9502,9 @@ def portal_invoices(user):
             tracking   = tracking_map.get(so_number, "")
             go_to_pdf_field = f.get("Go-to PDF") or {}
             go_to_pdf_url   = go_to_pdf_field.get("url", "") if isinstance(go_to_pdf_field, dict) else ""
+            cc_status  = f.get("Stripe Invoice Status (CC)", "")
+            ach_status = f.get("Stripe Invoice Status (ACH)", "")
+            is_paid    = (cc_status == "paid" or ach_status == "paid")
             invoices.append({
                 "record_id":  rec["id"],
                 "inv_number": inv_number,
@@ -9509,6 +9513,7 @@ def portal_invoices(user):
                 "total":      total,
                 "tracking":   tracking,
                 "go_to_pdf":  go_to_pdf_url,
+                "is_paid":    is_paid,
             })
 
         invoices.sort(key=lambda x: x.get("date", ""), reverse=True)

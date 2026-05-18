@@ -223,6 +223,10 @@
     .badge-accepted { background: #d4edda; color: #155724; }
     .badge-expired  { background: #f8d7da; color: #721c24; }
     .badge-shipped  { background: #cce5ff; color: #004085; }
+    .filter-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+    .filter-btn { padding:4px 14px; border-radius:20px; border:1.5px solid #c8d0da; background:#fff; color:#444; font-size:0.82rem; font-weight:600; cursor:pointer; transition:all .15s; }
+    .filter-btn:hover { border-color:var(--navy); color:var(--navy); }
+    .filter-btn.active { background:var(--navy); color:#fff; border-color:var(--navy); }
     .tracking-info { font-family: monospace; font-size: 0.82rem; color: #1a5276; word-break: break-all; text-decoration: underline; }
     .empty-state {
       text-align: center;
@@ -326,6 +330,12 @@
     <div class="tab-panel" id="tab-our-quotes">
       <div class="card">
         <p class="card-sub" id="quotesSubtitle" style="display:none;"></p>
+        <div class="filter-bar" id="quotesFilterBar" style="display:none;">
+          <button class="filter-btn active" onclick="filterQuotes('all')">All</button>
+          <button class="filter-btn" onclick="filterQuotes('open')">Open</button>
+          <button class="filter-btn" onclick="filterQuotes('accepted')">Accepted</button>
+          <button class="filter-btn" onclick="filterQuotes('expired')">Expired</button>
+        </div>
         <div id="quotesContent"><div class="loading">Loading quotes…</div></div>
       </div>
     </div>
@@ -357,7 +367,11 @@
     <!-- Our Orders Tab -->
     <div class="tab-panel" id="tab-our-orders">
       <div class="card">
-
+        <div class="filter-bar" id="ordersFilterBar" style="display:none;">
+          <button class="filter-btn active" onclick="filterOrders('all')">All</button>
+          <button class="filter-btn" onclick="filterOrders('confirmed')">Confirmed</button>
+          <button class="filter-btn" onclick="filterOrders('shipped')">Shipped</button>
+        </div>
         <div id="ordersContent"><div class="loading">Loading orders…</div></div>
       </div>
     </div>
@@ -365,6 +379,11 @@
     <!-- Invoices Tab -->
     <div class="tab-panel" id="tab-invoices">
       <div class="card">
+        <div class="filter-bar" id="invoicesFilterBar" style="display:none;">
+          <button class="filter-btn active" onclick="filterInvoices('all')">All</button>
+          <button class="filter-btn" onclick="filterInvoices('unpaid')">Unpaid</button>
+          <button class="filter-btn" onclick="filterInvoices('paid')">Paid</button>
+        </div>
         <div id="invoicesList"><div class="loading">Loading…</div></div>
       </div>
     </div>
@@ -665,117 +684,188 @@
     let _quotesCache = null;
     let _ordersCache = null;
 
+    // ── Quotes helpers ────────────────────────────────────────────────────────
+    let _quotesFilter = 'all';
+    const _quoteStatusOrder = q => q.is_accepted ? 1 : (q.is_expired ? 2 : 0);
+    const _quoteNum        = q => parseInt((q.quote_number || '').replace(/\D/g, ''), 10) || 0;
+
+    function _renderQuotes(quotes) {
+      const el = document.getElementById('quotesContent');
+      const bar = document.getElementById('quotesFilterBar');
+      if (!quotes || quotes.length === 0) {
+        bar.style.display = 'none';
+        el.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg><p>No quotes yet</p></div>';
+        return;
+      }
+      const sorted = [...quotes].sort((a, b) =>
+        _quoteStatusOrder(a) - _quoteStatusOrder(b) || _quoteNum(b) - _quoteNum(a)
+      );
+      const filtered = _quotesFilter === 'all' ? sorted
+        : _quotesFilter === 'open'     ? sorted.filter(q => !q.is_accepted && !q.is_expired)
+        : _quotesFilter === 'accepted' ? sorted.filter(q => q.is_accepted)
+        :                                sorted.filter(q => q.is_expired && !q.is_accepted);
+      bar.style.display = 'flex';
+      bar.querySelectorAll('.filter-btn').forEach(b =>
+        b.classList.toggle('active', b.textContent.toLowerCase() === _quotesFilter)
+      );
+      el.innerHTML = '<table><thead><tr><th>Quote #</th><th>Date</th><th>Expiry</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>' +
+        (filtered.length === 0 ? `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No ${_quotesFilter} quotes.</td></tr>` :
+        filtered.map(q => {
+          const badge = q.is_accepted ? '<span class="badge badge-accepted">Accepted</span>'
+                      : q.is_expired  ? '<span class="badge badge-expired">Expired</span>'
+                      :                 '<span class="badge badge-pending">Open</span>';
+          return `<tr>
+            <td><strong>${q.quote_number || '—'}</strong></td>
+            <td>${fmt(q.date)}</td>
+            <td>${fmt(q.expiry_date)}</td>
+            <td>${money(q.total)}</td>
+            <td>${badge}</td>
+            <td><button class="btn-sm" onclick="openViewQuote('${q.record_id}')">View →</button></td>
+          </tr>`;
+        }).join('')) +
+        '</tbody></table>';
+    }
+
+    function filterQuotes(f) {
+      _quotesFilter = f;
+      if (_quotesCache) _renderQuotes(_quotesCache.quotes);
+    }
+
     async function loadQuotes() {
       quotesLoaded = true;
       const el = document.getElementById('quotesContent');
       try {
-        const resp = _quotesCache ? { json: () => Promise.resolve(_quotesCache), ok: true }
-                                  : await fetch('/api/portal/quotes');
-        const data = await resp.json();
-        _quotesCache = data;
-        if (!data.quotes || data.quotes.length === 0) {
-          el.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg><p>No quotes yet</p></div>';
-          return;
+        if (!_quotesCache) {
+          const data = await (await fetch('/api/portal/quotes')).json();
+          _quotesCache = data;
         }
-        // Sort: open first, then accepted, then expired; within each group largest quote # first
-        const statusOrder = q => q.is_accepted ? 1 : (q.is_expired ? 2 : 0);
-        const quoteNum    = q => parseInt((q.quote_number || '').replace(/\D/g, ''), 10) || 0;
-        const sorted = [...data.quotes].sort((a, b) =>
-          statusOrder(a) - statusOrder(b) || quoteNum(b) - quoteNum(a)
-        );
-        el.innerHTML = '<table><thead><tr><th>Quote #</th><th>Date</th><th>Expiry</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>' +
-          sorted.map(q => {
-            const expired  = q.is_expired;
-            const accepted = q.is_accepted;
-            const badge = accepted ? '<span class="badge badge-accepted">Accepted</span>'
-                        : expired  ? '<span class="badge badge-expired">Expired</span>'
-                        :            '<span class="badge badge-pending">Open</span>';
-            return `<tr>
-              <td><strong>${q.quote_number || '—'}</strong></td>
-              <td>${fmt(q.date)}</td>
-              <td>${fmt(q.expiry_date)}</td>
-              <td>${money(q.total)}</td>
-              <td>${badge}</td>
-              <td><button class="btn-sm" onclick="openViewQuote('${q.record_id}')">View →</button></td>
-            </tr>`;
-          }).join('') +
-          '</tbody></table>';
+        _renderQuotes(_quotesCache.quotes);
       } catch (e) {
         el.innerHTML = '<div class="empty-state"><p>Failed to load quotes. Please refresh.</p></div>';
       }
+    }
+
+    // ── Orders helpers ────────────────────────────────────────────────────────
+    let _ordersFilter = 'all';
+    const _hasTracking = o => !!(o.tracking || (o.splitShipments || []).some(s => s.tracking));
+    const _soNum       = o => parseInt((o.so_number || '').replace(/\D/g, ''), 10) || 0;
+
+    function _renderOrders(orders) {
+      const el  = document.getElementById('ordersContent');
+      const bar = document.getElementById('ordersFilterBar');
+      if (!orders || orders.length === 0) {
+        bar.style.display = 'none';
+        el.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.07-.44.18-.88.18-1.36C18 2.54 15.46 0 12 0 9.24 0 6.8 1.64 5.73 4H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8-4c1.66 0 3 1.34 3 3H9c0-1.66 1.34-3 3-3z"/></svg><p>No orders yet</p></div>';
+        return;
+      }
+      const sorted = [...orders].sort((a, b) =>
+        _hasTracking(a) - _hasTracking(b) || _soNum(b) - _soNum(a)
+      );
+      const filtered = _ordersFilter === 'all'       ? sorted
+        : _ordersFilter === 'confirmed' ? sorted.filter(o => !_hasTracking(o))
+        :                                 sorted.filter(o => _hasTracking(o));
+      bar.style.display = 'flex';
+      bar.querySelectorAll('.filter-btn').forEach(b =>
+        b.classList.toggle('active', b.textContent.toLowerCase() === _ordersFilter)
+      );
+      el.innerHTML = '<table><thead><tr><th>Sales Order #</th><th>Date</th><th>Total</th><th>Tracking</th><th>Status</th><th></th></tr></thead><tbody>' +
+        (filtered.length === 0 ? `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No ${_ordersFilter} orders.</td></tr>` :
+        filtered.map(o => {
+          const shipped = _hasTracking(o);
+          const badge = shipped ? '<span class="badge badge-shipped">Shipped</span>'
+                                : '<span class="badge badge-active">Confirmed</span>';
+          return `<tr>
+            <td><strong>${o.so_number || '—'}</strong></td>
+            <td>${fmt(o.date)}</td>
+            <td>${money(o.total)}</td>
+            <td>${(() => {
+              const seen = new Set(); const parts = [];
+              const add = (trk, title) => {
+                if (!trk || seen.has(trk)) return; seen.add(trk);
+                parts.push(`<a class="tracking-info" href="${trackingUrl(trk)}" target="_blank" rel="noopener"${title ? ` title="${title}"` : ''}>${trk}</a>`);
+              };
+              add(o.tracking);
+              (o.splitShipments || []).forEach(s => add(s.tracking, s.splitNum));
+              return parts.length ? parts.join('<br>') : '<span style="color:var(--text-muted)">—</span>';
+            })()}</td>
+            <td>${badge}</td>
+            <td><button class="btn-sm" onclick="openViewOrder('${o.record_id}')">View →</button></td>
+          </tr>`;
+        }).join('')) +
+        '</tbody></table>';
+    }
+
+    function filterOrders(f) {
+      _ordersFilter = f;
+      if (_ordersCache) _renderOrders(_ordersCache.orders);
     }
 
     async function loadOrders() {
       ordersLoaded = true;
       const el = document.getElementById('ordersContent');
       try {
-        const resp = _ordersCache ? { json: () => Promise.resolve(_ordersCache), ok: true }
-                                  : await fetch('/api/portal/orders');
-        const data = await resp.json();
-        _ordersCache = data;
-        if (!data.orders || data.orders.length === 0) {
-          el.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.07-.44.18-.88.18-1.36C18 2.54 15.46 0 12 0 9.24 0 6.8 1.64 5.73 4H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8-4c1.66 0 3 1.34 3 3H9c0-1.66 1.34-3 3-3z"/></svg><p>No orders yet</p></div>';
-          return;
+        if (!_ordersCache) {
+          const data = await (await fetch('/api/portal/orders')).json();
+          _ordersCache = data;
         }
-        // Determine shipped status: has tracking on order or any split shipment
-        const hasTracking = o => !!(o.tracking || (o.splitShipments || []).some(s => s.tracking));
-        // Sort: Confirmed first, Shipped second; within each group largest SO# first
-        const soNum = o => parseInt((o.so_number || '').replace(/\D/g, ''), 10) || 0;
-        const sorted = [...data.orders].sort((a, b) =>
-          hasTracking(a) - hasTracking(b) || soNum(b) - soNum(a)
-        );
-        el.innerHTML = '<table><thead><tr><th>Sales Order #</th><th>Date</th><th>Total</th><th>Tracking</th><th>Status</th><th></th></tr></thead><tbody>' +
-          sorted.map(o => {
-            const shipped = hasTracking(o);
-            const badge = shipped
-              ? '<span class="badge badge-shipped">Shipped</span>'
-              : '<span class="badge badge-active">Confirmed</span>';
-            return `<tr>
-            <td><strong>${o.so_number || '—'}</strong></td>
-            <td>${fmt(o.date)}</td>
-            <td>${money(o.total)}</td>
-            <td>${(() => {
-              const seen = new Set();
-              const parts = [];
-              const addTracking = (trk, title) => {
-                if (!trk || seen.has(trk)) return;
-                seen.add(trk);
-                parts.push(`<a class="tracking-info" href="${trackingUrl(trk)}" target="_blank" rel="noopener"${title ? ` title="${title}"` : ''}>${trk}</a>`);
-              };
-              addTracking(o.tracking);
-              (o.splitShipments || []).forEach(s => addTracking(s.tracking, s.splitNum));
-              return parts.length ? parts.join('<br>') : '<span style="color:var(--text-muted)">—</span>';
-            })()}</td>
-            <td>${badge}</td>
-            <td><button class="btn-sm" onclick="openViewOrder('${o.record_id}')">View →</button></td>
-          </tr>`;
-          }).join('') +
-          '</tbody></table>';
+        _renderOrders(_ordersCache.orders);
       } catch (e) {
         el.innerHTML = '<div class="empty-state"><p>Failed to load orders. Please refresh.</p></div>';
       }
     }
 
-    async function loadInvoices() {
-      const el = document.getElementById('invoicesList');
-      try {
-        const resp = await fetch('/api/portal/invoices', { credentials: 'include' });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
-        if (!data.invoices || data.invoices.length === 0) {
-          el.innerHTML = '<div class="empty-state"><p>No invoices yet.</p></div>';
-          return;
-        }
-        el.innerHTML = '<table><thead><tr><th>Invoice #</th><th>Sales Order</th><th>Date</th><th>Total</th><th>Tracking</th><th></th></tr></thead><tbody>' +
-          data.invoices.map(inv => `<tr>
+    // ── Invoices helpers ──────────────────────────────────────────────────────
+    let _invoicesCache  = null;
+    let _invoicesFilter = 'all';
+
+    function _renderInvoices(invoices) {
+      const el  = document.getElementById('invoicesList');
+      const bar = document.getElementById('invoicesFilterBar');
+      if (!invoices || invoices.length === 0) {
+        bar.style.display = 'none';
+        el.innerHTML = '<div class="empty-state"><p>No invoices yet.</p></div>';
+        return;
+      }
+      const filtered = _invoicesFilter === 'all'    ? invoices
+        : _invoicesFilter === 'paid'   ? invoices.filter(i => i.is_paid)
+        :                                invoices.filter(i => !i.is_paid);
+      bar.style.display = 'flex';
+      bar.querySelectorAll('.filter-btn').forEach(b =>
+        b.classList.toggle('active', b.textContent.toLowerCase() === _invoicesFilter)
+      );
+      el.innerHTML = '<table><thead><tr><th>Invoice #</th><th>Sales Order</th><th>Date</th><th>Total</th><th>Tracking</th><th>Status</th><th></th></tr></thead><tbody>' +
+        (filtered.length === 0 ? `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">No ${_invoicesFilter} invoices.</td></tr>` :
+        filtered.map(inv => {
+          const badge = inv.is_paid
+            ? '<span class="badge badge-accepted">Paid</span>'
+            : '<span class="badge badge-pending">Unpaid</span>';
+          return `<tr>
             <td><strong>${inv.inv_number || '—'}</strong></td>
             <td>${inv.so_number || '—'}</td>
             <td>${fmt(inv.date)}</td>
             <td>${money(inv.total)}</td>
             <td>${inv.tracking ? `<a class="tracking-info" href="${trackingUrl(inv.tracking)}" target="_blank" rel="noopener">${inv.tracking}</a>` : '<span style="color:var(--text-muted)">—</span>'}</td>
+            <td>${badge}</td>
             <td><button class="btn-sm" onclick="openViewInvoice('${inv.record_id}')">View →</button></td>
-          </tr>`).join('') +
-          '</tbody></table>';
+          </tr>`;
+        }).join('')) +
+        '</tbody></table>';
+    }
+
+    function filterInvoices(f) {
+      _invoicesFilter = f;
+      if (_invoicesCache) _renderInvoices(_invoicesCache.invoices);
+    }
+
+    async function loadInvoices() {
+      const el = document.getElementById('invoicesList');
+      try {
+        if (!_invoicesCache) {
+          const resp = await fetch('/api/portal/invoices', { credentials: 'include' });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          _invoicesCache = await resp.json();
+        }
+        _renderInvoices(_invoicesCache.invoices);
       } catch (e) {
         el.innerHTML = '<div class="empty-state"><p>Failed to load invoices. Please refresh.</p></div>';
       }
