@@ -5343,6 +5343,7 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
         if q_po:
             meta_kv("PO #", q_po)
     else:
+        meta_kv("Quote Number", q_number)
         meta_kv("Quote Date",   q_date)
         if q_expiry:
             meta_kv("Expiry Date", q_expiry)
