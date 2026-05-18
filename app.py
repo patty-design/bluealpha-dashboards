@@ -4347,7 +4347,8 @@ def _build_catalog():
         fvar_ids  = f.get("Feature Variation", [])
         fvar_id   = fvar_ids[0] if fvar_ids else ""
         fvar_name = fvar_map.get(fvar_id, "").strip() if fvar_id else ""
-        if fvar_name.lower() in ("none", ""):
+        # Treat internal/non-display feature variation names as no feature variation
+        if fvar_name.lower() in ("none", "", "molle mount"):
             fvar_id = ""; fvar_name = ""
         if fvar_name.lower() in _EXCLUDED_FEATURE_VARS_GLOBAL:
             continue
@@ -4458,7 +4459,6 @@ _EXCLUDED_PARENTS = {
 # Feature variations to exclude globally (lowercase)
 _EXCLUDED_FEATURE_VARS_GLOBAL = {
     "base only (-onb)",
-    "molle mount",   # Internal SKU flag — not a user-visible variation; breaks add-on matching
 }
 
 # Add-ons to exclude globally (lowercase add-on names)
