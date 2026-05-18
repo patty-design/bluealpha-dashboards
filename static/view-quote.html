@@ -1078,7 +1078,7 @@ function renderQuoteDetails() {
   const notesEl = document.getElementById('notesText');
   if (notesEl) {
     notesEl.value = savedNotes;
-    if (isAccepted) { notesEl.disabled = true; notesEl.style.background = 'var(--bg)'; }
+    if (q.isAccepted) { notesEl.disabled = true; notesEl.style.background = 'var(--bg)'; }
   }
   renderItemsTable();
 
