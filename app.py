@@ -359,8 +359,8 @@ def _lookup_portal_customer(username, password):
         role_raw = (f.get("Portal Role") or "").strip()
         role_map = {
             "Admin":       "admin",
-            "Full Access": "full_access",
-            "Quotes Only": "quotes_only",
+            "Full Access": "full_access", "Orders": "orders",
+            "Quotes Only": "quotes_only", "Invoices": "invoices",
             "Read Only":   "read_only",
         }
         role = role_map.get(role_raw, None)
@@ -372,12 +372,15 @@ def _lookup_portal_customer(username, password):
         return None, None, None
 
 
-# Permission hierarchy (hierarchical — each role includes all below it)
+# Permission hierarchy
+# Tabs: New Quote + Our Quotes = create_quote / Our Orders = view_orders / Invoices = view_invoices
 _PORTAL_PERMISSIONS = {
-    "read_only":   {"view"},
-    "quotes_only": {"view", "create_quote"},
-    "full_access": {"view", "create_quote", "accept_quote"},
-    "admin":       {"view", "create_quote", "accept_quote", "manage_team"},
+    "read_only":   {"view", "view_quotes"},
+    "quotes_only": {"view", "view_quotes", "create_quote"},
+    "orders":      {"view", "view_quotes", "create_quote", "accept_quote", "view_orders"},
+    "invoices":    {"view", "view_invoices"},
+    "full_access": {"view", "view_quotes", "create_quote", "accept_quote", "view_orders", "view_invoices"},
+    "admin":       {"view", "view_quotes", "create_quote", "accept_quote", "view_orders", "view_invoices", "manage_team"},
 }
 
 def portal_can(user, action):
@@ -6433,8 +6436,7 @@ def portal_setup_account():
         parent_ids  = f.get("Parent Company", [])
         customer_id = parent_ids[0] if parent_ids else rec["id"]
         role_raw    = (f.get("Portal Role") or "").strip()
-        _rmap = {"Admin": "admin", "Full Access": "full_access",
-                 "Quotes Only": "quotes_only", "Read Only": "read_only"}
+        _rmap = {"Admin": "admin", "Full Access": "full_access", "Orders": "orders", "Quotes Only": "quotes_only", "Invoices": "invoices", "Read Only": "read_only"}
         role = _rmap.get(role_raw, "admin" if not parent_ids else "read_only")
         jwt_token = create_portal_token(rec["id"], customer_id, not bool(parent_ids), role)
         resp = make_response(Response(json.dumps({"ok": True}), headers=c, mimetype="application/json"))
@@ -6489,14 +6491,11 @@ def auth_magic_link(token):
         portal_role = None
         try:
             role_raw = uf.get("Portal Role", "")
+            _role_map = {"Admin": "admin", "Full Access": "full_access", "Orders": "orders",
+                         "Quotes Only": "quotes_only", "Invoices": "invoices", "Read Only": "read_only"}
             if not role_raw:
-                # Re-fetch to get the Portal Role field if not in token fields
-                _role_map = {"Admin": "admin", "Full Access": "full_access",
-                             "Quotes Only": "quotes_only", "Read Only": "read_only"}
                 portal_role = None  # legacy → admin
             else:
-                _role_map = {"Admin": "admin", "Full Access": "full_access",
-                             "Quotes Only": "quotes_only", "Read Only": "read_only"}
                 portal_role = _role_map.get(role_raw.strip(), None)
         except Exception:
             portal_role = None
@@ -6558,6 +6557,9 @@ def portal_me(user):
     can_manage_team  = portal_can(user, "manage_team")
     can_create_quote = portal_can(user, "create_quote")
     can_accept_quote = portal_can(user, "accept_quote")
+    can_view_quotes  = portal_can(user, "view_quotes")
+    can_view_orders  = portal_can(user, "view_orders")
+    can_view_invoices= portal_can(user, "view_invoices")
 
     # Use cached agency name if fresh
     _me_cached = _ME_CACHE.get(customer_id)
@@ -6588,6 +6590,9 @@ def portal_me(user):
         "canManageTeam":   can_manage_team,
         "canCreateQuote":  can_create_quote,
         "canAcceptQuote":  can_accept_quote,
+        "canViewQuotes":   can_view_quotes,
+        "canViewOrders":   can_view_orders,
+        "canViewInvoices": can_view_invoices,
     }), headers=c, mimetype="application/json")
 
 
@@ -7030,8 +7035,7 @@ def portal_team_list(user):
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
             headers=at_headers(read_token), timeout=10,
         )
-        _role_map = {"Admin": "admin", "Full Access": "full_access",
-                     "Quotes Only": "quotes_only", "Read Only": "read_only"}
+        _role_map = {"Admin": "admin", "Full Access": "full_access", "Orders": "orders", "Quotes Only": "quotes_only", "Invoices": "invoices", "Read Only": "read_only"}
         team     = []
         seen_ids = set()
 
@@ -7137,8 +7141,8 @@ def portal_team_add(user):
     if not _re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
         return Response(json.dumps({"error": "Please enter a valid email address."}),
                         status=400, headers=c, mimetype="application/json")
-    if role not in ("Full Access", "Quotes Only", "Read Only"):
-        return Response(json.dumps({"error": "Role must be Full Access, Quotes Only, or Read Only"}),
+    if role not in ("Full Access", "Orders", "Quotes Only", "Invoices", "Read Only"):
+        return Response(json.dumps({"error": "Role must be Full Access, Orders, Quotes Only, Invoices, or Read Only"}),
                         status=400, headers=c, mimetype="application/json")
 
     write_token = APPLY_WRITE_TOKEN or RETURNS_WRITE_TOKEN
@@ -7233,8 +7237,8 @@ def portal_team_change_role(user, record_id):
     customer_id = user.get("customer_id", "")
     data     = request.get_json() or {}
     new_role = (data.get("role") or "").strip()
-    if new_role not in ("Full Access", "Quotes Only", "Read Only"):
-        return Response(json.dumps({"error": "Role must be Full Access, Quotes Only, or Read Only"}),
+    if new_role not in ("Full Access", "Orders", "Quotes Only", "Invoices", "Read Only"):
+        return Response(json.dumps({"error": "Role must be Full Access, Orders, Quotes Only, Invoices, or Read Only"}),
                         status=400, headers=c, mimetype="application/json")
     read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
     try:

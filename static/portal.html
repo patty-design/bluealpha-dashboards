@@ -305,9 +305,9 @@
   <div class="container">
     <div class="tabs" id="tabNav">
       <div class="tab active" data-tab="new-quote" id="newQuoteTab">New Quote</div>
-      <div class="tab" data-tab="our-quotes">Our Quotes</div>
-      <div class="tab" data-tab="our-orders">Our Orders</div>
-      <div class="tab" data-tab="invoices">Invoices</div>
+      <div class="tab" data-tab="our-quotes" id="ourQuotesTab">Our Quotes</div>
+      <div class="tab" data-tab="our-orders" id="ourOrdersTab" style="display:none">Our Orders</div>
+      <div class="tab" data-tab="invoices" id="invoicesTab" style="display:none">Invoices</div>
       <div class="tab" data-tab="team" id="teamTab" style="display:none">Team</div>
     </div>
 
@@ -445,8 +445,10 @@
         <div style="margin-bottom:24px;padding:14px 16px;background:#f8f9fc;border-radius:8px;border:1px solid var(--border);font-size:0.82rem;color:var(--muted);line-height:1.7;">
           <strong style="color:var(--text);display:block;margin-bottom:6px;">Role Permissions</strong>
           <div><strong style="color:var(--text);">Read-Only</strong> — View and download quotes &amp; orders</div>
-          <div><strong style="color:var(--text);">Quotes Only</strong> — Read-Only + create new quotes</div>
-          <div><strong style="color:var(--text);">Full Access</strong> — Quotes Only + accept quotes</div>
+          <div><strong style="color:var(--text);">Quotes Only</strong> — New Quote + Our Quotes tabs</div>
+          <div><strong style="color:var(--text);">Orders</strong> — Quotes Only + Our Orders tab</div>
+          <div><strong style="color:var(--text);">Invoices</strong> — Invoices tab only</div>
+          <div><strong style="color:var(--text);">Full Access</strong> — Orders + Invoices (all tabs)</div>
           <div><strong style="color:var(--text);">Admin</strong> — Full Access + manage team</div>
         </div>
 
@@ -481,6 +483,8 @@
                 <select id="newRole" style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:9px 12px;font-size:0.88rem;font-family:'Lato',sans-serif;color:var(--text);">
                   <option value="Read Only">Read-Only</option>
                   <option value="Quotes Only">Quotes Only</option>
+                  <option value="Orders">Orders</option>
+                  <option value="Invoices">Invoices</option>
                   <option value="Full Access" selected>Full Access</option>
                 </select>
               </div>
@@ -597,11 +601,13 @@
         document.getElementById('agencyName').textContent = portalMe.agencyName || 'Government Portal';
         document.title = `Blue Alpha — ${portalMe.agencyName || 'Portal'}`;
 
-        // Show Team tab for admins
+        // Show/hide tabs based on role permissions
         if (portalMe.canManageTeam) {
           document.getElementById('teamTab').style.display = '';
           document.getElementById('shippedTab').style.display = '';
         }
+        if (portalMe.canViewOrders)   document.getElementById('ourOrdersTab').style.display = '';
+        if (portalMe.canViewInvoices) document.getElementById('invoicesTab').style.display = '';
 
         // Update Our Quotes subtitle based on role
         const qSub = document.getElementById('quotesSubtitle');
@@ -615,20 +621,30 @@
           }
         }
 
-        // Hide New Quote tab / show read-only message if no create_quote permission
-        if (!portalMe.canCreateQuote) {
+        // Determine default landing tab and hide inaccessible tabs
+        const _activateTab = (tabId, panelId, loader) => {
+          document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+          document.getElementById(tabId)?.classList.add('active');
+          document.getElementById(panelId)?.classList.add('active');
+          if (loader) loader();
+        };
+
+        if (!portalMe.canViewQuotes && !portalMe.canCreateQuote) {
+          // Invoices-only role — hide quote tabs, land on Invoices
+          document.getElementById('newQuoteTab').style.display = 'none';
+          document.getElementById('ourQuotesTab').style.display = 'none';
+          document.getElementById('quoteBuilderWrap').style.display = 'none';
+          document.getElementById('quoteReadOnlyMsg').style.display = '';
+          _activateTab('invoicesTab', 'tab-invoices', loadInvoices);
+        } else if (!portalMe.canCreateQuote) {
+          // Read-only quotes — hide New Quote, land on Our Quotes
           document.getElementById('quoteBuilderWrap').style.display = 'none';
           document.getElementById('quoteReadOnlyMsg').style.display = '';
           document.getElementById('newQuoteTab').style.display = 'none';
-          // Activate Our Quotes tab by default for read-only users
-          document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-          document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-          const quotesTab = document.querySelector('[data-tab="our-quotes"]');
-          if (quotesTab) quotesTab.classList.add('active');
-          document.getElementById('tab-our-quotes').classList.add('active');
-          loadQuotes();
+          _activateTab('ourQuotesTab', 'tab-our-quotes', loadQuotes);
         } else {
-          // Pre-fetch everything in parallel so tabs load instantly
+          // Can create quotes — pre-fetch everything in parallel so tabs load instantly
           fetch('/api/quote-catalog',      { credentials: 'same-origin' }).catch(() => {});
           fetch('/api/portal/quotes', { credentials: 'same-origin' }).then(r=>r.ok?r.json():null).then(d=>{if(d)_quotesCache=d;}).catch(()=>{});
           fetch('/api/portal/orders', { credentials: 'same-origin' }).then(r=>r.ok?r.json():null).then(d=>{if(d)_ordersCache=d;}).catch(()=>{});
@@ -930,7 +946,9 @@
     const ROLE_LABELS = {
       admin:       'Admin',
       full_access: 'Full Access',
+      orders:      'Orders',
       quotes_only: 'Quotes Only',
+      invoices:    'Invoices',
       read_only:   'Read Only',
     };
 
@@ -1057,6 +1075,8 @@
                         style="border:1px solid var(--border);border-radius:5px;padding:5px 8px;font-size:0.82rem;font-family:'Lato',sans-serif;">
                   <option value="Read Only"  ${u.role==='read_only'?'selected':''}>Read Only</option>
                   <option value="Quotes Only" ${u.role==='quotes_only'?'selected':''}>Quotes Only</option>
+                  <option value="Orders"      ${u.role==='orders'?'selected':''}>Orders</option>
+                  <option value="Invoices"    ${u.role==='invoices'?'selected':''}>Invoices</option>
                   <option value="Full Access" ${u.role==='full_access'?'selected':''}>Full Access</option>
                 </select>
                 ${u.pendingSetup
