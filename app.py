@@ -5220,13 +5220,12 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
     BD    = (221, 227, 234)
 
     # ── Logo (top-left) ───────────────────────────────────────────────
-    LOGO_TOP       = 13.0   # mm from top of page
-    HEADER_BOTTOM  = 32.0   # all header elements (logo, address, quote#) align at this y
-    # Logo sized so its visual content (97.5% of pixel height) lands exactly at HEADER_BOTTOM
-    _LOGO_CONTENT_FRAC = 708 / 726   # fraction of image height that contains real content
-    _PIXEL_ASPECT      = 726 / 1600  # image height / width
-    _logo_h  = (HEADER_BOTTOM - LOGO_TOP) / _LOGO_CONTENT_FRAC  # rendered height in mm
-    LOGO_W   = _logo_h / _PIXEL_ASPECT                           # rendered width in mm
+    LOGO_TOP           = 13.0          # mm from top of page
+    LOGO_W             = 40.0          # fixed logo width in mm
+    _PIXEL_ASPECT      = 726 / 1600    # image h/w ratio (ba-logo-white-bg.jpg)
+    _LOGO_CONTENT_FRAC = 708 / 726     # fraction of image height containing real content
+    _logo_h            = LOGO_W * _PIXEL_ASPECT                    # rendered height in mm
+    HEADER_BOTTOM      = LOGO_TOP + _logo_h * _LOGO_CONTENT_FRAC   # visual logo bottom — anchor for all 3 elements
     # Prefer transparent PNG; fall back to JPG, then URL download, then text
     _static    = os.path.dirname(os.path.abspath(__file__))
     logo_url   = "https://www.bluealphabelts.com/wp-content/uploads/2024/04/logo-1.png"
@@ -5279,16 +5278,22 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
     right_x = 19 + W * 0.62
     right_w = W * 0.38
 
-    _doc_label = "SALES ORDER" if doc_type == "order" else "QUOTE"
-    pdf.set_xy(right_x, LOGO_TOP)
+    _doc_label   = "SALES ORDER" if doc_type == "order" else "QUOTE"
+    _num_cell_h  = 5.5
+    _quote_cell_h = 12.0
+    _quote_gap    = 1.0
+    # Pin both cells to HEADER_BOTTOM so they align with logo and address
+    _quote_start = HEADER_BOTTOM - _num_cell_h - _quote_gap - _quote_cell_h
+
+    pdf.set_xy(right_x, _quote_start)
     pdf.set_font("Helvetica", "B", 28)
     pdf.set_text_color(*NAVY)
-    pdf.cell(right_w, 12, _doc_label, align="R", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(right_w, _quote_cell_h, _doc_label, align="R", new_x="LMARGIN", new_y="NEXT")
 
-    pdf.set_xy(right_x, pdf.get_y() + 1)
+    pdf.set_xy(right_x, HEADER_BOTTOM - _num_cell_h)
     pdf.set_font("Helvetica", "B", 11)
     pdf.set_text_color(*NAVY)
-    pdf.cell(right_w, 6, f"#{q_number}", align="R", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(right_w, _num_cell_h, f"#{q_number}", align="R", new_x="LMARGIN", new_y="NEXT")
 
     # Move cursor below header block — everything bottoms out at 32mm, tight gap before divider
     pdf.set_y(HEADER_BOTTOM + 4)  # tight gap after aligned header
