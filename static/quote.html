@@ -1264,7 +1264,9 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredA
   // DEBUG: show what options were found
   let _dbgEl = document.getElementById('addondbg_' + parentId);
   if (!_dbgEl) { _dbgEl = document.createElement('div'); _dbgEl.id = 'addondbg_' + parentId; _dbgEl.style.cssText='font-size:11px;color:#c00;padding:2px 0'; addonRow.after(_dbgEl); }
-  _dbgEl.textContent = `[debug] ${addons.length} addon(s) found for color=${colorId.slice(-6)}: ${addons.map(([,n])=>n).join(', ')} | selected=${defaultVal.slice(-6)}`;
+  const _dbgParentSkus = catalog.skus.filter(s => s.parentId === parentId);
+  const _dbgColorSkus  = _dbgParentSkus.filter(s => s.colorId === colorId);
+  _dbgEl.innerHTML = `[debug] total skus=${catalog.skus.length} | for parent=${_dbgParentSkus.length} | for color=${_dbgColorSkus.length} | addons found=${addons.length}: ${addons.map(([,n])=>n).join(', ')}<br>color skus: ${_dbgColorSkus.map(s=>'addon='+s.addonName+'(sz='+s.sizeId+')').join(' / ')}`;
   const _descEl = document.getElementById('pdesc_' + parentId);
   if (_descEl) _descEl.classList.remove('hidden');
   // Trigger price update now that add-on value is set
