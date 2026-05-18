@@ -885,7 +885,8 @@ let   catalog     = null;
 let   catalogLoaded = false;
 let   editItems   = [];
 let   savedItems  = [];
-let   dirty       = false;
+let   dirty              = false;
+let   pendingAddSelection = false;  // true once Add button is visible but item not yet committed
 
 function markDirty() {
   dirty = true;
@@ -906,7 +907,7 @@ function revertChanges() {
 }
 
 window.addEventListener('beforeunload', e => {
-  if (dirty) {
+  if (dirty || pendingAddSelection) {
     e.preventDefault();
     e.returnValue = 'You have unsaved changes. Leave without saving?';
   }
@@ -1367,6 +1368,7 @@ let addItemOpen = false;
 async function toggleAddItem() {
   addItemOpen = !addItemOpen;
   document.getElementById('addItemPanel').classList.toggle('hidden', !addItemOpen);
+  if (!addItemOpen) pendingAddSelection = false;  // panel closed — no longer pending
   if (addItemOpen && !catalogLoaded) await loadCatalog();
 }
 
@@ -1484,6 +1486,7 @@ function vOnFvar(forcedFvarId) {
     document.getElementById('vAddonRow').classList.remove('hidden');
   }
   document.getElementById('vQtyAddRow').classList.remove('hidden');
+  pendingAddSelection = true;  // Add button is now visible — warn on refresh
 }
 
 function vResetFrom(level) {
@@ -1554,6 +1557,7 @@ function vDoAdd() {
   markDirty();
   renderItemsTable();
 
+  pendingAddSelection = false;  // item committed — clear pending flag
   document.getElementById('vProd').value = '';
   vResetFrom('color');
   document.getElementById('vQty').value = 1;
