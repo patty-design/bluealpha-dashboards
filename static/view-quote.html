@@ -1494,12 +1494,22 @@ function vOnFvar(forcedFvarId) {
       else hasBase = true;
     }
   }
-  const addons = Object.entries(addonMap).sort((a,b)=>a[1].localeCompare(b[1]));
+  // Sort: "None" first, then alphabetical
+  const addons = Object.entries(addonMap).sort((a,b)=>{
+    const an = a[1].toLowerCase(), bn = b[1].toLowerCase();
+    if (an === 'none') return -1;
+    if (bn === 'none') return 1;
+    return a[1].localeCompare(b[1]);
+  });
   if (addons.length > 1 || (addons.length > 0 && hasBase)) {
     // Multiple add-on choices (or base+addon) — show dropdown
     const addonSel = document.getElementById('vAddon');
     addonSel.innerHTML = hasBase ? '<option value="">No add-on</option>' : '';
     addons.forEach(([id,name])=>{ const o=document.createElement('option'); o.value=id; o.textContent=name; addonSel.appendChild(o); });
+    // Default to None (base or "None" add-on record)
+    const noneEntry = addons.find(([,name])=>name.toLowerCase()==='none');
+    if (hasBase) addonSel.value = '';
+    else if (noneEntry) addonSel.value = noneEntry[0];
     document.getElementById('vAddonRow').classList.remove('hidden');
   } else if (addons.length === 1) {
     // Only one add-on, no base — auto-select silently (no row needed)
