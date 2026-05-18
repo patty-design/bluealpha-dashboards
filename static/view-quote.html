@@ -1487,12 +1487,18 @@ function vOnFvar(forcedFvarId) {
       else hasBase = true;
     }
   }
-  const addons = Object.entries(addonMap);
-  if (addons.length > 0 && hasBase) {
+  const addons = Object.entries(addonMap).sort((a,b)=>a[1].localeCompare(b[1]));
+  if (addons.length > 1 || (addons.length > 0 && hasBase)) {
+    // Multiple add-on choices (or base+addon) — show dropdown
     const addonSel = document.getElementById('vAddon');
-    addonSel.innerHTML = '<option value="">No add-on</option>';
+    addonSel.innerHTML = hasBase ? '<option value="">No add-on</option>' : '';
     addons.forEach(([id,name])=>{ const o=document.createElement('option'); o.value=id; o.textContent=name; addonSel.appendChild(o); });
     document.getElementById('vAddonRow').classList.remove('hidden');
+  } else if (addons.length === 1) {
+    // Only one add-on, no base — auto-select silently (no row needed)
+    const addonSel = document.getElementById('vAddon');
+    addonSel.innerHTML = `<option value="${addons[0][0]}">${addons[0][1]}</option>`;
+    addonSel.value = addons[0][0];
   }
   document.getElementById('vQtyAddRow').classList.remove('hidden');
   window.pendingAddSelection = true;  // Add button is now visible — warn on refresh
@@ -1540,7 +1546,7 @@ function vDoAdd() {
     s.parentId===parentId && s.colorId===colorId &&
     (!sizeId || s.sizeId===sizeId) &&
     (!fvarId || s.featureVarId===fvarId) &&
-    (addonId ? s.addonId===addonId : !s.addonId)
+    (addonId ? s.addonId===addonId : (!s.addonId || !document.getElementById('vAddonRow') || document.getElementById('vAddonRow').classList.contains('hidden')))
   );
   if (!sku) { alert('Could not find matching product. Please check your selections.'); return; }
 
