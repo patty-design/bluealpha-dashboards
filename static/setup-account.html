@@ -40,10 +40,12 @@
                padding: 2px 4px; line-height: 1; color: var(--muted);
                user-select: none; -webkit-user-select: none; }
     .requirements { margin-top: 8px; font-size: 0.78rem; list-style: none; padding: 0; }
-    .requirements li { padding: 2px 0; color: var(--muted); display: flex; align-items: center; gap: 6px; }
-    .requirements li::before { content: '○'; font-size: 0.65rem; flex-shrink: 0; }
+    .requirements li { padding: 2px 0; color: #888; display: flex; align-items: center; gap: 6px; transition: color 0.2s; }
+    .requirements li::before { content: '○'; font-size: 0.65rem; flex-shrink: 0; transition: content 0.2s; }
     .requirements li.met { color: var(--green); }
     .requirements li.met::before { content: '✓'; }
+    .req-header { font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase;
+                  letter-spacing: 0.04em; margin-top: 10px; margin-bottom: 2px; }
     .btn { display: block; width: 100%; margin-top: 24px; padding: 13px;
            background: var(--navy); color: #fff; border: none; border-radius: 7px;
            font-family: 'Montserrat', sans-serif; font-size: 0.95rem; font-weight: 700;
@@ -69,10 +71,11 @@
     <div id="formWrap">
       <label for="username">Username</label>
       <input type="text" id="username" autocomplete="username" placeholder="e.g. jsmith" spellcheck="false"
-             oninput="this.value = this.value.toLowerCase()">
-      <ul class="requirements" id="unReqs">
+             oninput="this.value = this.value.toLowerCase(); checkPwReqs()">
+      <p class="req-header">Username requirements</p>
+      <ul class="requirements">
         <li id="req-un-len">3–32 characters</li>
-        <li id="req-un-chars">Letters, numbers, . _ - only (no spaces)</li>
+        <li id="req-un-chars">Lowercase letters, numbers, and . _ - only (no spaces)</li>
       </ul>
 
       <label for="password">Password</label>
@@ -81,7 +84,8 @@
                oninput="checkPwReqs()">
         <button type="button" class="eye-btn" onclick="togglePw('password', this)" tabindex="-1">👁️</button>
       </div>
-      <ul class="requirements" id="pwReqs">
+      <p class="req-header">Password requirements</p>
+      <ul class="requirements">
         <li id="req-len">At least 8 characters</li>
       </ul>
 

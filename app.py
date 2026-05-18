@@ -6201,6 +6201,31 @@ def setup_account_page(token):
     return send_from_directory("static", "setup-account.html")
 
 
+import re as _re
+
+# ── Portal credential requirements (enforced on both frontend and backend) ────
+_USERNAME_RE = _re.compile(r'^[a-z0-9._-]{3,32}$')
+
+def _validate_username(username: str):
+    """Returns error string or None if valid."""
+    if not username:
+        return "Username is required."
+    if not _USERNAME_RE.match(username):
+        if len(username) < 3:
+            return "Username must be at least 3 characters."
+        if len(username) > 32:
+            return "Username must be 32 characters or fewer."
+        return "Username may only contain lowercase letters, numbers, and . _ -"
+    return None
+
+def _validate_password(password: str):
+    """Returns error string or None if valid."""
+    if not password:
+        return "Password is required."
+    if len(password) < 8:
+        return "Password must be at least 8 characters."
+    return None
+
 @app.route("/api/portal/setup-account", methods=["POST"])
 def portal_setup_account():
     """Complete account setup: validate invite token, set username + password."""
@@ -6210,12 +6235,15 @@ def portal_setup_account():
     token    = (data.get("token") or "").strip()
     username = (data.get("username") or "").strip().lower()
     password = (data.get("password") or "").strip()
-    if not token or not username or not password:
-        return Response(json.dumps({"error": "token, username, and password are required"}),
+    if not token:
+        return Response(json.dumps({"error": "Invalid or missing invite token."}),
                         status=400, headers=c, mimetype="application/json")
-    if len(password) < 8:
-        return Response(json.dumps({"error": "Password must be at least 8 characters"}),
-                        status=400, headers=c, mimetype="application/json")
+    err = _validate_username(username)
+    if err:
+        return Response(json.dumps({"error": err}), status=400, headers=c, mimetype="application/json")
+    err = _validate_password(password)
+    if err:
+        return Response(json.dumps({"error": err}), status=400, headers=c, mimetype="application/json")
 
     read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
     write_token = APPLY_WRITE_TOKEN or RETURNS_WRITE_TOKEN
@@ -7637,8 +7665,9 @@ def portal_change_password():
     new_pw     = (data.get("newPassword") or "").strip()
     if not current_pw or not new_pw:
         return Response(json.dumps({"error": "currentPassword and newPassword are required"}), status=400, headers=c, mimetype="application/json")
-    if len(new_pw) < 8:
-        return Response(json.dumps({"error": "New password must be at least 8 characters"}), status=400, headers=c, mimetype="application/json")
+    err = _validate_password(new_pw)
+    if err:
+        return Response(json.dumps({"error": err}), status=400, headers=c, mimetype="application/json")
 
     # ── B2B customer path (ba_portal_session) ──────────────────────────────
     customer_user = get_portal_user(request)
