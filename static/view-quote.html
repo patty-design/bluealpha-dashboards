@@ -1401,8 +1401,11 @@ async function loadCatalog() {
       }
     }
   } catch(e) {
-    document.getElementById('addItemPanel').innerHTML =
-      '<p style="color:var(--red);font-size:0.9rem;">Failed to load catalog. Please refresh.</p>';
+    const prodSel = document.getElementById('vProd');
+    if (prodSel) {
+      prodSel.innerHTML = '<option value="">⚠ Catalog error — try again</option>';
+    }
+    catalogLoaded = false; // allow retry on next open
   }
 }
 
