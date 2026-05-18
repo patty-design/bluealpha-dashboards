@@ -1143,12 +1143,14 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredA
   let hasBase = false;
   const _dbgLoop = [];
   for (const sku of catalog.skus) {
-    if (sku.parentId === parentId && sku.colorId === colorId && sku.sizeId === sizeId &&
-        (featureVarId ? sku.featureVarId === featureVarId : true)) {
-      const _added = !!(sku.addonId && sku.addonName);
-      _dbgLoop.push(`addonId=${JSON.stringify(sku.addonId)} addonName=${JSON.stringify(sku.addonName)} → ${_added ? 'ADDED' : 'BASE'}`);
-      if (sku.addonId && sku.addonName) addonMap[sku.addonId] = sku.addonName;
-      else hasBase = true;
+    if (sku.parentId === parentId && sku.colorId === colorId) {
+      const _szMatch = sku.sizeId === sizeId;
+      const _fvMatch = featureVarId ? sku.featureVarId === featureVarId : true;
+      _dbgLoop.push(`sz=${JSON.stringify(sku.sizeId)}===${JSON.stringify(sizeId)}:${_szMatch} fv=${JSON.stringify(sku.featureVarId)}===${JSON.stringify(featureVarId)}:${_fvMatch} addon=${sku.addonName}`);
+      if (_szMatch && _fvMatch) {
+        if (sku.addonId && sku.addonName) addonMap[sku.addonId] = sku.addonName;
+        else hasBase = true;
+      }
     }
   }
 
