@@ -1260,6 +1260,7 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredA
     }
   }
   addonSel.value = defaultVal;
+  addonRow.classList.remove('hidden');
   const _descEl = document.getElementById('pdesc_' + parentId);
   if (_descEl) _descEl.classList.remove('hidden');
   // Trigger price update now that add-on value is set
