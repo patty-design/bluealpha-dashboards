@@ -5324,6 +5324,7 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
 
     # --- Quote / Order Details ---
     def meta_kv(label, value):
+        pdf.set_x(meta_x)
         pdf.set_font("Helvetica", "B", 7)
         pdf.set_text_color(*MUTED)
         pdf.cell(col3_w, 5, label.upper(), border=0, new_x="LEFT", new_y="NEXT")
@@ -5332,7 +5333,7 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
         pdf.set_text_color(*TEXT)
         pdf.cell(col3_w, 5, str(value), border=0, new_x="LEFT", new_y="NEXT")
         pdf.set_x(meta_x)
-        pdf.ln(1)
+        pdf.set_y(pdf.get_y() + 1)
 
     pdf.set_xy(meta_x, y_info)
     if doc_type == "order":
