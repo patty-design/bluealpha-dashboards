@@ -5470,7 +5470,6 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
         pdf.set_text_color(*TEXT)
         pdf.cell(25, 6, value, border=0, align="R", new_x="LMARGIN", new_y="NEXT")
 
-    totals_row("Subtotal", f"${subtotal:.2f}")
     if shipping > 0:
         totals_row("Shipping", f"${shipping:.2f}")
     y_rule = pdf.get_y()
