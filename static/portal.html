@@ -490,9 +490,9 @@
         const _vqFrame = document.getElementById('viewQuoteFrame');
         if (_vqPanel && _vqPanel.classList.contains('active') && _vqFrame && _vqFrame.contentWindow) {
           const _cw = _vqFrame.contentWindow;
-          if ((_cw.dirty || _cw.pendingAddSelection) &&
-              !confirm('You have unsaved changes. Leave this quote without saving?')) {
-            return;
+          if (_cw.dirty || _cw.pendingAddSelection) {
+            if (!confirm('You have unsaved changes. Leave this quote without saving?')) return;
+            _clearViewQuoteFlags();  // user confirmed — clear so no double-warning
           }
         }
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -1063,7 +1063,15 @@
 
   let _viewReturnTab = 'our-quotes';
 
+  function _clearViewQuoteFlags() {
+    const f = document.getElementById('viewQuoteFrame');
+    if (f && f.contentWindow) {
+      try { f.contentWindow.dirty = false; f.contentWindow.pendingAddSelection = false; } catch(_) {}
+    }
+  }
+
   function openViewQuote(recordId) {
+    _clearViewQuoteFlags();
     _viewReturnTab = 'our-quotes';
     document.getElementById('viewBackBtn').textContent = '← Back to Quotes';
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -1076,6 +1084,7 @@
   }
 
   function openViewOrder(recordId) {
+    _clearViewQuoteFlags();
     _viewReturnTab = 'our-orders';
     document.getElementById('viewBackBtn').textContent = '← Back to Orders';
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -1088,6 +1097,7 @@
   }
 
   function closeViewQuote() {
+    _clearViewQuoteFlags();
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.querySelector(`[data-tab="${_viewReturnTab}"]`).classList.add('active');
