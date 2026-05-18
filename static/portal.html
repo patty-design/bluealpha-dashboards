@@ -1224,11 +1224,11 @@
       <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:12px;">Profile</div>
       <div class="modal-field">
         <label>Contact Name</label>
-        <input type="text" id="profName" placeholder="Your name" autocomplete="name">
+        <input type="text" id="profName" placeholder="Your name" autocomplete="portal-contact-name">
       </div>
       <div class="modal-field">
         <label>Email Address</label>
-        <input type="email" id="profEmail" placeholder="your@email.com" autocomplete="email">
+        <input type="email" id="profEmail" placeholder="your@email.com" autocomplete="portal-contact-email">
       </div>
       <div class="modal-msg" id="profMsg"></div>
       <div class="modal-actions" style="margin-bottom:28px;">
@@ -1292,22 +1292,27 @@
     btn.textContent = show ? '🙈' : '👁';
   }
   async function openChangePw() {
-    // Reset password fields
+    // Fetch profile first, THEN open modal — prevents autofill from overwriting API data
+    let profName = '', profEmail = '';
+    try {
+      const res  = await fetch('/api/portal/profile');
+      const data = await res.json();
+      const p    = data.profile || {};
+      profName  = p.contactName || '';
+      profEmail = p.email       || '';
+    } catch (_) {}
+
+    // Reset all fields
     document.getElementById('cpCurrent').value = '';
     document.getElementById('cpNew').value     = '';
     document.getElementById('cpConfirm').value = '';
     ['cpMsg','profMsg'].forEach(id => { const el = document.getElementById(id); el.className = 'modal-msg'; el.textContent = ''; });
     document.getElementById('pwMatchMsg').style.display = 'none';
+
+    // Set profile fields then open — autofill can't fire before modal is visible
+    document.getElementById('profName').value  = profName;
+    document.getElementById('profEmail').value = profEmail;
     document.getElementById('changePwModal').classList.add('open');
-    // Load profile
-    try {
-      const res  = await fetch('/api/portal/profile');
-      const data = await res.json();
-      const p    = data.profile || {};
-      document.getElementById('profName').value  = p.contactName || '';
-      document.getElementById('profEmail').value = p.email       || '';
-    } catch (_) {}
-    setTimeout(() => document.getElementById('profName').focus(), 50);
   }
   function closeChangePw() {
     document.getElementById('changePwModal').classList.remove('open');
