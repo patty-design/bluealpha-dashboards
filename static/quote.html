@@ -489,6 +489,14 @@ if (window.self !== window.top) {
       <div class="card-title">Step 1 — Select Your Items</div>
       <div class="card-subtitle">Choose your options to add items to your quote.</div>
 
+      <!-- Product search -->
+      <div id="catalogSearchWrap" style="display:none;margin-bottom:12px;">
+        <input type="text" id="catalogSearch" placeholder="Search products…"
+          oninput="filterCatalog(this.value)"
+          style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:0.9rem;outline:none;box-sizing:border-box;"
+          onfocus="this.style.borderColor='var(--navy)'" onblur="this.style.borderColor='var(--border)'">
+      </div>
+
       <!-- Category accordion -->
       <div class="catalog-section-wrap" id="catalogWrap">
         <div class="catalog-loading">Loading products…</div>
@@ -640,6 +648,7 @@ let activeParent = null;   // currently-expanded parent product id
       }
       catalog = data;
       buildCatalogUI();
+      document.getElementById('catalogSearchWrap').style.display = '';
       return;
     } catch (e) {
       wrap.innerHTML = `<div class="message message-error show"><strong>Catalog unavailable.</strong> Please try refreshing. If the issue persists, contact us at info@bluealpha.us</div>`;
@@ -817,6 +826,47 @@ function buildCatalogUI() {
     `;
     wrap.appendChild(section);
   }
+}
+
+function filterCatalog(query) {
+  const q = query.trim().toLowerCase();
+  const wrap = document.getElementById('catalogWrap');
+  const sections = wrap.querySelectorAll('.cat-section');
+  sections.forEach(section => {
+    const items = section.querySelectorAll('.product-item');
+    let visibleCount = 0;
+    items.forEach(item => {
+      const name = (item.querySelector('.product-row span')?.textContent || '').toLowerCase();
+      const match = !q || name.includes(q);
+      item.style.display = match ? '' : 'none';
+      if (match) visibleCount++;
+    });
+    // Show/expand section if any products match; hide if none
+    if (!q) {
+      section.style.display = '';
+      const header = section.querySelector('.cat-header');
+      const body   = section.querySelector('.cat-body');
+      // Restore original collapsed state (only if we opened it for search)
+      if (section.dataset.searchExpanded) {
+        header.classList.remove('open');
+        body.classList.remove('open');
+        section.classList.remove('expanded');
+        delete section.dataset.searchExpanded;
+      }
+    } else if (visibleCount === 0) {
+      section.style.display = 'none';
+    } else {
+      section.style.display = '';
+      const header = section.querySelector('.cat-header');
+      const body   = section.querySelector('.cat-body');
+      if (!header.classList.contains('open')) {
+        section.dataset.searchExpanded = '1';
+        header.classList.add('open');
+        body.classList.add('open');
+        section.classList.add('expanded');
+      }
+    }
+  });
 }
 
 function toggleCat(header) {
