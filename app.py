@@ -141,6 +141,31 @@ def version():
         "cs_pw_set": bool(CS_ADMIN_PASSWORD),
     }), mimetype="application/json")
 
+@app.route("/_ss_test")
+def ss_test():
+    """Quick ShipStation connectivity test — returns HTTP status + response time."""
+    import time as _time
+    t0 = _time.time()
+    try:
+        r = req_lib.get("https://ssapi.shipstation.com/orders",
+                        params={"orderNumber": "0", "pageSize": 1},
+                        headers=ss_headers(), timeout=15)
+        elapsed = _time.time() - t0
+        try:
+            body = r.json()
+        except Exception:
+            body = r.text[:200]
+        return Response(json.dumps({
+            "http_status": r.status_code,
+            "elapsed_s": round(elapsed, 2),
+            "ss_key_prefix": SHIPSTATION_KEY[:8] if SHIPSTATION_KEY else "(empty)",
+            "body_preview": str(body)[:200],
+        }), mimetype="application/json")
+    except Exception as e:
+        elapsed = _time.time() - t0
+        return Response(json.dumps({"error": str(e), "elapsed_s": round(elapsed, 2)}),
+                        status=500, mimetype="application/json")
+
 @app.route("/static/<path:filename>")
 def serve_static(filename):
     return send_from_directory("static", filename)
