@@ -352,6 +352,11 @@
   <div id="step-2" class="card hidden">
     <div class="card-title">Step 2 — Select Items to Return</div>
     <div class="items-list" id="items-list"></div>
+    <div class="message message-warning hidden" id="msg-med-notice">
+      <strong>⚠ Return Policy — Medical Items</strong>
+      <span id="med-notice-comp" style="display:none;">Medical Components kits can only be returned if the complete package is unopened.</span>
+      <span id="med-notice-tq" style="display:none;">Tourniquets can only be returned if the shrink wrap is unopened.</span>
+    </div>
     <div class="message message-error hidden" id="msg-no-selection">Please select at least one item to return.</div>
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="goBack(1)">Back</button>
@@ -520,10 +525,31 @@ document.getElementById('last-name').addEventListener('keydown', e => { if (e.ke
 document.getElementById('email-verify').addEventListener('keydown', e => { if (e.key === 'Enter') verifyOrder(); });
 
 // ── Step 2: Items ──
+// ── Medical item SKU detection ─────────────────────────────────────────────
+// Show notice whenever any order item is a medical product:
+//   MED-* = medical kit (may include components kit and/or tourniquet)
+//   MMP-* = medical mag pouch kits
+//   BAG-3850 through BAG-3855 = medical bag products
+function isMedSku(sku) {
+  if (!sku) return false;
+  const s = sku.toUpperCase();
+  return s.startsWith('MED-') || s.startsWith('MMP-') ||
+         /^BAG-385[0-5](-|$)/.test(s);
+}
+
+function checkMedNotice(items) {
+  const hasMed = (items || []).some(item => isMedSku(item.sku));
+  const banner = document.getElementById('msg-med-notice');
+  document.getElementById('med-notice-comp').style.display = hasMed ? 'block' : 'none';
+  document.getElementById('med-notice-tq').style.display   = hasMed ? 'block' : 'none';
+  banner.classList.toggle('hidden', !hasMed);
+}
+
 function buildItemsList(items, alreadyReturnedQtys) {
   const list = document.getElementById('items-list');
   list.innerHTML = '';
   const returnedQtys = alreadyReturnedQtys || {};
+  checkMedNotice(items);
 
   items.forEach((item, idx) => {
     const returnedQty = returnedQtys[item.sku] || 0;
