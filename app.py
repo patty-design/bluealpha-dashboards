@@ -9441,16 +9441,21 @@ def portal_admin_convert_to_invoice(user, record_id):
             price = confirmed_price if confirmed_price is not None else (float(adj_list[0]) if adj_list else 0)
             email_line_items.append({"name": product_name, "qty": qty, "unit_price": price, "_li_fields": lf})
 
-        # Create Invoice record
-        inv_body = {
-            "fields": {
-                "Order Type":         "Invoice",
-                "Order ID":           order_id_str,
-                "Date":               _today_utc().isoformat(),
-                "Sales Order Status": "Approved",
-                # Note: "Ready for ShipStation (SOs)" is a computed field — do not write it
-            }
+        # Create Invoice record — carry snapshot billing/shipping fields from SO
+        inv_fields = {
+            "Order Type":         "Invoice",
+            "Order ID":           order_id_str,
+            "Date":               _today_utc().isoformat(),
+            "Sales Order Status": "Approved",
+            # Note: "Ready for ShipStation (SOs)" is a computed field — do not write it
         }
+        # Copy snapshot fields so invoice shows correct billing/shipping regardless of
+        # future customer record changes
+        for _sf in ("Snapshot Org", "Snapshot Contact", "Snapshot Email",
+                    "Snapshot Phone", "Snapshot Addr 1", "Snapshot Addr 2"):
+            if so_fields.get(_sf):
+                inv_fields[_sf] = so_fields[_sf]
+        inv_body = {"fields": inv_fields}
         if customer_ids:
             inv_body["fields"]["Customer"] = customer_ids
         if po_number:
@@ -9975,16 +9980,19 @@ def admin_convert_to_invoice(record_id):
         all_li_ids = so_fields.get("MO Line Items", [])
         li_ids_to_copy = [lid for lid in all_li_ids if selected_items is None or lid in selected_items]
 
-        # Create Invoice record
-        inv_body = {
-            "fields": {
-                "Order Type":         "Invoice",
-                "Order ID":           order_id_str,
-                "Date":               _today_utc().isoformat(),
-                "Sales Order Status": "Approved",
-                # Note: "Ready for ShipStation (SOs)" is a computed field — do not write it
-            }
+        # Create Invoice record — carry snapshot billing/shipping fields from SO
+        inv_fields = {
+            "Order Type":         "Invoice",
+            "Order ID":           order_id_str,
+            "Date":               _today_utc().isoformat(),
+            "Sales Order Status": "Approved",
+            # Note: "Ready for ShipStation (SOs)" is a computed field — do not write it
         }
+        for _sf in ("Snapshot Org", "Snapshot Contact", "Snapshot Email",
+                    "Snapshot Phone", "Snapshot Addr 1", "Snapshot Addr 2"):
+            if so_fields.get(_sf):
+                inv_fields[_sf] = so_fields[_sf]
+        inv_body = {"fields": inv_fields}
         if customer_ids:
             inv_body["fields"]["Customer"] = customer_ids
         if po_number:
