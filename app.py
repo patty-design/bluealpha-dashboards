@@ -5888,6 +5888,25 @@ def _build_invoice_pdf_bytes(inv):
             pdf.set_font("Helvetica", "B" if ln == ship_org else "", 8)
             pdf.set_text_color(*TEXT)
             pdf.cell(col3_w, 5, ln, border=0, new_x="LEFT", new_y="NEXT")
+    # Ship Date + Tracking directly below Ship To address
+    if ship_date:
+        pdf.set_x(ship_x)
+        pdf.set_font("Helvetica", "B", 7)
+        pdf.set_text_color(*MUTED)
+        pdf.cell(col3_w, 5.5, "SHIP DATE", border=0, new_x="LEFT", new_y="NEXT")
+        pdf.set_x(ship_x)
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*TEXT)
+        pdf.cell(col3_w, 5, _fmt_date(ship_date), border=0, new_x="LEFT", new_y="NEXT")
+    if tracking:
+        pdf.set_x(ship_x)
+        pdf.set_font("Helvetica", "B", 7)
+        pdf.set_text_color(*MUTED)
+        pdf.cell(col3_w, 5.5, "TRACKING #", border=0, new_x="LEFT", new_y="NEXT")
+        pdf.set_x(ship_x)
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*TEXT)
+        pdf.cell(col3_w, 5, tracking, border=0, new_x="LEFT", new_y="NEXT")
     y_after_ship = pdf.get_y()
 
     # --- Invoice Details ---
@@ -5904,17 +5923,14 @@ def _build_invoice_pdf_bytes(inv):
         pdf.set_y(pdf.get_y() + 1)
 
     pdf.set_xy(meta_x, y_info)
-    meta_kv("Invoice #",    inv_number)
+    # Invoice # is in the header — skip it here
     if so_number:
         meta_kv("Sales Order #", so_number)
     meta_kv("Invoice Date", _fmt_date(date_str))
     meta_kv("Due Date",     _due_date(date_str))
     if po_number:
         meta_kv("PO #", po_number)
-    if ship_date:
-        meta_kv("Ship Date", _fmt_date(ship_date))
-    if tracking:
-        meta_kv("Tracking #", tracking)
+    # Ship Date + Tracking moved to Ship To column — not repeated here
     y_after_meta = pdf.get_y()
 
     pdf.set_y(max(y_after_bill, y_after_ship, y_after_meta) + 4)
