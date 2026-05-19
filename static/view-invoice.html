@@ -562,7 +562,7 @@ function render(inv) {
 
   // Invoice Details
   let detHTML = '';
-  detHTML += metaKV('Invoice #', escHtml(inv.invNumber || '—'));
+  // Invoice # is in the header — not repeated in details column
   if (inv.soNumber) detHTML += metaKV('Sales Order #', escHtml(inv.soNumber));
   detHTML += metaKV('Invoice Date', fmtDate(inv.date));
   detHTML += metaKV('Due Date', dueDateStr(inv.date));
