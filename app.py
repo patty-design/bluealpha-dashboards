@@ -5461,9 +5461,7 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
 
     pdf.set_xy(meta_x, y_info)
     if doc_type == "order":
-        meta_kv("Order Number", q_number)
         meta_kv("Order Date",   q_date)
-        meta_kv("Terms",        "Net 30")
         if q_po:
             meta_kv("PO #", q_po)
     else:
