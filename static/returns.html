@@ -352,7 +352,7 @@
   <div id="step-2" class="card hidden">
     <div class="card-title">Step 2 — Select Items to Return</div>
     <div class="items-list" id="items-list"></div>
-    <div class="message message-warning hidden" id="msg-med-notice">
+    <div class="message message-warning" id="msg-med-notice">
       <strong>⚠ Return Policy — Medical Items</strong>
       <span id="med-notice-comp" style="display:none;">Medical Components kits can only be returned if the complete package is unopened.</span>
       <span id="med-notice-tq" style="display:none;">Tourniquets can only be returned if the shrink wrap is unopened.</span>
@@ -542,7 +542,7 @@ function checkMedNotice(items) {
   const banner = document.getElementById('msg-med-notice');
   document.getElementById('med-notice-comp').style.display = hasMed ? 'block' : 'none';
   document.getElementById('med-notice-tq').style.display   = hasMed ? 'block' : 'none';
-  banner.classList.toggle('hidden', !hasMed);
+  banner.classList.toggle('show', hasMed);
 }
 
 function buildItemsList(items, alreadyReturnedQtys) {
