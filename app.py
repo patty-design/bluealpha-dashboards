@@ -4140,12 +4140,40 @@ def _fetch_quote_data(record_id):
     # Fetch customer record as fallback for older quotes that pre-date snapshot fields
     customer_ids = fields.get("Customer", [])
     customer = {}
+
+    # Fetch line items concurrently with customer fetch
+    li_record_ids = fields.get("MO Line Items", [])
+    line_items = []
+
+    import concurrent.futures as _cf
+    def _fetch_li_full(li_id):
+        try:
+            r2 = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+                headers=at_headers(token), timeout=15,
+            )
+            if r2.status_code == 200:
+                return li_id, r2.json()
+        except Exception:
+            pass
+        return li_id, None
+
+    _fut_customer = None
+    with _cf.ThreadPoolExecutor(max_workers=21) as _ex:
+        if customer_ids:
+            _fut_customer = _ex.submit(
+                req_lib.get,
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_ids[0]}",
+                headers=at_headers(token),
+                timeout=15,
+            )
+        if li_record_ids:
+            _results = list(_ex.map(_fetch_li_full, li_record_ids))
+        else:
+            _results = []
+
     if customer_ids:
-        cr = req_lib.get(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_ids[0]}",
-            headers=at_headers(token),
-            timeout=15,
-        )
+        cr = _fut_customer.result()
         if cr.status_code == 200:
             cf = cr.json().get("fields", {})
             customer = {
@@ -4177,24 +4205,7 @@ def _fetch_quote_data(record_id):
             "billToAddr1": _snap_addr1,  "billToAddr2": _snap_addr2,
         }
 
-    # Fetch line items in parallel
-    li_record_ids = fields.get("MO Line Items", [])
-    line_items = []
     if li_record_ids:
-        import concurrent.futures as _cf
-        def _fetch_li_full(li_id):
-            try:
-                r2 = req_lib.get(
-                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
-                    headers=at_headers(token), timeout=15,
-                )
-                if r2.status_code == 200:
-                    return li_id, r2.json()
-            except Exception:
-                pass
-            return li_id, None
-        with _cf.ThreadPoolExecutor(max_workers=20) as _ex:
-            _results = list(_ex.map(_fetch_li_full, li_record_ids))
         _results_map = {li_id: data for li_id, data in _results if data}
         for li_id in li_record_ids:
             li = _results_map.get(li_id)
@@ -6846,18 +6857,20 @@ def portal_orders(user):
 
     try:
         read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-        # Fetch all SOs then filter in Python (ARRAYJOIN formula returns display names not record IDs)
-        records = at_get_all(
-            MANUAL_ORDERS_TABLE_ID, read_token,
-            fields=["Document ID", "Order ID", "Date", "MO Line Items", "Customer", "Sales Order Status", "Go-to PDF"],
-            formula='{Order Type}="Sales Order"',
-        )
-        # Fetch tracking from Sales Order Tracking table (including split orders)
-        tracking_recs = at_get_all(
-            _SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
-            fields=["Order #", "Tracking #", "Base Order #"],
-            base_id=_SO_TRACKING_BASE,
-        )
+        # Fetch all SOs and tracking in parallel
+        with _cf.ThreadPoolExecutor(max_workers=2) as _ex_po:
+            _fut_records  = _ex_po.submit(at_get_all,
+                MANUAL_ORDERS_TABLE_ID, read_token,
+                fields=["Document ID", "Order ID", "Date", "MO Line Items", "Customer", "Sales Order Status", "Go-to PDF"],
+                formula='{Order Type}="Sales Order"',
+            )
+            _fut_tracking = _ex_po.submit(at_get_all,
+                _SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
+                fields=["Order #", "Tracking #", "Base Order #"],
+                base_id=_SO_TRACKING_BASE,
+            )
+        records       = _fut_records.result()
+        tracking_recs = _fut_tracking.result()
         tracking_map      = {}  # so_number → main tracking
         split_tracking_map = {}  # so_number → list of {split_num, tracking}
         for r in tracking_recs:
@@ -9696,21 +9709,9 @@ def invoice_detail(record_id):
         ship_addr1  = _first(fields.get("Customer Address (Line 1) (from Customer)", []))
         ship_addr2  = _first(fields.get("Customer Address (Line 2) (from Customer)", [])) or ship_csz
 
-        # Get tracking + ship date from SO Tracking table
+        # Get tracking + ship date and line items in parallel
         tracking  = ""
         ship_date = ""
-        tracking_recs = at_get_all(
-            _SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
-            fields=["Order #", "Tracking #", "Ship Date"],
-            base_id=_SO_TRACKING_BASE,
-        )
-        for tr in tracking_recs:
-            if tr.get("fields", {}).get("Order #", "").strip() == so_number:
-                tracking  = tr["fields"].get("Tracking #", "")
-                ship_date = tr["fields"].get("Ship Date", "")
-                break
-
-        # Fetch line items
         li_ids = fields.get("MO Line Items", [])
         import concurrent.futures as _cf_inv
         def _fetch_inv_li(li_id):
@@ -9724,8 +9725,19 @@ def invoice_detail(record_id):
             except Exception:
                 pass
             return li_id, None
-        with _cf_inv.ThreadPoolExecutor(max_workers=10) as _ex_inv:
+        with _cf_inv.ThreadPoolExecutor(max_workers=11) as _ex_inv:
+            _fut_tracking_inv = _ex_inv.submit(at_get_all,
+                _SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
+                fields=["Order #", "Tracking #", "Ship Date"],
+                base_id=_SO_TRACKING_BASE,
+            )
             _li_results = list(_ex_inv.map(_fetch_inv_li, li_ids))
+        tracking_recs = _fut_tracking_inv.result()
+        for tr in tracking_recs:
+            if tr.get("fields", {}).get("Order #", "").strip() == so_number:
+                tracking  = tr["fields"].get("Tracking #", "")
+                ship_date = tr["fields"].get("Ship Date", "")
+                break
 
         line_items = []
         for li_id, li_data in _li_results:
