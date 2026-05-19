@@ -5028,6 +5028,7 @@ def accept_quote(record_id):
     data = request.get_json() or {}
     billing      = data.get("billing") or {}
     shipping_obj = data.get("shipping")  # may be None (same as billing)
+    po_override  = (data.get("poNumber") or "").strip()  # optional PO # submitted from modal
 
     try:
         # Fetch MO record
@@ -5060,7 +5061,7 @@ def accept_quote(record_id):
         so_number    = f"SO-{order_id_str}"
         customer_ids = mo_fields.get("Customer", [])
         customer_id  = customer_ids[0] if customer_ids else None
-        po_number    = mo_fields.get("Purchase Order #", "")
+        po_number    = po_override or mo_fields.get("Purchase Order #", "")
         notes        = mo_fields.get("Notes from Customer", "")
         date_str     = mo_fields.get("Date", _today_utc().isoformat())
 

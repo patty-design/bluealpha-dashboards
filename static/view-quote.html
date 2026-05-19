@@ -872,6 +872,15 @@ if (window.self !== window.top) {
     <!-- Quote summary -->
     <div id="modalSummary" style="background:var(--light);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:0.875rem;"></div>
 
+    <!-- Optional PO Number -->
+    <div style="margin-bottom:16px;">
+      <label for="modalPoNumber" style="display:block;font-size:0.82rem;font-weight:600;color:var(--muted);margin-bottom:6px;">Purchase Order # <span style="font-weight:400;">(optional)</span></label>
+      <input type="text" id="modalPoNumber" placeholder="e.g. PO-12345"
+             pattern="[A-Za-z0-9\.\-]*"
+             style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;color:var(--text);"
+             oninput="this.value=this.value.replace(/[^A-Za-z0-9.\-]/g,'')">
+    </div>
+
     <!-- Terms checkbox -->
     <div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:20px;background:#f9f9f7;">
       <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
@@ -1730,17 +1739,23 @@ function openModal() {
   document.getElementById('acceptModal').classList.remove('hidden');
 }
 
-function closeModal() { document.getElementById('acceptModal').classList.add('hidden'); }
+function closeModal() {
+  document.getElementById('acceptModal').classList.add('hidden');
+  document.getElementById('modalPoNumber').value = '';
+  document.getElementById('termsCheckbox').checked = false;
+  document.getElementById('btnConfirmOrder').disabled = true;
+}
 
 async function confirmOrder() {
   const btn = document.getElementById('btnConfirmOrder');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner-sm"></span>Placing Order\u2026';
+  const poNumber = (document.getElementById('modalPoNumber').value || '').trim();
   try {
     const r = await fetch(`/api/accept-quote/${recordId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
+      body: JSON.stringify(poNumber ? { poNumber } : {}),
     });
     const data = await r.json();
     if (!r.ok || !data.success) throw new Error(data.error || 'Failed to accept');
