@@ -917,6 +917,8 @@ def cs_lookup_order():
     if not order_number:
         return Response(json.dumps({"status": "not_found"}), headers=c, mimetype="application/json")
 
+    mode = data.get("mode", "").strip()  # 'missing' | 'incorrect' | '' (default)
+
     try:
         # Fetch order — no eligibility check, just pull the data
         r = req_lib.get("https://ssapi.shipstation.com/orders",
@@ -941,31 +943,33 @@ def cs_lookup_order():
                  for i in order.get("items", []) if is_returnable_item(i)]
 
         # Remove already-cancelled items/quantities from this form's previous submissions
-        try:
-            formula = f"AND({{Order Number}}='{order_number}',{{Type}}='Cancellation')"
-            ac_r = req_lib.get(
-                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
-                params={"filterByFormula": formula, "fields[]": ["Items to Return"]},
-                headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
-                timeout=10,
-            )
-            already_cancelled = {}
-            for rec in ac_r.json().get("records", []):
-                items_text = rec.get("fields", {}).get("Items to Return", "")
-                for line in items_text.split("\n"):
-                    m = re.match(r'(\d+)x\s+(\S+)\s+[—\-]', line.strip())
-                    if m:
-                        already_cancelled[m.group(2).strip()] = \
-                            already_cancelled.get(m.group(2).strip(), 0) + int(m.group(1))
-            if already_cancelled:
-                adjusted = []
-                for item in items:
-                    remaining = item["quantity"] - already_cancelled.get(item["sku"], 0)
-                    if remaining > 0:
-                        adjusted.append({**item, "quantity": remaining})
-                items = adjusted
-        except Exception:
-            pass  # Don't block lookup if this check fails
+        # (skipped for missing/incorrect modes)
+        if mode not in ("missing", "incorrect"):
+            try:
+                formula = f"AND({{Order Number}}='{order_number}',{{Type}}='Cancellation')"
+                ac_r = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
+                    params={"filterByFormula": formula, "fields[]": ["Items to Return"]},
+                    headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
+                    timeout=10,
+                )
+                already_cancelled = {}
+                for rec in ac_r.json().get("records", []):
+                    items_text = rec.get("fields", {}).get("Items to Return", "")
+                    for line in items_text.split("\n"):
+                        m = re.match(r'(\d+)x\s+(\S+)\s+[—\-]', line.strip())
+                        if m:
+                            already_cancelled[m.group(2).strip()] = \
+                                already_cancelled.get(m.group(2).strip(), 0) + int(m.group(1))
+                if already_cancelled:
+                    adjusted = []
+                    for item in items:
+                        remaining = item["quantity"] - already_cancelled.get(item["sku"], 0)
+                        if remaining > 0:
+                            adjusted.append({**item, "quantity": remaining})
+                    items = adjusted
+            except Exception:
+                pass  # Don't block lookup if this check fails
 
         # Get ship date from shipments
         sr = req_lib.get("https://ssapi.shipstation.com/shipments",
@@ -977,46 +981,74 @@ def cs_lookup_order():
         tracking_number  = active_shipments[0].get("trackingNumber", "") if active_shipments else ""
         carrier_code     = active_shipments[0].get("carrierCode", "") if active_shipments else ""
 
+        # Missing/incorrect modes: order MUST have shipped
+        if mode in ("missing", "incorrect") and not active_shipments:
+            return Response(json.dumps({"status": "not_shipped"}), headers=c, mimetype="application/json")
+
         phone = (ship_to.get("phone") or (order.get("billTo") or {}).get("phone") or "")
 
         # Build already-returned qty map so CS portal can gray out items
+        # (skipped for missing/incorrect modes)
         cs_already_returned = {}
-        _cs_read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-        if RETURNS_TABLE_ID and _cs_read_token:
+        if mode not in ("missing", "incorrect"):
+            _cs_read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+            if RETURNS_TABLE_ID and _cs_read_token:
+                try:
+                    _cs_ar_formula = (f"AND({{Order Number}}='{order_number}'"
+                                      f",OR({{Status}}='New',{{Status}}='Label Sent',"
+                                      f"{{Status}}='Items Received',{{Status}}='Partial Received',"
+                                      f"{{Status}}='Refunded'),{{Type}}='Return')")
+                    _cs_ar_resp = req_lib.get(
+                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
+                        params={"filterByFormula": _cs_ar_formula, "fields[]": ["Items to Return"], "maxRecords": 20},
+                        headers={"Authorization": f"Bearer {_cs_read_token}"},
+                        timeout=10,
+                    )
+                    for _rec in _cs_ar_resp.json().get("records", []):
+                        for _line in _rec.get("fields", {}).get("Items to Return", "").split("\n"):
+                            _m = re.match(r'(\d+)x\s+(\S+)\s+[—\-]', _line.strip())
+                            if _m:
+                                _sku = _m.group(2).strip()
+                                cs_already_returned[_sku] = cs_already_returned.get(_sku, 0) + int(_m.group(1))
+                except Exception:
+                    pass
+
+        # Check for existing UPS Shipping Refund request for this order
+        # (skipped for missing/incorrect modes)
+        existing_shipping_refund = False
+        if mode not in ("missing", "incorrect"):
             try:
-                _cs_ar_formula = (f"AND({{Order Number}}='{order_number}'"
-                                  f",OR({{Status}}='New',{{Status}}='Label Sent',"
-                                  f"{{Status}}='Items Received',{{Status}}='Partial Received',"
-                                  f"{{Status}}='Refunded'),{{Type}}='Return')")
-                _cs_ar_resp = req_lib.get(
+                _sr_r = req_lib.get(
                     f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
-                    params={"filterByFormula": _cs_ar_formula, "fields[]": ["Items to Return"], "maxRecords": 20},
-                    headers={"Authorization": f"Bearer {_cs_read_token}"},
+                    params={"filterByFormula": f"AND({{Order Number}}='{order_number}',{{Type}}='UPS Shipping Refund')",
+                            "maxRecords": 1, "fields[]": ["Order Number"]},
+                    headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
                     timeout=10,
                 )
-                for _rec in _cs_ar_resp.json().get("records", []):
-                    for _line in _rec.get("fields", {}).get("Items to Return", "").split("\n"):
-                        _m = re.match(r'(\d+)x\s+(\S+)\s+[—\-]', _line.strip())
-                        if _m:
-                            _sku = _m.group(2).strip()
-                            cs_already_returned[_sku] = cs_already_returned.get(_sku, 0) + int(_m.group(1))
+                if _sr_r.status_code == 200 and _sr_r.json().get("records"):
+                    existing_shipping_refund = True
             except Exception:
                 pass
 
-        # Check for existing UPS Shipping Refund request for this order
-        existing_shipping_refund = False
-        try:
-            _sr_r = req_lib.get(
-                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}",
-                params={"filterByFormula": f"AND({{Order Number}}='{order_number}',{{Type}}='UPS Shipping Refund')",
-                        "maxRecords": 1, "fields[]": ["Order Number"]},
-                headers={"Authorization": f"Bearer {RETURNS_WRITE_TOKEN}"},
-                timeout=10,
-            )
-            if _sr_r.status_code == 200 and _sr_r.json().get("records"):
-                existing_shipping_refund = True
-        except Exception:
-            pass
+        # Build orderGroups (combo expansion) for missing/incorrect modes
+        order_groups = []
+        if mode in ("missing", "incorrect"):
+            for item in items:
+                sku  = item["sku"]
+                name = item["name"]
+                qty  = item["quantity"]
+                expanded = expand_sku_to_leaf_items(sku, qty)
+                is_combo = not (len(expanded) == 1 and expanded[0][1] == sku)
+                order_groups.append({
+                    "originalSku":  sku,
+                    "originalName": name,
+                    "originalQty":  qty,
+                    "isCombo":      is_combo,
+                    "components": [
+                        {"sku": c[1], "name": c[0], "qty": c[2]}
+                        for c in expanded
+                    ],
+                })
 
         return Response(json.dumps({
             "status":               "found",
@@ -1038,6 +1070,7 @@ def cs_lookup_order():
                 "postalCode": ship_to.get("postalCode", ""),
             },
             "items":                items,
+            "orderGroups":          order_groups,
             "alreadyReturnedQtys":  cs_already_returned,
             "shippingAmount":       float(order.get("shippingAmount") or 0),
             "existingShippingRefund": existing_shipping_refund,
@@ -1047,6 +1080,139 @@ def cs_lookup_order():
         print(f"[cs_lookup_order] Exception: {e}")
         return Response(json.dumps({"status": "error", "error": str(e)}),
                         status=500, headers=c, mimetype="application/json")
+
+
+def _cs_reship_submit(mode, data, c):
+    """Shared logic for cs-missing-submit and cs-incorrect-submit."""
+    from datetime import datetime, timezone
+    if not CS_ADMIN_PASSWORD or data.get("password", "") != CS_ADMIN_PASSWORD:
+        return Response(json.dumps({"status": "unauthorized"}), status=401, headers=c, mimetype="application/json")
+
+    order_number   = str(data.get("orderNumber", "")).strip()
+    order_id       = data.get("orderId")
+    customer_email = data.get("customerEmail", "")
+    address        = data.get("address", {})
+    selected_items = data.get("selectedItems", [])
+
+    if not order_number or not selected_items:
+        return Response(json.dumps({"status": "error", "error": "Missing required fields"}),
+                        status=400, headers=c, mimetype="application/json")
+
+    suffix_base = "-M" if mode == "missing" else "-I"
+    store_name_fragment = "missing items" if mode == "missing" else "incorrect item sent"
+    internal_note = (f"Missing items reshipment of order {order_number}"
+                     if mode == "missing"
+                     else f"Incorrect item reshipment of order {order_number}")
+
+    try:
+        # 1. Find next available order number suffix
+        new_order_number = order_number + suffix_base
+        suffix_counter   = 2
+        while True:
+            chk = req_lib.get("https://ssapi.shipstation.com/orders",
+                              params={"orderNumber": new_order_number},
+                              headers=ss_headers(), timeout=10)
+            if not chk.json().get("orders"):
+                break
+            new_order_number = f"{order_number}{suffix_base}{suffix_counter}"
+            suffix_counter += 1
+            if suffix_counter > 20:
+                break  # safety valve
+
+        # 2. Look up store ID
+        stores_r = req_lib.get("https://ssapi.shipstation.com/stores", headers=ss_headers(), timeout=10)
+        missing_store_id = None
+        for store in stores_r.json():
+            if store_name_fragment in (store.get("storeName") or "").lower():
+                missing_store_id = store.get("storeId")
+                break
+
+        # 3. Create ShipStation order
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        order_payload = {
+            "orderNumber":    new_order_number,
+            "orderDate":      now_str,
+            "paymentDate":    now_str,
+            "orderStatus":    "awaiting_shipment",
+            "amountPaid":     0,
+            "taxAmount":      0,
+            "shippingAmount": 0,
+            "internalNotes":  internal_note,
+            "customerEmail":  customer_email,
+            "shipTo": {
+                "name":        address.get("name", ""),
+                "street1":     address.get("street1", ""),
+                "street2":     address.get("street2", ""),
+                "city":        address.get("city", ""),
+                "state":       address.get("state", ""),
+                "postalCode":  address.get("postalCode", ""),
+                "country":     "US",
+                "residential": True,
+            },
+            "billTo": {
+                "name":       address.get("name", ""),
+                "street1":    address.get("street1", ""),
+                "city":       address.get("city", ""),
+                "state":      address.get("state", ""),
+                "postalCode": address.get("postalCode", ""),
+                "country":    "US",
+            },
+            "items": [
+                {"sku": i["sku"], "name": i["name"], "quantity": int(i["qty"]), "unitPrice": 0}
+                for i in selected_items
+            ],
+            "carrierCode":  "stamps_com",
+            "serviceCode":  "usps_ground_advantage",
+            "packageCode":  "package",
+            "confirmation": "delivery",
+            "weight":       {"value": 8, "units": "ounces"},
+            "dimensions":   {"units": "inches", "length": 8, "width": 8, "height": 2},
+            "advancedOptions": {"storeId": missing_store_id} if missing_store_id else {},
+        }
+        create_r = req_lib.post(
+            "https://ssapi.shipstation.com/orders/createorder",
+            headers={**ss_headers(), "Content-Type": "application/json"},
+            json=order_payload,
+            timeout=20,
+        )
+        if create_r.status_code not in (200, 201):
+            return Response(json.dumps({"status": "error", "error": f"SS createorder failed: {create_r.status_code} {create_r.text[:200]}"}),
+                            status=500, headers=c, mimetype="application/json")
+        new_order_id = create_r.json().get("orderId")
+
+        # 4. Apply Expedite tag 49845
+        if new_order_id:
+            try:
+                req_lib.post(
+                    "https://ssapi.shipstation.com/orders/addtag",
+                    headers={**ss_headers(), "Content-Type": "application/json"},
+                    json={"orderId": new_order_id, "tagId": 49845},
+                    timeout=10,
+                )
+            except Exception:
+                pass  # tag failure is non-fatal
+
+        return Response(json.dumps({"status": "ok", "newOrderNumber": new_order_number}),
+                        headers=c, mimetype="application/json")
+
+    except Exception as e:
+        print(f"[cs_reship_submit:{mode}] Exception: {e}")
+        return Response(json.dumps({"status": "error", "error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/cs-missing-submit", methods=["POST", "OPTIONS"])
+def cs_missing_submit():
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    return _cs_reship_submit("missing", request.get_json() or {}, cors())
+
+
+@app.route("/api/cs-incorrect-submit", methods=["POST", "OPTIONS"])
+def cs_incorrect_submit():
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
+    return _cs_reship_submit("incorrect", request.get_json() or {}, cors())
 
 
 def cancel_in_shipstation(order_id, items_to_cancel):

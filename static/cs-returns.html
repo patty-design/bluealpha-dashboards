@@ -413,6 +413,10 @@
       <button class="mode-btn" id="btn-mode-intl"            onclick="setMode('intl')">🌍 International<br>Size Exchange</button>
       <div class="mode-toggle-col-divider"></div>
       <button class="mode-btn" id="btn-mode-shipping"        onclick="setMode('shipping')">💲 UPS Shipping Refund</button>
+      <div class="mode-toggle-divider"></div>
+      <button class="mode-btn" id="btn-mode-missing"    onclick="setMode('missing')">📦 Missing<br>Items</button>
+      <div class="mode-toggle-col-divider"></div>
+      <button class="mode-btn" id="btn-mode-incorrect"  onclick="setMode('incorrect')">⚠ Incorrect<br>Items</button>
     </div>
 
     <div class="card">
@@ -440,6 +444,16 @@
       <!-- Shipping Refund banner -->
       <div id="banner-shipping" class="info-banner banner-green hidden">
         💲 <strong>Shipping refund request</strong> — Use this when the shipping fee needs to be refunded. Product costs are <strong>not</strong> refunded here.
+      </div>
+
+      <!-- Missing Items banner -->
+      <div id="banner-missing" class="info-banner banner-green hidden">
+        📦 <strong>Missing items</strong> — Verify the order shipped, then select which components or items were missing. A new order will be created in ShipStation.
+      </div>
+
+      <!-- Incorrect Items banner -->
+      <div id="banner-incorrect" class="info-banner banner-amber hidden">
+        ⚠ <strong>Incorrect items sent</strong> — Verify the order shipped, then select which components or items were incorrect. A new order will be created in ShipStation.
       </div>
 
       <!-- Lost Order banner + action toggle -->
@@ -574,6 +588,30 @@
         </div>
 
       </div>
+
+      <!-- Missing/Incorrect item selection panel -->
+      <div id="reship-panel" class="hidden">
+        <div id="reship-groups"></div>
+        <div class="message message-error hidden" id="msg-reship-none">Please select at least one item.</div>
+
+        <div style="margin-top:20px;">
+          <div style="font-weight:600;margin-bottom:8px;font-size:0.9rem;">Ship To Address</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <input id="reship-name"    placeholder="Name"      style="padding:7px 10px;border:1px solid #dde3ea;border-radius:6px;font-size:0.875rem;" />
+            <input id="reship-street1" placeholder="Street"    style="padding:7px 10px;border:1px solid #dde3ea;border-radius:6px;font-size:0.875rem;" />
+            <input id="reship-street2" placeholder="Apt/Suite" style="padding:7px 10px;border:1px solid #dde3ea;border-radius:6px;font-size:0.875rem;" />
+            <input id="reship-city"    placeholder="City"      style="padding:7px 10px;border:1px solid #dde3ea;border-radius:6px;font-size:0.875rem;" />
+            <input id="reship-state"   placeholder="State"     style="padding:7px 10px;border:1px solid #dde3ea;border-radius:6px;font-size:0.875rem;max-width:80px;" />
+            <input id="reship-zip"     placeholder="Zip"       style="padding:7px 10px;border:1px solid #dde3ea;border-radius:6px;font-size:0.875rem;max-width:100px;" />
+          </div>
+        </div>
+
+        <div class="message message-error hidden" id="msg-reship-error"></div>
+        <div style="margin-top:16px;">
+          <button class="btn btn-primary" onclick="submitReship(event)">Create Reshipment Order</button>
+        </div>
+      </div>
+
     </div>
 
     <!-- Exchange info block (only shown in exchange mode) -->
@@ -750,6 +788,16 @@
         </div>
       </div>
 
+      <!-- Generic: reshipment created (missing/incorrect) -->
+      <div id="generic-success" class="success-screen hidden">
+        <div class="success-icon">✓</div>
+        <h2>Order Created!</h2>
+        <p id="success-message">Reshipment order created in ShipStation.</p>
+        <div style="margin-top:28px;">
+          <button onclick="resetForm()" class="btn btn-primary">Submit Another</button>
+        </div>
+      </div>
+
       <!-- Shipping Refund: logged -->
       <div id="shipping-refund-success" class="success-screen hidden">
         <div class="success-icon">💲</div>
@@ -776,13 +824,14 @@
 const API_BASE = '';
 let csPassword  = '';
 let orderData   = null;
-let currentMode = 'return'; // 'return' | 'cancel' | 'lost' | 'exchange' | 'intl' | 'shipping'
+let currentMode = 'return'; // 'return' | 'cancel' | 'lost' | 'exchange' | 'intl' | 'shipping' | 'missing' | 'incorrect'
 let lostAction  = 'reship'; // 'reship' | 'refund'
 let orderBlocked = false;   // true when cancel mode + order already shipped
 let exchangeVerifyData = null;
 let exchangeOptionsCache = {};
 let intlVerifyData = null;
 let intlOptionsCache = {};
+let reshipOrderGroups = null;
 
 function displayName(name) {
   return name.replace(/^DBL No Buckle Outer\b/i, 'Duty Belt Lite');
@@ -827,12 +876,15 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── Mode toggle ────────────────────────────────────────────────────────────
 function setMode(mode) {
   currentMode = mode;
-  const isReturn   = mode === 'return';
-  const isCancel   = mode === 'cancel';
-  const isLost     = mode === 'lost';
-  const isExchange = mode === 'exchange';
-  const isIntl     = mode === 'intl';
-  const isShipping = mode === 'shipping';
+  const isReturn    = mode === 'return';
+  const isCancel    = mode === 'cancel';
+  const isLost      = mode === 'lost';
+  const isExchange  = mode === 'exchange';
+  const isIntl      = mode === 'intl';
+  const isShipping  = mode === 'shipping';
+  const isMissing   = mode === 'missing';
+  const isIncorrect = mode === 'incorrect';
+  const isReship    = isMissing || isIncorrect;
 
   document.getElementById('btn-mode-return').classList.toggle('active', isReturn);
   document.getElementById('btn-mode-cancel').classList.toggle('active', isCancel);
@@ -840,8 +892,8 @@ function setMode(mode) {
   document.getElementById('btn-mode-exchange').classList.toggle('active', isExchange);
   document.getElementById('btn-mode-intl').classList.toggle('active', isIntl);
   document.getElementById('btn-mode-shipping').classList.toggle('active', isShipping);
-
-
+  document.getElementById('btn-mode-missing').classList.toggle('active', isMissing);
+  document.getElementById('btn-mode-incorrect').classList.toggle('active', isIncorrect);
 
   // Banners
   document.getElementById('banner-return').classList.toggle('hidden', !isReturn);
@@ -850,6 +902,8 @@ function setMode(mode) {
   document.getElementById('banner-exchange').classList.toggle('hidden', !isExchange);
   document.getElementById('banner-intl').classList.toggle('hidden', !isIntl);
   document.getElementById('banner-shipping').classList.toggle('hidden', !isShipping);
+  document.getElementById('banner-missing').classList.toggle('hidden', !isMissing);
+  document.getElementById('banner-incorrect').classList.toggle('hidden', !isIncorrect);
 
   // Items label (only relevant for non-exchange/non-intl/non-shipping modes)
   document.getElementById('items-label').innerHTML = (isReturn ? 'Items to Return' : isCancel ? 'Items to Cancel' : 'Items to Reship') + ' <span class="req">*</span>';
@@ -874,8 +928,8 @@ function setMode(mode) {
   document.getElementById('cs-notes').placeholder    = isReturn ? 'Who approved it, why, any relevant context…'
                                                                  : 'Any additional context from the customer…';
 
-  // Submit button: hide in exchange/intl mode (those blocks have their own submit buttons)
-  document.getElementById('btn-cs-submit').classList.toggle('hidden', isExchange || isIntl);
+  // Submit button: hide in exchange/intl/missing/incorrect modes (those use their own submit UI)
+  document.getElementById('btn-cs-submit').classList.toggle('hidden', isExchange || isIntl || isReship);
   if (isReturn)        document.getElementById('btn-cs-submit').innerHTML = 'Submit &amp; Send Label';
   else if (isCancel)   document.getElementById('btn-cs-submit').innerHTML = 'Submit Cancellation Request';
   else if (isLost)     document.getElementById('btn-cs-submit').innerHTML = lostAction === 'refund' ? 'Log Refund Request' : 'Create Reshipment';
@@ -883,12 +937,14 @@ function setMode(mode) {
 
   // In exchange/intl mode, hide the shared order-info-block; show info blocks only after lookup
   document.getElementById('order-info-block').classList.add('hidden');
+  document.getElementById('reship-panel').classList.add('hidden');
   document.getElementById('exchange-info-block').classList.toggle('hidden', !isExchange || !exchangeVerifyData);
   document.getElementById('intl-info-block').classList.toggle('hidden', !isIntl || !intlVerifyData);
 
   // Reset state on mode switch
   orderData = null;
   orderBlocked = false;
+  reshipOrderGroups = null;
   if (!isExchange) {
     exchangeVerifyData = null;
     exchangeOptionsCache = {};
@@ -902,8 +958,8 @@ function setMode(mode) {
   document.getElementById('msg-order-not-found').classList.remove('show');
   document.getElementById('msg-lookup-error').classList.remove('show');
   document.getElementById('cs-order-number').value = '';
-  // Re-show submit button in case it was hidden by block state (non-exchange/intl modes)
-  if (!isExchange && !isIntl) document.getElementById('btn-cs-submit').classList.remove('hidden');
+  // Re-show submit button in case it was hidden by block state (non-exchange/intl/reship modes)
+  if (!isExchange && !isIntl && !isReship) document.getElementById('btn-cs-submit').classList.remove('hidden');
 }
 
 // ── Lost action sub-toggle ─────────────────────────────────────────────────
@@ -933,7 +989,7 @@ async function lookupOrder() {
     const res = await fetch(API_BASE + '/api/cs-lookup-order', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ password: csPassword, orderNumber: orderNum })
+      body: JSON.stringify({ password: csPassword, orderNumber: orderNum, mode: currentMode })
     });
     const data = await res.json();
     if (data.status === 'found') {
@@ -941,7 +997,12 @@ async function lookupOrder() {
       populateOrderInfo(data);
     } else if (data.status === 'not_found') {
       document.getElementById('msg-order-not-found').classList.add('show');
+    } else if (data.status === 'not_shipped') {
+      document.getElementById('msg-lookup-error').textContent = 'This order has not shipped yet.';
+      document.getElementById('msg-lookup-error').classList.add('show');
     } else {
+      document.getElementById('msg-lookup-error').classList.remove('show');
+      document.getElementById('msg-lookup-error').textContent = 'Something went wrong. Please try again.';
       document.getElementById('msg-lookup-error').classList.add('show');
     }
   } catch (e) {
@@ -953,6 +1014,39 @@ async function lookupOrder() {
 
 function populateOrderInfo(data) {
   const orderNum = document.getElementById('cs-order-number').value.trim();
+
+  // Missing/Incorrect mode: show reship panel
+  if (currentMode === 'missing' || currentMode === 'incorrect') {
+    reshipOrderGroups = data.orderGroups || [];
+    // Show order info
+    document.getElementById('order-info-text').innerHTML =
+      '<strong>Order #' + orderNum + '</strong> — ' + (data.customerName || 'Unknown customer') + '<br>' +
+      (data.email    ? '📧 ' + data.email + '<br>' : '') +
+      (data.shipDate ? '📦 Shipped: ' + (function(d){ const p=d.slice(0,10).split('-'); return p[1]+'-'+p[2]+'-'+p[0]; })(data.shipDate) + '<br>' : '');
+    document.getElementById('order-info-block').classList.remove('hidden');
+    // Hide normal form fields inside order-info-block
+    document.getElementById('cs-items-list').closest('.field').classList.add('hidden');
+    document.getElementById('field-email').classList.add('hidden');
+    document.getElementById('field-address').classList.add('hidden');
+    document.getElementById('field-reason-return').classList.add('hidden');
+    document.getElementById('field-reason-cancel').classList.add('hidden');
+    document.getElementById('field-reason-shipping').classList.add('hidden');
+    document.getElementById('field-notes').classList.add('hidden');
+    document.getElementById('btn-cs-submit').classList.add('hidden');
+    document.getElementById('already-shipped-warning').classList.add('hidden');
+    document.getElementById('section-lost-address').classList.add('hidden');
+    // Populate reship panel
+    const a = data.address || {};
+    document.getElementById('reship-name').value    = a.name || '';
+    document.getElementById('reship-street1').value = a.street1 || '';
+    document.getElementById('reship-street2').value = a.street2 || '';
+    document.getElementById('reship-city').value    = a.city || '';
+    document.getElementById('reship-state').value   = a.state || '';
+    document.getElementById('reship-zip').value     = a.postalCode || '';
+    buildReshipGroups(reshipOrderGroups);
+    document.getElementById('reship-panel').classList.remove('hidden');
+    return;
+  }
 
   // Shipping mode: block if no shipping was charged or refund already requested
   if (currentMode === 'shipping') {
@@ -1802,9 +1896,100 @@ function copyIntlPaymentLink() {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function showSuccessState(id) {
-  ['return-success-pending','return-success-sent','return-success-review','cancel-success','lost-success','lost-refund-success','exchange-success','intl-exception-success','shipping-refund-success']
+  ['return-success-pending','return-success-sent','return-success-review','cancel-success','lost-success','lost-refund-success','exchange-success','intl-exception-success','shipping-refund-success','generic-success']
     .forEach(s => document.getElementById(s).classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function buildReshipGroups(orderGroups) {
+  const container = document.getElementById('reship-groups');
+  container.innerHTML = '';
+  orderGroups.forEach((group, gi) => {
+    const header = document.createElement('div');
+    header.style.cssText = 'font-weight:600;font-size:0.875rem;margin:12px 0 6px;color:#1b2438;';
+    header.textContent = group.originalName + (group.isCombo ? ' (combo)' : '');
+    container.appendChild(header);
+    group.components.forEach((comp, ci) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:6px;padding:6px 10px;background:#f5f7fa;border-radius:6px;';
+      row.innerHTML =
+        '<input type="checkbox" id="reship-chk-' + gi + '-' + ci + '" checked style="width:16px;height:16px;flex-shrink:0;">' +
+        '<label for="reship-chk-' + gi + '-' + ci + '" style="flex:1;font-size:0.875rem;">' + escHtml(comp.name) + '</label>' +
+        '<input type="number" id="reship-qty-' + gi + '-' + ci + '" value="' + comp.qty + '" min="1" max="' + comp.qty + '" style="width:55px;padding:3px 6px;border:1px solid #dde3ea;border-radius:4px;font-size:0.875rem;">';
+      container.appendChild(row);
+    });
+  });
+}
+
+async function submitReship(evt) {
+  const selectedItems = [];
+  (reshipOrderGroups || []).forEach((group, gi) => {
+    group.components.forEach((comp, ci) => {
+      const chk = document.getElementById('reship-chk-' + gi + '-' + ci);
+      const qty = parseInt(document.getElementById('reship-qty-' + gi + '-' + ci).value) || comp.qty;
+      if (chk && chk.checked) {
+        selectedItems.push({ sku: comp.sku, name: comp.name, qty });
+      }
+    });
+  });
+  if (selectedItems.length === 0) {
+    document.getElementById('msg-reship-none').classList.add('show');
+    return;
+  }
+  document.getElementById('msg-reship-none').classList.remove('show');
+
+  const endpoint = currentMode === 'missing' ? '/api/cs-missing-submit' : '/api/cs-incorrect-submit';
+  const address = {
+    name:       document.getElementById('reship-name').value.trim(),
+    street1:    document.getElementById('reship-street1').value.trim(),
+    street2:    document.getElementById('reship-street2').value.trim(),
+    city:       document.getElementById('reship-city').value.trim(),
+    state:      document.getElementById('reship-state').value.trim(),
+    postalCode: document.getElementById('reship-zip').value.trim(),
+  };
+
+  const btn = (evt && evt.currentTarget) || document.querySelector('#reship-panel .btn-primary');
+  btn.disabled = true;
+  btn.textContent = 'Creating order\u2026';
+
+  const errEl = document.getElementById('msg-reship-error');
+  errEl.classList.remove('show');
+  errEl.classList.add('hidden');
+
+  try {
+    const res = await fetch(API_BASE + endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        password:      csPassword,
+        orderNumber:   orderData.orderNumber || document.getElementById('cs-order-number').value.trim(),
+        orderId:       orderData.orderId,
+        customerEmail: orderData.email || '',
+        address,
+        selectedItems,
+      }),
+    });
+    const result = await res.json();
+    if (result.status === 'ok') {
+      document.getElementById('screen-main').classList.add('hidden');
+      document.getElementById('screen-success').classList.remove('hidden');
+      showSuccessState('generic-success');
+      document.getElementById('success-message').textContent =
+        'Reshipment order ' + result.newOrderNumber + ' created in ShipStation.';
+    } else {
+      throw new Error(result.error || result.message || 'Unknown error');
+    }
+  } catch (e) {
+    errEl.textContent = 'Error: ' + e.message;
+    errEl.classList.remove('hidden');
+    errEl.classList.add('show');
+    btn.disabled = false;
+    btn.textContent = 'Create Reshipment Order';
+  }
 }
 
 async function pollStatus(recordId, attempts) {
@@ -1824,6 +2009,7 @@ async function pollStatus(recordId, attempts) {
 
 function resetForm() {
   orderData = null;
+  reshipOrderGroups = null;
   exchangeVerifyData = null;
   exchangeOptionsCache = {};
   document.getElementById('cs-order-number').value  = '';
@@ -1853,6 +2039,16 @@ function resetForm() {
   document.getElementById('intl-payment-link-result').classList.add('hidden');
   intlVerifyData = null;
   intlOptionsCache = {};
+  document.getElementById('reship-groups').innerHTML = '';
+  document.getElementById('reship-name').value    = '';
+  document.getElementById('reship-street1').value = '';
+  document.getElementById('reship-street2').value = '';
+  document.getElementById('reship-city').value    = '';
+  document.getElementById('reship-state').value   = '';
+  document.getElementById('reship-zip').value     = '';
+  document.getElementById('reship-panel').classList.add('hidden');
+  document.getElementById('msg-reship-none').classList.remove('show');
+  document.getElementById('msg-reship-error').classList.add('hidden');
   document.getElementById('order-info-block').classList.add('hidden');
   document.getElementById('exchange-info-block').classList.add('hidden');
   document.getElementById('intl-info-block').classList.add('hidden');
