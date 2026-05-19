@@ -136,6 +136,9 @@ def version():
         "token_prefix": tok[:12] if tok else "(empty)",
         "write_token_set": bool(RETURNS_WRITE_TOKEN),
         "write_token_prefix": RETURNS_WRITE_TOKEN[:12] if RETURNS_WRITE_TOKEN else "(empty)",
+        "ss_key_set": bool(SHIPSTATION_KEY),
+        "ss_key_prefix": SHIPSTATION_KEY[:8] if SHIPSTATION_KEY else "(empty)",
+        "cs_pw_set": bool(CS_ADMIN_PASSWORD),
     }), mimetype="application/json")
 
 @app.route("/static/<path:filename>")
