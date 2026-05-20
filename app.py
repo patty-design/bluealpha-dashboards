@@ -3059,8 +3059,8 @@ _ONTIME_REFRESHING = False
 _ONTIME_LAST_ERROR = {"msg": None, "ts": 0}
 
 _ONTIME_CONTRACT = 137893
+_ONTIME_EXCLUDE_TAGS = {137893, 49845}   # Contract + Expedite — excluded from on-time calc
 _ONTIME_RULES = [
-    ({49845},                                   3,  True),
     ({109623, 137358, 105813},                  5,  True),
     ({137359, 68484, 119374, 123911, 102014},  10, False),
     ({55571},                                  14, False),
@@ -3095,7 +3095,7 @@ def _refresh_ontime_cache():
         def _get_sla(order):
             """Return (sla_days, use_business_days) or (None, None) to skip."""
             tag_ids = set(order.get("tagIds") or [])
-            if _ONTIME_CONTRACT in tag_ids:
+            if tag_ids & _ONTIME_EXCLUDE_TAGS:
                 return None, None
             store_id = (order.get("advancedOptions") or {}).get("storeId")
             if store_id == SIZING_EXCHANGE_STORE_ID:
