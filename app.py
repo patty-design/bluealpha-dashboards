@@ -3054,7 +3054,7 @@ def return_label_pdf(record_id):
         return Response(f"Error: {e}", status=500)
 
 
-_ONTIME_CACHE = {"ts": 0, "data": None}
+_ONTIME_CACHE = {"ts": 0, "data": None}  # reset on every deploy
 _ONTIME_REFRESHING = False
 _ONTIME_LAST_ERROR = {"msg": None, "ts": 0}
 
@@ -3162,6 +3162,15 @@ def _refresh_ontime_cache():
                 total_7d += 1
                 if age < sla_days:
                     on_time_7d += 1
+
+        # Debug: log sample ship dates to diagnose 7d window
+        sample_ships = sorted(set(
+            datetime.strptime((o.get("shipDate") or "")[:10], "%Y-%m-%d").date()
+            for o in all_orders if (o.get("shipDate") or "")[:10]
+        ))
+        print(f"[on-time-debug] seven_days_ago_date={seven_days_ago_date}, "
+              f"total orders={len(all_orders)}, "
+              f"sample ship dates (last 5): {sample_ships[-5:] if sample_ships else []}")
 
         pct    = round(on_time    * 100 / total)    if total    else 0
         pct_7d = round(on_time_7d * 100 / total_7d) if total_7d else 0
