@@ -3157,8 +3157,8 @@ def _refresh_ontime_cache():
             total += 1
             if age < sla_days:
                 on_time += 1
-            # 7-day window: orders shipped in last 7 days
-            if ship_d >= seven_days_ago_date:
+            # 7-day window: orders placed (createDate) in last 7 days that have shipped
+            if create_d >= seven_days_ago_date:
                 total_7d += 1
                 if age < sla_days:
                     on_time_7d += 1
