@@ -3189,6 +3189,37 @@ def _refresh_ontime_cache():
         _ONTIME_REFRESHING = False
 
 
+@app.route("/api/on-time-debug-sync")
+def on_time_debug_sync():
+    """Temporary: synchronous mini-fetch to inspect raw shipDate values."""
+    from datetime import datetime, timedelta
+    import time as _time
+    cors_headers = {"Access-Control-Allow-Origin": "*"}
+    try:
+        seven_days_ago_date = (datetime.utcnow() - timedelta(days=7)).date()
+        thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
+        r = req_lib.get(
+            "https://ssapi.shipstation.com/orders",
+            params={"orderStatus": "shipped", "shipDateStart": thirty_days_ago,
+                    "pageSize": 10, "page": 1},
+            headers=ss_headers(), timeout=30,
+        )
+        r.raise_for_status()
+        orders = r.json().get("orders", [])
+        samples = [{"shipDate": o.get("shipDate"), "createDate": o.get("createDate"),
+                    "tagIds": o.get("tagIds")} for o in orders]
+        in_7d = sum(1 for o in orders if (o.get("shipDate") or "")[:10] >= str(seven_days_ago_date))
+        return Response(json.dumps({
+            "seven_days_ago_date": str(seven_days_ago_date),
+            "thirty_days_ago": thirty_days_ago,
+            "page1_count": len(orders),
+            "page1_in_7d": in_7d,
+            "samples": samples,
+        }), headers=cors_headers, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), headers=cors_headers, mimetype="application/json")
+
+
 @app.route("/api/on-time-shipments")
 def on_time_shipments():
     import time as _time
