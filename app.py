@@ -3088,6 +3088,7 @@ def _refresh_ontime_cache():
         if not SHIPSTATION_KEY or not SHIPSTATION_SECRET:
             raise RuntimeError("SHIPSTATION_KEY or SHIPSTATION_SECRET not configured")
         thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
+        seven_days_ago_date = (datetime.utcnow() - timedelta(days=7)).date()
         page = 1
         all_orders = []
         MAX_PAGES = 40   # 20K orders — more than enough for a statistically reliable on-time %
@@ -3123,6 +3124,8 @@ def _refresh_ontime_cache():
 
         on_time = 0
         total = 0
+        on_time_7d = 0
+        total_7d = 0
         for order in all_orders:
             tag_ids = set(order.get("tagIds") or [])
             if _ONTIME_CONTRACT in tag_ids:
@@ -3154,11 +3157,20 @@ def _refresh_ontime_cache():
             total += 1
             if age < sla_days:
                 on_time += 1
+            # 7-day window: orders shipped in last 7 days
+            if ship_d >= seven_days_ago_date:
+                total_7d += 1
+                if age < sla_days:
+                    on_time_7d += 1
 
-        pct = round(on_time * 100 / total) if total else 0
-        _ONTIME_CACHE["data"] = {"percent": pct, "onTime": on_time, "total": total, "window": "30d"}
+        pct    = round(on_time    * 100 / total)    if total    else 0
+        pct_7d = round(on_time_7d * 100 / total_7d) if total_7d else 0
+        _ONTIME_CACHE["data"] = {
+            "percent": pct, "onTime": on_time, "total": total, "window": "30d",
+            "percent7d": pct_7d, "onTime7d": on_time_7d, "total7d": total_7d,
+        }
         _ONTIME_CACHE["ts"]   = _time.time()
-        print(f"[on-time] cache refreshed — {pct}% on-time ({on_time}/{total})")
+        print(f"[on-time] cache refreshed — {pct}% on-time 30d ({on_time}/{total}), {pct_7d}% 7d ({on_time_7d}/{total_7d})")
     except Exception as e:
         import time as _time
         _ONTIME_LAST_ERROR["msg"] = str(e)
