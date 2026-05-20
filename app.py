@@ -3087,8 +3087,9 @@ def _refresh_ontime_cache():
     try:
         if not SHIPSTATION_KEY or not SHIPSTATION_SECRET:
             raise RuntimeError("SHIPSTATION_KEY or SHIPSTATION_SECRET not configured")
-        thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
-        seven_days_ago_date = (datetime.utcnow() - timedelta(days=7)).date()
+        thirty_days_ago     = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
+        fourteen_days_ago   = (datetime.utcnow() - timedelta(days=14)).strftime("%Y-%m-%d")
+        today_date          = datetime.utcnow().date()
         page = 1
         all_orders = []
         MAX_PAGES = 40   # 20K orders — more than enough for a statistically reliable on-time %
@@ -3157,29 +3158,97 @@ def _refresh_ontime_cache():
             total += 1
             if age < sla_days:
                 on_time += 1
-            # 7-day window: orders placed (createDate) in last 7 days that have shipped
-            if create_d >= seven_days_ago_date:
-                total_7d += 1
-                if age < sla_days:
-                    on_time_7d += 1
 
-        # Debug: log sample ship dates to diagnose 7d window
-        sample_ships = sorted(set(
-            datetime.strptime((o.get("shipDate") or "")[:10], "%Y-%m-%d").date()
-            for o in all_orders if (o.get("shipDate") or "")[:10]
-        ))
-        print(f"[on-time-debug] seven_days_ago_date={seven_days_ago_date}, "
-              f"total orders={len(all_orders)}, "
-              f"sample ship dates (last 5): {sample_ships[-5:] if sample_ships else []}")
+        pct = round(on_time * 100 / total) if total else 0
+        print(f"[on-time] 30d pass done — {pct}% ({on_time}/{total})")
 
-        pct    = round(on_time    * 100 / total)    if total    else 0
-        pct_7d = round(on_time_7d * 100 / total_7d) if total_7d else 0
+        # ── 14-day on-time: shipped orders placed in last 14 days ──────────────
+        # Uses createDateStart (reliable) instead of shipDateStart
+        # Also fetches awaiting_shipment to count overdue-but-unshipped as late
+        def _classify_order(order, end_date):
+            """Returns (counted, on_time_flag) or (False, False) to skip."""
+            tag_ids = set(order.get("tagIds") or [])
+            if _ONTIME_CONTRACT in tag_ids:
+                return False, False
+            store_id = (order.get("advancedOptions") or {}).get("storeId")
+            if store_id == SIZING_EXCHANGE_STORE_ID:
+                sla, biz = 3, True
+            else:
+                sla, biz = None, False
+                for rule_tags, days, use_biz in _ONTIME_RULES:
+                    if tag_ids & rule_tags:
+                        if sla is None or days > sla:
+                            sla, biz = days, use_biz
+            if sla is None:
+                return False, False
+            create_str = order.get("createDate") or ""
+            try:
+                create_d = datetime.strptime(create_str[:10], "%Y-%m-%d").date()
+            except (ValueError, TypeError):
+                return False, False
+            age = _business_days(create_d, end_date) if biz else (end_date - create_d).days
+            return True, (age < sla)
+
+        def _fetch_ss_page(status, create_start, max_pages=6):
+            results = []
+            for pg in range(1, max_pages + 1):
+                if pg > 1:
+                    _time.sleep(1.5)
+                resp = req_lib.get("https://ssapi.shipstation.com/orders",
+                    params={"orderStatus": status, "createDateStart": create_start,
+                            "pageSize": 500, "page": pg},
+                    headers=ss_headers(), timeout=30)
+                resp.raise_for_status()
+                body = resp.json()
+                results.extend(body.get("orders", []))
+                if pg >= body.get("pages", 1):
+                    break
+            return results
+
+        # Shipped orders placed in last 14 days
+        _time.sleep(1.5)
+        shipped_14d = _fetch_ss_page("shipped", fourteen_days_ago)
+        print(f"[on-time] 14d shipped fetch: {len(shipped_14d)} orders")
+
+        # Awaiting-shipment orders placed in last 14 days (overdue ones count as late)
+        _time.sleep(1.5)
+        awaiting_14d = _fetch_ss_page("awaiting_shipment", fourteen_days_ago, max_pages=3)
+        print(f"[on-time] 14d awaiting fetch: {len(awaiting_14d)} orders")
+
+        on_time_14d = 0
+        total_14d   = 0
+        overdue_14d = 0
+
+        for order in shipped_14d:
+            ship_str = order.get("shipDate") or ""
+            try:
+                ship_d = datetime.strptime(ship_str[:10], "%Y-%m-%d").date()
+            except (ValueError, TypeError):
+                continue
+            counted, good = _classify_order(order, ship_d)
+            if counted:
+                total_14d += 1
+                if good:
+                    on_time_14d += 1
+
+        for order in awaiting_14d:
+            counted, good = _classify_order(order, today_date)
+            if counted:
+                # Only include if overdue (past SLA deadline) — still-pending-on-time orders excluded
+                if not good:
+                    total_14d += 1
+                    overdue_14d += 1
+                # on_time_14d not incremented — it's late
+
+        pct_14d = round(on_time_14d * 100 / total_14d) if total_14d else 0
+        print(f"[on-time] 14d — {pct_14d}% ({on_time_14d}/{total_14d}), overdue pending: {overdue_14d}")
+
         _ONTIME_CACHE["data"] = {
-            "percent": pct, "onTime": on_time, "total": total, "window": "30d",
-            "percent7d": pct_7d, "onTime7d": on_time_7d, "total7d": total_7d,
+            "percent":   pct,       "onTime":   on_time,    "total":   total,    "window": "30d",
+            "percent14d": pct_14d,  "onTime14d": on_time_14d, "total14d": total_14d,
+            "overdue14d": overdue_14d,
         }
-        _ONTIME_CACHE["ts"]   = _time.time()
-        print(f"[on-time] cache refreshed — {pct}% on-time 30d ({on_time}/{total}), {pct_7d}% 7d ({on_time_7d}/{total_7d})")
+        _ONTIME_CACHE["ts"] = _time.time()
     except Exception as e:
         import time as _time
         _ONTIME_LAST_ERROR["msg"] = str(e)
