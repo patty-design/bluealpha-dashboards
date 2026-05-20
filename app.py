@@ -3087,109 +3087,27 @@ def _refresh_ontime_cache():
     try:
         if not SHIPSTATION_KEY or not SHIPSTATION_SECRET:
             raise RuntimeError("SHIPSTATION_KEY or SHIPSTATION_SECRET not configured")
-        thirty_days_ago     = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
-        fourteen_days_ago   = (datetime.utcnow() - timedelta(days=14)).strftime("%Y-%m-%d")
-        today_date          = datetime.utcnow().date()
-        page = 1
-        all_orders = []
-        MAX_PAGES = 40   # 20K orders — more than enough for a statistically reliable on-time %
-        while page <= MAX_PAGES:
-            if page > 1:
-                _time.sleep(1.5)   # stay under ShipStation's 40 req/min rate limit
-            retries = 3
-            r = None
-            while retries > 0:
-                r = req_lib.get(
-                    "https://ssapi.shipstation.com/orders",
-                    params={"orderStatus": "shipped", "shipDateStart": thirty_days_ago,
-                            "pageSize": 500, "page": page},
-                    headers=ss_headers(), timeout=30,
-                )
-                if r.status_code == 429:
-                    retry_after = int(r.headers.get("Retry-After", 60))
-                    print(f"[on-time] 429 rate limit on page {page}, sleeping {retry_after}s")
-                    _time.sleep(retry_after)
-                    retries -= 1
-                    continue
-                r.raise_for_status()
-                break
-            if retries == 0:
-                raise RuntimeError(f"ShipStation rate limit: exhausted retries on page {page}")
-            body = r.json()
-            all_orders.extend(body.get("orders", []))
-            total_pages = body.get("pages", 1)
-            print(f"[on-time] fetched page {page}/{total_pages} ({len(all_orders)} orders so far)")
-            if page >= total_pages:
-                break
-            page += 1
+        thirty_days_ago   = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
+        fourteen_days_ago = (datetime.utcnow() - timedelta(days=14)).strftime("%Y-%m-%d")
+        today_date        = datetime.utcnow().date()
 
-        on_time = 0
-        total = 0
-        on_time_7d = 0
-        total_7d = 0
-        for order in all_orders:
+        # ── Shared helpers ──────────────────────────────────────────────────────
+        def _get_sla(order):
+            """Return (sla_days, use_business_days) or (None, None) to skip."""
             tag_ids = set(order.get("tagIds") or [])
             if _ONTIME_CONTRACT in tag_ids:
-                continue
-
-            # Sizing exchange store: 3 business days
+                return None, None
             store_id = (order.get("advancedOptions") or {}).get("storeId")
             if store_id == SIZING_EXCHANGE_STORE_ID:
-                sla_days = 3
-                use_business = True
-            else:
-                sla_days = None
-                use_business = False
-                for rule_tags, days, biz in _ONTIME_RULES:
-                    if tag_ids & rule_tags:
-                        if sla_days is None or days > sla_days:
-                            sla_days = days
-                            use_business = biz
-            if sla_days is None:
-                continue
-            create_str = order.get("createDate") or ""
-            ship_str   = order.get("shipDate") or ""
-            try:
-                create_d = datetime.strptime(create_str[:10], "%Y-%m-%d").date()
-                ship_d   = datetime.strptime(ship_str[:10],   "%Y-%m-%d").date()
-            except (ValueError, TypeError):
-                continue
-            age = _business_days(create_d, ship_d) if use_business else (ship_d - create_d).days
-            total += 1
-            if age < sla_days:
-                on_time += 1
+                return 3, True
+            sla, biz = None, False
+            for rule_tags, days, use_biz in _ONTIME_RULES:
+                if tag_ids & rule_tags:
+                    if sla is None or days > sla:
+                        sla, biz = days, use_biz
+            return sla, biz
 
-        pct = round(on_time * 100 / total) if total else 0
-        print(f"[on-time] 30d pass done — {pct}% ({on_time}/{total})")
-
-        # ── 14-day on-time: shipped orders placed in last 14 days ──────────────
-        # Uses createDateStart (reliable) instead of shipDateStart
-        # Also fetches awaiting_shipment to count overdue-but-unshipped as late
-        def _classify_order(order, end_date):
-            """Returns (counted, on_time_flag) or (False, False) to skip."""
-            tag_ids = set(order.get("tagIds") or [])
-            if _ONTIME_CONTRACT in tag_ids:
-                return False, False
-            store_id = (order.get("advancedOptions") or {}).get("storeId")
-            if store_id == SIZING_EXCHANGE_STORE_ID:
-                sla, biz = 3, True
-            else:
-                sla, biz = None, False
-                for rule_tags, days, use_biz in _ONTIME_RULES:
-                    if tag_ids & rule_tags:
-                        if sla is None or days > sla:
-                            sla, biz = days, use_biz
-            if sla is None:
-                return False, False
-            create_str = order.get("createDate") or ""
-            try:
-                create_d = datetime.strptime(create_str[:10], "%Y-%m-%d").date()
-            except (ValueError, TypeError):
-                return False, False
-            age = _business_days(create_d, end_date) if biz else (end_date - create_d).days
-            return True, (age < sla)
-
-        def _fetch_ss_page(status, create_start, max_pages=6):
+        def _fetch_ss(status, create_start, max_pages=40):
             results = []
             for pg in range(1, max_pages + 1):
                 if pg > 1:
@@ -3198,55 +3116,74 @@ def _refresh_ontime_cache():
                     params={"orderStatus": status, "createDateStart": create_start,
                             "pageSize": 500, "page": pg},
                     headers=ss_headers(), timeout=30)
+                if resp.status_code == 429:
+                    _time.sleep(int(resp.headers.get("Retry-After", 60)))
+                    continue
                 resp.raise_for_status()
                 body = resp.json()
                 results.extend(body.get("orders", []))
+                print(f"[on-time] {status}/{create_start} page {pg}/{body.get('pages',1)} ({len(results)} so far)")
                 if pg >= body.get("pages", 1):
                     break
             return results
 
-        # Shipped orders placed in last 14 days
+        def _score_window(shipped_orders, awaiting_orders):
+            """Return (on_time, total, overdue) for a set of shipped + awaiting orders."""
+            on_time = total = overdue = 0
+            for order in shipped_orders:
+                sla, biz = _get_sla(order)
+                if sla is None:
+                    continue
+                create_str = order.get("createDate") or ""
+                ship_str   = order.get("shipDate") or ""
+                try:
+                    create_d = datetime.strptime(create_str[:10], "%Y-%m-%d").date()
+                    ship_d   = datetime.strptime(ship_str[:10],   "%Y-%m-%d").date()
+                except (ValueError, TypeError):
+                    continue
+                age = _business_days(create_d, ship_d) if biz else (ship_d - create_d).days
+                total += 1
+                if age < sla:
+                    on_time += 1
+            for order in awaiting_orders:
+                sla, biz = _get_sla(order)
+                if sla is None:
+                    continue
+                create_str = order.get("createDate") or ""
+                try:
+                    create_d = datetime.strptime(create_str[:10], "%Y-%m-%d").date()
+                except (ValueError, TypeError):
+                    continue
+                age = _business_days(create_d, today_date) if biz else (today_date - create_d).days
+                if age >= sla:          # past deadline → count as late
+                    total += 1
+                    overdue += 1
+                # still within window → exclude (not yet due)
+            return on_time, total, overdue
+
+        # ── 30-day fetch ────────────────────────────────────────────────────────
+        shipped_30d  = _fetch_ss("shipped",            thirty_days_ago, max_pages=40)
         _time.sleep(1.5)
-        shipped_14d = _fetch_ss_page("shipped", fourteen_days_ago)
-        print(f"[on-time] 14d shipped fetch: {len(shipped_14d)} orders")
+        awaiting_30d = _fetch_ss("awaiting_shipment",  thirty_days_ago, max_pages=10)
 
-        # Awaiting-shipment orders placed in last 14 days (overdue ones count as late)
-        _time.sleep(1.5)
-        awaiting_14d = _fetch_ss_page("awaiting_shipment", fourteen_days_ago, max_pages=3)
-        print(f"[on-time] 14d awaiting fetch: {len(awaiting_14d)} orders")
+        on_time_30, total_30, overdue_30 = _score_window(shipped_30d, awaiting_30d)
+        pct_30 = round(on_time_30 * 100 / total_30) if total_30 else 0
+        print(f"[on-time] 30d — {pct_30}% ({on_time_30}/{total_30}), overdue: {overdue_30}")
 
-        on_time_14d = 0
-        total_14d   = 0
-        overdue_14d = 0
+        # ── 14-day fetch ────────────────────────────────────────────────────────
+        # Filter the already-fetched lists rather than hitting ShipStation again
+        shipped_14d  = [o for o in shipped_30d
+                        if (o.get("createDate") or "")[:10] >= fourteen_days_ago]
+        awaiting_14d = [o for o in awaiting_30d
+                        if (o.get("createDate") or "")[:10] >= fourteen_days_ago]
 
-        for order in shipped_14d:
-            ship_str = order.get("shipDate") or ""
-            try:
-                ship_d = datetime.strptime(ship_str[:10], "%Y-%m-%d").date()
-            except (ValueError, TypeError):
-                continue
-            counted, good = _classify_order(order, ship_d)
-            if counted:
-                total_14d += 1
-                if good:
-                    on_time_14d += 1
-
-        for order in awaiting_14d:
-            counted, good = _classify_order(order, today_date)
-            if counted:
-                # Only include if overdue (past SLA deadline) — still-pending-on-time orders excluded
-                if not good:
-                    total_14d += 1
-                    overdue_14d += 1
-                # on_time_14d not incremented — it's late
-
-        pct_14d = round(on_time_14d * 100 / total_14d) if total_14d else 0
-        print(f"[on-time] 14d — {pct_14d}% ({on_time_14d}/{total_14d}), overdue pending: {overdue_14d}")
+        on_time_14, total_14, overdue_14 = _score_window(shipped_14d, awaiting_14d)
+        pct_14 = round(on_time_14 * 100 / total_14) if total_14 else 0
+        print(f"[on-time] 14d — {pct_14}% ({on_time_14}/{total_14}), overdue: {overdue_14}")
 
         _ONTIME_CACHE["data"] = {
-            "percent":   pct,       "onTime":   on_time,    "total":   total,    "window": "30d",
-            "percent14d": pct_14d,  "onTime14d": on_time_14d, "total14d": total_14d,
-            "overdue14d": overdue_14d,
+            "percent":    pct_30,    "onTime":    on_time_30,  "total":    total_30,  "overdue":    overdue_30,
+            "percent14d": pct_14,    "onTime14d": on_time_14,  "total14d": total_14,  "overdue14d": overdue_14,
         }
         _ONTIME_CACHE["ts"] = _time.time()
     except Exception as e:
