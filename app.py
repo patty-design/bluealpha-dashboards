@@ -5129,10 +5129,11 @@ def create_quote():
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}",
                 headers={**at_headers(token), "Content-Type": "application/json"},
                 json={"fields": {
-                    "Manual Order":         [mo_record_id],
-                    "Product SKU":          [item["skuRecordId"]],
-                    "Qty.":                 int(item["qty"]),
-                    "Confirmed Unit Price": float(item["unitPrice"]),
+                    "Manual Order":               [mo_record_id],
+                    "Product SKU":                [item["skuRecordId"]],
+                    "Qty.":                       int(item["qty"]),
+                    "Confirmed Unit Price":       float(item["unitPrice"]),
+                    "Confirmed Adj. Unit Price":  float(item["unitPrice"]),
                 }},
                 timeout=15,
             )
@@ -5224,10 +5225,11 @@ def update_quote(record_id):
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}",
                 headers={**at_headers(write_token), "Content-Type": "application/json"},
                 json={"records": [{"fields": {
-                    "Manual Order": [record_id],
-                    "Product SKU":  [item["skuRecordId"]],
-                    "Qty.":         int(item["qty"]),
-                    "Confirmed Unit Price": float(item["unitPrice"]),
+                    "Manual Order":              [record_id],
+                    "Product SKU":               [item["skuRecordId"]],
+                    "Qty.":                      int(item["qty"]),
+                    "Confirmed Unit Price":      float(item["unitPrice"]),
+                    "Confirmed Adj. Unit Price": float(item["unitPrice"]),
                 }} for item in batch]},
                 timeout=15,
             )
@@ -5425,10 +5427,11 @@ def accept_quote(record_id):
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}",
                 headers={**at_headers(token), "Content-Type": "application/json"},
                 json={"fields": {
-                    "Manual Order":         [so_record_id],
-                    "Product SKU":          lf.get("Product SKU", []),
-                    "Qty.":                 lf.get("Qty.", 0),
-                    "Confirmed Unit Price": float(price),
+                    "Manual Order":              [so_record_id],
+                    "Product SKU":               lf.get("Product SKU", []),
+                    "Qty.":                      lf.get("Qty.", 0),
+                    "Confirmed Unit Price":      float(price),
+                    "Confirmed Adj. Unit Price": float(price),
                 }},
                 timeout=15,
             )
@@ -7866,7 +7869,8 @@ def portal_duplicate_quote(user, record_id):
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}",
                 headers={**at_headers(token), "Content-Type": "application/json"},
                 json={"fields": {"Manual Order": [new_mo_id], "Product SKU": [sku_id],
-                                 "Qty.": qty, "Confirmed Unit Price": current_price}}, timeout=15,
+                                 "Qty.": qty, "Confirmed Unit Price": current_price,
+                                 "Confirmed Adj. Unit Price": current_price}}, timeout=15,
             ).raise_for_status()
 
         # Bust per-customer quotes cache
@@ -9741,10 +9745,11 @@ def portal_admin_convert_to_invoice(user, record_id):
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}",
                 headers={**at_headers(write_token), "Content-Type": "application/json"},
                 json={"fields": {
-                    "Manual Order":         [inv_record_id],
-                    "Product SKU":          lf.get("Product SKU", []),
-                    "Qty.":                 item["qty"],
-                    "Confirmed Unit Price": float(price),
+                    "Manual Order":              [inv_record_id],
+                    "Product SKU":               lf.get("Product SKU", []),
+                    "Qty.":                      item["qty"],
+                    "Confirmed Unit Price":      float(price),
+                    "Confirmed Adj. Unit Price": float(price),
                 }},
                 timeout=15,
             )
@@ -10275,10 +10280,11 @@ def admin_convert_to_invoice(record_id):
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}",
                 headers={**at_headers(write_token), "Content-Type": "application/json"},
                 json={"fields": {
-                    "Manual Order": [inv_record_id],
-                    "Product SKU":  lf.get("Product SKU", []),
-                    "Qty.":         qty,
-                    "Confirmed Unit Price": float(price),
+                    "Manual Order":              [inv_record_id],
+                    "Product SKU":               lf.get("Product SKU", []),
+                    "Qty.":                      qty,
+                    "Confirmed Unit Price":      float(price),
+                    "Confirmed Adj. Unit Price": float(price),
                 }}, timeout=15,
             )
             li_items_for_email.append({"name": pname, "qty": qty, "unit_price": float(price)})
