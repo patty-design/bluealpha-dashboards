@@ -9777,19 +9777,10 @@ def portal_admin_convert_to_invoice(user, record_id):
             except Exception as email_err:
                 print(f"[convert-to-invoice] email failed: {email_err}")
 
-        # Create Stripe invoices in background (non-blocking)
-        if STRIPE_SECRET_KEY and to_email and email_line_items:
-            import threading as _t_stripe2
-            _wt2 = write_token
-            _rid2 = inv_record_id
-            _items2 = list(email_line_items)
-            _en2, _tn2, _on2 = to_email, to_name, org_name
-            def _stripe_bg2():
-                try:
-                    _create_stripe_invoices_for_record(_wt2, _rid2, _en2, _tn2, _on2, _items2)
-                except Exception as _se2:
-                    print(f"[stripe] invoice creation failed: {_se2}")
-            _t_stripe2.Thread(target=_stripe_bg2, daemon=True).start()
+        # NOTE: Stripe invoice creation is handled exclusively by the Airtable
+        # automation "Stripe Dual Invoice Generator" (Script 1). Do NOT create
+        # Stripe invoices here — doing so creates duplicates that break the
+        # Airtable webhook status sync (Script 2).
 
         # Clear orders cache
         _ORDERS_CACHE.clear()
@@ -10302,18 +10293,10 @@ def admin_convert_to_invoice(record_id):
             except Exception as email_err:
                 print(f"[convert-to-invoice] email failed: {email_err}")
 
-        # Create Stripe invoices in background (non-blocking)
-        if STRIPE_SECRET_KEY and bill_email and li_items_for_email:
-            import threading as _t_stripe
-            _wt = write_token
-            _rid = inv_record_id
-            _items = list(li_items_for_email)
-            def _stripe_bg():
-                try:
-                    _create_stripe_invoices_for_record(_wt, _rid, bill_email, bill_name, org_name, _items)
-                except Exception as _se:
-                    print(f"[stripe] invoice creation failed: {_se}")
-            _t_stripe.Thread(target=_stripe_bg, daemon=True).start()
+        # NOTE: Stripe invoice creation is handled exclusively by the Airtable
+        # automation "Stripe Dual Invoice Generator" (Script 1). Do NOT create
+        # Stripe invoices here — doing so creates duplicates that break the
+        # Airtable webhook status sync (Script 2).
 
         _ORDERS_CACHE.clear()
         _INVOICES_CACHE.clear()
