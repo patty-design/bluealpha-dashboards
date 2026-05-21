@@ -9701,11 +9701,13 @@ def portal_admin_convert_to_invoice(user, record_id):
 
         # Create Invoice record — carry snapshot billing/shipping fields from SO
         inv_fields = {
-            "Order Type":         "Invoice",
-            "Order ID":           order_id_str,
-            "Date":               _today_utc().isoformat(),
-            "Sales Order Status": "Approved",
-            # Note: "Ready for ShipStation (SOs)" is a computed field — do not write it
+            "Order Type":      "Invoice",
+            "Order ID":        order_id_str,
+            "Date":            _today_utc().isoformat(),
+            "Invoice Status":  "Approved",
+            # Note: "Ready for ShipStation (SOs)", "MO Is Approved" are computed — do not write.
+            # Do NOT set "Sales Order Status" on invoices — that's an SO-only field.
+            # "Invoice Status" = "Approved" is what drives MO Is Approved for invoice records.
         }
         # Copy snapshot fields so invoice shows correct billing/shipping regardless of
         # future customer record changes
@@ -10231,11 +10233,13 @@ def admin_convert_to_invoice(record_id):
 
         # Create Invoice record — carry snapshot billing/shipping fields from SO
         inv_fields = {
-            "Order Type":         "Invoice",
-            "Order ID":           order_id_str,
-            "Date":               _today_utc().isoformat(),
-            "Sales Order Status": "Approved",
-            # Note: "Ready for ShipStation (SOs)" is a computed field — do not write it
+            "Order Type":     "Invoice",
+            "Order ID":       order_id_str,
+            "Date":           _today_utc().isoformat(),
+            "Invoice Status": "Approved",
+            # Note: "Ready for ShipStation (SOs)", "MO Is Approved" are computed — do not write.
+            # Do NOT set "Sales Order Status" on invoices — that's an SO-only field.
+            # "Invoice Status" = "Approved" is what drives MO Is Approved for invoice records.
         }
         for _sf in ("Snapshot Org", "Snapshot Contact", "Snapshot Email",
                     "Snapshot Phone", "Snapshot Addr 1", "Snapshot Addr 2"):
