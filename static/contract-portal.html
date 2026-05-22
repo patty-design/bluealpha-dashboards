@@ -857,11 +857,17 @@
       } else {
         // Preload catalog in background
         loadCatalog();
-        // Pre-warm caches
-        fetch('/api/portal/quotes', { credentials: 'same-origin' })
-          .then(r => r.ok ? r.json() : null)
-          .then(d => { if (d) _myOrdersCache = d; })
-          .catch(() => {});
+        // Pre-warm order cache (quotes + sales orders combined)
+        Promise.all([
+          fetch('/api/portal/quotes', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : { quotes: [] }),
+          fetch('/api/portal/orders', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : { orders: [] }),
+        ]).then(([qData, oData]) => {
+          const salesOrders = (oData.orders || []).map(o => ({
+            record_id: o.record_id, so_number: o.so_number, date: o.date, total: o.total,
+            status: o.tracking ? 'shipped' : 'approved', tracking: o.tracking,
+          }));
+          _myOrdersCache = { quotes: [...(qData.quotes || []), ...salesOrders] };
+        }).catch(() => {});
       }
 
       // Pre-load account info
@@ -1354,8 +1360,21 @@
     const el = document.getElementById('myOrdersContent');
     try {
       if (!_myOrdersCache) {
-        const data = await (await fetch('/api/portal/quotes', { credentials: 'same-origin' })).json();
-        _myOrdersCache = data;
+        // Fetch both portal-submitted quotes AND approved sales orders in parallel
+        const [qData, oData] = await Promise.all([
+          fetch('/api/portal/quotes',  { credentials: 'same-origin' }).then(r => r.ok ? r.json() : { quotes: [] }),
+          fetch('/api/portal/orders',  { credentials: 'same-origin' }).then(r => r.ok ? r.json() : { orders: [] }),
+        ]);
+        // Normalize sales orders into the same shape as quotes
+        const salesOrders = (oData.orders || []).map(o => ({
+          record_id:    o.record_id,
+          so_number:    o.so_number,
+          date:         o.date,
+          total:        o.total,
+          status:       o.tracking ? 'shipped' : 'approved',
+          tracking:     o.tracking,
+        }));
+        _myOrdersCache = { quotes: [...(qData.quotes || []), ...salesOrders] };
       }
       _renderMyOrders(_myOrdersCache.quotes);
     } catch (e) {
