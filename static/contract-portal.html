@@ -925,6 +925,8 @@
       parentMap[sku.parentId].skus.push(sku);
     }
 
+    parentOrder.sort((a, b) => (parentMap[a].name || '').localeCompare(parentMap[b].name || ''));
+
     let html = '<div class="accordion-catalog">';
     for (const pid of parentOrder) {
       html += _productAccordionHtml(parentMap[pid]);
