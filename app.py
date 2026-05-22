@@ -294,9 +294,10 @@ def portal_login_required(f):
     def decorated(*args, **kwargs):
         user = get_portal_user(request)
         if not user:
-            # API routes return JSON 401; page routes redirect to /quote
+            # API routes return JSON 403; page routes redirect to /quote
+            # (403 not 401 — browsers show a native auth dialog on 401)
             if request.path.startswith("/api/"):
-                return Response(json.dumps({"error": "Unauthorized"}), status=401,
+                return Response(json.dumps({"error": "Unauthorized"}), status=403,
                                 headers=cors(), mimetype="application/json")
             return redirect("/quote")
         return f(*args, user=user, **kwargs)
