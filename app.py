@@ -294,7 +294,11 @@ def portal_login_required(f):
     def decorated(*args, **kwargs):
         user = get_portal_user(request)
         if not user:
-            return redirect("/login")
+            # API routes return JSON 401; page routes redirect to /quote
+            if request.path.startswith("/api/"):
+                return Response(json.dumps({"error": "Unauthorized"}), status=401,
+                                headers=cors(), mimetype="application/json")
+            return redirect("/quote")
         return f(*args, user=user, **kwargs)
     return decorated
 
@@ -6906,14 +6910,15 @@ def contract_catalog(user):
         return Response(json.dumps({"error": "No customer"}), status=403, headers=c, mimetype="application/json")
     try:
         token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-        # Fetch contract SKUs linked to this customer
-        formula = f'AND({{Category}}="Contract",FIND("{customer_id}",ARRAYJOIN({{Customers}}))>0)'
-        sku_records = at_get_all(
+        # Fetch all contract SKUs, then filter in Python (ARRAYJOIN returns display names not IDs)
+        all_contract_skus = at_get_all(
             PRODUCT_SKUS_TABLE_ID, token,
             fields=["SKU ID", "Name + Variations", "Sale Price", "Parent Product",
                     "Color", "Size", "Feature Variation", "Add-ons", "Category", "Customers"],
-            formula=formula,
+            formula='{Category}="Contract"',
         )
+        sku_records = [r for r in all_contract_skus
+                       if customer_id in r.get("fields", {}).get("Customers", [])]
         # Fetch parent/color/size/fvar name maps
         import concurrent.futures as _cf_cc
         with _cf_cc.ThreadPoolExecutor(max_workers=4) as ex:
