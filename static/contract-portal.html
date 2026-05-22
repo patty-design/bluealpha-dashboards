@@ -302,8 +302,94 @@
       font-weight: 800;
       color: var(--navy);
     }
-    .product-group { margin-bottom: 28px; }
-    .product-group-title {
+    /* ── Accordion catalog ───────────────────────────────────────────────── */
+    .accordion-catalog { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
+    .product-item { border-bottom: 1px solid var(--border); }
+    .product-item:last-child { border-bottom: none; }
+    .product-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      cursor: pointer;
+      transition: background 0.15s;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+      user-select: none;
+    }
+    .product-row:hover { background: #f0f4f8; }
+    .product-row.active {
+      background: #dce8f5;
+      color: var(--navy);
+      font-weight: 700;
+      border-left: 4px solid var(--navy);
+      padding-left: 12px;
+    }
+    .product-row .p-arrow { font-size: 0.75rem; color: var(--muted); transition: transform 0.2s; }
+    .product-row.active .p-arrow { transform: rotate(90deg); color: var(--navy); }
+    .product-item.active { box-shadow: inset 0 0 0 2px var(--navy); }
+    .product-selector {
+      display: none;
+      padding: 18px 20px 20px;
+      background: #f7f9fc;
+      border-top: 1px solid var(--border);
+    }
+    .product-selector.open { display: block; }
+    .sel-row { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
+    .sel-row:last-child { margin-bottom: 0; }
+    .sel-field { flex: 1; min-width: 120px; }
+    .sel-field label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .sel-field select,
+    .sel-field input[type="number"] {
+      width: 100%;
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      padding: 9px 12px;
+      font-size: 0.9rem;
+      font-family: 'Lato', sans-serif;
+      color: var(--text);
+      background: var(--white);
+    }
+    .sel-field select:focus,
+    .sel-field input[type="number"]:focus { outline: none; border-color: var(--navy); }
+    .sel-qty { flex: 0 0 80px; }
+    .btn-add-inline {
+      flex: 0 0 auto;
+      padding: 10px 20px;
+      background: var(--navy);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.15s;
+      align-self: flex-end;
+    }
+    .btn-add-inline:hover { opacity: 0.85; }
+    .btn-add-inline:disabled { opacity: 0.4; cursor: not-allowed; }
+    .sku-price-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 14px;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .sku-price-row .sku-price-val { font-size: 1.05rem; font-weight: 700; color: var(--navy); }
+    /* ── Cart ────────────────────────────────────────────────────────────── */
+    .cart-section-title {
       font-family: 'Montserrat', sans-serif;
       font-size: 0.8rem;
       font-weight: 800;
@@ -312,33 +398,11 @@
       color: var(--navy);
       padding: 0 0 8px;
       border-bottom: 2px solid var(--navy);
-      margin-bottom: 0;
+      margin-bottom: 12px;
     }
-    .product-row {
-      display: grid;
-      grid-template-columns: 100px 1fr auto 90px;
-      gap: 12px;
-      align-items: center;
-      padding: 10px 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .product-row:last-child { border-bottom: none; }
-    .product-sku  { font-family: monospace; font-size: 0.8rem; color: var(--muted); }
-    .product-name { font-size: 0.88rem; font-weight: 600; color: var(--text); line-height: 1.35; }
-    .product-price { font-size: 0.88rem; color: var(--muted); text-align: right; white-space: nowrap; }
-    .qty-input {
-      width: 80px;
-      border: 1.5px solid var(--border);
-      border-radius: 6px;
-      padding: 7px 10px;
-      font-size: 0.9rem;
-      text-align: center;
-      font-family: 'Lato', sans-serif;
-      color: var(--text);
-      transition: border-color 0.15s;
-    }
-    .qty-input:focus { outline: none; border-color: var(--navy); }
-    .qty-input.has-qty { border-color: var(--navy); background: #eef2ff; font-weight: 700; }
+    .cart-table { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-bottom: 0; }
+    .cart-table th { font-size: 0.72rem; padding: 8px 12px; }
+    .cart-table td { padding: 10px 12px; font-size: 0.88rem; vertical-align: middle; }
     .order-confirmation {
       text-align: center;
       padding: 40px 20px;
@@ -458,11 +522,9 @@
     /* ── Responsive ──────────────────────────────────────────────────────── */
     @media (max-width: 640px) {
       .order-header-fields { grid-template-columns: 1fr; }
-      .product-row { grid-template-columns: 1fr auto; grid-template-rows: auto auto; }
-      .product-sku { display: none; }
-      .product-price { grid-column: 2; grid-row: 1; }
-      .product-name { grid-column: 1; grid-row: 1; }
-      .qty-input { grid-column: 1 / -1; width: 100%; }
+      .accordion-catalog { border-radius: 6px; }
+      .sel-row { flex-direction: column; }
+      .btn-add-inline { width: 100%; justify-content: center; }
       .add-user-form .form-row { grid-template-columns: 1fr; }
       th, td { padding: 8px 10px; }
       .header-center { display: none; }
@@ -498,9 +560,32 @@
   <div class="tab-panel active" id="tab-new-order">
     <div class="card" id="orderFormCard">
       <div class="card-title">New Order</div>
-      <p class="card-sub">Browse your catalog and enter quantities to place an order.</p>
+      <p class="card-sub">Select a product below, choose your options, and add items to your order.</p>
 
-      <div class="order-header-fields">
+      <div id="catalogContent"><div class="loading">Loading catalog…</div></div>
+
+      <!-- Cart section — hidden until items are added -->
+      <div id="cartSection" style="display:none;margin-top:28px;">
+        <div class="cart-section-title">Your Order</div>
+        <table class="cart-table">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th style="text-align:center">Qty</th>
+              <th style="text-align:right">Unit Price</th>
+              <th style="text-align:right">Line Total</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="cartBody"></tbody>
+        </table>
+        <div class="order-subtotal-bar" style="margin-top:12px;margin-bottom:0;">
+          <span class="order-subtotal-label">Order Subtotal</span>
+          <span class="order-subtotal-amount" id="orderSubtotal">$0.00</span>
+        </div>
+      </div>
+
+      <div class="order-header-fields" style="margin-top:24px;">
         <div class="order-field">
           <label>PO Number <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
           <input type="text" id="orderPoNumber" placeholder="Your internal PO #">
@@ -510,13 +595,6 @@
           <textarea id="orderNotes" placeholder="Special instructions, delivery notes…" style="height:42px;min-height:42px;"></textarea>
         </div>
       </div>
-
-      <div class="order-subtotal-bar">
-        <span class="order-subtotal-label">Order Subtotal</span>
-        <span class="order-subtotal-amount" id="orderSubtotal">$0.00</span>
-      </div>
-
-      <div id="catalogContent"><div class="loading">Loading catalog…</div></div>
 
       <div style="margin-top:24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
         <button class="btn-primary" id="submitOrderBtn" onclick="submitOrder()" disabled>Submit Order</button>
@@ -814,6 +892,9 @@
   }
 
   // ── Catalog / New Order ───────────────────────────────────────────────────
+  let _cart         = [];   // [{recordId, sku, name, qty, unitPrice}]
+  let _activeParent = null; // currently-expanded parent product id
+
   async function loadCatalog() {
     const el = document.getElementById('catalogContent');
     try {
@@ -821,7 +902,6 @@
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       _catalogData = await resp.json();
       _renderCatalog(_catalogData);
-      document.getElementById('submitOrderBtn').disabled = false;
     } catch (e) {
       el.innerHTML = `<div class="msg msg-error">Failed to load catalog: ${escHtml(e.message)}. Please refresh.</div>`;
     }
@@ -834,81 +914,306 @@
       return;
     }
 
-    // Group by parentName
-    const groups = {};
-    const groupOrder = [];
+    // Build unique parents preserving order from skus array
+    const parentMap   = {};
+    const parentOrder = [];
     for (const sku of data.skus) {
-      const g = sku.parentName || 'Other';
-      if (!groups[g]) { groups[g] = []; groupOrder.push(g); }
-      groups[g].push(sku);
+      if (!parentMap[sku.parentId]) {
+        parentMap[sku.parentId] = { id: sku.parentId, name: sku.parentName || sku.name, skus: [] };
+        parentOrder.push(sku.parentId);
+      }
+      parentMap[sku.parentId].skus.push(sku);
     }
 
-    let html = '';
-    for (const groupName of groupOrder) {
-      html += `<div class="product-group">
-        <div class="product-group-title">${escHtml(groupName)}</div>`;
-      for (const sku of groups[groupName]) {
-        const priceDisplay = sku.price != null ? money(sku.price) + ' / ea' : 'Contact for price';
-        html += `<div class="product-row" data-record-id="${escHtml(sku.recordId)}" data-unit-price="${escHtml(String(sku.price || 0))}">
-          <div class="product-sku">${escHtml(sku.sku || '—')}</div>
-          <div class="product-name">${escHtml(sku.name || sku.sku || '—')}</div>
-          <div class="product-price">${escHtml(priceDisplay)}</div>
-          <input type="number" class="qty-input" min="0" value="0"
-            data-record-id="${escHtml(sku.recordId)}"
-            data-unit-price="${escHtml(String(sku.price || 0))}"
-            oninput="onQtyChange(this)" onchange="onQtyChange(this)"
-            aria-label="Quantity for ${escHtml(sku.name || sku.sku)}">
-        </div>`;
-      }
-      html += '</div>';
+    let html = '<div class="accordion-catalog">';
+    for (const pid of parentOrder) {
+      html += _productAccordionHtml(parentMap[pid]);
     }
+    html += '</div>';
     el.innerHTML = html;
+    _activeParent = null;
   }
 
-  function onQtyChange(input) {
-    const val = parseInt(input.value, 10) || 0;
-    input.value = val < 0 ? 0 : val;
-    input.classList.toggle('has-qty', val > 0);
-    _updateSubtotal();
+  function _productAccordionHtml(p) {
+    const hasColors = p.skus.some(s => s.colorId);
+    const hasSizes  = p.skus.some(s => s.sizeId);
+
+    let colorHtml = '';
+    if (hasColors) {
+      colorHtml = `<div class="sel-field">
+          <label>Color</label>
+          <select id="sc_${p.id}" onchange="onSelColor('${p.id}')">
+            <option value="">Select a color\u2026</option>
+          </select>
+        </div>`;
+    }
+
+    let sizeHtml = '';
+    if (hasSizes) {
+      sizeHtml = `<div class="sel-field" id="szfield_${p.id}" style="display:none">
+          <label>Size</label>
+          <select id="ss_${p.id}" onchange="onSelSize('${p.id}')">
+            <option value="">Select a size\u2026</option>
+          </select>
+        </div>`;
+    }
+
+    return `<div class="product-item" id="pi_${p.id}">
+      <div class="product-row" onclick="toggleProduct('${p.id}', this)">
+        <span>${escHtml(p.name)}</span>
+        <span class="p-arrow">&#9658;</span>
+      </div>
+      <div class="product-selector" id="ps_${p.id}">
+        <div class="sel-row">
+          ${colorHtml}
+          ${sizeHtml}
+        </div>
+        <div class="sku-price-row" id="spricerow_${p.id}" style="display:none">
+          Unit price: <span class="sku-price-val" id="sprice_${p.id}"></span>
+        </div>
+        <div class="sel-row" id="sqrow_${p.id}" style="display:none">
+          <div class="sel-field sel-qty">
+            <label>Qty</label>
+            <input type="number" id="sq_${p.id}" min="1" value="1">
+          </div>
+          <button class="btn-add-inline" id="sb_${p.id}" disabled
+                  onclick="addToOrder('${p.id}')">Add to Order</button>
+        </div>
+      </div>
+    </div>`;
   }
 
-  function _updateSubtotal() {
-    let total = 0;
-    document.querySelectorAll('.qty-input').forEach(inp => {
-      const qty   = parseInt(inp.value, 10) || 0;
-      const price = parseFloat(inp.dataset.unitPrice) || 0;
-      total += qty * price;
-    });
-    document.getElementById('orderSubtotal').textContent = money(total);
-  }
+  function toggleProduct(parentId, rowEl) {
+    // Close previously open product
+    if (_activeParent && _activeParent !== parentId) {
+      const prev     = document.getElementById('ps_' + _activeParent);
+      const prevRow  = prev && prev.previousElementSibling;
+      const prevItem = document.getElementById('pi_' + _activeParent);
+      if (prev)     prev.classList.remove('open');
+      if (prevRow)  prevRow.classList.remove('active');
+      if (prevItem) prevItem.classList.remove('active');
+    }
 
-  async function submitOrder() {
-    const btn    = document.getElementById('submitOrderBtn');
-    const msgEl  = document.getElementById('submitOrderMsg');
-    msgEl.textContent = '';
-    msgEl.style.color = 'var(--muted)';
+    const selector = document.getElementById('ps_' + parentId);
+    const item     = document.getElementById('pi_' + parentId);
+    const isOpen   = selector.classList.contains('open');
 
-    // Collect items
-    const items = [];
-    document.querySelectorAll('.qty-input').forEach(inp => {
-      const qty = parseInt(inp.value, 10) || 0;
-      if (qty > 0) {
-        items.push({
-          recordId:  inp.dataset.recordId,
-          qty:       qty,
-          unitPrice: parseFloat(inp.dataset.unitPrice) || 0,
-        });
+    selector.classList.toggle('open', !isOpen);
+    rowEl.classList.toggle('active', !isOpen);
+    item.classList.toggle('active', !isOpen);
+    _activeParent = isOpen ? null : parentId;
+
+    // Populate selectors when opening
+    if (!isOpen) {
+      const colorSel = document.getElementById('sc_' + parentId);
+      if (colorSel) {
+        // Has color — populate on first open
+        if (colorSel.options.length <= 1) {
+          const colorMap = {};
+          for (const sku of _catalogData.skus) {
+            if (sku.parentId === parentId && sku.colorId && sku.colorName)
+              colorMap[sku.colorId] = sku.colorName;
+          }
+          const colors = Object.entries(colorMap).sort((a, b) => a[1].localeCompare(b[1]));
+          for (const [id, name] of colors) {
+            const opt = document.createElement('option');
+            opt.value = id; opt.textContent = name;
+            colorSel.appendChild(opt);
+          }
+          // Auto-select if only one color
+          if (colors.length === 1) {
+            colorSel.value = colors[0][0];
+            onSelColor(parentId);
+          }
+        }
+      } else {
+        // No colors — populate sizes directly or show price
+        const sizeSel = document.getElementById('ss_' + parentId);
+        if (sizeSel && sizeSel.options.length <= 1) {
+          _populateSizes(parentId, '');
+        } else if (!sizeSel) {
+          _showPriceAndQty(parentId, '', '');
+        }
       }
+    }
+  }
+
+  function onSelColor(parentId) {
+    const colorId = document.getElementById('sc_' + parentId)?.value || '';
+    const sizeSel = document.getElementById('ss_' + parentId);
+    const szField = document.getElementById('szfield_' + parentId);
+
+    // Reset size, price, qty
+    if (sizeSel) {
+      sizeSel.innerHTML = '<option value="">Select a size\u2026</option>';
+      if (szField) szField.style.display = 'none';
+    }
+    document.getElementById('spricerow_' + parentId).style.display = 'none';
+    document.getElementById('sqrow_' + parentId).style.display     = 'none';
+    document.getElementById('sb_' + parentId).disabled = true;
+
+    if (!colorId) return;
+
+    if (sizeSel) {
+      _populateSizes(parentId, colorId);
+    } else {
+      // No size selector — resolve SKU directly
+      _showPriceAndQty(parentId, colorId, '');
+    }
+  }
+
+  function _populateSizes(parentId, colorId) {
+    const sizeSel = document.getElementById('ss_' + parentId);
+    const szField = document.getElementById('szfield_' + parentId);
+    if (!sizeSel) return;
+
+    const sizeMap = {};
+    for (const sku of _catalogData.skus) {
+      if (sku.parentId === parentId && sku.sizeId && sku.sizeName &&
+          (!colorId || sku.colorId === colorId))
+        sizeMap[sku.sizeId] = sku.sizeName;
+    }
+    const sizes = Object.entries(sizeMap).sort((a, b) => {
+      const na = parseFloat(a[1]), nb = parseFloat(b[1]);
+      if (!isNaN(na) && !isNaN(nb)) return na - nb;
+      return a[1].localeCompare(b[1]);
     });
 
-    if (items.length === 0) {
-      msgEl.textContent  = 'Please enter a quantity for at least one item.';
-      msgEl.style.color  = 'var(--red)';
+    if (sizes.length <= 1) {
+      // Zero or one size — skip size dropdown
+      if (szField) szField.style.display = 'none';
+      const sizeId = sizes.length === 1 ? sizes[0][0] : '';
+      _showPriceAndQty(parentId, colorId, sizeId);
       return;
     }
 
-    btn.disabled     = true;
-    btn.textContent  = 'Submitting…';
+    // Multiple sizes — show dropdown
+    for (const [id, name] of sizes) {
+      const opt = document.createElement('option');
+      opt.value = id; opt.textContent = name;
+      sizeSel.appendChild(opt);
+    }
+    if (szField) szField.style.display = '';
+  }
+
+  function onSelSize(parentId) {
+    const colorId = document.getElementById('sc_' + parentId)?.value || '';
+    const sizeId  = document.getElementById('ss_' + parentId)?.value || '';
+    document.getElementById('spricerow_' + parentId).style.display = 'none';
+    document.getElementById('sqrow_' + parentId).style.display     = 'none';
+    document.getElementById('sb_' + parentId).disabled = true;
+    if (sizeId) _showPriceAndQty(parentId, colorId, sizeId);
+  }
+
+  function _showPriceAndQty(parentId, colorId, sizeId) {
+    const sku = _catalogData.skus.find(s =>
+      s.parentId === parentId &&
+      (!colorId || s.colorId === colorId) &&
+      (!sizeId  || s.sizeId  === sizeId)
+    );
+    if (!sku) return;
+
+    const priceEl  = document.getElementById('sprice_' + parentId);
+    const priceRow = document.getElementById('spricerow_' + parentId);
+    const qtyRow   = document.getElementById('sqrow_' + parentId);
+    const addBtn   = document.getElementById('sb_' + parentId);
+
+    if (priceEl)  priceEl.textContent = sku.price != null ? money(sku.price) : 'Contact for price';
+    if (priceRow) priceRow.style.display = '';
+    if (qtyRow)   qtyRow.style.display   = '';
+    if (addBtn)   addBtn.disabled = (sku.price == null);
+  }
+
+  function addToOrder(parentId) {
+    const colorId = document.getElementById('sc_' + parentId)?.value || '';
+    const sizeId  = document.getElementById('ss_' + parentId)?.value || '';
+    const qty     = Math.max(1, parseInt(document.getElementById('sq_' + parentId)?.value, 10) || 1);
+
+    const sku = _catalogData.skus.find(s =>
+      s.parentId === parentId &&
+      (!colorId || s.colorId === colorId) &&
+      (!sizeId  || s.sizeId  === sizeId)
+    );
+    if (!sku) return;
+
+    // Build display name: Parent — Color — Size
+    const parts = [sku.parentName || sku.name];
+    if (sku.colorName) parts.push(sku.colorName);
+    if (sku.sizeName)  parts.push(sku.sizeName);
+
+    _cart.push({
+      recordId:  sku.recordId,
+      sku:       sku.sku || '',
+      name:      parts.join(' \u2014 '),
+      qty,
+      unitPrice: sku.price || 0,
+    });
+    _renderCart();
+    _resetProductSelectors(parentId);
+  }
+
+  function _resetProductSelectors(parentId) {
+    const colorSel = document.getElementById('sc_' + parentId);
+    const sizeSel  = document.getElementById('ss_' + parentId);
+    const szField  = document.getElementById('szfield_' + parentId);
+    if (colorSel) colorSel.selectedIndex = 0;
+    if (sizeSel)  sizeSel.innerHTML = '<option value="">Select a size\u2026</option>';
+    if (szField)  szField.style.display = 'none';
+    document.getElementById('spricerow_' + parentId).style.display = 'none';
+    document.getElementById('sqrow_' + parentId).style.display     = 'none';
+    document.getElementById('sb_' + parentId).disabled = true;
+    const qtyEl = document.getElementById('sq_' + parentId);
+    if (qtyEl) qtyEl.value = 1;
+  }
+
+  function removeFromCart(idx) {
+    _cart.splice(idx, 1);
+    _renderCart();
+  }
+
+  function _renderCart() {
+    const section = document.getElementById('cartSection');
+    const body    = document.getElementById('cartBody');
+
+    if (_cart.length === 0) {
+      section.style.display = 'none';
+      document.getElementById('orderSubtotal').textContent = '$0.00';
+      document.getElementById('submitOrderBtn').disabled = true;
+      return;
+    }
+
+    let total = 0;
+    body.innerHTML = _cart.map((item, idx) => {
+      const lineTotal = item.qty * item.unitPrice;
+      total += lineTotal;
+      return `<tr>
+        <td>${escHtml(item.name)}</td>
+        <td style="text-align:center">${item.qty}</td>
+        <td style="text-align:right">${money(item.unitPrice)}</td>
+        <td style="text-align:right;font-weight:700">${money(lineTotal)}</td>
+        <td><button class="btn-danger" onclick="removeFromCart(${idx})">Remove</button></td>
+      </tr>`;
+    }).join('');
+
+    section.style.display = '';
+    document.getElementById('orderSubtotal').textContent = money(total);
+    document.getElementById('submitOrderBtn').disabled = false;
+  }
+
+  async function submitOrder() {
+    const btn   = document.getElementById('submitOrderBtn');
+    const msgEl = document.getElementById('submitOrderMsg');
+    msgEl.textContent = '';
+    msgEl.style.color = 'var(--muted)';
+
+    if (_cart.length === 0) {
+      msgEl.textContent = 'Please add at least one item to your order.';
+      msgEl.style.color = 'var(--red)';
+      return;
+    }
+
+    btn.disabled    = true;
+    btn.textContent = 'Submitting\u2026';
 
     const payload = {
       orgName:     portalMe?.agencyName || portalMe?.orgName || '',
@@ -917,7 +1222,11 @@
       contactName: portalMe?.contactName || '',
       poNumber:    document.getElementById('orderPoNumber').value.trim(),
       notes:       document.getElementById('orderNotes').value.trim(),
-      items,
+      items: _cart.map(item => ({
+        recordId:  item.recordId,
+        qty:       item.qty,
+        unitPrice: item.unitPrice,
+      })),
     };
 
     try {
@@ -949,19 +1258,20 @@
   }
 
   function resetOrderForm() {
-    // Reset qty inputs
-    document.querySelectorAll('.qty-input').forEach(inp => {
-      inp.value = 0;
-      inp.classList.remove('has-qty');
-    });
+    _cart = [];
+    _activeParent = null;
     document.getElementById('orderPoNumber').value = '';
     document.getElementById('orderNotes').value    = '';
     document.getElementById('orderSubtotal').textContent = '$0.00';
+    document.getElementById('cartSection').style.display = 'none';
+    document.getElementById('cartBody').innerHTML   = '';
     document.getElementById('submitOrderMsg').textContent = '';
-    document.getElementById('submitOrderBtn').disabled  = false;
+    document.getElementById('submitOrderBtn').disabled  = true;
     document.getElementById('submitOrderBtn').textContent = 'Submit Order';
     document.getElementById('orderConfirmCard').style.display = 'none';
     document.getElementById('orderFormCard').style.display    = '';
+    // Re-render catalog to reset all accordion states
+    if (_catalogData) _renderCatalog(_catalogData);
     window.scrollTo(0, 0);
   }
 
