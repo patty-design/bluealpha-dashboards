@@ -506,6 +506,43 @@
     let accountInfoLoaded = false;
     let quoteBuilderDirty = false; // true after a quote is submitted — reload iframe on next visit
 
+    // ── Silent background refresh ─────────────────────────────────────────────
+    // Caches expire after 5 minutes; silently refetch on tab switch or page focus
+    const _CACHE_TTL_MS = 5 * 60 * 1000;
+    let _quotesCacheTs   = 0;
+    let _ordersCacheTs   = 0;
+    let _invoicesCacheTs = 0;
+
+    function _activeTabName() {
+      const t = document.querySelector('.tab.active');
+      return t ? t.dataset.tab : '';
+    }
+
+    async function _silentRefresh() {
+      const tab = _activeTabName();
+      const now = Date.now();
+      try {
+        if (tab === 'our-quotes' && _quotesCache && now - _quotesCacheTs > _CACHE_TTL_MS) {
+          const d = await (await fetch('/api/portal/quotes', { credentials: 'same-origin' })).json();
+          if (d && d.quotes) { _quotesCache = d; _quotesCacheTs = now; _renderQuotes(d.quotes); }
+        } else if (tab === 'our-orders' && _ordersCache && now - _ordersCacheTs > _CACHE_TTL_MS) {
+          const d = await (await fetch('/api/portal/orders', { credentials: 'same-origin' })).json();
+          if (d && d.orders) { _ordersCache = d; _ordersCacheTs = now; _renderOrders(d.orders); }
+        } else if (tab === 'invoices' && _invoicesCache && now - _invoicesCacheTs > _CACHE_TTL_MS) {
+          const resp = await fetch('/api/portal/invoices', { credentials: 'include' });
+          const d = await resp.json();
+          if (d && d.invoices) { _invoicesCache = d; _invoicesCacheTs = now; _renderInvoices(d.invoices); }
+        }
+      } catch (e) { /* silent — don't surface background refresh errors */ }
+    }
+
+    // Refresh when user returns to this browser tab
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') _silentRefresh();
+    });
+    // Also refresh every 5 minutes while the page is open
+    setInterval(_silentRefresh, _CACHE_TTL_MS);
+
     // ── Central pending-changes check ────────────────────────────────────────
     function portalPendingChanges() {
       // Only check what's relevant to the currently visible panel.
@@ -747,7 +784,7 @@
     }
 
     async function loadQuotes() {
-      quotesLoaded = true;
+      quotesLoaded = true; _quotesCacheTs = Date.now();
       const el = document.getElementById('quotesContent');
       try {
         if (!_quotesCache) {
@@ -816,7 +853,7 @@
     }
 
     async function loadOrders() {
-      ordersLoaded = true;
+      ordersLoaded = true; _ordersCacheTs = Date.now();
       const el = document.getElementById('ordersContent');
       try {
         if (!_ordersCache) {
@@ -874,6 +911,7 @@
 
     async function loadInvoices() {
       const el = document.getElementById('invoicesList');
+      _invoicesCacheTs = Date.now();
       try {
         if (!_invoicesCache) {
           const resp = await fetch('/api/portal/invoices', { credentials: 'include' });
