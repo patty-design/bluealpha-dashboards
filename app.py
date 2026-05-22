@@ -6311,11 +6311,11 @@ def _build_invoice_pdf_bytes(inv):
         if stripe_cc_url:
             pdf.set_font("Helvetica", "", 8.5)
             pdf.set_text_color(27, 100, 180)
-            pdf.cell(0, 6, "Pay by Credit Card \u2192", border=0, link=stripe_cc_url, new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(0, 6, "Pay by Credit Card >>", border=0, link=stripe_cc_url, new_x="LMARGIN", new_y="NEXT")
         if stripe_ach_url:
             pdf.set_font("Helvetica", "", 8.5)
             pdf.set_text_color(27, 100, 180)
-            pdf.cell(0, 6, "Pay by ACH / Bank Transfer \u2192", border=0, link=stripe_ach_url, new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(0, 6, "Pay by ACH / Bank Transfer >>", border=0, link=stripe_ach_url, new_x="LMARGIN", new_y="NEXT")
         pdf.ln(4)
 
     # ── Footer pinned to bottom of current page ───────────────────────
