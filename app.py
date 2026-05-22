@@ -6309,19 +6309,13 @@ def _build_invoice_pdf_bytes(inv):
         pdf.cell(0, 5, "Pay Online", border=0, new_x="LMARGIN", new_y="NEXT")
         pdf.ln(1)
         if stripe_cc_url:
-            pdf.set_font("Helvetica", "B", 8)
-            pdf.set_text_color(*TEXT)
-            pdf.cell(28, 5, "Credit Card:", border=0)
-            pdf.set_font("Helvetica", "", 8)
+            pdf.set_font("Helvetica", "", 8.5)
             pdf.set_text_color(27, 100, 180)
-            pdf.cell(0, 5, stripe_cc_url, border=0, link=stripe_cc_url, new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(0, 6, "Pay by Credit Card \u2192", border=0, link=stripe_cc_url, new_x="LMARGIN", new_y="NEXT")
         if stripe_ach_url:
-            pdf.set_font("Helvetica", "B", 8)
-            pdf.set_text_color(*TEXT)
-            pdf.cell(28, 5, "ACH / Bank:", border=0)
-            pdf.set_font("Helvetica", "", 8)
+            pdf.set_font("Helvetica", "", 8.5)
             pdf.set_text_color(27, 100, 180)
-            pdf.cell(0, 5, stripe_ach_url, border=0, link=stripe_ach_url, new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(0, 6, "Pay by ACH / Bank Transfer \u2192", border=0, link=stripe_ach_url, new_x="LMARGIN", new_y="NEXT")
         pdf.ln(4)
 
     # ── Footer pinned to bottom of current page ───────────────────────
