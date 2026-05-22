@@ -6874,6 +6874,17 @@ def portal_logout():
 @app.route("/portal")
 @portal_login_required
 def portal_page(user):
+    # If this customer has contract SKUs, redirect them to the contract portal
+    customer_id = user.get("customer_id", "")
+    if customer_id:
+        try:
+            token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+            formula = f'AND({{Category}}="Contract",FIND("{customer_id}",ARRAYJOIN({{Customers}}))>0)'
+            recs = at_get_all(PRODUCT_SKUS_TABLE_ID, token, fields=["SKU ID"], formula=formula)
+            if recs:
+                return redirect("/contract")
+        except Exception:
+            pass
     return send_from_directory("static", "portal.html")
 
 
