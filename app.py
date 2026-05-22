@@ -2680,11 +2680,28 @@ def submit_return():
 
 @app.route("/api/return-status/<record_id>")
 def return_status(record_id):
-    """Poll for the current status of a return record (reads from in-memory cache set by background thread)."""
+    """Poll for the current status of a return record.
+    Reads from in-memory cache first; falls back to Airtable so app restarts
+    don't cause a permanently stuck 'New' status."""
     status = _return_status_cache.get(record_id)
     if status:
         return Response(json.dumps({"status": status}), headers=cors(), mimetype="application/json")
-    # Not in cache yet — background thread still processing
+    # Not in cache — check Airtable directly (handles post-restart scenarios)
+    try:
+        read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        at_resp = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
+            params={"fields[]": ["Status"]},
+            headers={"Authorization": f"Bearer {read_token}"},
+            timeout=8,
+        )
+        at_status = at_resp.json().get("fields", {}).get("Status", "New")
+        # Populate cache so subsequent polls are fast
+        _return_status_cache[record_id] = at_status
+        return Response(json.dumps({"status": at_status}), headers=cors(), mimetype="application/json")
+    except Exception:
+        pass
+    # Airtable unreachable — tell client to keep polling
     return Response(json.dumps({"status": "New"}), headers=cors(), mimetype="application/json")
 
 
