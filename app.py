@@ -6883,9 +6883,12 @@ def portal_page(user):
     if customer_id:
         try:
             token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
-            formula = f'AND({{Category}}="Contract",FIND("{customer_id}",ARRAYJOIN({{Customers}}))>0)'
-            recs = at_get_all(PRODUCT_SKUS_TABLE_ID, token, fields=["SKU ID"], formula=formula)
-            if recs:
+            # ARRAYJOIN returns display names not IDs, so filter in Python
+            all_contract = at_get_all(PRODUCT_SKUS_TABLE_ID, token,
+                                      fields=["SKU ID", "Customers"],
+                                      formula='{Category}="Contract"')
+            if any(customer_id in r.get("fields", {}).get("Customers", [])
+                   for r in all_contract):
                 return redirect("/contract")
         except Exception:
             pass
