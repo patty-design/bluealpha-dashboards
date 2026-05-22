@@ -451,10 +451,18 @@
     let resetRecordId = null;
     let currentRole   = null; // 'admin' or 'cs'
 
-    // ── Startup: check session ────────────────────────────────────────────────
+    // ── Startup: check session (with one retry for transient server restarts) ──
     (async () => {
-      const resp = await fetch('/api/admin/applications');
-      if (resp.ok) {
+      let resp;
+      try {
+        resp = await fetch('/api/admin/applications');
+      } catch (e) { resp = null; }
+      // If server briefly unavailable, wait 3s and retry once
+      if (!resp || (!resp.ok && resp.status !== 401 && resp.status !== 403)) {
+        await new Promise(r => setTimeout(r, 3000));
+        try { resp = await fetch('/api/admin/applications'); } catch (e) { resp = null; }
+      }
+      if (resp && resp.ok) {
         const data = await resp.json();
         // Determine role from cookie session — call login endpoint won't help here.
         // We probe by fetching users (admin-only) — if 403/401, we're CS.
