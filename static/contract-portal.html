@@ -577,6 +577,10 @@
           <label>Notes <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
           <textarea id="orderNotes" placeholder="Special instructions, delivery notes…" style="height:42px;min-height:42px;"></textarea>
         </div>
+        <div class="order-field">
+          <label>PO Document <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional PDF)</span></label>
+          <input type="file" id="orderPdfFile" accept=".pdf,application/pdf" style="font-size:0.85rem;padding:6px 0;">
+        </div>
       </div>
 
       <div style="margin-top:24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
@@ -1210,6 +1214,19 @@
     btn.disabled    = true;
     btn.textContent = 'Submitting\u2026';
 
+    // Read PDF as base64 if provided
+    let pdfBase64 = null, pdfFilename = null;
+    const pdfFile = document.getElementById('orderPdfFile').files[0];
+    if (pdfFile) {
+      pdfBase64  = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload  = () => res(r.result.split(',')[1]);
+        r.onerror = rej;
+        r.readAsDataURL(pdfFile);
+      });
+      pdfFilename = pdfFile.name;
+    }
+
     const payload = {
       orgName:     portalMe?.agencyName || portalMe?.orgName || '',
       email:       portalMe?.email      || '',
@@ -1217,6 +1234,8 @@
       contactName: portalMe?.contactName || '',
       poNumber:    poNumber,
       notes:       document.getElementById('orderNotes').value.trim(),
+      pdfBase64,
+      pdfFilename,
       items: _cart.map(item => ({
         recordId:  item.recordId,
         qty:       item.qty,

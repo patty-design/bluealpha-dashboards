@@ -5166,7 +5166,25 @@ def create_quote():
                 print(f"[create_quote] line item creation failed {li_r.status_code}: {err_detail} | item={item}")
             li_r.raise_for_status()
 
-        # 5. Send email with PDF attachment
+        # 5. Upload PO document to Airtable if provided
+        pdf_b64  = (data.get("pdfBase64") or "").strip()
+        pdf_name = (data.get("pdfFilename") or "po-document.pdf").strip()
+        if pdf_b64:
+            try:
+                import base64 as _b64, io as _io
+                pdf_bytes = _b64.b64decode(pdf_b64)
+                upload_r = req_lib.post(
+                    f"https://content.airtable.com/v0/{AIRTABLE_BASE_ID}/{mo_record_id}/fldLJ5x2nJhGVuzKv/uploadAttachment",
+                    headers={"Authorization": f"Bearer {token}"},
+                    files={"file": (pdf_name, _io.BytesIO(pdf_bytes), "application/pdf")},
+                    timeout=30,
+                )
+                if not upload_r.ok:
+                    print(f"[create_quote] PDF upload failed {upload_r.status_code}: {upload_r.text[:200]}")
+            except Exception as pdf_err:
+                print(f"[create_quote] PDF upload error: {pdf_err}")
+
+        # 6. Send email with PDF attachment
         try:
             quote_data = _fetch_quote_data(mo_record_id)
             send_quote_email(email, contact_name or org_name, org_name,
