@@ -6296,6 +6296,34 @@ def _build_invoice_pdf_bytes(inv):
     totals_row("Total Due", f"${subtotal:.2f}", bold=True)
     pdf.ln(5)
 
+    # ── Stripe Payment Links ──────────────────────────────────────────
+    stripe_cc_url  = inv.get("stripeCcUrl", "")
+    stripe_ach_url = inv.get("stripeAchUrl", "")
+    if stripe_cc_url or stripe_ach_url:
+        pdf.set_draw_color(*BD)
+        pdf.set_line_width(0.3)
+        pdf.line(19, pdf.get_y(), 19 + W, pdf.get_y())
+        pdf.ln(3)
+        pdf.set_font("Helvetica", "B", 8.5)
+        pdf.set_text_color(*NAVY)
+        pdf.cell(0, 5, "Pay Online", border=0, new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(1)
+        if stripe_cc_url:
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.set_text_color(*TEXT)
+            pdf.cell(28, 5, "Credit Card:", border=0)
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_text_color(27, 100, 180)
+            pdf.cell(0, 5, stripe_cc_url, border=0, link=stripe_cc_url, new_x="LMARGIN", new_y="NEXT")
+        if stripe_ach_url:
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.set_text_color(*TEXT)
+            pdf.cell(28, 5, "ACH / Bank:", border=0)
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_text_color(27, 100, 180)
+            pdf.cell(0, 5, stripe_ach_url, border=0, link=stripe_ach_url, new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(4)
+
     # ── Footer pinned to bottom of current page ───────────────────────
     PAGE_H     = 279.4   # letter height in mm
     BOT_MARGIN = 6       # mm from bottom for footer start
