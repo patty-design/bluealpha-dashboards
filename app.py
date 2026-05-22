@@ -6877,6 +6877,95 @@ def portal_page(user):
     return send_from_directory("static", "portal.html")
 
 
+@app.route("/contract")
+@portal_login_required
+def contract_portal_page(user):
+    return send_from_directory("static", "contract-portal.html")
+
+
+@app.route("/api/contract-catalog", methods=["GET", "OPTIONS"])
+@portal_login_required
+def contract_catalog(user):
+    """Return contract SKUs visible to the logged-in customer."""
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "GET"})
+    c = cors()
+    customer_id = user.get("customer_id", "")
+    if not customer_id:
+        return Response(json.dumps({"error": "No customer"}), status=403, headers=c, mimetype="application/json")
+    try:
+        token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        # Fetch contract SKUs linked to this customer
+        formula = f'AND({{Category}}="Contract",FIND("{customer_id}",ARRAYJOIN({{Customers}}))>0)'
+        sku_records = at_get_all(
+            PRODUCT_SKUS_TABLE_ID, token,
+            fields=["SKU ID", "Name + Variations", "Sale Price", "Parent Product",
+                    "Color", "Size", "Feature Variation", "Add-ons", "Category", "Customers"],
+            formula=formula,
+        )
+        # Fetch parent/color/size/fvar name maps
+        import concurrent.futures as _cf_cc
+        with _cf_cc.ThreadPoolExecutor(max_workers=4) as ex:
+            fut_parents = ex.submit(at_get_all, PARENT_PRODUCTS_TABLE_ID, token, fields=["Name"])
+            fut_colors  = ex.submit(at_get_all, COLORS_TABLE_ID,          token, fields=["Name"])
+            fut_sizes   = ex.submit(at_get_all, SIZES_TABLE_ID,           token, fields=["Name"])
+            fut_fvars   = ex.submit(at_get_all, FEATURE_VARIATIONS_TABLE_ID, token, fields=["Name"])
+            parent_map  = {r["id"]: r["fields"].get("Name","") for r in fut_parents.result()}
+            color_map   = {r["id"]: r["fields"].get("Name","") for r in fut_colors.result()}
+            size_map    = {r["id"]: r["fields"].get("Name","") for r in fut_sizes.result()}
+            fvar_map    = {r["id"]: r["fields"].get("Name","").strip() for r in fut_fvars.result()}
+
+        skus = []
+        seen_parents = {}
+        for r in sku_records:
+            f = r.get("fields", {})
+            parent_ids = f.get("Parent Product", [])
+            if not parent_ids:
+                continue
+            parent_id   = parent_ids[0]
+            parent_name = parent_map.get(parent_id, "")
+            if not parent_name:
+                continue
+            color_ids  = f.get("Color", [])
+            size_ids   = f.get("Size", [])
+            color_id   = color_ids[0] if color_ids else ""
+            size_id    = size_ids[0]  if size_ids  else ""
+            color_name = color_map.get(color_id, "")
+            size_name  = size_map.get(size_id, "")
+            if size_name.strip().lower() in ("none", "n/a", "one size"):
+                size_id = ""; size_name = ""
+            fvar_ids  = f.get("Feature Variation", [])
+            fvar_id   = fvar_ids[0] if fvar_ids else ""
+            fvar_name = fvar_map.get(fvar_id, "").strip() if fvar_id else ""
+            if fvar_name.lower() in ("none", ""):
+                fvar_id = ""; fvar_name = ""
+            skus.append({
+                "recordId":       r["id"],
+                "sku":            f.get("SKU ID", ""),
+                "name":           f.get("Name + Variations", ""),
+                "price":          f.get("Sale Price", 0),
+                "parentId":       parent_id,
+                "parentName":     parent_name,
+                "colorId":        color_id,
+                "colorName":      color_name,
+                "sizeId":         size_id,
+                "sizeName":       size_name,
+                "featureVarId":   fvar_id,
+                "featureVarName": fvar_name,
+            })
+            if parent_id not in seen_parents:
+                seen_parents[parent_id] = parent_name
+
+        parents = sorted(
+            [{"id": k, "name": v} for k, v in seen_parents.items()],
+            key=lambda x: x["name"],
+        )
+        return Response(json.dumps({"parents": parents, "skus": skus}), headers=c, mimetype="application/json")
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
 @app.route("/api/portal/me")
 @portal_login_required
 def portal_me(user):
