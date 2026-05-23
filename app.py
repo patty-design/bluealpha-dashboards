@@ -10816,7 +10816,8 @@ def admin_invoices():
             MANUAL_ORDERS_TABLE_ID, read_token,
             fields=["Document ID", "Order ID", "Date", "Snapshot Org", "MO Line Items",
                     "Invoice Paid", "Check #", "Check Date", "Check Payment Amount",
-                    "Stripe Invoice Status (CC)", "Stripe Invoice Status (ACH)"],
+                    "Stripe Invoice Status (CC)", "Stripe Invoice Status (ACH)",
+                    "Stripe Invoice Due Date"],
             formula='{Order Type}="Invoice"',
         )
 
@@ -10856,6 +10857,7 @@ def admin_invoices():
                 "so_number":     so_number,
                 "customer_name": f.get("Snapshot Org", "") or "",
                 "date":          f.get("Date", ""),
+                "due_date":      f.get("Stripe Invoice Due Date", "") or "",
                 "total":         total,
                 "is_paid":       is_paid,
                 "check_number":  check_number,

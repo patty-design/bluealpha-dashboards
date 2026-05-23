@@ -369,10 +369,14 @@
 
       <!-- Admin: Invoices -->
       <div class="tab-panel" id="tab-invoices">
+        <div style="margin-bottom:10px;">
+          <input type="text" id="invoiceSearch" placeholder="Search customer or invoice #…" oninput="applyInvoiceFilters()" style="max-width:320px;margin-bottom:0;">
+        </div>
         <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
           <button class="filter-btn active" onclick="filterInvoices(this,'all')">All</button>
           <button class="filter-btn" onclick="filterInvoices(this,'unpaid')">Unpaid</button>
           <button class="filter-btn" onclick="filterInvoices(this,'paid')">Paid</button>
+          <button class="filter-btn" onclick="filterInvoices(this,'pastdue')">Past Due</button>
         </div>
         <div id="invoicesContent"><div class="loading">Loading…</div></div>
       </div>
@@ -1202,19 +1206,40 @@
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
         allInvoices = data.invoices || [];
-        renderInvoices(allInvoices);
+        applyInvoiceFilters();
         invoicesLoaded = true;
       } catch (e) {
         el.innerHTML = `<div class="empty-state">Failed to load: ${esc(e.message)}</div>`;
       }
     }
 
+    let _invoiceFilter = 'all';
+
     function filterInvoices(btn, filter) {
       document.querySelectorAll('#tab-invoices .filter-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      const filtered = filter === 'paid'   ? allInvoices.filter(i => i.is_paid)
-                     : filter === 'unpaid' ? allInvoices.filter(i => !i.is_paid)
-                     : allInvoices;
+      _invoiceFilter = filter;
+      applyInvoiceFilters();
+    }
+
+    function applyInvoiceFilters() {
+      const q = (document.getElementById('invoiceSearch')?.value || '').toLowerCase().trim();
+      const today = new Date().toISOString().slice(0, 10);
+      let filtered = allInvoices;
+
+      // Status filter
+      if (_invoiceFilter === 'paid')    filtered = filtered.filter(i => i.is_paid);
+      if (_invoiceFilter === 'unpaid')  filtered = filtered.filter(i => !i.is_paid);
+      if (_invoiceFilter === 'pastdue') filtered = filtered.filter(i =>
+        !i.is_paid && i.due_date && i.due_date < today
+      );
+
+      // Text search: customer name or invoice #
+      if (q) filtered = filtered.filter(i =>
+        (i.customer_name || '').toLowerCase().includes(q) ||
+        (i.inv_number    || '').toLowerCase().includes(q)
+      );
+
       renderInvoices(filtered);
     }
 
