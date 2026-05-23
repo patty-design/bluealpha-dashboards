@@ -268,6 +268,22 @@
     .add-user-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
     .add-user-form .form-col-full { grid-column: 1 / -1; }
     @media (max-width: 600px) { .add-user-form { grid-template-columns: 1fr; } }
+    /* Filter buttons (Invoices tab) */
+    .filter-btn {
+      padding: 7px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 20px;
+      background: var(--white);
+      color: var(--muted);
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .filter-btn:hover { border-color: var(--navy); color: var(--navy); }
+    .filter-btn.active { background: var(--navy); color: var(--white); border-color: var(--navy); }
   </style>
 </head>
 <body>
@@ -306,6 +322,8 @@
         <div class="tab cs-only" data-tab="cs-apps" style="display:none;">Applications</div>
         <!-- Admin-only Shipped Orders tab -->
         <div class="tab admin-only" data-tab="shipped">📦 Shipped Orders</div>
+        <!-- Admin-only Invoices tab -->
+        <div class="tab admin-only" data-tab="invoices">📄 Invoices</div>
         <!-- Admin-only Users tab -->
         <div class="tab admin-only" data-tab="users" style="margin-left:auto;">👥 Users</div>
         <!-- Password tab (both roles) -->
@@ -347,6 +365,16 @@
           </div>
           <div id="shippedContent"><div class="loading">Loading…</div></div>
         </div>
+      </div>
+
+      <!-- Admin: Invoices -->
+      <div class="tab-panel" id="tab-invoices">
+        <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="filter-btn active" onclick="filterInvoices(this,'all')">All</button>
+          <button class="filter-btn" onclick="filterInvoices(this,'unpaid')">Unpaid</button>
+          <button class="filter-btn" onclick="filterInvoices(this,'paid')">Paid</button>
+        </div>
+        <div id="invoicesContent"><div class="loading">Loading…</div></div>
       </div>
 
       <!-- Admin: Users management -->
@@ -441,6 +469,25 @@
       <div class="modal-btns" style="margin-top:14px;">
         <button class="btn btn-outline" onclick="closeResetModal()">Cancel</button>
         <button class="btn btn-primary" onclick="submitResetPw()">Set Password</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mark Paid by Check Modal -->
+  <div class="modal-overlay" id="markPaidModal">
+    <div class="modal">
+      <h3>Mark Paid by Check</h3>
+      <p>Enter the check details to record this invoice as paid.</p>
+      <label>Check #</label>
+      <input type="text" id="checkNumber" placeholder="e.g. 1042" autocomplete="off">
+      <label style="margin-top:4px;">Check Date</label>
+      <input type="date" id="checkDate">
+      <label style="margin-top:4px;">Check Amount ($)</label>
+      <input type="number" id="checkAmount" placeholder="0.00" step="0.01" min="0">
+      <div id="markPaidMsg"></div>
+      <div class="modal-btns" style="margin-top:14px;">
+        <button class="btn btn-outline" onclick="closeMarkPaidModal()">Cancel</button>
+        <button class="btn btn-success" id="markPaidSubmitBtn" onclick="submitMarkPaid()">Save</button>
       </div>
     </div>
   </div>
@@ -1134,6 +1181,127 @@
       const t = tn.replace(/\s/g, '');
       if (/^1Z/i.test(t)) return `https://www.ups.com/track?tracknum=${t}`;
       return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${t}`;
+    }
+
+    // ── Invoices (admin only) ─────────────────────────────────────────────────
+    let allInvoices = [];
+    let invoicesLoaded = false;
+    let markPaidRecordId = null;
+
+    document.querySelectorAll('.tab').forEach(tab => {
+      if (tab.dataset.tab === 'invoices') {
+        tab.addEventListener('click', () => { if (!invoicesLoaded) loadInvoices(); });
+      }
+    });
+
+    async function loadInvoices() {
+      const el = document.getElementById('invoicesContent');
+      el.innerHTML = '<div class="loading">Loading…</div>';
+      try {
+        const resp = await fetch('/api/admin/invoices');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        allInvoices = data.invoices || [];
+        renderInvoices(allInvoices);
+        invoicesLoaded = true;
+      } catch (e) {
+        el.innerHTML = `<div class="empty-state">Failed to load: ${esc(e.message)}</div>`;
+      }
+    }
+
+    function filterInvoices(btn, filter) {
+      document.querySelectorAll('#tab-invoices .filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const filtered = filter === 'paid'   ? allInvoices.filter(i => i.is_paid)
+                     : filter === 'unpaid' ? allInvoices.filter(i => !i.is_paid)
+                     : allInvoices;
+      renderInvoices(filtered);
+    }
+
+    function renderInvoices(invoices) {
+      const el = document.getElementById('invoicesContent');
+      if (!invoices.length) {
+        el.innerHTML = '<div class="empty-state">No invoices found.</div>';
+        return;
+      }
+      let html = '<div class="card"><table><thead><tr>'
+        + '<th>Invoice #</th><th>SO #</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th><th>Actions</th>'
+        + '</tr></thead><tbody>';
+      invoices.forEach(inv => {
+        const statusBadge = inv.is_paid
+          ? '<span class="badge" style="background:#d4edda;color:#155724;">PAID</span>'
+          : '<span class="badge" style="background:#f8d7da;color:#721c24;">UNPAID</span>';
+        let actions = '';
+        if (!inv.is_paid) {
+          actions = `<button class="btn btn-outline btn-sm" onclick="openMarkPaidModal('${esc(inv.record_id)}')">Mark Paid by Check</button>`;
+        } else if (inv.check_number) {
+          actions = `<small style="color:var(--muted);">Check #${esc(inv.check_number)}</small>`;
+        }
+        html += `<tr>
+          <td><strong>${esc(inv.inv_number)}</strong></td>
+          <td>${esc(inv.so_number)}</td>
+          <td>${esc(inv.customer_name)}</td>
+          <td>${fmt(inv.date)}</td>
+          <td>$${inv.total.toFixed(2)}</td>
+          <td>${statusBadge}</td>
+          <td>${actions}</td>
+        </tr>`;
+      });
+      html += '</tbody></table></div>';
+      el.innerHTML = html;
+    }
+
+    function openMarkPaidModal(recordId) {
+      markPaidRecordId = recordId;
+      document.getElementById('checkNumber').value = '';
+      document.getElementById('checkDate').value = '';
+      document.getElementById('checkAmount').value = '';
+      document.getElementById('markPaidMsg').innerHTML = '';
+      const btn = document.getElementById('markPaidSubmitBtn');
+      btn.disabled = false;
+      btn.textContent = 'Save';
+      document.getElementById('markPaidModal').classList.add('show');
+    }
+
+    function closeMarkPaidModal() {
+      markPaidRecordId = null;
+      document.getElementById('markPaidModal').classList.remove('show');
+    }
+
+    async function submitMarkPaid() {
+      const checkNumber = document.getElementById('checkNumber').value.trim();
+      const checkDate   = document.getElementById('checkDate').value.trim();
+      const checkAmount = parseFloat(document.getElementById('checkAmount').value);
+      const msgEl = document.getElementById('markPaidMsg');
+      msgEl.innerHTML = '';
+      if (!checkNumber || !checkDate || isNaN(checkAmount) || checkAmount < 0) {
+        msgEl.innerHTML = '<div class="alert alert-error" style="margin-top:10px;">All fields are required.</div>';
+        return;
+      }
+      const btn = document.getElementById('markPaidSubmitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      try {
+        const resp = await fetch(`/api/admin/invoices/${markPaidRecordId}/mark-paid-check`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ checkNumber, checkDate, checkAmount })
+        });
+        const data = await resp.json();
+        if (resp.ok && data.ok) {
+          closeMarkPaidModal();
+          invoicesLoaded = false;
+          loadInvoices();
+        } else {
+          msgEl.innerHTML = `<div class="alert alert-error" style="margin-top:10px;">${data.error || 'Failed to save.'}</div>`;
+          btn.disabled = false;
+          btn.textContent = 'Save';
+        }
+      } catch (e) {
+        msgEl.innerHTML = '<div class="alert alert-error" style="margin-top:10px;">Network error.</div>';
+        btn.disabled = false;
+        btn.textContent = 'Save';
+      }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

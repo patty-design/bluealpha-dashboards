@@ -10800,6 +10800,114 @@ def admin_sync_tracking_debug():
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Admin: Invoices
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/api/admin/invoices", methods=["GET"])
+def admin_invoices():
+    """Return all Invoice-type Manual Orders for the admin portal."""
+    c = cors()
+    if not check_admin_session(request):
+        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+    try:
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+
+        inv_records = at_get_all(
+            MANUAL_ORDERS_TABLE_ID, read_token,
+            fields=["Document ID", "Order ID", "Date", "Snapshot Org", "MO Line Items",
+                    "Invoice Paid", "Check #", "Check Date", "Check Payment Amount",
+                    "Stripe Invoice Status (CC)", "Stripe Invoice Status (ACH)"],
+            formula='{Order Type}="Invoice"',
+        )
+
+        # Batch-fetch all line items to calculate totals
+        all_li_ids = []
+        for rec in inv_records:
+            all_li_ids.extend(rec.get("fields", {}).get("MO Line Items", []))
+        li_total_map = {}
+        if all_li_ids:
+            for i in range(0, len(all_li_ids), 100):
+                batch = all_li_ids[i:i + 100]
+                formula = "OR(" + ",".join(f'RECORD_ID()="{lid}"' for lid in batch) + ")"
+                li_recs = at_get_all(MO_LINE_ITEMS_TABLE_ID, read_token,
+                                     fields=["Dynamic Line Item Total"],
+                                     formula=formula)
+                for lr in li_recs:
+                    li_total_map[lr["id"]] = float(lr.get("fields", {}).get("Dynamic Line Item Total") or 0)
+
+        invoices = []
+        for rec in inv_records:
+            f = rec.get("fields", {})
+            order_id     = str(f.get("Order ID", "")).strip()
+            so_number    = f"SO-{order_id}" if order_id else ""
+            inv_number   = f.get("Document ID", f"IN-{order_id}")
+            li_ids       = f.get("MO Line Items", [])
+            total        = round(sum(li_total_map.get(lid, 0) for lid in li_ids), 2)
+            cc_status    = f.get("Stripe Invoice Status (CC)", "")
+            ach_status   = f.get("Stripe Invoice Status (ACH)", "")
+            is_paid      = bool(f.get("Invoice Paid")) or cc_status == "paid" or ach_status == "paid"
+            check_number = f.get("Check #", "") or ""
+            check_date   = f.get("Check Date", "") or ""
+            check_amt_raw = f.get("Check Payment Amount")
+            check_amount  = float(check_amt_raw) if check_amt_raw is not None else None
+            invoices.append({
+                "record_id":     rec["id"],
+                "inv_number":    inv_number,
+                "so_number":     so_number,
+                "customer_name": f.get("Snapshot Org", "") or "",
+                "date":          f.get("Date", ""),
+                "total":         total,
+                "is_paid":       is_paid,
+                "check_number":  check_number,
+                "check_date":    check_date,
+                "check_amount":  check_amount,
+            })
+
+        invoices.sort(key=lambda x: x.get("date", ""), reverse=True)
+        return Response(json.dumps({"invoices": invoices}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/admin/invoices/<record_id>/mark-paid-check", methods=["PATCH"])
+def admin_mark_invoice_paid_check(record_id):
+    """Mark an invoice as paid by check — writes Check #, Check Date, Check Payment Amount."""
+    c = cors()
+    if not check_admin_session(request):
+        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+    body = request.get_json() or {}
+    check_number = (body.get("checkNumber") or "").strip()
+    check_date   = (body.get("checkDate") or "").strip()
+    check_amount = body.get("checkAmount")
+    if not check_number or not check_date or check_amount is None:
+        return Response(
+            json.dumps({"error": "checkNumber, checkDate, and checkAmount are required"}),
+            status=400, headers=c, mimetype="application/json",
+        )
+    try:
+        write_token = RETURNS_WRITE_TOKEN
+        r = req_lib.patch(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": {
+                "Check #":              check_number,
+                "Check Date":           check_date,
+                "Check Payment Amount": float(check_amount),
+            }},
+            timeout=15,
+        )
+        if not r.ok:
+            return Response(
+                json.dumps({"error": f"Airtable error: {r.text[:200]}"}),
+                status=500, headers=c, mimetype="application/json",
+            )
+        _INVOICES_CACHE.clear()
+        return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
