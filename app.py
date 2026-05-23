@@ -9988,7 +9988,8 @@ def portal_invoices(user):
             MANUAL_ORDERS_TABLE_ID, read_token,
             fields=["Document ID", "Order ID", "Date", "MO Line Items",
                     "Sales Order Status", "Go-to PDF", "Customer",
-                    "Stripe Invoice Status (CC)", "Stripe Invoice Status (ACH)"],
+                    "Stripe Invoice Status (CC)", "Stripe Invoice Status (ACH)",
+                    "Invoice Paid"],
             formula='{Order Type}="Invoice"',
         )
         # Filter to this customer
@@ -10032,7 +10033,7 @@ def portal_invoices(user):
             go_to_pdf_url   = go_to_pdf_field.get("url", "") if isinstance(go_to_pdf_field, dict) else ""
             cc_status  = f.get("Stripe Invoice Status (CC)", "")
             ach_status = f.get("Stripe Invoice Status (ACH)", "")
-            is_paid    = (cc_status == "paid" or ach_status == "paid")
+            is_paid    = bool(f.get("Invoice Paid")) or cc_status == "paid" or ach_status == "paid"
             invoices.append({
                 "record_id":  rec["id"],
                 "inv_number": inv_number,
