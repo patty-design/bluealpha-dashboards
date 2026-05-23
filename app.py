@@ -10837,6 +10837,28 @@ def admin_invoices():
                     li_total_map[lr["id"]] = float(lr.get("fields", {}).get("Dynamic Line Item Total") or 0)
 
         invoices = []
+        # Collect customer IDs that are missing Snapshot Org so we can batch-fetch names
+        missing_cust_ids = set()
+        for rec in inv_records:
+            f = rec.get("fields", {})
+            if not f.get("Snapshot Org"):
+                for cid in f.get("Customer", []):
+                    missing_cust_ids.add(cid)
+        # Batch-fetch org names for those customers
+        cust_name_map = {}
+        for cid in missing_cust_ids:
+            try:
+                cr = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{cid}",
+                    headers=at_headers(read_token),
+                    params={"fields[]": ["Organization Name"]},
+                    timeout=10,
+                )
+                if cr.status_code == 200:
+                    cust_name_map[cid] = cr.json().get("fields", {}).get("Organization Name", "")
+            except Exception:
+                pass
+
         for rec in inv_records:
             f = rec.get("fields", {})
             order_id     = str(f.get("Order ID", "")).strip()
@@ -10851,11 +10873,16 @@ def admin_invoices():
             check_date   = f.get("Check Date", "") or ""
             check_amt_raw = f.get("Check Payment Amount")
             check_amount  = float(check_amt_raw) if check_amt_raw is not None else None
+            # Resolve customer name: prefer Snapshot Org, fall back to linked customer record
+            snapshot_org  = f.get("Snapshot Org", "") or ""
+            if not snapshot_org:
+                linked_custs = f.get("Customer", [])
+                snapshot_org = cust_name_map.get(linked_custs[0], "") if linked_custs else ""
             invoices.append({
                 "record_id":     rec["id"],
                 "inv_number":    inv_number,
                 "so_number":     so_number,
-                "customer_name": f.get("Snapshot Org", "") or "",
+                "customer_name": snapshot_org,
                 "date":          f.get("Date", ""),
                 "due_date":      f.get("Stripe Invoice Due Date", "") or "",
                 "total":         total,
