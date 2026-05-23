@@ -482,7 +482,8 @@
       <input type="text" id="checkNumber" placeholder="e.g. 1042" autocomplete="off">
       <label style="margin-top:4px;">Check Date</label>
       <input type="date" id="checkDate">
-      <input type="hidden" id="checkAmount">
+      <label style="margin-top:4px;">Check Amount ($)</label>
+      <input type="number" id="checkAmount" placeholder="0.00" step="0.01" min="0">
       <div id="markPaidMsg"></div>
       <div class="modal-btns" style="margin-top:14px;">
         <button class="btn btn-outline" onclick="closeMarkPaidModal()">Cancel</button>
@@ -1232,7 +1233,7 @@
           : '<span class="badge" style="background:#f8d7da;color:#721c24;">UNPAID</span>';
         let actions = '';
         if (!inv.is_paid) {
-          actions = `<button class="btn btn-outline btn-sm" onclick="openMarkPaidModal('${esc(inv.record_id)}', ${inv.total})">Mark Paid by Check</button>`;
+          actions = `<button class="btn btn-outline btn-sm" onclick="openMarkPaidModal('${esc(inv.record_id)}')">Mark Paid by Check</button>`;
         } else if (inv.check_number) {
           actions = `<small style="color:var(--muted);">Check #${esc(inv.check_number)}</small>`;
         }
@@ -1250,11 +1251,11 @@
       el.innerHTML = html;
     }
 
-    function openMarkPaidModal(recordId, total) {
+    function openMarkPaidModal(recordId) {
       markPaidRecordId = recordId;
       document.getElementById('checkNumber').value = '';
       document.getElementById('checkDate').value = '';
-      document.getElementById('checkAmount').value = total || 0;
+      document.getElementById('checkAmount').value = '';
       document.getElementById('markPaidMsg').innerHTML = '';
       const btn = document.getElementById('markPaidSubmitBtn');
       btn.disabled = false;
@@ -1273,8 +1274,8 @@
       const checkAmount = parseFloat(document.getElementById('checkAmount').value);
       const msgEl = document.getElementById('markPaidMsg');
       msgEl.innerHTML = '';
-      if (!checkNumber || !checkDate) {
-        msgEl.innerHTML = '<div class="alert alert-error" style="margin-top:10px;">Check # and Check Date are required.</div>';
+      if (!checkNumber || !checkDate || isNaN(checkAmount) || checkAmount <= 0) {
+        msgEl.innerHTML = '<div class="alert alert-error" style="margin-top:10px;">All fields are required.</div>';
         return;
       }
       const btn = document.getElementById('markPaidSubmitBtn');
