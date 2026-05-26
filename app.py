@@ -4074,10 +4074,6 @@ def send_quote_email(to_email, to_name, company, quote_number, record_id, expiry
                   <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Expires</td>
                   <td style="padding:4px 0;color:#1a2633;font-size:13px;">{expiry_date}</td>
                 </tr>
-                <tr>
-                  <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Terms</td>
-                  <td style="padding:4px 0;color:#1a2633;font-size:13px;">Net 30</td>
-                </tr>
               </table>
             </td></tr>
           </table>
@@ -4167,10 +4163,6 @@ def send_quote_accepted_email(to_email, to_name, org_name, qu_number, so_number)
                 <tr>
                   <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Sales Order</td>
                   <td style="padding:4px 0;color:#1a2633;font-size:13px;font-weight:700;">{so_number}</td>
-                </tr>
-                <tr>
-                  <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Terms</td>
-                  <td style="padding:4px 0;color:#1a2633;font-size:13px;">Net 30</td>
                 </tr>
               </table>
             </td></tr>
@@ -4275,10 +4267,6 @@ def send_invoice_email(to_email, to_name, org_name, so_number, inv_number, line_
                   <td style="padding:4px 0;color:#1a2633;font-size:13px;">{tracking_display}</td>
                 </tr>
                 {'<tr><td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Ship Date</td><td style="padding:4px 0;color:#1a2633;font-size:13px;">' + ship_date_display + '</td></tr>' if ship_date_display else ''}
-                <tr>
-                  <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Terms</td>
-                  <td style="padding:4px 0;color:#1a2633;font-size:13px;">Net 30</td>
-                </tr>
                 <tr>
                   <td style="padding:4px 0;color:#6b7a8d;font-size:13px;">Invoice Date</td>
                   <td style="padding:4px 0;color:#1a2633;font-size:13px;">{today_str}</td>
