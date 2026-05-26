@@ -6556,9 +6556,8 @@ def apply_page():
         )
         if dup_check:
             return Response(json.dumps({"error": (
-                "An account already exists for this organization name. "
-                "If your organization has multiple locations or offices, "
-                "please contact us directly to set up your account."
+                "An account already exists with this organization name. "
+                "Please enter a different name."
             )}), status=409, headers=c, mimetype="application/json")
     except Exception as _dup_err:
         print(f"[apply] duplicate check failed: {_dup_err}")  # non-fatal — proceed
