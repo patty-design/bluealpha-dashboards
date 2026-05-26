@@ -4041,7 +4041,7 @@ def send_quote_email(to_email, to_name, company, quote_number, record_id, expiry
     if not SENDGRID_API_KEY:
         return
     actual_to = TEST_EMAIL_OVERRIDE or to_email
-    quote_link = f"{QUOTE_BASE_URL}/portal"
+    quote_link = f"{QUOTE_BASE_URL}/portal?tab=our-quotes&quote={record_id}"
     first_name = to_name.split()[0] if to_name else "there"
     subject = f"Your Blue Alpha Quote \u2013 {quote_number}"
     html_body = f"""<!DOCTYPE html>
