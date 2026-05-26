@@ -6916,7 +6916,9 @@ def portal_page(user):
 @app.route("/contract")
 @portal_login_required
 def contract_portal_page(user):
-    return send_from_directory("static", "contract-portal.html")
+    resp = send_from_directory("static", "contract-portal.html")
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    return resp
 
 
 @app.route("/api/contract-catalog", methods=["GET", "OPTIONS"])

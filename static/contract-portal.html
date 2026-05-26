@@ -781,7 +781,7 @@
   }
 
   // ── Silent background refresh ─────────────────────────────────────────────
-  const _CACHE_TTL_MS = 5 * 60 * 1000;
+  const _CACHE_TTL_MS = 60 * 1000; // 60 seconds
 
   async function _silentRefresh() {
     const tab = activeTabName();
@@ -797,8 +797,12 @@
     } catch (e) { /* silent */ }
   }
 
+  // Refresh when user returns to this browser tab — force by resetting timestamps
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') _silentRefresh();
+    if (document.visibilityState === 'visible') {
+      _myOrdersCacheTs = 0; _invoicesCacheTs = 0;
+      _silentRefresh();
+    }
   });
   setInterval(_silentRefresh, _CACHE_TTL_MS);
 
@@ -1359,7 +1363,8 @@
     _myOrdersCacheTs = Date.now();
     const el = document.getElementById('myOrdersContent');
     try {
-      if (!_myOrdersCache) {
+      // Always re-fetch — backend cache keeps this fast
+      {
         // Fetch both portal-submitted quotes AND approved sales orders in parallel
         const [qData, oData] = await Promise.all([
           fetch('/api/portal/quotes',  { credentials: 'same-origin' }).then(r => r.ok ? r.json() : { quotes: [] }),
