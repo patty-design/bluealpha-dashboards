@@ -7120,7 +7120,7 @@ def portal_update_profile(user):
         parts = [p for p in [city, f"{state} {zip_code}".strip()] if p]
         return ", ".join(parts)
     fields = {}
-    if data.get("orgName"):     fields["Organization Name"]            = data["orgName"].strip()
+    # Organization Name is intentionally excluded — cannot be changed via portal
     if data.get("contactName"): fields["Main Contact Name"]            = data["contactName"].strip()
     if data.get("email"):       fields["Main Contact Email"]           = data["email"].strip()
     if data.get("phone"):       fields["Main Contact Phone #"]         = data["phone"].strip()
@@ -7862,8 +7862,9 @@ def portal_account_info(user):
         return Response(json.dumps({"error": "Admin access required"}), status=403, headers=c, mimetype="application/json")
     data = request.get_json() or {}
     _MAP = {
-        "shipOrg":   "Organization Name",      "shipName":  "Main Contact Name",
-        "shipEmail": "Main Contact Email",      "shipPhone": "Main Contact Phone #",
+        # Organization Name is intentionally excluded — cannot be changed via portal
+        "shipName":  "Main Contact Name",       "shipEmail": "Main Contact Email",
+        "shipPhone": "Main Contact Phone #",
         "shipAddr1": "Customer Address (Line 1)", "shipAddr2": "Customer Address (Line 2)",
         "billOrg":   "Bill-To Org Name",        "billName":  "Bill-To Contact Name",
         "billEmail": "Bill-To Contact Email",   "billPhone": "Bill-To Phone #",
@@ -7914,7 +7915,7 @@ def portal_update_quote_addresses(user, record_id):
         if data.get("billName"):  fields["Bill-To Contact Name"]         = data["billName"]
         if "billAddr1" in data:   fields["Bill-To Address (Line 1)"]     = data["billAddr1"]
         if "billAddr2" in data:   fields["Bill-To Address (Line 2)"]     = data["billAddr2"]
-        if data.get("shipOrg"):   fields["Organization Name"]            = data["shipOrg"]
+        # Organization Name is intentionally excluded — cannot be changed via portal
         if data.get("shipName"):  fields["Main Contact Name"]            = data["shipName"]
         if "shipAddr1" in data:   fields["Customer Address (Line 1)"]    = data["shipAddr1"]
         if "shipLine2" in data:   fields["Customer Address (Line 2)"]    = data["shipLine2"]
