@@ -6885,7 +6885,9 @@ def portal_page(user):
                 return redirect("/contract")
         except Exception:
             pass
-    return send_from_directory("static", "portal.html")
+    resp = send_from_directory("static", "portal.html")
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    return resp
 
 
 @app.route("/contract")
