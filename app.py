@@ -4413,6 +4413,7 @@ def _fetch_quote_data(record_id):
             customer = {
                 # Use snapshot if present, fall back to customer record
                 "orgName":      _snap_org     or cf.get("Organization Name", ""),
+                "shipToOrg":    cf.get("Ship To Name", "") or _snap_org or cf.get("Organization Name", ""),
                 "contactName":  _snap_contact or cf.get("Main Contact Name", ""),
                 "email":        _snap_email   or cf.get("Main Contact Email", ""),
                 "phone":        _snap_phone   or cf.get("Main Contact Phone #", ""),
@@ -5682,8 +5683,9 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
     y_after_bill = pdf.get_y()
 
     # --- Ship To ---
+    ship_org_display = cust.get("shipToOrg") or cust.get("orgName", "")
     ship_lines = [
-        cust.get("orgName", ""),
+        ship_org_display,
         cust.get("contactName", ""),
         addr1,
         ", ".join(filter(None, [city, f"{state_v} {zip_v}".strip()])),
@@ -5695,7 +5697,7 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
     for ln in ship_lines:
         if ln:
             pdf.set_x(ship_x)
-            pdf.set_font("Helvetica", "B" if ln == cust.get("orgName", "") else "", 8)
+            pdf.set_font("Helvetica", "B" if ln == ship_org_display else "", 8)
             pdf.set_text_color(*TEXT)
             pdf.cell(col3_w, 5, ln, border=0, new_x="LEFT", new_y="NEXT")
     y_after_ship = pdf.get_y()
@@ -7838,7 +7840,7 @@ def portal_account_info(user):
             else:
                 print(f"[account_info] AT fetch failed: id={customer_id} status={r.status_code} body={r.text[:300]}")
             return Response(json.dumps({"info": {
-                "shipOrg":   f.get("Organization Name", ""),
+                "shipOrg":   f.get("Ship To Name", "") or f.get("Organization Name", ""),
                 "shipName":  f.get("Main Contact Name", ""),
                 "shipEmail": f.get("Main Contact Email", ""),
                 "shipPhone": f.get("Main Contact Phone #", ""),
@@ -7862,8 +7864,8 @@ def portal_account_info(user):
         return Response(json.dumps({"error": "Admin access required"}), status=403, headers=c, mimetype="application/json")
     data = request.get_json() or {}
     _MAP = {
-        # Organization Name is intentionally excluded — cannot be changed via portal
-        "shipName":  "Main Contact Name",       "shipEmail": "Main Contact Email",
+        "shipOrg":   "Ship To Name",            "shipName":  "Main Contact Name",
+        "shipEmail": "Main Contact Email",
         "shipPhone": "Main Contact Phone #",
         "shipAddr1": "Customer Address (Line 1)", "shipAddr2": "Customer Address (Line 2)",
         "billOrg":   "Bill-To Org Name",        "billName":  "Bill-To Contact Name",
@@ -7915,7 +7917,8 @@ def portal_update_quote_addresses(user, record_id):
         if data.get("billName"):  fields["Bill-To Contact Name"]         = data["billName"]
         if "billAddr1" in data:   fields["Bill-To Address (Line 1)"]     = data["billAddr1"]
         if "billAddr2" in data:   fields["Bill-To Address (Line 2)"]     = data["billAddr2"]
-        # Organization Name is intentionally excluded — cannot be changed via portal
+        # Organization Name is intentionally excluded — Ship To Name is the editable ship-to org
+        if data.get("shipOrg"):   fields["Ship To Name"]                 = data["shipOrg"]
         if data.get("shipName"):  fields["Main Contact Name"]            = data["shipName"]
         if "shipAddr1" in data:   fields["Customer Address (Line 1)"]    = data["shipAddr1"]
         if "shipLine2" in data:   fields["Customer Address (Line 2)"]    = data["shipLine2"]
