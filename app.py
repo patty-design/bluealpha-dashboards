@@ -5023,23 +5023,9 @@ def create_quote():
 
         if provided_cust_id:
             cust_id = provided_cust_id
-            # Only update address/phone — never overwrite org name or contact name from the
-            # quote form, as Chrome autofill can corrupt those fields on the customer record
-            # and break billing info on ALL existing quotes for that customer.
-            _cust_update = {}
-            if phone:  _cust_update["Main Contact Phone #"]      = phone
-            if _line1: _cust_update["Customer Address (Line 1)"] = _line1
-            if _line2: _cust_update["Customer Address (Line 2)"] = _line2
-            if _cust_update:
-                try:
-                    req_lib.patch(
-                        f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{cust_id}",
-                        headers={**at_headers(token), "Content-Type": "application/json"},
-                        json={"fields": _cust_update},
-                        timeout=15,
-                    )
-                except Exception as _ue:
-                    print(f"[create_quote] customer update failed: {_ue}")
+            # Do NOT update the customer record from the quote form.
+            # Address/phone entered here go to snapshot fields on the MO record only.
+            # Customer address should only be updated via the Team tab.
         else:
           existing = at_get_all(
             CUSTOMERS_TABLE_ID, read_token,
