@@ -507,7 +507,7 @@
 
     // ── Silent background refresh ─────────────────────────────────────────────
     // Caches expire after 5 minutes; silently refetch on tab switch or page focus
-    const _CACHE_TTL_MS = 5 * 60 * 1000;
+    const _CACHE_TTL_MS = 60 * 1000; // 60 seconds
     let _quotesCacheTs   = 0;
     let _ordersCacheTs   = 0;
     let _invoicesCacheTs = 0;
@@ -535,9 +535,12 @@
       } catch (e) { /* silent — don't surface background refresh errors */ }
     }
 
-    // Refresh when user returns to this browser tab
+    // Refresh when user returns to this browser tab — force by resetting timestamps
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') _silentRefresh();
+      if (document.visibilityState === 'visible') {
+        _quotesCacheTs = 0; _ordersCacheTs = 0; _invoicesCacheTs = 0;
+        _silentRefresh();
+      }
     });
     // Also refresh every 5 minutes while the page is open
     setInterval(_silentRefresh, _CACHE_TTL_MS);
@@ -788,12 +791,13 @@
       quotesLoaded = true; _quotesCacheTs = Date.now();
       const el = document.getElementById('quotesContent');
       try {
-        if (!_quotesCache) {
-          const data = await (await fetch('/api/portal/quotes')).json();
-          _quotesCache = data;
-        }
+        // Always re-fetch — backend has server-side cache so this is fast
+        const data = await (await fetch('/api/portal/quotes', { credentials: 'same-origin' })).json();
+        _quotesCache = data;
         _renderQuotes(_quotesCache.quotes);
       } catch (e) {
+        // On error, fall back to stale cache if available
+        if (_quotesCache) { _renderQuotes(_quotesCache.quotes); return; }
         el.innerHTML = '<div class="empty-state"><p>Failed to load quotes. Please refresh.</p></div>';
       }
     }
