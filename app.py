@@ -4421,11 +4421,12 @@ def _fetch_quote_data(record_id):
                 "city":         cf.get("Customer City", ""),
                 "state":        cf.get("Customer State", ""),
                 "zip":          cf.get("Customer Zip Code", ""),
-                "billToName":   _snap_contact or cf.get("Bill-To Contact Name", "") or cf.get("Main Contact Name", ""),
-                "billToEmail":  _snap_email   or cf.get("Bill-To Contact Email", "") or cf.get("Main Contact Email", ""),
-                "billToOrg":    _snap_org     or cf.get("Bill-To Org Name", "") or cf.get("Organization Name", ""),
-                "billToAddr1":  _snap_addr1   or cf.get("Bill-To Address (Line 1)", ""),
-                "billToAddr2":  _snap_addr2   or cf.get("Bill-To Address (Line 2)", ""),
+                # Bill-To always comes from Customer record — never snapshot (snapshot = shipping)
+                "billToName":   cf.get("Bill-To Contact Name", "") or cf.get("Main Contact Name", ""),
+                "billToEmail":  cf.get("Bill-To Contact Email", "") or cf.get("Main Contact Email", ""),
+                "billToOrg":    cf.get("Bill-To Org Name", "") or cf.get("Organization Name", ""),
+                "billToAddr1":  cf.get("Bill-To Address (Line 1)", ""),
+                "billToAddr2":  cf.get("Bill-To Address (Line 2)", ""),
             }
     elif _snap_org or _snap_contact or _snap_email:
         # No linked customer but snapshot exists (edge case)
@@ -4436,7 +4437,7 @@ def _fetch_quote_data(record_id):
             "city": "", "state": "", "zip": "",
             "billToName":  _snap_contact, "billToEmail": _snap_email,
             "billToOrg":   _snap_org,
-            "billToAddr1": _snap_addr1,  "billToAddr2": _snap_addr2,
+            "billToAddr1": "", "billToAddr2": "",
         }
 
     if li_record_ids:
