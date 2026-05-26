@@ -9950,15 +9950,10 @@ def portal_admin_convert_to_invoice(user, record_id):
             except Exception as email_err:
                 print(f"[convert-to-invoice] email failed: {email_err}")
 
-        # Create Stripe CC + ACH invoices in the background
-        if to_email:
-            stripe_items = [{"name": li["name"], "qty": li["qty"], "unit_price": li["unit_price"]}
-                            for li in email_line_items]
-            threading.Thread(
-                target=_create_stripe_invoices_for_record,
-                args=(write_token, inv_record_id, to_email, to_name, org_name, stripe_items),
-                daemon=True,
-            ).start()
+        # NOTE: Stripe invoice creation is handled exclusively by the Airtable
+        # automation "Stripe Dual Invoice Generator" (Script 1). Do NOT create
+        # Stripe invoices here — doing so creates duplicates that break the
+        # Airtable webhook status sync (Script 2).
 
         # Clear orders cache
         _ORDERS_CACHE.clear()
@@ -10475,15 +10470,10 @@ def admin_convert_to_invoice(record_id):
             except Exception as email_err:
                 print(f"[convert-to-invoice] email failed: {email_err}")
 
-        # Create Stripe CC + ACH invoices in the background
-        if bill_email:
-            stripe_items = [{"name": i["name"], "qty": i["qty"], "unit_price": i["unit_price"]}
-                            for i in li_items_for_email]
-            threading.Thread(
-                target=_create_stripe_invoices_for_record,
-                args=(write_token, inv_record_id, bill_email, bill_name, org_name, stripe_items),
-                daemon=True,
-            ).start()
+        # NOTE: Stripe invoice creation is handled exclusively by the Airtable
+        # automation "Stripe Dual Invoice Generator" (Script 1). Do NOT create
+        # Stripe invoices here — doing so creates duplicates that break the
+        # Airtable webhook status sync (Script 2).
 
         _ORDERS_CACHE.clear()
         _INVOICES_CACHE.clear()
