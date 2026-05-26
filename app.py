@@ -6536,9 +6536,30 @@ def apply_page():
     required_fields = [company_name, ein, tax_exemption_number,
                        shipping_contact_name, shipping_contact_email, shipping_contact_phone,
                        shipping_addr1, shipping_city, shipping_state, shipping_zip]
+    if not billing_same:
+        required_fields += [billing_contact_name, billing_contact_email,
+                            billing_addr1, billing_city, billing_state, billing_zip]
     if not all(required_fields):
         return Response(json.dumps({"error": "Please fill in all required fields."}),
                         status=400, headers=c, mimetype="application/json")
+
+    # Reject duplicate company names — same name may exist for different locations,
+    # but those should be set up manually by Blue Alpha staff.
+    try:
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        dup_check = at_get_all(
+            CUSTOMERS_TABLE_ID, read_token,
+            fields=["Organization Name"],
+            formula=f"LOWER({{Organization Name}})='{company_name.lower().replace(chr(39), chr(39)+chr(39))}'",
+        )
+        if dup_check:
+            return Response(json.dumps({"error": (
+                "An account already exists for this organization name. "
+                "If your organization has multiple locations or offices, "
+                "please contact us directly to set up your account."
+            )}), status=409, headers=c, mimetype="application/json")
+    except Exception as _dup_err:
+        print(f"[apply] duplicate check failed: {_dup_err}")  # non-fatal — proceed
 
     # Customer Address = SHIPPING address (city/state/zip auto-parsed by Airtable formula)
     # Bill-To Address  = BILLING address (plain text)
