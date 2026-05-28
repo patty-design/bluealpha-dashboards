@@ -6381,6 +6381,9 @@ def invoice_pdf(record_id):
                 tracking  = tr["fields"].get("Tracking #", "")
                 ship_date = tr["fields"].get("Ship Date", "")
                 break
+        # Fall back to Tracking field on the Manual Orders record itself (legacy orders)
+        if not tracking:
+            tracking = fields.get("Tracking", "")
 
         li_ids = fields.get("MO Line Items", [])
         line_items = []
