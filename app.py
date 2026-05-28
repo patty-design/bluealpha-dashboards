@@ -10380,11 +10380,13 @@ def admin_convert_to_invoice(record_id):
         # Parse optional selected line items + split suffix
         selected_items = None
         split_suffix   = ""
+        shipping_cost  = 0.0
         try:
             body = request.get_json(silent=True) or {}
             if "lineItems" in body:
                 selected_items = {item["lineItemId"]: int(item["qty"]) for item in body["lineItems"] if int(item.get("qty", 0)) > 0}
-            split_suffix = str(body.get("splitSuffix") or "").strip()
+            split_suffix  = str(body.get("splitSuffix") or "").strip()
+            shipping_cost = float(body.get("shippingCost") or 0)
         except Exception:
             pass
 
@@ -10501,6 +10503,22 @@ def admin_convert_to_invoice(record_id):
                 }}, timeout=15,
             )
             li_items_for_email.append({"name": pname, "qty": qty, "unit_price": float(price)})
+
+        # Add shipping line item if specified (links to "Shipping Fee" SKU record)
+        _SHIPPING_SKU_RECORD_ID = "recvxAfBvDgM1HEpw"
+        if shipping_cost and shipping_cost > 0:
+            req_lib.post(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}",
+                headers={**at_headers(write_token), "Content-Type": "application/json"},
+                json={"fields": {
+                    "Manual Order":              [inv_record_id],
+                    "Product SKU":               [_SHIPPING_SKU_RECORD_ID],
+                    "Qty.":                      1,
+                    "Confirmed Unit Price":      round(shipping_cost, 2),
+                    "Confirmed Adj. Unit Price": round(shipping_cost, 2),
+                }}, timeout=15,
+            )
+            li_items_for_email.append({"name": "Shipping Fee", "qty": 1, "unit_price": round(shipping_cost, 2)})
 
         total = round(sum(i["qty"] * i["unit_price"] for i in li_items_for_email), 2)
 

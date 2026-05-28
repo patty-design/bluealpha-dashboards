@@ -1086,6 +1086,14 @@
               `).join('')}
             </tbody>
             <tfoot>
+              <tr style="border-top:1px solid #eee;">
+                <td colspan="4" style="padding:8px;text-align:right;font-weight:600;">Shipping:</td>
+                <td style="padding:6px 8px;text-align:right;">
+                  <input type="number" id="invoiceShipping" value="0" min="0" step="0.01"
+                    style="width:80px;text-align:right;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:0.88rem;"
+                    oninput="updateInvoiceGrandTotal()">
+                </td>
+              </tr>
               <tr style="border-top:2px solid #ddd;font-weight:700;">
                 <td colspan="4" style="padding:8px;text-align:right;">Invoice Total:</td>
                 <td style="padding:8px;text-align:right;" id="invoiceGrandTotal">$${items.reduce((s,i)=>s+i.qty*i.unit_price,0).toFixed(2)}</td>
@@ -1100,6 +1108,20 @@
       }
     }
 
+    function updateInvoiceGrandTotal() {
+      let grand = 0;
+      document.querySelectorAll('.inv-check').forEach(cb => {
+        if (cb.checked) {
+          const i = cb.dataset.idx;
+          const q = parseInt(document.querySelector(`.inv-qty[data-idx="${i}"]`).value) || 0;
+          const u = parseFloat(document.querySelector(`.inv-qty[data-idx="${i}"]`).dataset.unit) || 0;
+          grand += q * u;
+        }
+      });
+      grand += parseFloat(document.getElementById('invoiceShipping')?.value || 0) || 0;
+      document.getElementById('invoiceGrandTotal').textContent = `$${grand.toFixed(2)}`;
+    }
+
     function updateInvoiceRow(idx) {
       const check = document.querySelector(`.inv-check[data-idx="${idx}"]`);
       const qtyEl = document.querySelector(`.inv-qty[data-idx="${idx}"]`);
@@ -1110,17 +1132,7 @@
       qtyEl.disabled = !enabled;
       qtyEl.style.opacity = enabled ? '1' : '0.4';
       totalEl.textContent = enabled ? `$${(qty * unitPrice).toFixed(2)}` : '—';
-      // Update grand total
-      let grand = 0;
-      document.querySelectorAll('.inv-check').forEach(cb => {
-        if (cb.checked) {
-          const i = cb.dataset.idx;
-          const q = parseInt(document.querySelector(`.inv-qty[data-idx="${i}"]`).value) || 0;
-          const u = parseFloat(document.querySelector(`.inv-qty[data-idx="${i}"]`).dataset.unit) || 0;
-          grand += q * u;
-        }
-      });
-      document.getElementById('invoiceGrandTotal').textContent = `$${grand.toFixed(2)}`;
+      updateInvoiceGrandTotal();
     }
 
     function closeInvoiceModal() {
@@ -1148,7 +1160,8 @@
       submitEl.textContent = 'Converting…';
 
       try {
-        const body = { lineItems: selected };
+        const shippingCost = parseFloat(document.getElementById('invoiceShipping')?.value || 0) || 0;
+        const body = { lineItems: selected, shippingCost };
         // Derive split suffix from explicit flag or from the SO number pattern (e.g. SO-0342-1 → "1")
         const effectiveSuffix = _invoiceModalSplitSuffix ||
           (/^SO-\d+-(\d+)$/.exec(_invoiceModalSoNumber)||[])[1] || '';
