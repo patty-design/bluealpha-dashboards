@@ -7857,8 +7857,8 @@ def portal_account_info(user):
 
             return Response(json.dumps({"info": {
                 "shipOrg":   f.get("Ship To Name", "") or f.get("Organization Name", ""),
-                "shipName":  uf.get("Main Contact Name", "") or f.get("Main Contact Name", ""),
-                "shipEmail": uf.get("Main Contact Email", "") or f.get("Main Contact Email", ""),
+                "shipName":  uf.get("Main Contact Name", "") or (f.get("Main Contact Name", "") if is_primary else ""),
+                "shipEmail": uf.get("Main Contact Email", "") or (f.get("Main Contact Email", "") if is_primary else ""),
                 "shipPhone": f.get("Main Contact Phone #", ""),
                 "shipAddr1": f.get("Customer Address (Line 1)", ""),
                 "shipAddr2": f.get("Customer Address (Line 2)", ""),
