@@ -4667,9 +4667,11 @@ def _build_catalog():
             display_name = _PARENT_NAME_OVERRIDES.get(parent_name.lower(), parent_name)
             seen_parents[parent_id] = {"name": display_name, "category": category}
 
+    _PRODUCT_SELECT_PARENTS = {"alias accessories"}
     parents = sorted(
         [{"id": k, "name": v["name"], "category": v["category"],
-          "addons": addon_parent_map.get(k, [])}
+          "addons": addon_parent_map.get(k, []),
+          "productSelect": v["name"].lower().strip() in _PRODUCT_SELECT_PARENTS}
          for k, v in seen_parents.items()],
         key=lambda x: (-1 if x["name"].lower() in _SORT_FIRST_PARENTS else 1 if x["name"].lower() in _SORT_LAST_PARENTS else 0, x["name"]),
     )
@@ -6995,8 +6997,11 @@ def contract_catalog(user):
             if parent_id not in seen_parents:
                 seen_parents[parent_id] = parent_name
 
+        _PRODUCT_SELECT_PARENTS = {"alias accessories"}
         parents = sorted(
-            [{"id": k, "name": v} for k, v in seen_parents.items()],
+            [{"id": k, "name": v,
+              "productSelect": v.lower().strip() in _PRODUCT_SELECT_PARENTS}
+             for k, v in seen_parents.items()],
             key=lambda x: x["name"],
         )
         return Response(json.dumps({"parents": parents, "skus": skus}), headers=c, mimetype="application/json")

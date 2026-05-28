@@ -927,12 +927,22 @@
       return;
     }
 
+    // Build parent metadata map from data.parents (carries productSelect flag etc.)
+    const parentMeta = {};
+    for (const p of (data.parents || [])) parentMeta[p.id] = p;
+
     // Build unique parents preserving order from skus array
     const parentMap   = {};
     const parentOrder = [];
     for (const sku of data.skus) {
       if (!parentMap[sku.parentId]) {
-        parentMap[sku.parentId] = { id: sku.parentId, name: sku.parentName || sku.name, skus: [] };
+        const meta = parentMeta[sku.parentId] || {};
+        parentMap[sku.parentId] = {
+          id: sku.parentId,
+          name: sku.parentName || sku.name,
+          skus: [],
+          productSelect: !!meta.productSelect,
+        };
         parentOrder.push(sku.parentId);
       }
       parentMap[sku.parentId].skus.push(sku);
@@ -954,7 +964,15 @@
     const hasSizes  = p.skus.some(s => s.sizeId);
 
     let colorHtml = '';
-    if (hasColors) {
+    if (p.productSelect) {
+      // Product-select mode: dropdown lists SKU names directly (no color/size)
+      colorHtml = `<div class="sel-field">
+          <label>Product</label>
+          <select id="sc_${p.id}" onchange="onSelProduct('${p.id}')">
+            <option value="">Select a product\u2026</option>
+          </select>
+        </div>`;
+    } else if (hasColors) {
       colorHtml = `<div class="sel-field">
           <label>Color</label>
           <select id="sc_${p.id}" onchange="onSelColor('${p.id}')">
@@ -964,7 +982,7 @@
     }
 
     let sizeHtml = '';
-    if (hasSizes) {
+    if (!p.productSelect && hasSizes) {
       sizeHtml = `<div class="sel-field" id="szfield_${p.id}" style="display:none">
           <label>Size</label>
           <select id="ss_${p.id}" onchange="onSelSize('${p.id}')">
@@ -1020,25 +1038,46 @@
 
     // Populate selectors when opening
     if (!isOpen) {
+      const p = _catalogData && _catalogData.parents
+        ? (_catalogData.parents.find(x => x.id === parentId) || {})
+        : {};
       const colorSel = document.getElementById('sc_' + parentId);
       if (colorSel) {
-        // Has color — populate on first open
-        if (colorSel.options.length <= 1) {
-          const colorMap = {};
-          for (const sku of _catalogData.skus) {
-            if (sku.parentId === parentId && sku.colorId && sku.colorName)
-              colorMap[sku.colorId] = sku.colorName;
+        if (p.productSelect) {
+          // Product-select mode — populate with SKU names on first open
+          if (colorSel.options.length <= 1) {
+            const parentSkus = _catalogData.skus
+              .filter(s => s.parentId === parentId)
+              .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            for (const sku of parentSkus) {
+              const opt = document.createElement('option');
+              opt.value = sku.recordId;
+              opt.textContent = sku.name;
+              colorSel.appendChild(opt);
+            }
+            if (parentSkus.length === 1) {
+              colorSel.value = parentSkus[0].recordId;
+              onSelProduct(parentId);
+            }
           }
-          const colors = Object.entries(colorMap).sort((a, b) => a[1].localeCompare(b[1]));
-          for (const [id, name] of colors) {
-            const opt = document.createElement('option');
-            opt.value = id; opt.textContent = name;
-            colorSel.appendChild(opt);
-          }
-          // Auto-select if only one color
-          if (colors.length === 1) {
-            colorSel.value = colors[0][0];
-            onSelColor(parentId);
+        } else {
+          // Normal color mode — populate on first open
+          if (colorSel.options.length <= 1) {
+            const colorMap = {};
+            for (const sku of _catalogData.skus) {
+              if (sku.parentId === parentId && sku.colorId && sku.colorName)
+                colorMap[sku.colorId] = sku.colorName;
+            }
+            const colors = Object.entries(colorMap).sort((a, b) => a[1].localeCompare(b[1]));
+            for (const [id, name] of colors) {
+              const opt = document.createElement('option');
+              opt.value = id; opt.textContent = name;
+              colorSel.appendChild(opt);
+            }
+            if (colors.length === 1) {
+              colorSel.value = colors[0][0];
+              onSelColor(parentId);
+            }
           }
         }
       } else {
@@ -1051,6 +1090,18 @@
         }
       }
     }
+  }
+
+  function onSelProduct(parentId) {
+    const sel   = document.getElementById('sc_' + parentId);
+    const recId = sel ? sel.value : '';
+    document.getElementById('spricerow_' + parentId).style.display = 'none';
+    document.getElementById('sqrow_' + parentId).style.display     = 'none';
+    document.getElementById('sb_' + parentId).disabled = true;
+    if (!recId) return;
+    const sku = (_catalogData.skus || []).find(s => s.recordId === recId);
+    if (!sku) return;
+    _showPriceAndQty(parentId, recId, '');
   }
 
   function onSelColor(parentId) {
@@ -1121,11 +1172,15 @@
   }
 
   function _showPriceAndQty(parentId, colorId, sizeId) {
-    const sku = _catalogData.skus.find(s =>
-      s.parentId === parentId &&
-      (!colorId || s.colorId === colorId) &&
-      (!sizeId  || s.sizeId  === sizeId)
-    );
+    // In product-select mode the select value is a SKU recordId (starts with "rec")
+    const isRecordSel = colorId && colorId.startsWith('rec');
+    const sku = isRecordSel
+      ? _catalogData.skus.find(s => s.recordId === colorId)
+      : _catalogData.skus.find(s =>
+          s.parentId === parentId &&
+          (!colorId || s.colorId === colorId) &&
+          (!sizeId  || s.sizeId  === sizeId)
+        );
     if (!sku) return;
 
     const priceEl  = document.getElementById('sprice_' + parentId);
@@ -1144,17 +1199,23 @@
     const sizeId  = document.getElementById('ss_' + parentId)?.value || '';
     const qty     = Math.max(1, parseInt(document.getElementById('sq_' + parentId)?.value, 10) || 1);
 
-    const sku = _catalogData.skus.find(s =>
-      s.parentId === parentId &&
-      (!colorId || s.colorId === colorId) &&
-      (!sizeId  || s.sizeId  === sizeId)
-    );
+    // In product-select mode, colorId is a SKU recordId
+    const isRecordSel = colorId && colorId.startsWith('rec');
+    const sku = isRecordSel
+      ? _catalogData.skus.find(s => s.recordId === colorId)
+      : _catalogData.skus.find(s =>
+          s.parentId === parentId &&
+          (!colorId || s.colorId === colorId) &&
+          (!sizeId  || s.sizeId  === sizeId)
+        );
     if (!sku) return;
 
-    // Build display name: Parent — Color — Size
-    const parts = [sku.parentName || sku.name];
-    if (sku.colorName) parts.push(sku.colorName);
-    if (sku.sizeName)  parts.push(sku.sizeName);
+    // Build display name: for product-select use SKU name; otherwise Parent — Color — Size
+    const parts = isRecordSel
+      ? [sku.name]
+      : [sku.parentName || sku.name];
+    if (!isRecordSel && sku.colorName) parts.push(sku.colorName);
+    if (!isRecordSel && sku.sizeName)  parts.push(sku.sizeName);
 
     _cart.push({
       recordId:  sku.recordId,
