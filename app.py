@@ -7603,8 +7603,8 @@ def portal_team_add(user):
     if not _re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
         return Response(json.dumps({"error": "Please enter a valid email address."}),
                         status=400, headers=c, mimetype="application/json")
-    if role not in ("Full Access", "Orders", "Quotes Only", "Invoices", "Read Only"):
-        return Response(json.dumps({"error": "Role must be Full Access, Orders, Quotes Only, Invoices, or Read Only"}),
+    if role not in ("Admin", "Full Access", "Orders", "Quotes Only", "Invoices", "Read Only"):
+        return Response(json.dumps({"error": "Role must be Admin, Full Access, Orders, Quotes Only, Invoices, or Read Only"}),
                         status=400, headers=c, mimetype="application/json")
 
     write_token = APPLY_WRITE_TOKEN or RETURNS_WRITE_TOKEN
@@ -7699,8 +7699,8 @@ def portal_team_change_role(user, record_id):
     customer_id = user.get("customer_id", "")
     data     = request.get_json() or {}
     new_role = (data.get("role") or "").strip()
-    if new_role not in ("Full Access", "Orders", "Quotes Only", "Invoices", "Read Only"):
-        return Response(json.dumps({"error": "Role must be Full Access, Orders, Quotes Only, Invoices, or Read Only"}),
+    if new_role not in ("Admin", "Full Access", "Orders", "Quotes Only", "Invoices", "Read Only"):
+        return Response(json.dumps({"error": "Role must be Admin, Full Access, Orders, Quotes Only, Invoices, or Read Only"}),
                         status=400, headers=c, mimetype="application/json")
     read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
     try:
