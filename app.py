@@ -4199,7 +4199,15 @@ def send_invoice_email(to_email, to_name, org_name, so_number, inv_number, line_
     """Send invoice email after SO is converted to invoice."""
     if not SENDGRID_API_KEY:
         return
-    actual_to = TEST_EMAIL_OVERRIDE or to_email
+    # Support semicolon or comma-separated email addresses
+    if TEST_EMAIL_OVERRIDE:
+        to_list = [{"email": TEST_EMAIL_OVERRIDE, "name": to_name}]
+    else:
+        raw_emails = [e.strip() for e in to_email.replace(",", ";").split(";") if e.strip()]
+        to_list = [{"email": e, "name": to_name} for e in raw_emails] if raw_emails else []
+    if not to_list:
+        return
+    actual_to = to_list[0]["email"]  # kept for legacy references below
     first_name = to_name.split()[0] if to_name else "there"
     subject = f"Blue Alpha {so_number} \u2014 Invoice {inv_number}"
     from datetime import timedelta
@@ -4315,7 +4323,7 @@ def send_invoice_email(to_email, to_name, org_name, so_number, inv_number, line_
             "https://api.sendgrid.com/v3/mail/send",
             headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
             json={
-                "personalizations": [{"to": [{"email": actual_to, "name": to_name}]}],
+                "personalizations": [{"to": to_list}],
                 "from": {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
                 "subject": subject,
                 "content": [{"type": "text/html", "value": html_body}],
