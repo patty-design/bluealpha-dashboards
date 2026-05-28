@@ -7825,12 +7825,15 @@ def portal_team_delete(user, record_id):
 def portal_account_info(user):
     c = cors()
     customer_id = user.get("customer_id", "")
+    user_id     = user.get("user_id", customer_id)   # sub-users have their own record
+    is_primary  = user.get("is_primary", True)
     if not customer_id:
         return Response(json.dumps({"error": "No customer"}), status=400, headers=c, mimetype="application/json")
 
     if request.method == "GET":
         try:
             token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+            # Fetch company record for org/address fields
             r = req_lib.get(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
                 headers=at_headers(token),
@@ -7841,10 +7844,21 @@ def portal_account_info(user):
                 f = r.json().get("fields", {})
             else:
                 print(f"[account_info] AT fetch failed: id={customer_id} status={r.status_code} body={r.text[:300]}")
+
+            # For sub-users, fetch their own record for their personal name/email
+            uf = f
+            if not is_primary and user_id != customer_id:
+                ur = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{user_id}",
+                    headers=at_headers(token), timeout=10,
+                )
+                if ur.status_code == 200:
+                    uf = ur.json().get("fields", {})
+
             return Response(json.dumps({"info": {
                 "shipOrg":   f.get("Ship To Name", "") or f.get("Organization Name", ""),
-                "shipName":  f.get("Main Contact Name", ""),
-                "shipEmail": f.get("Main Contact Email", ""),
+                "shipName":  uf.get("Main Contact Name", "") or f.get("Main Contact Name", ""),
+                "shipEmail": uf.get("Main Contact Email", "") or f.get("Main Contact Email", ""),
                 "shipPhone": f.get("Main Contact Phone #", ""),
                 "shipAddr1": f.get("Customer Address (Line 1)", ""),
                 "shipAddr2": f.get("Customer Address (Line 2)", ""),
@@ -7861,32 +7875,47 @@ def portal_account_info(user):
         except Exception as e:
             return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
-    # PATCH
-    if not portal_can(user, "manage_team"):
-        return Response(json.dumps({"error": "Admin access required"}), status=403, headers=c, mimetype="application/json")
+    # PATCH — each user saves their own name/email to their own record;
+    # company-level fields (address, org) only saveable by primary/admin
     data = request.get_json() or {}
-    _MAP = {
-        "shipOrg":   "Ship To Name",            "shipName":  "Main Contact Name",
-        "shipEmail": "Main Contact Email",
+    write_token = RETURNS_WRITE_TOKEN
+
+    # Personal fields always save to user's own record
+    _PERSONAL = {"shipName": "Main Contact Name", "shipEmail": "Main Contact Email"}
+    personal_fields = {at_f: data[k] for k, at_f in _PERSONAL.items() if k in data}
+    if personal_fields:
+        try:
+            req_lib.patch(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{user_id}",
+                headers={**at_headers(write_token), "Content-Type": "application/json"},
+                json={"fields": personal_fields}, timeout=15,
+            ).raise_for_status()
+        except Exception as e:
+            return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+    # Company-level fields save to company record — admin/primary only
+    _COMPANY = {
+        "shipOrg":   "Ship To Name",
         "shipPhone": "Main Contact Phone #",
         "shipAddr1": "Customer Address (Line 1)", "shipAddr2": "Customer Address (Line 2)",
-        "billOrg":   "Bill-To Org Name",        "billName":  "Bill-To Contact Name",
-        "billEmail": "Bill-To Contact Email",   "billPhone": "Bill-To Phone #",
-        "billAddr1": "Bill-To Address (Line 1)", "billAddr2": "Bill-To Address (Line 2)",
+        "billOrg":   "Bill-To Org Name",         "billName":  "Bill-To Contact Name",
+        "billEmail": "Bill-To Contact Email",     "billPhone": "Bill-To Phone #",
+        "billAddr1": "Bill-To Address (Line 1)",  "billAddr2": "Bill-To Address (Line 2)",
     }
-    fields = {at_f: data[k] for k, at_f in _MAP.items() if k in data}
-    if not fields:
-        return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
-    try:
-        r = req_lib.patch(
-            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
-            headers={**at_headers(RETURNS_WRITE_TOKEN), "Content-Type": "application/json"},
-            json={"fields": fields}, timeout=15,
-        )
-        r.raise_for_status()
-        return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
-    except Exception as e:
-        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+    company_fields = {at_f: data[k] for k, at_f in _COMPANY.items() if k in data}
+    if company_fields:
+        if not portal_can(user, "manage_team"):
+            return Response(json.dumps({"error": "Admin access required to update company details"}), status=403, headers=c, mimetype="application/json")
+        try:
+            req_lib.patch(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
+                headers={**at_headers(write_token), "Content-Type": "application/json"},
+                json={"fields": company_fields}, timeout=15,
+            ).raise_for_status()
+        except Exception as e:
+            return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+    return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
 
 
 @app.route("/api/portal/update-quote-addresses/<record_id>", methods=["POST"])
