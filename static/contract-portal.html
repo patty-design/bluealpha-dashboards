@@ -788,17 +788,21 @@
     const now = Date.now();
     try {
       if (tab === 'our-orders' && _myOrdersCache && now - _myOrdersCacheTs > _CACHE_TTL_MS) {
-        const [qData, oData] = await Promise.all([
-          fetch('/api/portal/quotes',  { credentials: 'same-origin' }).then(r => r.ok ? r.json() : { quotes: [] }),
-          fetch('/api/portal/orders',  { credentials: 'same-origin' }).then(r => r.ok ? r.json() : { orders: [] }),
+        const [qResp, oResp] = await Promise.all([
+          fetch('/api/portal/quotes',  { credentials: 'same-origin' }),
+          fetch('/api/portal/orders',  { credentials: 'same-origin' }),
         ]);
+        // Only proceed if both calls succeeded — don't wipe the list on auth/network errors
+        if (!qResp.ok || !oResp.ok) return;
+        const [qData, oData] = await Promise.all([qResp.json(), oResp.json()]);
         const salesOrders = (oData.orders || []).map(o => ({
           record_id: o.record_id, so_number: o.so_number, date: o.date,
           total: o.total, status: o.tracking ? 'shipped' : 'approved', tracking: o.tracking,
         }));
-        const combined = { quotes: [...(qData.quotes || []), ...salesOrders] };
-        if (combined.quotes.length > 0 || (qData.quotes && oData.orders)) {
-          _myOrdersCache = combined; _myOrdersCacheTs = now; _renderMyOrders(combined.quotes);
+        const combined = [...(qData.quotes || []), ...salesOrders];
+        // Only update if we got results — never overwrite a populated list with empty
+        if (combined.length > 0) {
+          _myOrdersCache = { quotes: combined }; _myOrdersCacheTs = now; _renderMyOrders(combined);
         }
       } else if (tab === 'invoices' && _invoicesCache && now - _invoicesCacheTs > _CACHE_TTL_MS) {
         const d = await (await fetch('/api/portal/invoices', { credentials: 'include' })).json();
