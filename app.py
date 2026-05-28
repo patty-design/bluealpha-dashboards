@@ -9993,7 +9993,7 @@ def portal_invoices(user):
             fields=["Document ID", "Order ID", "Date", "MO Line Items",
                     "Sales Order Status", "Go-to PDF", "Customer",
                     "Stripe Invoice Status (CC)", "Stripe Invoice Status (ACH)",
-                    "Invoice Paid", "Hidden from Customer"],
+                    "Invoice Paid", "Hidden from Customer", "Tracking"],
             formula='{Order Type}="Invoice"',
         )
         # Filter to this customer, excluding hidden records
@@ -10033,7 +10033,7 @@ def portal_invoices(user):
             inv_number = f.get("Document ID", f"IN-{order_id}")
             li_ids     = f.get("MO Line Items", [])
             total      = round(sum(li_total_map.get(lid, 0) for lid in li_ids), 2)
-            tracking   = tracking_map.get(so_number, "")
+            tracking   = tracking_map.get(so_number, "") or f.get("Tracking", "")
             go_to_pdf_field = f.get("Go-to PDF") or {}
             go_to_pdf_url   = go_to_pdf_field.get("url", "") if isinstance(go_to_pdf_field, dict) else ""
             cc_status  = f.get("Stripe Invoice Status (CC)", "")
