@@ -7255,7 +7255,7 @@ def portal_orders(user):
         with _cf.ThreadPoolExecutor(max_workers=2) as _ex_po:
             _fut_records  = _ex_po.submit(at_get_all,
                 MANUAL_ORDERS_TABLE_ID, read_token,
-                fields=["Document ID", "Order ID", "Date", "MO Line Items", "Customer", "Sales Order Status", "Go-to PDF"],
+                fields=["Document ID", "Order ID", "Date", "MO Line Items", "Customer", "Sales Order Status", "Go-to PDF", "Hidden from Customer"],
                 formula='{Order Type}="Sales Order"',
             )
             _fut_tracking = _ex_po.submit(at_get_all,
@@ -7281,7 +7281,8 @@ def portal_orders(user):
                 tracking_map[key] = trk
         records = [r for r in records
                    if customer_id in r.get("fields", {}).get("Customer", [])
-                   and r.get("fields", {}).get("Sales Order Status") == "Approved"]
+                   and r.get("fields", {}).get("Sales Order Status") == "Approved"
+                   and not r.get("fields", {}).get("Hidden from Customer", False)]
 
         # Batch-fetch all line items in one AT query
         all_li_ids = []
@@ -9992,12 +9993,13 @@ def portal_invoices(user):
             fields=["Document ID", "Order ID", "Date", "MO Line Items",
                     "Sales Order Status", "Go-to PDF", "Customer",
                     "Stripe Invoice Status (CC)", "Stripe Invoice Status (ACH)",
-                    "Invoice Paid"],
+                    "Invoice Paid", "Hidden from Customer"],
             formula='{Order Type}="Invoice"',
         )
-        # Filter to this customer
+        # Filter to this customer, excluding hidden records
         inv_records = [r for r in inv_records
-                       if customer_id in r.get("fields", {}).get("Customer", [])]
+                       if customer_id in r.get("fields", {}).get("Customer", [])
+                       and not r.get("fields", {}).get("Hidden from Customer", False)]
 
         # Batch-fetch all line items to calculate totals (Adj. Unit Price is a chained lookup — doesn't work)
         all_li_ids = []
