@@ -1171,10 +1171,13 @@
     if (sizeId) _showPriceAndQty(parentId, colorId, sizeId);
   }
 
+  function _isProductSelect(parentId) {
+    return !!(_catalogData?.parents?.find(p => p.id === parentId)?.productSelect);
+  }
+
   function _showPriceAndQty(parentId, colorId, sizeId) {
-    // In product-select mode the select value is a SKU recordId (starts with "rec")
-    const isRecordSel = colorId && colorId.startsWith('rec');
-    const sku = isRecordSel
+    const isProductSel = _isProductSelect(parentId);
+    const sku = isProductSel
       ? _catalogData.skus.find(s => s.recordId === colorId)
       : _catalogData.skus.find(s =>
           s.parentId === parentId &&
@@ -1199,9 +1202,8 @@
     const sizeId  = document.getElementById('ss_' + parentId)?.value || '';
     const qty     = Math.max(1, parseInt(document.getElementById('sq_' + parentId)?.value, 10) || 1);
 
-    // In product-select mode, colorId is a SKU recordId
-    const isRecordSel = colorId && colorId.startsWith('rec');
-    const sku = isRecordSel
+    const isProductSel = _isProductSelect(parentId);
+    const sku = isProductSel
       ? _catalogData.skus.find(s => s.recordId === colorId)
       : _catalogData.skus.find(s =>
           s.parentId === parentId &&
@@ -1211,11 +1213,11 @@
     if (!sku) return;
 
     // Build display name: for product-select use SKU name; otherwise Parent — Color — Size
-    const parts = isRecordSel
+    const parts = isProductSel
       ? [sku.name]
       : [sku.parentName || sku.name];
-    if (!isRecordSel && sku.colorName) parts.push(sku.colorName);
-    if (!isRecordSel && sku.sizeName)  parts.push(sku.sizeName);
+    if (!isProductSel && sku.colorName) parts.push(sku.colorName);
+    if (!isProductSel && sku.sizeName)  parts.push(sku.sizeName);
 
     _cart.push({
       recordId:  sku.recordId,
