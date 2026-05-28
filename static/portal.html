@@ -413,7 +413,8 @@
               <div style="font-weight:600;font-size:0.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Bill To</div>
               <label>Organization</label><input type="text" id="ai_billOrg" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
               <label>Contact Name</label><input type="text" id="ai_billName" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
-              <label>Email</label><input type="email" id="ai_billEmail" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+              <label>Email</label><input type="text" id="ai_billEmail" style="width:100%;box-sizing:border-box;margin-bottom:2px;" placeholder="billing@example.com">
+              <div style="font-size:0.75rem;color:var(--muted);margin-bottom:8px;">Separate multiple addresses with a semicolon</div>
               <label>Phone</label><input type="text" id="ai_billPhone" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
               <label>Address Line 1</label><input type="text" id="ai_billAddr1" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
               <label>Address Line 2</label><input type="text" id="ai_billAddr2" style="width:100%;box-sizing:border-box;">
@@ -1062,9 +1063,31 @@
       document.getElementById('editAccountBtn').style.display = portalMe?.canManageTeam ? '' : 'none';
     }
 
+    function _validateEmails(raw) {
+      if (!raw) return true;
+      const emailRe = /^[^\s@;,]+@[^\s@;,]+\.[^\s@;,]+$/;
+      return raw.replace(/,/g, ';').split(';').map(e => e.trim()).filter(Boolean).every(e => emailRe.test(e));
+    }
+
     async function saveAccountInfo() {
       const btn = document.getElementById('saveAccountBtn');
       const msg = document.getElementById('accountSaveMsg');
+
+      // Validate email fields before saving
+      const billEmailVal = document.getElementById('ai_billEmail')?.value.trim() || '';
+      const shipEmailVal = document.getElementById('ai_shipEmail')?.value.trim() || '';
+      if (billEmailVal && !_validateEmails(billEmailVal)) {
+        msg.textContent = 'Billing email contains an invalid address. Separate multiple addresses with a semicolon.';
+        msg.style.color = 'var(--red)';
+        return;
+      }
+      if (shipEmailVal && !_validateEmails(shipEmailVal)) {
+        msg.textContent = 'Shipping email contains an invalid address.';
+        msg.style.color = 'var(--red)';
+        return;
+      }
+      msg.textContent = '';
+
       btn.disabled = true; btn.textContent = 'Saving…';
       const payload = {};
       ['billOrg','billName','billEmail','billPhone','billAddr1','billAddr2',
