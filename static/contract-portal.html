@@ -1645,7 +1645,7 @@
       const data = await resp.json();
       const info = data.info || {};
       // Prefer contact-level fields; fall back to portalMe
-      document.getElementById('accountName').value  = info.contactName || portalMe?.contactName || '';
+      document.getElementById('accountName').value  = info.shipName || info.contactName || portalMe?.contactName || '';
       document.getElementById('accountEmail').value = info.contactEmail || info.billEmail || portalMe?.email || '';
     } catch (e) { /* non-critical */ }
   }
