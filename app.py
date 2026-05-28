@@ -7554,7 +7554,7 @@ def _send_portal_invite_email(to_email, invitee_name, inviter_company, setup_lin
   <img src="https://bluealphabelts.com/wp-content/uploads/2021/01/Blue-Alpha-Logo-White-Background.png" alt="Blue Alpha" style="height:40px;margin-bottom:24px;">
   <h2 style="font-size:20px;font-weight:700;margin:0 0 12px;">You've been invited</h2>
   <p style="font-size:15px;margin:0 0 16px;">Hi {first},</p>
-  <p style="font-size:15px;margin:0 0 24px;">{inviter_company} has invited you to join their Blue Alpha quote portal account. Click the button below to set up your username and password.</p>
+  <p style="font-size:15px;margin:0 0 24px;">{inviter_company} has invited you to join their Blue Alpha portal account. Click the button below to set up your username and password.</p>
   <a href="{setup_link}" style="display:inline-block;background:#1B2438;color:#fff;font-family:Arial;font-size:15px;font-weight:700;text-decoration:none;padding:14px 36px;border-radius:6px;">Set Up My Account →</a>
   <p style="font-size:12px;color:#888;margin-top:24px;">This link expires in 48 hours. If you weren't expecting this invitation, you can safely ignore this email.</p>
 </div>"""}],
