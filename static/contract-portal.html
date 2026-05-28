@@ -788,8 +788,18 @@
     const now = Date.now();
     try {
       if (tab === 'our-orders' && _myOrdersCache && now - _myOrdersCacheTs > _CACHE_TTL_MS) {
-        const d = await (await fetch('/api/portal/quotes', { credentials: 'same-origin' })).json();
-        if (d && d.quotes) { _myOrdersCache = d; _myOrdersCacheTs = now; _renderMyOrders(d.quotes); }
+        const [qData, oData] = await Promise.all([
+          fetch('/api/portal/quotes',  { credentials: 'same-origin' }).then(r => r.ok ? r.json() : { quotes: [] }),
+          fetch('/api/portal/orders',  { credentials: 'same-origin' }).then(r => r.ok ? r.json() : { orders: [] }),
+        ]);
+        const salesOrders = (oData.orders || []).map(o => ({
+          record_id: o.record_id, so_number: o.so_number, date: o.date,
+          total: o.total, status: o.tracking ? 'shipped' : 'approved', tracking: o.tracking,
+        }));
+        const combined = { quotes: [...(qData.quotes || []), ...salesOrders] };
+        if (combined.quotes.length > 0 || (qData.quotes && oData.orders)) {
+          _myOrdersCache = combined; _myOrdersCacheTs = now; _renderMyOrders(combined.quotes);
+        }
       } else if (tab === 'invoices' && _invoicesCache && now - _invoicesCacheTs > _CACHE_TTL_MS) {
         const d = await (await fetch('/api/portal/invoices', { credentials: 'include' })).json();
         if (d && d.invoices) { _invoicesCache = d; _invoicesCacheTs = now; _renderInvoices(d.invoices); }
