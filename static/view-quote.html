@@ -881,6 +881,13 @@ if (window.self !== window.top) {
              oninput="this.value=this.value.replace(/[^A-Za-z0-9.\-]/g,'')">
     </div>
 
+    <!-- Optional PO Document -->
+    <div style="margin-bottom:16px;">
+      <label for="modalPdfFile" style="display:block;font-size:0.82rem;font-weight:600;color:var(--muted);margin-bottom:6px;">PO Document <span style="font-weight:400;">(optional PDF)</span></label>
+      <input type="file" id="modalPdfFile" accept=".pdf,application/pdf"
+             style="width:100%;box-sizing:border-box;font-size:0.85rem;color:var(--text);">
+    </div>
+
     <!-- Terms checkbox -->
     <div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:20px;background:#f9f9f7;">
       <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
@@ -1742,6 +1749,7 @@ function openModal() {
 function closeModal() {
   document.getElementById('acceptModal').classList.add('hidden');
   document.getElementById('modalPoNumber').value = '';
+  document.getElementById('modalPdfFile').value  = '';
   document.getElementById('termsCheckbox').checked = false;
   document.getElementById('btnConfirmOrder').disabled = true;
 }
@@ -1751,11 +1759,28 @@ async function confirmOrder() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner-sm"></span>Placing Order\u2026';
   const poNumber = (document.getElementById('modalPoNumber').value || '').trim();
+
+  // Read PDF attachment if provided
+  let pdfBase64 = null, pdfFilename = null;
+  const pdfFile = document.getElementById('modalPdfFile').files[0];
+  if (pdfFile) {
+    pdfBase64  = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload  = () => res(r.result.split(',')[1]);
+      r.onerror = rej;
+      r.readAsDataURL(pdfFile);
+    });
+    pdfFilename = pdfFile.name;
+  }
+
   try {
+    const payload = {};
+    if (poNumber)  payload.poNumber   = poNumber;
+    if (pdfBase64) { payload.pdfBase64 = pdfBase64; payload.pdfFilename = pdfFilename; }
     const r = await fetch(`/api/accept-quote/${recordId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(poNumber ? { poNumber } : {}),
+      body: JSON.stringify(payload),
     });
     const data = await r.json();
     if (!r.ok || !data.success) throw new Error(data.error || 'Failed to accept');

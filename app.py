@@ -5292,6 +5292,8 @@ def accept_quote(record_id):
     billing      = data.get("billing") or {}
     shipping_obj = data.get("shipping")  # may be None (same as billing)
     po_override  = (data.get("poNumber") or "").strip()  # optional PO # submitted from modal
+    pdf_b64      = (data.get("pdfBase64") or "").strip()
+    pdf_name     = (data.get("pdfFilename") or "po-document.pdf").strip()
 
     try:
         # Fetch MO record
@@ -5386,6 +5388,22 @@ def accept_quote(record_id):
             return Response(json.dumps({"error": f"SO create failed ({so_r.status_code}): {at_err}"}),
                             status=500, headers=c, mimetype="application/json")
         so_record_id = so_r.json()["id"]
+
+        # Upload PO document to SO record if provided
+        if pdf_b64:
+            try:
+                import base64 as _b64, io as _io
+                pdf_bytes = _b64.b64decode(pdf_b64)
+                upload_r = req_lib.post(
+                    f"https://content.airtable.com/v0/{AIRTABLE_BASE_ID}/{so_record_id}/fldLJ5x2nJhGVuzKv/uploadAttachment",
+                    headers={"Authorization": f"Bearer {token}"},
+                    files={"file": (pdf_name, _io.BytesIO(pdf_bytes), "application/pdf")},
+                    timeout=30,
+                )
+                if not upload_r.ok:
+                    print(f"[accept_quote] PDF upload failed {upload_r.status_code}: {upload_r.text[:200]}")
+            except Exception as pdf_err:
+                print(f"[accept_quote] PDF upload error: {pdf_err}")
 
         # Update customer address only (never org name or contact name — those are shared
         # across all documents and Chrome autofill can corrupt them)
