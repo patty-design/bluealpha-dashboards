@@ -217,6 +217,8 @@
     }
     .filter-btn:hover { border-color: var(--navy); color: var(--navy); }
     .filter-btn.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+    .filter-search { margin-left:auto; padding:4px 12px; border-radius:20px; border:1.5px solid #c8d0da; background:#fff; color:#333; font-size:0.82rem; outline:none; min-width:180px; transition:border-color .15s; }
+    .filter-search:focus { border-color:var(--navy); }
 
     /* ── States ──────────────────────────────────────────────────────────── */
     .empty-state {
@@ -617,6 +619,7 @@
         <button class="filter-btn" onclick="filterMyOrders('pending')">Pending</button>
         <button class="filter-btn" onclick="filterMyOrders('inprogress')">In Progress</button>
         <button class="filter-btn" onclick="filterMyOrders('shipped')">Shipped</button>
+        <input class="filter-search" id="ordersSearch" type="search" placeholder="Search order #, PO #…" oninput="searchMyOrders(this.value)">
       </div>
       <div id="myOrdersContent"><div class="loading">Loading orders…</div></div>
     </div>
@@ -642,6 +645,7 @@
         <button class="filter-btn active" onclick="filterInvoices('all')">All</button>
         <button class="filter-btn" onclick="filterInvoices('unpaid')">Unpaid</button>
         <button class="filter-btn" onclick="filterInvoices('paid')">Paid</button>
+        <input class="filter-search" id="invoicesSearch" type="search" placeholder="Search invoice #, SO #, PO #…" oninput="searchInvoices(this.value)">
       </div>
       <div id="invoicesList"><div class="loading">Loading invoices…</div></div>
     </div>
@@ -750,7 +754,9 @@
   let _teamLoaded        = false;
   let _accountLoaded     = false;
   let _myOrdersFilter    = 'all';
+  let _myOrdersSearch    = '';
   let _invoicesFilter    = 'all';
+  let _invoicesSearch    = '';
   let _myOrdersCacheTs   = 0;
   let _invoicesCacheTs   = 0;
 
@@ -1400,7 +1406,7 @@
       return numB - numA;
     });
 
-    const filtered = _myOrdersFilter === 'all' ? sorted
+    const _statusFiltered = _myOrdersFilter === 'all' ? sorted
       : _myOrdersFilter === 'pending'    ? sorted.filter(q => {
           const s = (q.status || '').toLowerCase();
           return !s || s === 'pending';
@@ -1410,6 +1416,10 @@
           return s === 'approved' || s === 'active' || s === 'accepted' || s === 'in progress';
         })
       : sorted.filter(q => (q.status || '').toLowerCase() === 'shipped');
+    const _oq = _myOrdersSearch.toLowerCase().trim();
+    const filtered = _oq
+      ? _statusFiltered.filter(q => [q.quote_number, q.so_number, q.po_number].some(v => (v||'').toLowerCase().includes(_oq)))
+      : _statusFiltered;
 
     bar.style.display = 'flex';
     bar.querySelectorAll('.filter-btn').forEach(b => {
@@ -1418,7 +1428,7 @@
     });
 
     el.innerHTML = '<table><thead><tr><th>Order #</th><th>PO #</th><th>Date</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>' +
-      (filtered.length === 0 ? `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No ${_myOrdersFilter} orders.</td></tr>` :
+      (filtered.length === 0 ? `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No matching orders.</td></tr>` :
       filtered.map(q => `
         <tr>
           <td><strong>${escHtml(q.quote_number || q.so_number || '—')}</strong></td>
@@ -1434,6 +1444,10 @@
 
   function filterMyOrders(f) {
     _myOrdersFilter = f;
+    if (_myOrdersCache) _renderMyOrders(_myOrdersCache.quotes);
+  }
+  function searchMyOrders(val) {
+    _myOrdersSearch = val;
     if (_myOrdersCache) _renderMyOrders(_myOrdersCache.quotes);
   }
 
@@ -1495,15 +1509,19 @@
       el.innerHTML = '<div class="empty-state"><p>No invoices yet.</p></div>';
       return;
     }
-    const filtered = _invoicesFilter === 'all'  ? invoices
+    const _statusFiltered2 = _invoicesFilter === 'all'  ? invoices
       : _invoicesFilter === 'paid'   ? invoices.filter(i => i.is_paid)
       :                                 invoices.filter(i => !i.is_paid);
+    const _iq = _invoicesSearch.toLowerCase().trim();
+    const filtered = _iq
+      ? _statusFiltered2.filter(i => [i.inv_number, i.so_number, i.po_number].some(v => (v||'').toLowerCase().includes(_iq)))
+      : _statusFiltered2;
     bar.style.display = 'flex';
     bar.querySelectorAll('.filter-btn').forEach(b =>
       b.classList.toggle('active', b.textContent.toLowerCase() === _invoicesFilter)
     );
     el.innerHTML = '<table><thead><tr><th>Invoice #</th><th>SO #</th><th>PO #</th><th>Date</th><th>Total</th><th>Tracking</th><th>Status</th><th></th></tr></thead><tbody>' +
-      (filtered.length === 0 ? `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">No ${_invoicesFilter} invoices.</td></tr>` :
+      (filtered.length === 0 ? `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">No matching invoices.</td></tr>` :
       filtered.map(inv => {
         const badge = inv.is_paid
           ? '<span class="badge badge-paid">Paid</span>'
@@ -1527,6 +1545,10 @@
 
   function filterInvoices(f) {
     _invoicesFilter = f;
+    if (_invoicesCache) _renderInvoices(_invoicesCache.invoices);
+  }
+  function searchInvoices(val) {
+    _invoicesSearch = val;
     if (_invoicesCache) _renderInvoices(_invoicesCache.invoices);
   }
 

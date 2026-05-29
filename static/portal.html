@@ -227,6 +227,8 @@
     .filter-btn { padding:4px 14px; border-radius:20px; border:1.5px solid #c8d0da; background:#fff; color:#444; font-size:0.82rem; font-weight:600; cursor:pointer; transition:all .15s; }
     .filter-btn:hover { border-color:var(--navy); color:var(--navy); }
     .filter-btn.active { background:var(--navy); color:#fff; border-color:var(--navy); }
+    .filter-search { margin-left:auto; padding:4px 12px; border-radius:20px; border:1.5px solid #c8d0da; background:#fff; color:#333; font-size:0.82rem; outline:none; min-width:180px; transition:border-color .15s; }
+    .filter-search:focus { border-color:var(--navy); }
     .tracking-info { font-family: monospace; font-size: 0.82rem; color: #1a5276; word-break: break-all; text-decoration: underline; }
     .empty-state {
       text-align: center;
@@ -370,6 +372,7 @@
           <button class="filter-btn active" onclick="filterOrders('all')">All</button>
           <button class="filter-btn" onclick="filterOrders('confirmed')">Confirmed</button>
           <button class="filter-btn" onclick="filterOrders('shipped')">Shipped</button>
+          <input class="filter-search" id="ordersSearch" type="search" placeholder="Search SO #, PO #…" oninput="searchOrders(this.value)">
         </div>
         <div id="ordersContent"><div class="loading">Loading orders…</div></div>
       </div>
@@ -382,6 +385,7 @@
           <button class="filter-btn active" onclick="filterInvoices('all')">All</button>
           <button class="filter-btn" onclick="filterInvoices('unpaid')">Unpaid</button>
           <button class="filter-btn" onclick="filterInvoices('paid')">Paid</button>
+          <input class="filter-search" id="invoicesSearch" type="search" placeholder="Search invoice #, SO #, PO #…" oninput="searchInvoices(this.value)">
         </div>
         <div id="invoicesList"><div class="loading">Loading…</div></div>
       </div>
@@ -805,6 +809,7 @@
 
     // ── Orders helpers ────────────────────────────────────────────────────────
     let _ordersFilter = 'all';
+    let _ordersSearch = '';
     const _hasTracking = o => !!(o.tracking || (o.splitShipments || []).some(s => s.tracking));
     const _soNum       = o => parseInt((o.so_number || '').replace(/\D/g, ''), 10) || 0;
 
@@ -819,15 +824,19 @@
       const sorted = [...orders].sort((a, b) =>
         _hasTracking(a) - _hasTracking(b) || _soNum(b) - _soNum(a)
       );
-      const filtered = _ordersFilter === 'all'       ? sorted
+      const _statusFiltered = _ordersFilter === 'all'       ? sorted
         : _ordersFilter === 'confirmed' ? sorted.filter(o => !_hasTracking(o))
         :                                 sorted.filter(o => _hasTracking(o));
+      const _oq = _ordersSearch.toLowerCase().trim();
+      const filtered = _oq
+        ? _statusFiltered.filter(o => [o.so_number, o.po_number].some(v => (v||'').toLowerCase().includes(_oq)))
+        : _statusFiltered;
       bar.style.display = 'flex';
       bar.querySelectorAll('.filter-btn').forEach(b =>
         b.classList.toggle('active', b.textContent.toLowerCase() === _ordersFilter)
       );
       el.innerHTML = '<table><thead><tr><th>Sales Order #</th><th>PO #</th><th>Date</th><th>Total</th><th>Tracking</th><th>Status</th><th></th></tr></thead><tbody>' +
-        (filtered.length === 0 ? `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">No ${_ordersFilter} orders.</td></tr>` :
+        (filtered.length === 0 ? `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">No matching orders.</td></tr>` :
         filtered.map(o => {
           const shipped = _hasTracking(o);
           const badge = shipped ? '<span class="badge badge-shipped">Shipped</span>'
@@ -858,6 +867,10 @@
       _ordersFilter = f;
       if (_ordersCache) _renderOrders(_ordersCache.orders);
     }
+    function searchOrders(val) {
+      _ordersSearch = val;
+      if (_ordersCache) _renderOrders(_ordersCache.orders);
+    }
 
     async function loadOrders() {
       ordersLoaded = true; _ordersCacheTs = Date.now();
@@ -876,6 +889,7 @@
     // ── Invoices helpers ──────────────────────────────────────────────────────
     let _invoicesCache  = null;
     let _invoicesFilter = 'all';
+    let _invoicesSearch = '';
 
     function _renderInvoices(invoices) {
       const el  = document.getElementById('invoicesList');
@@ -885,15 +899,19 @@
         el.innerHTML = '<div class="empty-state"><p>No invoices yet.</p></div>';
         return;
       }
-      const filtered = _invoicesFilter === 'all'    ? invoices
+      const _statusFiltered = _invoicesFilter === 'all'    ? invoices
         : _invoicesFilter === 'paid'   ? invoices.filter(i => i.is_paid)
         :                                invoices.filter(i => !i.is_paid);
+      const _iq = _invoicesSearch.toLowerCase().trim();
+      const filtered = _iq
+        ? _statusFiltered.filter(i => [i.inv_number, i.so_number, i.po_number].some(v => (v||'').toLowerCase().includes(_iq)))
+        : _statusFiltered;
       bar.style.display = 'flex';
       bar.querySelectorAll('.filter-btn').forEach(b =>
         b.classList.toggle('active', b.textContent.toLowerCase() === _invoicesFilter)
       );
       el.innerHTML = '<table><thead><tr><th>Invoice #</th><th>Sales Order</th><th>PO #</th><th>Date</th><th>Total</th><th>Tracking</th><th>Status</th><th></th></tr></thead><tbody>' +
-        (filtered.length === 0 ? `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">No ${_invoicesFilter} invoices.</td></tr>` :
+        (filtered.length === 0 ? `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">No matching invoices.</td></tr>` :
         filtered.map(inv => {
           const badge = inv.is_paid
             ? '<span class="badge badge-accepted">Paid</span>'
@@ -914,6 +932,10 @@
 
     function filterInvoices(f) {
       _invoicesFilter = f;
+      if (_invoicesCache) _renderInvoices(_invoicesCache.invoices);
+    }
+    function searchInvoices(val) {
+      _invoicesSearch = val;
       if (_invoicesCache) _renderInvoices(_invoicesCache.invoices);
     }
 
