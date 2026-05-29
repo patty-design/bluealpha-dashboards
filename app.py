@@ -10708,7 +10708,7 @@ def _run_tracking_sync():
                     base_order_num is set for split orders (e.g. 'SO-0337-1' has base 'SO-0337').
                     Only writes to Airtable if tracking was found — never clears existing data."""
                     r2 = req_lib.get("https://ssapi.shipstation.com/shipments",
-                                     params={"orderNumber": order_num, "pageSize": 50},
+                                     params={"orderNumber": order_num, "pageSize": 50, "storeId": 212019},
                                      headers=ss_hdrs, timeout=15)
                     t_parts, sd_str = [], ""
                     order_total = None
