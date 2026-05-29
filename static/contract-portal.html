@@ -1448,7 +1448,7 @@
           <td>${q.po_number ? escHtml(q.po_number) : '<span style="color:var(--text-muted)">—</span>'}</td>
           <td>${fmt(q.date)}</td>
           <td>${money(q.total)}</td>
-          <td>${_orderStatusBadge(q)}</td>
+          <td style="line-height:1.2;">${_orderStatusBadge(q)}${q.tracking ? `<a href="${trackingUrl(q.tracking)}" target="_blank" rel="noopener" style="display:block;font-size:0.68rem;font-family:monospace;color:var(--text-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">${escHtml(q.tracking)}</a>` : ''}</td>
           <td><button class="btn-sm" onclick="openViewQuote('${escHtml(q.record_id)}')">View →</button></td>
         </tr>`
       ).join('')) +
