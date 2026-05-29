@@ -7271,7 +7271,7 @@ def portal_orders(user):
         with _cf.ThreadPoolExecutor(max_workers=2) as _ex_po:
             _fut_records  = _ex_po.submit(at_get_all,
                 MANUAL_ORDERS_TABLE_ID, read_token,
-                fields=["Document ID", "Order ID", "Date", "MO Line Items", "Customer", "Sales Order Status", "Go-to PDF", "Hidden from Customer", "Tracking"],
+                fields=["Document ID", "Order ID", "Date", "MO Line Items", "Customer", "Sales Order Status", "Go-to PDF", "Hidden from Customer", "Tracking", "Purchase Order #"],
                 formula='{Order Type}="Sales Order"',
             )
             _fut_tracking = _ex_po.submit(at_get_all,
@@ -7330,6 +7330,7 @@ def portal_orders(user):
                 "go_to_pdf":      go_to_pdf_url,
                 "tracking":       tracking_map.get(so_number, "") or f.get("Tracking", ""),
                 "splitShipments": split_tracking_map.get(so_number, []),
+                "po_number":      f.get("Purchase Order #", ""),
             })
         orders.sort(key=lambda x: x.get("date", ""), reverse=True)
         _ORDERS_CACHE[customer_id] = {"ts": _time_mod.time(), "data": orders}
@@ -10038,7 +10039,7 @@ def portal_invoices(user):
             fields=["Document ID", "Order ID", "Date", "MO Line Items",
                     "Sales Order Status", "Go-to PDF", "Customer",
                     "Stripe Invoice Status (CC)", "Stripe Invoice Status (ACH)",
-                    "Invoice Paid", "Hidden from Customer", "Tracking"],
+                    "Invoice Paid", "Hidden from Customer", "Tracking", "Purchase Order #"],
             formula='{Order Type}="Invoice"',
         )
         # Filter to this customer, excluding hidden records
@@ -10093,6 +10094,7 @@ def portal_invoices(user):
                 "tracking":   tracking,
                 "go_to_pdf":  go_to_pdf_url,
                 "is_paid":    is_paid,
+                "po_number":  f.get("Purchase Order #", ""),
             })
 
         invoices.sort(key=lambda x: x.get("date", ""), reverse=True)

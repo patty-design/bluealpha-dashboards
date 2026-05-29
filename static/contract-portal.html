@@ -1417,11 +1417,12 @@
       b.classList.toggle('active', map[b.textContent] === _myOrdersFilter);
     });
 
-    el.innerHTML = '<table><thead><tr><th>Order #</th><th>Date</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>' +
-      (filtered.length === 0 ? `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px;">No ${_myOrdersFilter} orders.</td></tr>` :
+    el.innerHTML = '<table><thead><tr><th>Order #</th><th>PO #</th><th>Date</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>' +
+      (filtered.length === 0 ? `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No ${_myOrdersFilter} orders.</td></tr>` :
       filtered.map(q => `
         <tr>
           <td><strong>${escHtml(q.quote_number || q.so_number || '—')}</strong></td>
+          <td>${q.po_number ? escHtml(q.po_number) : '<span style="color:var(--text-muted)">—</span>'}</td>
           <td>${fmt(q.date)}</td>
           <td>${money(q.total)}</td>
           <td>${_orderStatusBadge(q)}</td>
@@ -1455,6 +1456,7 @@
           total:        o.total,
           status:       o.tracking ? 'shipped' : 'approved',
           tracking:     o.tracking,
+          po_number:    o.po_number || '',
         }));
         _myOrdersCache = { quotes: [...(qData.quotes || []), ...salesOrders] };
       }
@@ -1500,8 +1502,8 @@
     bar.querySelectorAll('.filter-btn').forEach(b =>
       b.classList.toggle('active', b.textContent.toLowerCase() === _invoicesFilter)
     );
-    el.innerHTML = '<table><thead><tr><th>Invoice #</th><th>SO #</th><th>Date</th><th>Total</th><th>Tracking</th><th>Status</th><th></th></tr></thead><tbody>' +
-      (filtered.length === 0 ? `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">No ${_invoicesFilter} invoices.</td></tr>` :
+    el.innerHTML = '<table><thead><tr><th>Invoice #</th><th>SO #</th><th>PO #</th><th>Date</th><th>Total</th><th>Tracking</th><th>Status</th><th></th></tr></thead><tbody>' +
+      (filtered.length === 0 ? `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">No ${_invoicesFilter} invoices.</td></tr>` :
       filtered.map(inv => {
         const badge = inv.is_paid
           ? '<span class="badge badge-paid">Paid</span>'
@@ -1512,6 +1514,7 @@
         return `<tr>
           <td><strong>${escHtml(inv.inv_number || '—')}</strong></td>
           <td>${escHtml(inv.so_number || '—')}</td>
+          <td>${inv.po_number ? escHtml(inv.po_number) : '<span style="color:var(--text-muted)">—</span>'}</td>
           <td>${fmt(inv.date)}</td>
           <td>${money(inv.total)}</td>
           <td>${trackCell}</td>

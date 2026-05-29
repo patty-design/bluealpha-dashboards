@@ -826,14 +826,15 @@
       bar.querySelectorAll('.filter-btn').forEach(b =>
         b.classList.toggle('active', b.textContent.toLowerCase() === _ordersFilter)
       );
-      el.innerHTML = '<table><thead><tr><th>Sales Order #</th><th>Date</th><th>Total</th><th>Tracking</th><th>Status</th><th></th></tr></thead><tbody>' +
-        (filtered.length === 0 ? `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No ${_ordersFilter} orders.</td></tr>` :
+      el.innerHTML = '<table><thead><tr><th>Sales Order #</th><th>PO #</th><th>Date</th><th>Total</th><th>Tracking</th><th>Status</th><th></th></tr></thead><tbody>' +
+        (filtered.length === 0 ? `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">No ${_ordersFilter} orders.</td></tr>` :
         filtered.map(o => {
           const shipped = _hasTracking(o);
           const badge = shipped ? '<span class="badge badge-shipped">Shipped</span>'
                                 : '<span class="badge badge-active">Confirmed</span>';
           return `<tr>
             <td><strong>${o.so_number || '—'}</strong></td>
+            <td>${o.po_number || '<span style="color:var(--text-muted)">—</span>'}</td>
             <td>${fmt(o.date)}</td>
             <td>${money(o.total)}</td>
             <td>${(() => {
@@ -891,8 +892,8 @@
       bar.querySelectorAll('.filter-btn').forEach(b =>
         b.classList.toggle('active', b.textContent.toLowerCase() === _invoicesFilter)
       );
-      el.innerHTML = '<table><thead><tr><th>Invoice #</th><th>Sales Order</th><th>Date</th><th>Total</th><th>Tracking</th><th>Status</th><th></th></tr></thead><tbody>' +
-        (filtered.length === 0 ? `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">No ${_invoicesFilter} invoices.</td></tr>` :
+      el.innerHTML = '<table><thead><tr><th>Invoice #</th><th>Sales Order</th><th>PO #</th><th>Date</th><th>Total</th><th>Tracking</th><th>Status</th><th></th></tr></thead><tbody>' +
+        (filtered.length === 0 ? `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">No ${_invoicesFilter} invoices.</td></tr>` :
         filtered.map(inv => {
           const badge = inv.is_paid
             ? '<span class="badge badge-accepted">Paid</span>'
@@ -900,6 +901,7 @@
           return `<tr>
             <td><strong>${inv.inv_number || '—'}</strong></td>
             <td>${inv.so_number || '—'}</td>
+            <td>${inv.po_number || '<span style="color:var(--text-muted)">—</span>'}</td>
             <td>${fmt(inv.date)}</td>
             <td>${money(inv.total)}</td>
             <td>${inv.tracking ? `<a class="tracking-info" href="${trackingUrl(inv.tracking)}" target="_blank" rel="noopener">${inv.tracking}</a>` : '<span style="color:var(--text-muted)">—</span>'}</td>
