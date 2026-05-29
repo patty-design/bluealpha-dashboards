@@ -229,6 +229,10 @@
     .filter-btn.active { background:var(--navy); color:#fff; border-color:var(--navy); }
     .filter-search { margin-left:auto; padding:4px 12px; border-radius:20px; border:1.5px solid #c8d0da; background:#fff; color:#333; font-size:0.82rem; outline:none; min-width:180px; transition:border-color .15s; }
     .filter-search:focus { border-color:var(--navy); }
+    .filter-date-wrap { display:flex; align-items:center; gap:5px; margin-left:8px; }
+    .filter-date-wrap span { font-size:0.78rem; color:#666; white-space:nowrap; }
+    .filter-date { padding:3px 8px; border-radius:6px; border:1.5px solid #c8d0da; background:#fff; color:#333; font-size:0.8rem; outline:none; transition:border-color .15s; }
+    .filter-date:focus { border-color:var(--navy); }
     .tracking-info { font-family: monospace; font-size: 0.82rem; color: #1a5276; word-break: break-all; text-decoration: underline; }
     .empty-state {
       text-align: center;
@@ -372,6 +376,10 @@
           <button class="filter-btn active" onclick="filterOrders('all')">All</button>
           <button class="filter-btn" onclick="filterOrders('confirmed')">Confirmed</button>
           <button class="filter-btn" onclick="filterOrders('shipped')">Shipped</button>
+          <div class="filter-date-wrap">
+            <span>From</span><input class="filter-date" type="date" id="ordersDateFrom" onchange="filterOrdersDate()">
+            <span>To</span><input class="filter-date" type="date" id="ordersDateTo" onchange="filterOrdersDate()">
+          </div>
           <input class="filter-search" id="ordersSearch" type="search" placeholder="Search SO #, PO #…" oninput="searchOrders(this.value)">
         </div>
         <div id="ordersContent"><div class="loading">Loading orders…</div></div>
@@ -385,6 +393,10 @@
           <button class="filter-btn active" onclick="filterInvoices('all')">All</button>
           <button class="filter-btn" onclick="filterInvoices('unpaid')">Unpaid</button>
           <button class="filter-btn" onclick="filterInvoices('paid')">Paid</button>
+          <div class="filter-date-wrap">
+            <span>From</span><input class="filter-date" type="date" id="invoicesDateFrom" onchange="filterInvoicesDate()">
+            <span>To</span><input class="filter-date" type="date" id="invoicesDateTo" onchange="filterInvoicesDate()">
+          </div>
           <input class="filter-search" id="invoicesSearch" type="search" placeholder="Search invoice #, PO #…" oninput="searchInvoices(this.value)">
         </div>
         <div id="invoicesList"><div class="loading">Loading…</div></div>
@@ -808,8 +820,10 @@
     }
 
     // ── Orders helpers ────────────────────────────────────────────────────────
-    let _ordersFilter = 'all';
-    let _ordersSearch = '';
+    let _ordersFilter   = 'all';
+    let _ordersSearch   = '';
+    let _ordersDateFrom = '';
+    let _ordersDateTo   = '';
     const _hasTracking = o => !!(o.tracking || (o.splitShipments || []).some(s => s.tracking));
     const _soNum       = o => parseInt((o.so_number || '').replace(/\D/g, ''), 10) || 0;
 
@@ -828,9 +842,18 @@
         : _ordersFilter === 'confirmed' ? sorted.filter(o => !_hasTracking(o))
         :                                 sorted.filter(o => _hasTracking(o));
       const _oq = _ordersSearch.toLowerCase().trim();
-      const filtered = _oq
+      const _searched = _oq
         ? _statusFiltered.filter(o => [o.so_number, o.po_number].some(v => (v||'').toLowerCase().includes(_oq)))
         : _statusFiltered;
+      const _odf = _ordersDateFrom ? new Date(_ordersDateFrom + 'T00:00:00') : null;
+      const _odt = _ordersDateTo   ? new Date(_ordersDateTo   + 'T23:59:59') : null;
+      const filtered = (_odf || _odt) ? _searched.filter(o => {
+        if (!o.date) return false;
+        const d = new Date(o.date);
+        if (_odf && d < _odf) return false;
+        if (_odt && d > _odt) return false;
+        return true;
+      }) : _searched;
       bar.style.display = 'flex';
       bar.querySelectorAll('.filter-btn').forEach(b =>
         b.classList.toggle('active', b.textContent.toLowerCase() === _ordersFilter)
@@ -871,6 +894,11 @@
       _ordersSearch = val;
       if (_ordersCache) _renderOrders(_ordersCache.orders);
     }
+    function filterOrdersDate() {
+      _ordersDateFrom = document.getElementById('ordersDateFrom').value;
+      _ordersDateTo   = document.getElementById('ordersDateTo').value;
+      if (_ordersCache) _renderOrders(_ordersCache.orders);
+    }
 
     async function loadOrders() {
       ordersLoaded = true; _ordersCacheTs = Date.now();
@@ -887,9 +915,11 @@
     }
 
     // ── Invoices helpers ──────────────────────────────────────────────────────
-    let _invoicesCache  = null;
-    let _invoicesFilter = 'all';
-    let _invoicesSearch = '';
+    let _invoicesCache    = null;
+    let _invoicesFilter   = 'all';
+    let _invoicesSearch   = '';
+    let _invoicesDateFrom = '';
+    let _invoicesDateTo   = '';
 
     function _renderInvoices(invoices) {
       const el  = document.getElementById('invoicesList');
@@ -903,9 +933,18 @@
         : _invoicesFilter === 'paid'   ? invoices.filter(i => i.is_paid)
         :                                invoices.filter(i => !i.is_paid);
       const _iq = _invoicesSearch.toLowerCase().trim();
-      const filtered = _iq
+      const _isearched = _iq
         ? _statusFiltered.filter(i => [i.inv_number, i.so_number, i.po_number].some(v => (v||'').toLowerCase().includes(_iq)))
         : _statusFiltered;
+      const _idf = _invoicesDateFrom ? new Date(_invoicesDateFrom + 'T00:00:00') : null;
+      const _idt = _invoicesDateTo   ? new Date(_invoicesDateTo   + 'T23:59:59') : null;
+      const filtered = (_idf || _idt) ? _isearched.filter(i => {
+        if (!i.date) return false;
+        const d = new Date(i.date);
+        if (_idf && d < _idf) return false;
+        if (_idt && d > _idt) return false;
+        return true;
+      }) : _isearched;
       bar.style.display = 'flex';
       bar.querySelectorAll('.filter-btn').forEach(b =>
         b.classList.toggle('active', b.textContent.toLowerCase() === _invoicesFilter)
@@ -935,6 +974,11 @@
     }
     function searchInvoices(val) {
       _invoicesSearch = val;
+      if (_invoicesCache) _renderInvoices(_invoicesCache.invoices);
+    }
+    function filterInvoicesDate() {
+      _invoicesDateFrom = document.getElementById('invoicesDateFrom').value;
+      _invoicesDateTo   = document.getElementById('invoicesDateTo').value;
       if (_invoicesCache) _renderInvoices(_invoicesCache.invoices);
     }
 
