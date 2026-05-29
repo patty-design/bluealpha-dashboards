@@ -805,6 +805,7 @@
         const resp = await fetch(`/api/admin/users/reset-password/${resetRecordId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ newPassword: pw })
         });
         const data = await resp.json();
