@@ -1507,7 +1507,7 @@
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     const frame = document.getElementById('viewQuoteFrame');
-    frame.src   = '/view-quote/' + recordId + '?from=portal';
+    frame.src   = '/view-quote/' + recordId + '?from=contract';
     frame.style.height = '600px';
     document.getElementById('tab-view-quote').classList.add('active');
     window.scrollTo(0, 0);

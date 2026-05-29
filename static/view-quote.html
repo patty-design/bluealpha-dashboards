@@ -641,6 +641,10 @@
       if (window.self !== window.top) { window.parent.postMessage({ type: 'closeViewQuote' }, '*'); }
       else { window.location.href = '/portal?tab=our-quotes'; }
     };
+  } else if (from === 'contract') {
+    window.viewingAsOrder  = true;
+    window.viewingAsContract = true;
+    backLink.style.display = 'none';
   }
 })();
 </script>
@@ -1088,10 +1092,13 @@ function renderQuoteDetails() {
     document.getElementById('bannerExpired').classList.remove('hidden');
   }
 
-  // Notes — always editable (unless accepted)
+  // Notes — always editable (unless accepted); hidden on contract portal view
   savedNotes = q.notes || '';
   const notesEl = document.getElementById('notesText');
-  if (notesEl) {
+  const notesCard = document.getElementById('notesCard');
+  if (window.viewingAsContract && notesCard) {
+    notesCard.style.display = 'none';
+  } else if (notesEl) {
     notesEl.value = savedNotes;
     if (q.isAccepted) { notesEl.disabled = true; notesEl.style.background = 'var(--bg)'; }
   }
@@ -1230,6 +1237,7 @@ async function saveAddressEdit() {
 function buildActions(editable) {
   const bar = document.getElementById('actionsBar');
   bar.innerHTML = '';
+  if (window.viewingAsContract) return;  // contract portal: no action buttons
   const q = quoteData;
 
   if (q.isAccepted) {
