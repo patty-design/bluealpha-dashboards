@@ -620,7 +620,6 @@
       <div class="card-title" style="margin-bottom:20px;">Our Orders</div>
       <div class="filter-bar" id="ordersFilterBar" style="display:none;">
         <button class="filter-btn active" onclick="filterMyOrders('all')">All</button>
-        <button class="filter-btn" onclick="filterMyOrders('pending')">Pending</button>
         <button class="filter-btn" onclick="filterMyOrders('inprogress')">In Progress</button>
         <button class="filter-btn" onclick="filterMyOrders('shipped')">Shipped</button>
         <div class="filter-date-wrap">
@@ -810,21 +809,15 @@
     const now = Date.now();
     try {
       if (tab === 'our-orders' && _myOrdersCache && now - _myOrdersCacheTs > _CACHE_TTL_MS) {
-        const [qResp, oResp] = await Promise.all([
-          fetch('/api/portal/quotes',  { credentials: 'same-origin' }),
-          fetch('/api/portal/orders',  { credentials: 'same-origin' }),
-        ]);
-        // Only proceed if both calls succeeded — don't wipe the list on auth/network errors
-        if (!qResp.ok || !oResp.ok) return;
-        const [qData, oData] = await Promise.all([qResp.json(), oResp.json()]);
+        const oResp = await fetch('/api/portal/orders', { credentials: 'same-origin' });
+        if (!oResp.ok) return;
+        const oData = await oResp.json();
         const salesOrders = (oData.orders || []).map(o => ({
           record_id: o.record_id, so_number: o.so_number, date: o.date,
-          total: o.total, status: o.tracking ? 'shipped' : 'approved', tracking: o.tracking,
+          total: o.total, status: o.tracking ? 'shipped' : 'approved', tracking: o.tracking, po_number: o.po_number || '',
         }));
-        const combined = [...(qData.quotes || []), ...salesOrders];
-        // Only update if we got results — never overwrite a populated list with empty
-        if (combined.length > 0) {
-          _myOrdersCache = { quotes: combined }; _myOrdersCacheTs = now; _renderMyOrders(combined);
+        if (salesOrders.length > 0) {
+          _myOrdersCache = { quotes: salesOrders }; _myOrdersCacheTs = now; _renderMyOrders(salesOrders);
         }
       } else if (tab === 'invoices' && _invoicesCache && now - _invoicesCacheTs > _CACHE_TTL_MS) {
         const d = await (await fetch('/api/portal/invoices', { credentials: 'include' })).json();
@@ -897,17 +890,16 @@
       } else {
         // Preload catalog in background
         loadCatalog();
-        // Pre-warm order cache (quotes + sales orders combined)
-        Promise.all([
-          fetch('/api/portal/quotes', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : { quotes: [] }),
-          fetch('/api/portal/orders', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : { orders: [] }),
-        ]).then(([qData, oData]) => {
-          const salesOrders = (oData.orders || []).map(o => ({
-            record_id: o.record_id, so_number: o.so_number, date: o.date, total: o.total,
-            status: o.tracking ? 'shipped' : 'approved', tracking: o.tracking,
-          }));
-          _myOrdersCache = { quotes: [...(qData.quotes || []), ...salesOrders] };
-        }).catch(() => {});
+        // Pre-warm order cache (sales orders only)
+        fetch('/api/portal/orders', { credentials: 'same-origin' })
+          .then(r => r.ok ? r.json() : { orders: [] })
+          .then(oData => {
+            const salesOrders = (oData.orders || []).map(o => ({
+              record_id: o.record_id, so_number: o.so_number, date: o.date, total: o.total,
+              status: o.tracking ? 'shipped' : 'approved', tracking: o.tracking, po_number: o.po_number || '',
+            }));
+            _myOrdersCache = { quotes: salesOrders };
+          }).catch(() => {});
       }
 
       // Pre-load account info
@@ -1423,10 +1415,6 @@
     });
 
     const _statusFiltered = _myOrdersFilter === 'all' ? sorted
-      : _myOrdersFilter === 'pending'    ? sorted.filter(q => {
-          const s = (q.status || '').toLowerCase();
-          return !s || s === 'pending';
-        })
       : _myOrdersFilter === 'inprogress' ? sorted.filter(q => {
           const s = (q.status || '').toLowerCase();
           return s === 'approved' || s === 'active' || s === 'accepted' || s === 'in progress';
@@ -1448,7 +1436,7 @@
 
     bar.style.display = 'flex';
     bar.querySelectorAll('.filter-btn').forEach(b => {
-      const map = { 'All':'all','Pending':'pending','In Progress':'inprogress','Shipped':'shipped' };
+      const map = { 'All':'all','In Progress':'inprogress','Shipped':'shipped' };
       b.classList.toggle('active', map[b.textContent] === _myOrdersFilter);
     });
 
@@ -1485,26 +1473,18 @@
     _myOrdersCacheTs = Date.now();
     const el = document.getElementById('myOrdersContent');
     try {
-      // Always re-fetch — backend cache keeps this fast
-      {
-        // Fetch both portal-submitted quotes AND approved sales orders in parallel
-        const [qData, oData] = await Promise.all([
-          fetch('/api/portal/quotes',  { credentials: 'same-origin' }).then(r => r.ok ? r.json() : { quotes: [] }),
-          fetch('/api/portal/orders',  { credentials: 'same-origin' }).then(r => r.ok ? r.json() : { orders: [] }),
-        ]);
-        // Normalize sales orders into the same shape as quotes
-        const salesOrders = (oData.orders || []).map(o => ({
-          record_id:    o.record_id,
-          so_number:    o.so_number,
-          date:         o.date,
-          total:        o.total,
-          status:       o.tracking ? 'shipped' : 'approved',
-          tracking:     o.tracking,
-          po_number:    o.po_number || '',
-        }));
-        _myOrdersCache = { quotes: [...(qData.quotes || []), ...salesOrders] };
-      }
-      _renderMyOrders(_myOrdersCache.quotes);
+      const oData = await fetch('/api/portal/orders', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : { orders: [] });
+      const salesOrders = (oData.orders || []).map(o => ({
+        record_id:  o.record_id,
+        so_number:  o.so_number,
+        date:       o.date,
+        total:      o.total,
+        status:     o.tracking ? 'shipped' : 'approved',
+        tracking:   o.tracking,
+        po_number:  o.po_number || '',
+      }));
+      _myOrdersCache = { quotes: salesOrders };
+      _renderMyOrders(salesOrders);
     } catch (e) {
       el.innerHTML = '<div class="empty-state"><p>Failed to load orders. Please refresh.</p></div>';
     }
