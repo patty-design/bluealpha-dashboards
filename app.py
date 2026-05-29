@@ -8307,7 +8307,7 @@ def admin_reset_user_password(record_id):
         r = req_lib.patch(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{EMPLOYEES_TABLE_ID}/{record_id}",
             headers={**at_headers(write_token), "Content-Type": "application/json"},
-            json={"fields": {"Portal Hash": new_hash}},
+            json={"fields": {"Password Hash": new_hash}},
             timeout=10,
         )
         if r.status_code != 200:
