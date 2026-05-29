@@ -1263,6 +1263,18 @@
     _renderCart();
   }
 
+  function updateCartQty(idx, val) {
+    const qty = parseInt(val, 10);
+    if (!qty || qty < 1) return;
+    _cart[idx].qty = qty;
+    // Update totals without re-rendering (which would steal focus from the input)
+    const lineTotal = qty * _cart[idx].unitPrice;
+    const row = document.getElementById('cartBody').rows[idx];
+    if (row) row.cells[3].textContent = money(lineTotal);
+    const total = _cart.reduce((s, i) => s + i.qty * i.unitPrice, 0);
+    document.getElementById('orderSubtotal').textContent = money(total);
+  }
+
   function _renderCart() {
     const section = document.getElementById('cartSection');
     const body    = document.getElementById('cartBody');
@@ -1280,7 +1292,7 @@
       total += lineTotal;
       return `<tr>
         <td>${escHtml(item.name)}</td>
-        <td style="text-align:center">${item.qty}</td>
+        <td style="text-align:center"><input type="number" min="1" value="${item.qty}" style="width:60px;text-align:center;border:1.5px solid #c8d0da;border-radius:6px;padding:3px 6px;font-size:0.88rem;" onchange="updateCartQty(${idx}, this.value)" oninput="updateCartQty(${idx}, this.value)"></td>
         <td style="text-align:right">${money(item.unitPrice)}</td>
         <td style="text-align:right;font-weight:700">${money(lineTotal)}</td>
         <td><button class="btn-danger" onclick="removeFromCart(${idx})">Remove</button></td>
