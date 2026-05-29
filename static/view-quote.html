@@ -642,9 +642,13 @@
       else { window.location.href = '/portal?tab=our-quotes'; }
     };
   } else if (from === 'contract') {
-    window.viewingAsOrder  = true;
+    window.viewingAsOrder    = true;
     window.viewingAsContract = true;
-    backLink.style.display = 'none';
+    backLink.style.display   = 'none';
+    document.addEventListener('DOMContentLoaded', function() {
+      const lt = document.getElementById('loadingText');
+      if (lt) lt.textContent = 'Loading your order…';
+    });
   }
 })();
 </script>
