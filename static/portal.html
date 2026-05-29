@@ -910,15 +910,14 @@
       bar.querySelectorAll('.filter-btn').forEach(b =>
         b.classList.toggle('active', b.textContent.toLowerCase() === _invoicesFilter)
       );
-      el.innerHTML = '<table><thead><tr><th>Invoice #</th><th>Sales Order</th><th>PO #</th><th>Date</th><th>Total</th><th>Tracking</th><th>Status</th><th></th></tr></thead><tbody>' +
-        (filtered.length === 0 ? `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">No matching invoices.</td></tr>` :
+      el.innerHTML = '<table><thead><tr><th>Invoice #</th><th>PO #</th><th>Date</th><th>Total</th><th>Tracking</th><th>Status</th><th></th></tr></thead><tbody>' +
+        (filtered.length === 0 ? `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">No matching invoices.</td></tr>` :
         filtered.map(inv => {
           const badge = inv.is_paid
             ? '<span class="badge badge-accepted">Paid</span>'
             : '<span class="badge badge-pending">Unpaid</span>';
           return `<tr>
             <td><strong>${inv.inv_number || '—'}</strong></td>
-            <td>${inv.so_number || '—'}</td>
             <td>${inv.po_number || '<span style="color:var(--text-muted)">—</span>'}</td>
             <td>${fmt(inv.date)}</td>
             <td>${money(inv.total)}</td>
