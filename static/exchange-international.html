@@ -614,8 +614,11 @@ const BUCKLE_FILTER_PARENTS = new Set([
 function detectBuckle(sku, name) {
   const s = (sku  || '').toLowerCase();
   const n = (name || '').toLowerCase();
-  if (s.includes('-cob-') || n.includes('cobra')) return 'cobra';
-  if (s.includes('-gtb-') || n.includes('gt buckle')) return 'gt';
+  // GT Cobra / GT Buckle — must be checked BEFORE generic cobra check
+  // because "GT Cobra" contains the word "cobra"
+  if (s.includes('-gtb-') || n.includes('gt cobra') || n.includes('gt buckle')) return 'gt';
+  // Aluminum COBRA
+  if (s.includes('-cob-') || n.includes('aluminum cobra')) return 'cobra';
   return null;
 }
 
