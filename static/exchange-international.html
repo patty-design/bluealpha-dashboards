@@ -605,6 +605,20 @@ function displayName(name) {
   return name.replace(/^DBL No Buckle Outer\b/i, 'Duty Belt Lite');
 }
 
+// Parents where exchange options must match the original item's buckle type
+const BUCKLE_FILTER_PARENTS = new Set([
+  'recPHyho0XoHRQXZp',  // 2" Standard Duty Belt
+  'rec7KI77AOb7qMe0g',  // 2" MOLLE Duty Belt
+]);
+
+function detectBuckle(sku, name) {
+  const s = (sku  || '').toLowerCase();
+  const n = (name || '').toLowerCase();
+  if (s.includes('-cob-') || n.includes('cobra')) return 'cobra';
+  if (s.includes('-gtb-') || n.includes('gt buckle')) return 'gt';
+  return null;
+}
+
 // ── Progress helper ───────────────────────────────────────────────────────────
 function setNewStep(n) {
   [1,2,3,4,5].forEach(i => {
@@ -731,7 +745,16 @@ async function buildStep3(data) {
     row.id = `n-item-row-${idx}`;
 
     const allOpts = optionsCache[item.parentProductId] || [];
-    const opts    = allOpts.filter(o => o.sku !== item.sku);
+    let opts = allOpts.filter(o => o.sku !== item.sku);
+
+    // For Standard/MOLLE duty belts, filter options to match the original buckle type
+    if (BUCKLE_FILTER_PARENTS.has(item.parentProductId)) {
+      const buckle = detectBuckle(item.sku, item.name);
+      if (buckle) {
+        opts = opts.filter(o => detectBuckle(o.sku, o.name) === buckle);
+      }
+    }
+
     let optionsHtml = '<option value="">Select a size/color…</option>';
     if (opts.length === 0) {
       optionsHtml = '<option value="">No other sizes available — contact us</option>';
