@@ -321,7 +321,7 @@
   <!-- ── STEP 1: Verify Order ── -->
   <div id="step-1" class="card">
     <div class="card-title">Step 1 — Verify Your Order</div>
-    <p class="card-subtitle">Enter your order details to check eligibility</p>
+    <p class="card-subtitle">Enter your order number and the last name and/or email from your original order</p>
 
     <div class="field">
       <label>Order Number <span class="req">*</span></label>
@@ -335,7 +335,7 @@
       <label>Email Address</label>
       <input type="email" id="email-input" placeholder="Email used on the order" autocomplete="off">
     </div>
-    <p style="font-size:0.82rem; color:var(--muted); margin-top:-8px; margin-bottom:16px;">Provide last name OR email (or both).</p>
+    <p style="font-size:0.82rem; color:var(--muted); margin-top:-8px; margin-bottom:16px;">At least one of last name or email is required.</p>
 
     <button class="btn btn-primary" id="btn-verify" onclick="verifyExchange()" style="margin-top:8px;">
       Continue
@@ -346,7 +346,7 @@
 
     <div class="message message-error" id="msg-not-found">
       <strong>Order not found</strong>
-      We couldn't find that order. Please check your order number and email, or contact us at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">678-961-3304</a>.
+      We couldn't find that order. Please check your order number and last name/email, or contact us at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or <a href="tel:6789613304">678-961-3304</a>.
     </div>
     <div class="message message-warning" id="msg-already-exchanged">
       <strong>Exchange Already Submitted</strong>
