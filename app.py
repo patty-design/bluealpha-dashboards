@@ -1055,6 +1055,28 @@ def cs_lookup_order():
                     ],
                 })
 
+        # Check for existing reshipment orders for this order number
+        already_reshipped = {}
+        if mode in ("missing", "incorrect"):
+            for suffix_base in ("-M", "-I"):
+                check_num = order_number + suffix_base
+                counter = 2
+                while counter <= 8:
+                    chk_r = req_lib.get("https://ssapi.shipstation.com/orders",
+                                        params={"orderNumber": check_num},
+                                        headers=ss_headers(), timeout=10)
+                    existing_orders = chk_r.json().get("orders", [])
+                    if not existing_orders:
+                        break
+                    for o in existing_orders:
+                        for it in o.get("items", []):
+                            sku = (it.get("sku") or "").strip()
+                            qty = it.get("quantity", 1)
+                            if sku:
+                                already_reshipped[sku] = already_reshipped.get(sku, 0) + qty
+                    check_num = f"{order_number}{suffix_base}{counter}"
+                    counter += 1
+
         return Response(json.dumps({
             "status":               "found",
             "orderId":              order.get("orderId"),
@@ -1077,6 +1099,7 @@ def cs_lookup_order():
             "items":                items,
             "orderGroups":          order_groups,
             "alreadyReturnedQtys":  cs_already_returned,
+            "alreadyReshippedSkus": already_reshipped,
             "shippingAmount":       float(order.get("shippingAmount") or 0),
             "existingShippingRefund": existing_shipping_refund,
         }), headers=c, mimetype="application/json")
@@ -1098,6 +1121,7 @@ def _cs_reship_submit(mode, data, c):
     customer_email = data.get("customerEmail", "")
     address        = data.get("address", {})
     selected_items = data.get("selectedItems", [])
+    notes          = data.get("notes", "").strip()
 
     if not order_number or not selected_items:
         return Response(json.dumps({"status": "error", "error": "Missing required fields"}),
@@ -1108,6 +1132,8 @@ def _cs_reship_submit(mode, data, c):
     internal_note = (f"Missing items reshipment of order {order_number}"
                      if mode == "missing"
                      else f"Incorrect item reshipment of order {order_number}")
+    if notes:
+        internal_note = internal_note + "\n" + notes
 
     try:
         # 1. Find next available order number suffix

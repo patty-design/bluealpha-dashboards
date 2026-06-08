@@ -605,6 +605,16 @@
       <!-- Missing/Incorrect item selection panel -->
       <div id="reship-panel" class="hidden">
         <div id="reship-groups"></div>
+        <!-- Notes for special SKUs -->
+        <div id="reship-notes-section" class="hidden" style="margin-top:14px;">
+          <div style="background:#fff8e1;border:1px solid #f9c73a;border-radius:6px;padding:10px 14px;margin-bottom:10px;font-size:0.875rem;color:#7a5800;">
+            ⚠️ <strong>Size &amp; color required</strong> — One or more items in this reshipment require a specific size and color. Please enter the requested size and color in the notes box below.
+          </div>
+          <div class="field">
+            <label>Reshipment Notes <span class="req">*</span></label>
+            <textarea id="reship-notes" placeholder="Enter requested size and color (e.g. Black 34, Coyote Brown 38)…" style="min-height:70px;"></textarea>
+          </div>
+        </div>
         <div class="message message-error hidden" id="msg-reship-none">Please select at least one item.</div>
 
         <div style="margin-top:20px;">
@@ -1928,21 +1938,47 @@ function escHtml(str) {
 function buildReshipGroups(orderGroups) {
   const container = document.getElementById('reship-groups');
   container.innerHTML = '';
+  // Clear notes textarea
+  const notesEl = document.getElementById('reship-notes');
+  if (notesEl) notesEl.value = '';
+
+  const alreadyReshipped = (orderData && orderData.alreadyReshippedSkus) || {};
+  const specialSkus = ['BAG-2946', 'BAG-2947', 'BAG-2948', 'BAG-2949'];
+  let hasSpecialSku = false;
+
   orderGroups.forEach((group, gi) => {
     const header = document.createElement('div');
     header.style.cssText = 'font-weight:600;font-size:0.875rem;margin:12px 0 6px;color:#1b2438;';
     header.textContent = group.originalName + (group.isCombo ? ' (combo)' : '');
     container.appendChild(header);
     group.components.forEach((comp, ci) => {
+      if (specialSkus.includes(comp.sku)) hasSpecialSku = true;
+      const isAlreadyReshipped = !!alreadyReshipped[comp.sku];
       const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:6px;padding:6px 10px;background:#f5f7fa;border-radius:6px;';
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:6px;padding:6px 10px;background:#f5f7fa;border-radius:6px;'
+        + (isAlreadyReshipped ? 'opacity:0.5;pointer-events:none;' : '');
+      const badgeHtml = isAlreadyReshipped
+        ? ' <span style="font-size:0.75rem;color:#888;font-style:italic;">(already reshipped)</span>'
+        : '';
       row.innerHTML =
-        '<input type="checkbox" id="reship-chk-' + gi + '-' + ci + '" checked style="width:16px;height:16px;flex-shrink:0;">' +
-        '<label for="reship-chk-' + gi + '-' + ci + '" style="flex:1;font-size:0.875rem;">' + escHtml(comp.name) + '</label>' +
-        '<input type="number" id="reship-qty-' + gi + '-' + ci + '" value="' + comp.qty + '" min="1" max="' + comp.qty + '" style="width:55px;padding:3px 6px;border:1px solid #dde3ea;border-radius:4px;font-size:0.875rem;">';
+        '<input type="checkbox" id="reship-chk-' + gi + '-' + ci + '"'
+        + (isAlreadyReshipped ? '' : ' checked')
+        + (isAlreadyReshipped ? ' disabled' : '')
+        + ' style="width:16px;height:16px;flex-shrink:0;">'
+        + '<label for="reship-chk-' + gi + '-' + ci + '" style="flex:1;font-size:0.875rem;">' + escHtml(comp.name) + badgeHtml + '</label>'
+        + '<input type="number" id="reship-qty-' + gi + '-' + ci + '" value="' + comp.qty + '" min="1" max="' + comp.qty + '" style="width:55px;padding:3px 6px;border:1px solid #dde3ea;border-radius:4px;font-size:0.875rem;">';
       container.appendChild(row);
     });
   });
+
+  const notesSec = document.getElementById('reship-notes-section');
+  if (notesSec) {
+    if (hasSpecialSku) {
+      notesSec.classList.remove('hidden');
+    } else {
+      notesSec.classList.add('hidden');
+    }
+  }
 }
 
 async function submitReship(evt) {
@@ -1981,6 +2017,7 @@ async function submitReship(evt) {
   errEl.classList.add('hidden');
 
   try {
+    const reshipNotes = document.getElementById('reship-notes').value.trim();
     const res = await fetch(API_BASE + endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1991,6 +2028,7 @@ async function submitReship(evt) {
         customerEmail: orderData.email || '',
         address,
         selectedItems,
+        notes:         reshipNotes,
       }),
     });
     const result = await res.json();
