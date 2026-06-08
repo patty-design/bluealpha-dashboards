@@ -4712,6 +4712,7 @@ _LP_INNER_REQUIRED_PARENT_IDS = {
     "rec8H08vrdCtZ0yrn",  # 2" Duty Belt Lite - MOLLE
     "recobDC5byTEvR81w",  # 2" Duty Belt Lite - Standard
     "rec7KI77AOb7qMe0g",  # 2" MOLLE Duty Belt
+    "recPHyho0XoHRQXZp",  # 2" Standard Duty Belt
 }
 
 _EXCLUDED_PARENTS = {
