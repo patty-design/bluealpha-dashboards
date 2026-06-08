@@ -3662,12 +3662,20 @@ def exchange_options():
             if parent_product_id not in fields.get("Parent Product", []):
                 continue
             raw_name = fields.get("Name + Variations", "")
-            clean_name = raw_name.replace(" - Base Only (-ONB)", "").replace(" - Base Only", "").replace(" (-ONB)", "").strip()
-            clean_name = re.sub(r'\s+Outer\s*-\s*', ' - ', clean_name).strip()
+            # Exclude "Add Size to Order Notes" options — customer can't specify size there
+            if "add size to order notes" in raw_name.lower():
+                continue
+            sku = fields.get("SKU ID", "")
+            # Apply explicit name overrides first; otherwise clean the raw name
+            if sku in _EXCHANGE_NAME_OVERRIDES:
+                clean_name = _EXCHANGE_NAME_OVERRIDES[sku]
+            else:
+                clean_name = raw_name.replace(" - Base Only (-ONB)", "").replace(" - Base Only", "").replace(" (-ONB)", "").strip()
+                clean_name = re.sub(r'\s+Outer\s*-\s*', ' - ', clean_name).strip()
             options.append({
                 "id":   rec["id"],
                 "name": clean_name,
-                "sku":  fields.get("SKU ID", ""),
+                "sku":  sku,
             })
         options.sort(key=lambda x: x["name"])
         return Response(json.dumps({"options": options}), headers=c, mimetype="application/json")
@@ -4714,6 +4722,12 @@ _LP_INNER_REQUIRED_PARENT_IDS = {
     "recobDC5byTEvR81w",  # 2" Duty Belt Lite - Standard
     "rec7KI77AOb7qMe0g",  # 2" MOLLE Duty Belt
     "recPHyho0XoHRQXZp",  # 2" Standard Duty Belt
+}
+
+# Display name overrides for exchange options (keyed by SKU ID)
+_EXCHANGE_NAME_OVERRIDES = {
+    "STA-ALC-OTH-BASE": '2" Standard - Black - Other Size - Aluminum COBRA\u00ae',
+    "MOL-ALC-OTH-BASE": '2" MOLLE - Black - Other Size - Aluminum COBRA\u00ae',
 }
 
 _EXCLUDED_PARENTS = {
@@ -8794,12 +8808,20 @@ def intl_exchange_options():
             if parent_product_id not in fields.get("Parent Product", []):
                 continue
             raw_name = fields.get("Name + Variations", "")
-            clean_name = raw_name.replace(" - Base Only (-ONB)", "").replace(" - Base Only", "").replace(" (-ONB)", "").strip()
-            clean_name = re.sub(r'\s+Outer\s*-\s*', ' - ', clean_name).strip()
+            # Exclude "Add Size to Order Notes" options — customer can't specify size there
+            if "add size to order notes" in raw_name.lower():
+                continue
+            sku = fields.get("SKU ID", "")
+            # Apply explicit name overrides first; otherwise clean the raw name
+            if sku in _EXCHANGE_NAME_OVERRIDES:
+                clean_name = _EXCHANGE_NAME_OVERRIDES[sku]
+            else:
+                clean_name = raw_name.replace(" - Base Only (-ONB)", "").replace(" - Base Only", "").replace(" (-ONB)", "").strip()
+                clean_name = re.sub(r'\s+Outer\s*-\s*', ' - ', clean_name).strip()
             options.append({
                 "id":   rec["id"],
                 "name": clean_name,
-                "sku":  fields.get("SKU ID", ""),
+                "sku":  sku,
             })
         options.sort(key=lambda x: x["name"])
         return Response(json.dumps({"options": options}), headers=c, mimetype="application/json")
