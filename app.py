@@ -857,6 +857,7 @@ def verify_order():
             try:
                 filter_formula = (f"AND({{Order Number}}='{order_number}',"
                                  f"OR({{Status}}='New',{{Status}}='Label Sent',"
+                                 f"{{Status}}='Needs Review',"
                                  f"{{Status}}='Items Received',{{Status}}='Partial Received',"
                                  f"{{Status}}='Refunded'))")
                 ar = req_lib.get(
@@ -2498,6 +2499,7 @@ def submit_return():
         try:
             _ar_formula = (f"AND({{Order Number}}='{data.get('orderNumber','')}'"
                            f",OR({{Status}}='New',{{Status}}='Label Sent',"
+                           f"{{Status}}='Needs Review',"
                            f"{{Status}}='Items Received',{{Status}}='Partial Received',"
                            f"{{Status}}='Refunded'),{{Type}}='Return')")
             _ar_resp = req_lib.get(
@@ -2666,8 +2668,12 @@ def submit_return():
                 json={"fields": status_update},
                 timeout=10,
             )
-            # Cache result so the poll endpoint can read it without needing Airtable read scope
-            _return_status_cache[record_id] = status_update.get("Status", "Needs Review")
+            # Cache the full response payload so the poll endpoint can include label URL
+            cached_payload = {"status": status_update.get("Status", "Needs Review")}
+            if status_update.get("Status") == "Needs Review" and label_pdf_b64:
+                # Label was generated but email failed — surface download URL
+                cached_payload["labelUrl"] = label_download_url
+            _return_status_cache[record_id] = cached_payload
 
             # ── On success, delete any other stale "Needs Review" records for this order ──
             if status_update.get("Status") == "Label Sent":
@@ -2714,22 +2720,32 @@ def return_status(record_id):
     """Poll for the current status of a return record.
     Reads from in-memory cache first; falls back to Airtable so app restarts
     don't cause a permanently stuck 'New' status."""
-    status = _return_status_cache.get(record_id)
-    if status:
-        return Response(json.dumps({"status": status}), headers=cors(), mimetype="application/json")
+    cached = _return_status_cache.get(record_id)
+    if cached:
+        # Cache may be a dict (new format) or a plain status string (legacy/exception path)
+        if isinstance(cached, dict):
+            return Response(json.dumps(cached), headers=cors(), mimetype="application/json")
+        return Response(json.dumps({"status": cached}), headers=cors(), mimetype="application/json")
     # Not in cache — check Airtable directly (handles post-restart scenarios)
     try:
         read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
         at_resp = req_lib.get(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{RETURNS_TABLE_ID}/{record_id}",
-            params={"fields[]": ["Status"]},
+            params={"fields[]": ["Status", "Status Notes", "Label PDF Data", "Return Label URL"]},
             headers={"Authorization": f"Bearer {read_token}"},
             timeout=8,
         )
-        at_status = at_resp.json().get("fields", {}).get("Status", "New")
+        at_fields = at_resp.json().get("fields", {})
+        at_status = at_fields.get("Status", "New")
         # Populate cache so subsequent polls are fast
         _return_status_cache[record_id] = at_status
-        return Response(json.dumps({"status": at_status}), headers=cors(), mimetype="application/json")
+        payload = {"status": at_status}
+        # If label was generated but email failed, surface the download URL to the frontend
+        if at_fields.get("Label PDF Data") and at_fields.get("Return Label URL"):
+            payload["labelUrl"] = at_fields["Return Label URL"]
+        if at_fields.get("Status Notes"):
+            payload["statusNotes"] = at_fields["Status Notes"]
+        return Response(json.dumps(payload), headers=cors(), mimetype="application/json")
     except Exception:
         pass
     # Airtable unreachable — tell client to keep polling
