@@ -3677,7 +3677,7 @@ def exchange_options():
                 "name": clean_name,
                 "sku":  sku,
             })
-        options.sort(key=lambda x: x["name"])
+        options.sort(key=lambda x: (1 if "other size" in x["name"].lower() else 0, x["name"]))
         return Response(json.dumps({"options": options}), headers=c, mimetype="application/json")
 
     except Exception as e:
@@ -8823,7 +8823,7 @@ def intl_exchange_options():
                 "name": clean_name,
                 "sku":  sku,
             })
-        options.sort(key=lambda x: x["name"])
+        options.sort(key=lambda x: (1 if "other size" in x["name"].lower() else 0, x["name"]))
         return Response(json.dumps({"options": options}), headers=c, mimetype="application/json")
 
     except Exception as e:
