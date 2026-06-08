@@ -3663,6 +3663,7 @@ def exchange_options():
                 continue
             raw_name = fields.get("Name + Variations", "")
             clean_name = raw_name.replace(" - Base Only (-ONB)", "").replace(" - Base Only", "").replace(" (-ONB)", "").strip()
+            clean_name = re.sub(r'\s+Outer\s*-\s*', ' - ', clean_name).strip()
             options.append({
                 "id":   rec["id"],
                 "name": clean_name,
@@ -8794,6 +8795,7 @@ def intl_exchange_options():
                 continue
             raw_name = fields.get("Name + Variations", "")
             clean_name = raw_name.replace(" - Base Only (-ONB)", "").replace(" - Base Only", "").replace(" (-ONB)", "").strip()
+            clean_name = re.sub(r'\s+Outer\s*-\s*', ' - ', clean_name).strip()
             options.append({
                 "id":   rec["id"],
                 "name": clean_name,
