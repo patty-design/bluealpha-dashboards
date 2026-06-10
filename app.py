@@ -10876,11 +10876,11 @@ def _tracking_sync_worker():
     """Daily at 6 PM ET — sync ShipStation tracking to Airtable for all approved SOs."""
     import time as _t
     from zoneinfo import ZoneInfo
-    from datetime import timedelta
+    from datetime import datetime as _dt, timedelta
     _t.sleep(10)  # brief startup delay
     # On startup: if it's already past 6 PM ET, run immediately (catches missed deploys)
     try:
-        _startup_et = datetime.now(ZoneInfo("America/New_York"))
+        _startup_et = _dt.now(ZoneInfo("America/New_York"))
         if _startup_et.hour >= 18:
             print(f"[tracking-sync] startup after 6 PM ET ({_startup_et.strftime('%H:%M')}), running sync now")
             _run_tracking_sync()
@@ -10889,7 +10889,7 @@ def _tracking_sync_worker():
     while True:
         try:
             et_tz  = ZoneInfo("America/New_York")
-            now_et = datetime.now(et_tz)
+            now_et = _dt.now(et_tz)
             next_run = now_et.replace(hour=18, minute=0, second=0, microsecond=0)
             if now_et >= next_run:
                 next_run += timedelta(days=1)
