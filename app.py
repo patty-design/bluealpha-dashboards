@@ -9722,7 +9722,9 @@ def portal_admin_shipped_orders(user):
             so_number  = f.get("Document ID", "")
             order_id   = str(f.get("Order ID", "")).strip()
             tracking   = tracking_map.get(so_number, "")
-            if not tracking:
+            ship_date  = ship_date_map.get(so_number, "")
+            # Include pickup orders (shipped but no tracking) if they have a ship date
+            if not tracking and not ship_date:
                 continue
             org_name_list = f.get("Bill-To Org Name (from Customer)", [])
             org_name = org_name_list[0] if org_name_list else ""
@@ -9748,8 +9750,9 @@ def portal_admin_shipped_orders(user):
         for order_num, base_order_num in base_order_map.items():
             if not base_order_num:
                 continue
-            tracking = tracking_map.get(order_num, "")
-            if not tracking:
+            tracking  = tracking_map.get(order_num, "")
+            ship_date = ship_date_map.get(order_num, "")
+            if not tracking and not ship_date:
                 continue
             parent_rec = so_by_doc.get(base_order_num)
             if not parent_rec:
@@ -10794,23 +10797,30 @@ def _run_tracking_sync():
                                 sd_str = sd
                     t_str = " | ".join(t_parts)
 
-                    # Only write to Airtable if we found tracking — never overwrite with empty
-                    if not t_str:
-                        return ""
-
-                    # Get order total from ShipStation orders API (shipmentItems don't carry prices)
+                    # Get order total and check pickup status from ShipStation orders API
                     try:
                         ro = req_lib.get("https://ssapi.shipstation.com/orders",
                                          params={"orderNumber": order_num, "pageSize": 5},
                                          headers=ss_hdrs, timeout=15)
                         if ro.ok:
-                            ss_orders = ro.json().get("orders", [])
+                            ss_orders = [o for o in ro.json().get("orders", [])
+                                         if o.get("orderNumber", "").strip() == order_num]
                             if ss_orders:
                                 ot = ss_orders[0].get("orderTotal")
                                 if ot is not None and float(ot) > 0:
                                     order_total = float(ot)
+                                # Pickup: order is shipped but has no tracking from shipments
+                                if not t_str and ss_orders[0].get("orderStatus") == "shipped":
+                                    if not sd_str:
+                                        sd_str = (ss_orders[0].get("shipDate") or "")[:10]
+                                    if sd_str:
+                                        print(f"[tracking-sync] {order_num}: no tracking, marked as pickup (ship date {sd_str})")
                     except Exception as _ot_err:
-                        print(f"[tracking-sync] order total fetch failed for {order_num}: {_ot_err}")
+                        print(f"[tracking-sync] order fetch failed for {order_num}: {_ot_err}")
+
+                    # Only write to Airtable if we have tracking OR a ship date (pickup orders)
+                    if not t_str and not sd_str:
+                        return ""
 
                     flds = {"Order #": order_num, "Date": so_date, "Tracking #": t_str}
                     if sd_str:
@@ -10868,6 +10878,14 @@ def _tracking_sync_worker():
     from zoneinfo import ZoneInfo
     from datetime import timedelta
     _t.sleep(10)  # brief startup delay
+    # On startup: if it's already past 6 PM ET, run immediately (catches missed deploys)
+    try:
+        _startup_et = datetime.now(ZoneInfo("America/New_York"))
+        if _startup_et.hour >= 18:
+            print(f"[tracking-sync] startup after 6 PM ET ({_startup_et.strftime('%H:%M')}), running sync now")
+            _run_tracking_sync()
+    except Exception as _se:
+        print(f"[tracking-sync] startup check error: {_se}")
     while True:
         try:
             et_tz  = ZoneInfo("America/New_York")

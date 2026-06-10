@@ -961,7 +961,7 @@
         const tbody = data.orders.map(o => {
           const trackCell = o.tracking
             ? `<a href="${trackingUrl(o.tracking)}" style="font-family:monospace;font-size:0.82rem;color:#1a5276;">${esc(o.tracking)}</a>`
-            : '—';
+            : (o.ship_date ? `<span style="font-size:0.82rem;color:#777;font-style:italic;">Picked Up</span>` : '—');
           const splitBadge = o.is_split ? `<span style="display:inline-block;margin-left:6px;background:#f0f4ff;color:#1B2438;font-size:0.68rem;font-weight:700;padding:1px 7px;border-radius:8px;letter-spacing:.04em;vertical-align:middle;">SPLIT</span>` : '';
           const soLink = o.is_split
             ? `<span style="font-weight:700;color:#1B2438;">${esc(o.so_number)}</span>${splitBadge}`
