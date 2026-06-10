@@ -10380,7 +10380,8 @@ def admin_shipped_orders():
             f = rec.get("fields", {})
             so_number = f.get("Document ID", f'SO-{f.get("Order ID","")}')
             tracking  = tracking_map.get(so_number, "")
-            if not tracking:
+            ship_date = ship_date_map.get(so_number, "")
+            if not tracking and not ship_date:
                 continue
             order_id = f.get("Order ID", "")
             org_list = f.get("Bill-To Org Name (from Customer)", [])
@@ -10408,8 +10409,9 @@ def admin_shipped_orders():
         for order_num, base_order_num in base_order_map.items():
             if not base_order_num:
                 continue
-            tracking = tracking_map.get(order_num, "")
-            if not tracking:
+            tracking  = tracking_map.get(order_num, "")
+            ship_date = ship_date_map.get(order_num, "")
+            if not tracking and not ship_date:
                 continue
             parent_rec = so_by_doc.get(base_order_num)
             if not parent_rec:
