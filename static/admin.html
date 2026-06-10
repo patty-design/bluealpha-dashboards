@@ -944,7 +944,7 @@
     let shippedLoaded = false;
     document.querySelectorAll('.tab').forEach(tab => {
       if (tab.dataset.tab === 'shipped') {
-        tab.addEventListener('click', () => { if (!shippedLoaded) loadShippedOrders(); });
+        tab.addEventListener('click', () => { loadShippedOrders(); });
       }
     });
 
