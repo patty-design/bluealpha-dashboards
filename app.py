@@ -7347,7 +7347,7 @@ def portal_orders(user):
         with _cf.ThreadPoolExecutor(max_workers=2) as _ex_po:
             _fut_records  = _ex_po.submit(at_get_all,
                 MANUAL_ORDERS_TABLE_ID, read_token,
-                fields=["Document ID", "Order ID", "Date", "MO Line Items", "Customer", "Sales Order Status", "Go-to PDF", "Hidden from Customer", "Tracking", "Purchase Order #"],
+                fields=["Document ID", "Order ID", "Date", "MO Line Items", "Customer", "Sales Order Status", "Go-to PDF", "Hidden from Customer", "Tracking", "Tracking #", "Purchase Order #"],
                 formula='{Order Type}="Sales Order"',
             )
             _fut_tracking = _ex_po.submit(at_get_all,
@@ -7404,7 +7404,7 @@ def portal_orders(user):
                 "date":           f.get("Date", ""),
                 "total":          round(total, 2),
                 "go_to_pdf":      go_to_pdf_url,
-                "tracking":       tracking_map.get(so_number, "") or f.get("Tracking", ""),
+                "tracking":       tracking_map.get(so_number, "") or f.get("Tracking #", "") or f.get("Tracking", ""),
                 "splitShipments": split_tracking_map.get(so_number, []),
                 "po_number":      f.get("Purchase Order #", ""),
             })
