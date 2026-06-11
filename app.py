@@ -7991,6 +7991,8 @@ def portal_account_info(user):
         "shipOrg":   "Ship To Name",
         "shipPhone": "Main Contact Phone #",
         "shipAddr1": "Customer Address (Line 1)", "shipAddr2": "Customer Address (Line 2)",
+        "shipCity":  "Customer City",             "shipState": "Customer State",
+        "shipZip":   "Customer Zip Code",
         "billOrg":   "Bill-To Org Name",         "billName":  "Bill-To Contact Name",
         "billEmail": "Bill-To Contact Email",     "billPhone": "Bill-To Phone #",
         "billAddr1": "Bill-To Address (Line 1)",  "billAddr2": "Bill-To Address (Line 2)",

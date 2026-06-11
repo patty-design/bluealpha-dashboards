@@ -738,19 +738,80 @@
   <div class="tab-panel" id="tab-account">
     <div class="card">
       <div class="card-title">My Account</div>
-      <p class="card-sub">Update your contact name and email address.</p>
-      <div class="account-form">
-        <div class="form-field">
-          <label>Contact Name</label>
-          <input type="text" id="accountName" placeholder="Your name" autocomplete="off">
-        </div>
-        <div class="form-field">
-          <label>Email Address</label>
-          <input type="email" id="accountEmail" placeholder="your@email.com" autocomplete="off">
-        </div>
-        <button class="btn-primary" id="saveAccountBtn" onclick="saveAccount()">Save Changes</button>
-        <div id="accountSaveMsg" style="margin-top:12px;font-size:0.85rem;"></div>
+      <p class="card-sub">Manage your contact information and default billing and shipping addresses.</p>
+
+      <!-- Company (read-only) -->
+      <div style="margin-bottom:28px;">
+        <div style="font-family:'Montserrat',sans-serif;font-size:0.75rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Company</div>
+        <div style="padding:10px 14px;background:#f5f7fa;border:1px solid var(--border);border-radius:6px;font-size:0.92rem;font-weight:600;color:var(--text);" id="accountOrgName">—</div>
+        <div style="font-size:0.75rem;color:var(--muted);margin-top:4px;">To update your company name, contact your Blue Alpha account manager.</div>
       </div>
+
+      <!-- Contact info -->
+      <div style="margin-bottom:28px;">
+        <div style="font-family:'Montserrat',sans-serif;font-size:0.75rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">Your Contact Info</div>
+        <div class="account-form">
+          <div class="form-field">
+            <label>Contact Name</label>
+            <input type="text" id="accountName" placeholder="Your name" autocomplete="off">
+          </div>
+          <div class="form-field">
+            <label>Email Address</label>
+            <input type="email" id="accountEmail" placeholder="your@email.com" autocomplete="off">
+          </div>
+        </div>
+      </div>
+
+      <!-- Shipping address -->
+      <div style="margin-bottom:28px;">
+        <div style="font-family:'Montserrat',sans-serif;font-size:0.75rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">Default Shipping Address</div>
+        <div class="account-form" style="max-width:540px;">
+          <div class="form-field">
+            <label>Address Line 1</label>
+            <input type="text" id="shipAddr1" placeholder="123 Main St" autocomplete="off">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 80px 100px;gap:12px;">
+            <div class="form-field" style="margin-bottom:0;">
+              <label>City</label>
+              <input type="text" id="shipCity" placeholder="City" autocomplete="off">
+            </div>
+            <div class="form-field" style="margin-bottom:0;">
+              <label>State</label>
+              <input type="text" id="shipState" placeholder="GA" maxlength="2" autocomplete="off">
+            </div>
+            <div class="form-field" style="margin-bottom:0;">
+              <label>Zip Code</label>
+              <input type="text" id="shipZip" placeholder="30165" maxlength="10" autocomplete="off">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Billing address -->
+      <div style="margin-bottom:28px;">
+        <div style="font-family:'Montserrat',sans-serif;font-size:0.75rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">Default Billing Address</div>
+        <div class="account-form" style="max-width:540px;">
+          <div class="form-field">
+            <label>Billing Contact Name</label>
+            <input type="text" id="billName" placeholder="Accounts Payable" autocomplete="off">
+          </div>
+          <div class="form-field">
+            <label>Billing Email</label>
+            <input type="email" id="billEmail" placeholder="ap@company.com" autocomplete="off">
+          </div>
+          <div class="form-field">
+            <label>Billing Address Line 1</label>
+            <input type="text" id="billAddr1" placeholder="123 Main St" autocomplete="off">
+          </div>
+          <div class="form-field">
+            <label>Billing Address Line 2</label>
+            <input type="text" id="billAddr2" placeholder="Suite 100, City, ST 00000" autocomplete="off">
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-primary" id="saveAccountBtn" onclick="saveAccount()">Save Changes</button>
+      <div id="accountSaveMsg" style="margin-top:12px;font-size:0.85rem;"></div>
     </div>
   </div>
 
@@ -1767,32 +1828,57 @@
       if (!resp.ok) return;
       const data = await resp.json();
       const info = data.info || {};
-      // Prefer contact-level fields; fall back to portalMe
-      document.getElementById('accountName').value  = info.shipName || info.contactName || portalMe?.contactName || '';
-      document.getElementById('accountEmail').value = info.shipEmail || info.contactEmail || '';
+
+      // Company name (read-only)
+      const orgEl = document.getElementById('accountOrgName');
+      if (orgEl) orgEl.textContent = portalMe?.agencyName || portalMe?.orgName || info.shipOrg || '—';
+
+      // Personal contact
+      document.getElementById('accountName').value  = info.shipName  || portalMe?.contactName || '';
+      document.getElementById('accountEmail').value = info.shipEmail || '';
+
+      // Shipping address
+      document.getElementById('shipAddr1').value = info.shipAddr1 || '';
+      document.getElementById('shipCity').value  = info.shipCity  || '';
+      document.getElementById('shipState').value = info.shipState || '';
+      document.getElementById('shipZip').value   = info.shipZip   || '';
+
+      // Billing
+      document.getElementById('billName').value  = info.billName  || '';
+      document.getElementById('billEmail').value = info.billEmail || '';
+      document.getElementById('billAddr1').value = info.billAddr1 || '';
+      document.getElementById('billAddr2').value = info.billAddr2 || '';
     } catch (e) { /* non-critical */ }
   }
 
   async function saveAccount() {
     const btn   = document.getElementById('saveAccountBtn');
     const msgEl = document.getElementById('accountSaveMsg');
-    msgEl.textContent  = '';
-    msgEl.style.color  = 'var(--muted)';
-    const contactName = document.getElementById('accountName').value.trim();
-    const email       = document.getElementById('accountEmail').value.trim();
-    if (!contactName && !email) {
-      msgEl.textContent = 'Please enter a name or email.';
-      msgEl.style.color = 'var(--red)';
-      return;
-    }
+    msgEl.textContent = '';
+    msgEl.style.color = 'var(--muted)';
     btn.disabled    = true;
     btn.textContent = 'Saving…';
     try {
-      const resp = await fetch('/api/portal/update-profile', {
-        method:  'POST',
+      const payload = {
+        shipName:  document.getElementById('accountName').value.trim(),
+        shipEmail: document.getElementById('accountEmail').value.trim(),
+        shipAddr1: document.getElementById('shipAddr1').value.trim(),
+        shipCity:  document.getElementById('shipCity').value.trim(),
+        shipState: document.getElementById('shipState').value.trim(),
+        shipZip:   document.getElementById('shipZip').value.trim(),
+        billName:  document.getElementById('billName').value.trim(),
+        billEmail: document.getElementById('billEmail').value.trim(),
+        billAddr1: document.getElementById('billAddr1').value.trim(),
+        billAddr2: document.getElementById('billAddr2').value.trim(),
+      };
+      // Strip empty strings so backend doesn't overwrite with blanks
+      Object.keys(payload).forEach(k => { if (!payload[k]) delete payload[k]; });
+
+      const resp = await fetch('/api/portal/account-info', {
+        method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body:    JSON.stringify({ contactName, email }),
+        body:    JSON.stringify(payload),
       });
       const data = await resp.json();
       if (data.ok) {
