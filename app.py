@@ -7285,16 +7285,16 @@ def portal_quotes(user):
         all_li_ids = []
         for r in records:
             all_li_ids.extend(r.get("fields", {}).get("MO Line Items", []))
-        li_total_map = {}  # li_id -> Dynamic Line Item Total
+        li_total_map = {}  # li_id -> Confirmed Line Item Total
         if all_li_ids:
             chunks = [all_li_ids[i:i+30] for i in range(0, len(all_li_ids), 30)]
             for chunk in chunks:
                 formula = "OR(" + ",".join(f'RECORD_ID()="{lid}"' for lid in chunk) + ")"
                 li_recs = at_get_all(MO_LINE_ITEMS_TABLE_ID, read_token,
-                                     fields=["Dynamic Line Item Total"],
+                                     fields=["Confirmed Line Item Total"],
                                      formula=formula)
                 for lr in li_recs:
-                    li_total_map[lr["id"]] = float(lr.get("fields", {}).get("Dynamic Line Item Total") or 0)
+                    li_total_map[lr["id"]] = float(lr.get("fields", {}).get("Confirmed Line Item Total") or 0)
 
         quotes = []
         for r in records:
@@ -7386,10 +7386,10 @@ def portal_orders(user):
             for chunk in chunks:
                 formula = "OR(" + ",".join(f'RECORD_ID()="{lid}"' for lid in chunk) + ")"
                 li_recs = at_get_all(MO_LINE_ITEMS_TABLE_ID, read_token,
-                                     fields=["Dynamic Line Item Total"],
+                                     fields=["Confirmed Line Item Total"],
                                      formula=formula)
                 for lr in li_recs:
-                    li_total_map[lr["id"]] = float(lr.get("fields", {}).get("Dynamic Line Item Total") or 0)
+                    li_total_map[lr["id"]] = float(lr.get("fields", {}).get("Confirmed Line Item Total") or 0)
 
         orders = []
         for r in records:
@@ -10141,16 +10141,16 @@ def portal_invoices(user):
         all_li_ids = []
         for rec in inv_records:
             all_li_ids.extend(rec.get("fields", {}).get("MO Line Items", []))
-        li_total_map = {}  # line_item_id → Dynamic Line Item Total
+        li_total_map = {}  # line_item_id → Confirmed Line Item Total
         if all_li_ids:
             for i in range(0, len(all_li_ids), 100):
                 batch = all_li_ids[i:i+100]
                 formula = "OR(" + ",".join(f'RECORD_ID()="{lid}"' for lid in batch) + ")"
                 li_recs = at_get_all(MO_LINE_ITEMS_TABLE_ID, read_token,
-                                     fields=["Dynamic Line Item Total"],
+                                     fields=["Confirmed Line Item Total"],
                                      formula=formula)
                 for lr in li_recs:
-                    li_total_map[lr["id"]] = float(lr.get("fields", {}).get("Dynamic Line Item Total") or 0)
+                    li_total_map[lr["id"]] = float(lr.get("fields", {}).get("Confirmed Line Item Total") or 0)
 
         # Fetch tracking from SO Tracking Link (keyed by SO-{order_id})
         tracking_recs = at_get_all(
@@ -10371,9 +10371,9 @@ def admin_shipped_orders():
             for chunk in [all_li_ids[i:i+30] for i in range(0, len(all_li_ids), 30)]:
                 formula_li = "OR(" + ",".join(f'RECORD_ID()="{lid}"' for lid in chunk) + ")"
                 li_recs = at_get_all(MO_LINE_ITEMS_TABLE_ID, read_token,
-                                     fields=["Dynamic Line Item Total"], formula=formula_li)
+                                     fields=["Confirmed Line Item Total"], formula=formula_li)
                 for lr in li_recs:
-                    li_total_map[lr["id"]] = float(lr.get("fields", {}).get("Dynamic Line Item Total") or 0)
+                    li_total_map[lr["id"]] = float(lr.get("fields", {}).get("Confirmed Line Item Total") or 0)
 
         orders = []
 
@@ -11008,10 +11008,10 @@ def admin_invoices():
                 batch = all_li_ids[i:i + 100]
                 formula = "OR(" + ",".join(f'RECORD_ID()="{lid}"' for lid in batch) + ")"
                 li_recs = at_get_all(MO_LINE_ITEMS_TABLE_ID, read_token,
-                                     fields=["Dynamic Line Item Total"],
+                                     fields=["Confirmed Line Item Total"],
                                      formula=formula)
                 for lr in li_recs:
-                    li_total_map[lr["id"]] = float(lr.get("fields", {}).get("Dynamic Line Item Total") or 0)
+                    li_total_map[lr["id"]] = float(lr.get("fields", {}).get("Confirmed Line Item Total") or 0)
 
         invoices = []
         # Collect customer IDs that are missing Snapshot Org so we can batch-fetch names
