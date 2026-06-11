@@ -542,7 +542,7 @@
     <div class="tab"        data-tab="our-orders" id="tabOurOrders" style="display:none">Our Orders</div>
     <div class="tab"        data-tab="invoices"   id="tabInvoices"  style="display:none">Invoices</div>
     <div class="tab"        data-tab="team"       id="tabTeam"      style="display:none">Team</div>
-    <div class="tab"        data-tab="account"    id="tabAccount">My Account</div>
+    <div class="tab"        data-tab="account"    id="tabAccount" style="display:none">My Account</div>
   </div>
 
   <!-- ── New Order Tab ───────────────────────────────────────────────────── -->
@@ -934,6 +934,7 @@
       }
       if (portalMe.canManageTeam) {
         document.getElementById('tabTeam').style.display = '';
+        document.getElementById('tabAccount').style.display = '';
       }
 
       // Default landing tab
