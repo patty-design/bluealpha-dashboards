@@ -518,14 +518,14 @@ def send_approval_email(to_email, to_name, company, magic_link):
           <p style="color:#1a2633;font-size:16px;margin:0 0 8px;">Hi {first_name},</p>
           <p style="color:#6b7a8d;font-size:14px;line-height:1.6;margin:0 0 20px;">
             Great news — your application for <strong>{company}</strong> has been approved!
-            You can now access the Blue Alpha Government Agency Quote Portal.
+            You now have access to the Blue Alpha Government Agency Portal.
           </p>
           <p style="color:#6b7a8d;font-size:14px;line-height:1.6;margin:0 0 24px;">
-            Click the button below to log in. This link is valid for 48 hours.
+            Click the button below to create your username and password. This link is valid for <strong>7 days</strong>.
           </p>
           <table cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
             <tr><td>
-              <a href="{magic_link}" style="display:inline-block;background:#1B2438;color:#fff;font-family:Arial;font-size:14px;font-weight:700;text-decoration:none;padding:13px 32px;border-radius:6px;">Access Portal →</a>
+              <a href="{magic_link}" style="display:inline-block;background:#1B2438;color:#fff;font-family:Arial;font-size:14px;font-weight:700;text-decoration:none;padding:13px 32px;border-radius:6px;">Set Up Your Account →</a>
             </td></tr>
           </table>
           <p style="color:#6b7a8d;font-size:12px;line-height:1.5;">
@@ -6844,7 +6844,7 @@ def portal_setup_account():
                 if exp_dt.tzinfo is None:
                     exp_dt = exp_dt.replace(tzinfo=timezone.utc)
                 if datetime.now(timezone.utc) > exp_dt:
-                    return Response(json.dumps({"error": "Invite link has expired. Ask your admin to resend."}),
+                    return Response(json.dumps({"error": "This setup link has expired. Please contact info@bluealpha.us to get a new one."}),
                                     status=400, headers=c, mimetype="application/json")
             except Exception:
                 pass
@@ -7659,12 +7659,12 @@ def _send_portal_invite_email(to_email, invitee_name, inviter_company, setup_lin
         print(f"[portal_invite_email] failed: {e}")
 
 
-def _generate_portal_invite(record_id, write_token):
+def _generate_portal_invite(record_id, write_token, expiry_hours=48):
     """Generate an invite token for a sub-user and store it in Airtable. Returns setup URL."""
     import secrets
     from datetime import datetime, timezone, timedelta
     token = secrets.token_urlsafe(32)
-    expiry = (datetime.now(timezone.utc) + timedelta(hours=48)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    expiry = (datetime.now(timezone.utc) + timedelta(hours=expiry_hours)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
     req_lib.patch(
         f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{record_id}",
         headers={**at_headers(write_token), "Content-Type": "application/json"},
@@ -8588,8 +8588,9 @@ def admin_approve(app_id):
             timeout=10,
         )
 
-        # Generate magic link (48hr for first login) — writes to Customer record
-        magic_link = generate_magic_link(app_id, expiry_hours=48)
+        # Generate setup-account link (7 days) so user can create username + password
+        write_token = APPLY_WRITE_TOKEN or RETURNS_WRITE_TOKEN
+        magic_link = _generate_portal_invite(app_id, write_token, expiry_hours=168)
 
         # Send approval email
         send_approval_email(contact_email, contact_name, company_name, magic_link)
