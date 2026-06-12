@@ -7133,6 +7133,23 @@ def portal_me(user):
                 print(f"[portal_me] customer fetch failed: {e}")
         _ME_CACHE[customer_id] = {"ts": _time_mod.time(), "data": agency_name}
 
+    # Check if user has credentials set up (Portal Username on their own record)
+    has_credentials = False
+    user_id = user.get("user_id", "") or customer_id
+    if user_id:
+        try:
+            read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+            ur = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{user_id}",
+                headers=at_headers(read_token),
+                params={"fields[]": ["Portal Username"]},
+                timeout=10,
+            )
+            if ur.status_code == 200:
+                has_credentials = bool(ur.json().get("fields", {}).get("Portal Username", "").strip())
+        except Exception as e:
+            print(f"[portal_me] credentials check failed: {e}")
+
     return Response(json.dumps({
         "agencyName":      agency_name,
         "isPrimary":       is_primary,
@@ -7144,6 +7161,7 @@ def portal_me(user):
         "canViewQuotes":   can_view_quotes,
         "canViewOrders":   can_view_orders,
         "canViewInvoices": can_view_invoices,
+        "hasCredentials":  has_credentials,
     }), headers=c, mimetype="application/json")
 
 

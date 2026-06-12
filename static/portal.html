@@ -307,6 +307,18 @@
     </div>
   </header>
 
+  <!-- Credentials setup banner — shown when user has no username/password -->
+  <div id="credentialsBanner" style="display:none; background:#fffbeb; border-bottom:2px solid #f59e0b; padding:12px 24px;">
+    <div style="max-width:900px; margin:0 auto; display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+      <span style="font-size:1.1rem;">🔐</span>
+      <div style="flex:1; min-width:200px;">
+        <strong style="color:#92400e; font-size:0.92rem;">Set up your login credentials</strong>
+        <span style="color:#78350f; font-size:0.88rem; margin-left:8px;">Create a username and password so you can log in any time without needing an email link.</span>
+      </div>
+      <button onclick="openSetupCredentialsModal()" style="background:#1B2438; color:#fff; border:none; border-radius:6px; padding:8px 18px; font-weight:700; font-size:0.88rem; cursor:pointer; white-space:nowrap;">Set Up Now</button>
+    </div>
+  </div>
+
   <div class="container">
     <div class="tabs" id="tabNav">
       <div class="tab active" data-tab="new-quote" id="newQuoteTab">New Quote</div>
@@ -656,6 +668,11 @@
         portalMe = await resp.json();
         document.getElementById('agencyName').textContent = portalMe.agencyName || 'Government Agency Portal';
         document.title = `Blue Alpha — ${portalMe.agencyName || 'Portal'}`;
+
+        // Show credentials banner if user has no username/password set up
+        if (!portalMe.hasCredentials) {
+          document.getElementById('credentialsBanner').style.display = '';
+        }
 
         // Show/hide tabs based on role permissions
         if (portalMe.canManageTeam) {
@@ -1477,6 +1494,33 @@
   }
   </script>
 
+  <!-- Set Up Credentials Modal -->
+  <div class="modal-overlay" id="setupCredentialsModal">
+    <div class="modal-box" style="max-width:420px;">
+      <h3>Set Up Your Login Credentials</h3>
+      <p style="font-size:0.88rem;color:#555;margin:-10px 0 20px;">Choose a username and password so you can log in any time without needing an email link.</p>
+      <div class="modal-field">
+        <label>Username</label>
+        <input type="text" id="scUsername" autocomplete="username" placeholder="e.g. j.smith"
+               oninput="this.value=this.value.toLowerCase()">
+        <div style="font-size:0.76rem;color:#888;margin-top:4px;">Lowercase letters, numbers, and . _ - only · 3–32 characters</div>
+      </div>
+      <div class="modal-field">
+        <label>Password</label>
+        <input type="password" id="scPassword" autocomplete="new-password" placeholder="At least 8 characters">
+      </div>
+      <div class="modal-field">
+        <label>Confirm Password</label>
+        <input type="password" id="scConfirm" autocomplete="new-password" placeholder="Re-enter password">
+      </div>
+      <div class="modal-msg" id="scMsg"></div>
+      <div class="modal-actions">
+        <button class="btn-save" id="scSaveBtn" onclick="submitSetupCredentials()">Create Credentials</button>
+        <button class="btn-cancel" onclick="closeSetupCredentialsModal()">Later</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Account Settings Modal -->
   <div class="modal-overlay" id="changePwModal">
     <div class="modal-box" style="max-width:440px;">
@@ -1654,6 +1698,70 @@
   }
   document.getElementById('changePwModal').addEventListener('click', function(e) {
     if (e.target === this) closeChangePw();
+  });
+
+  // ─── Setup Credentials (magic-link users without a password yet) ─────────
+  function openSetupCredentialsModal() {
+    document.getElementById('scUsername').value = '';
+    document.getElementById('scPassword').value = '';
+    document.getElementById('scConfirm').value  = '';
+    const msg = document.getElementById('scMsg');
+    msg.className = 'modal-msg'; msg.textContent = '';
+    document.getElementById('scSaveBtn').disabled = false;
+    document.getElementById('scSaveBtn').textContent = 'Create Credentials';
+    document.getElementById('setupCredentialsModal').classList.add('open');
+    setTimeout(() => document.getElementById('scUsername').focus(), 50);
+  }
+
+  function closeSetupCredentialsModal() {
+    document.getElementById('setupCredentialsModal').classList.remove('open');
+  }
+
+  async function submitSetupCredentials() {
+    const username = document.getElementById('scUsername').value.trim().toLowerCase();
+    const password = document.getElementById('scPassword').value;
+    const confirm  = document.getElementById('scConfirm').value;
+    const msg      = document.getElementById('scMsg');
+    const btn      = document.getElementById('scSaveBtn');
+
+    msg.className = 'modal-msg'; msg.textContent = '';
+
+    if (!username || username.length < 3)        { showScErr('Username must be at least 3 characters.'); return; }
+    if (!/^[a-z0-9._-]+$/.test(username))        { showScErr('Username can only contain lowercase letters, numbers, and . _ -'); return; }
+    if (password.length < 8)                      { showScErr('Password must be at least 8 characters.'); return; }
+    if (password !== confirm)                     { showScErr('Passwords do not match.'); return; }
+
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const r = await fetch('/api/portal/set-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+        credentials: 'same-origin',
+      });
+      const d = await r.json();
+      if (d.ok) {
+        msg.className = 'modal-msg success'; msg.textContent = 'Credentials created! You can now log in with your username and password.';
+        document.getElementById('credentialsBanner').style.display = 'none';
+        btn.textContent = 'Done';
+        setTimeout(() => closeSetupCredentialsModal(), 2000);
+      } else {
+        showScErr(d.error || 'Something went wrong. Please try again.');
+        btn.disabled = false; btn.textContent = 'Create Credentials';
+      }
+    } catch (e) {
+      showScErr('Network error — please try again.');
+      btn.disabled = false; btn.textContent = 'Create Credentials';
+    }
+  }
+
+  function showScErr(text) {
+    const el = document.getElementById('scMsg');
+    el.className = 'modal-msg error'; el.textContent = text;
+  }
+
+  document.getElementById('setupCredentialsModal').addEventListener('click', function(e) {
+    if (e.target === this) closeSetupCredentialsModal();
   });
   </script>
 </body>
