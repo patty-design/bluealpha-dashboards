@@ -4726,7 +4726,7 @@ def _build_catalog():
             display_name = _PARENT_NAME_OVERRIDES.get(parent_name.lower(), parent_name)
             seen_parents[parent_id] = {"name": display_name, "category": category}
 
-    _PRODUCT_SELECT_PARENTS = {"alias accessories"}
+    _PRODUCT_SELECT_PARENTS = {"alias accessories", "ohc items"}
     parents = sorted(
         [{"id": k, "name": v["name"], "category": v["category"],
           "addons": addon_parent_map.get(k, []),
@@ -7084,7 +7084,7 @@ def contract_catalog(user):
             if parent_id not in seen_parents:
                 seen_parents[parent_id] = parent_name
 
-        _PRODUCT_SELECT_PARENTS = {"alias accessories"}
+        _PRODUCT_SELECT_PARENTS = {"alias accessories", "ohc items"}
         parents = sorted(
             [{"id": k, "name": v,
               "productSelect": v.lower().strip() in _PRODUCT_SELECT_PARENTS}

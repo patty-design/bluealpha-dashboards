@@ -712,6 +712,7 @@ function _productHtml(p) {
       </div>
     </div>`;
 
+  const _isVarSelect = !!p.productSelect;
   return `
     <div class="product-item" id="pi_${p.id}">
       <div class="product-row" onclick="toggleProduct('${p.id}', this)">
@@ -720,29 +721,29 @@ function _productHtml(p) {
       </div>
       <div class="product-selector" id="ps_${p.id}">
         <div class="sel-row">
-          <div class="sel-field">
-            <label>Color</label>
-            <select id="sc_${p.id}" onchange="onSelColor('${p.id}')">
-              <option value="">Select a color…</option>
+          <div class="sel-field"${_isVarSelect ? ' style="flex:1 1 100%"' : ''}>
+            <label>${_isVarSelect ? 'Variation' : 'Color'}</label>
+            <select id="sc_${p.id}" onchange="${_isVarSelect ? `onSelVariation('${p.id}')` : `onSelColor('${p.id}')`}">
+              <option value="">${_isVarSelect ? 'Select a variation\u2026' : 'Select a color\u2026'}</option>
             </select>
           </div>
-          <div class="sel-field hidden" id="szfield_${p.id}">
+          ${_isVarSelect ? '' : `<div class="sel-field hidden" id="szfield_${p.id}">
             <label>Size</label>
             <select id="ss_${p.id}" onchange="onSelSize('${p.id}')" autocomplete="off">
-              <option value="">Select a size…</option>
+              <option value="">Select a size\u2026</option>
             </select>
             <div id="sl_${p.id}" class="one-size-label hidden">One Size</div>
-          </div>
+          </div>`}
         </div>
-        <div class="sel-row hidden" id="sfrow_${p.id}">
+        ${_isVarSelect ? '' : `<div class="sel-row hidden" id="sfrow_${p.id}">
           <div class="sel-field" style="flex:1 1 100%">
             <label>Style / Version</label>
             <select id="sfeat_${p.id}" onchange="onSelFeature('${p.id}')">
-              <option value="">Select a style…</option>
+              <option value="">Select a style\u2026</option>
             </select>
           </div>
-        </div>
-        ${addonHtml}
+        </div>`}
+        ${_isVarSelect ? '' : addonHtml}
         ${descHtml}
         <div class="sku-price-row hidden" id="spricerow_${p.id}">
           Unit price: <span class="sku-price-val" id="sprice_${p.id}"></span>
@@ -895,28 +896,69 @@ function toggleProduct(parentId, rowEl) {
   item.classList.toggle('active', !isOpen);
   activeParent = isOpen ? null : parentId;
 
-  // Populate colors when opening
+  // Populate colors (or variations) when opening
   if (!isOpen) {
-    const colorSel = document.getElementById('sc_' + parentId);
+    const colorSel  = document.getElementById('sc_' + parentId);
+    const parentObj = catalog.parents.find(p => p.id === parentId);
     if (colorSel.options.length <= 1) {
-      const colorMap = {};
-      for (const sku of catalog.skus) {
-        if (sku.parentId === parentId && sku.colorId && sku.colorName)
-          colorMap[sku.colorId] = sku.colorName;
-      }
-      const colors = Object.entries(colorMap).sort((a,b) => a[1].localeCompare(b[1]));
-      for (const [id, name] of colors) {
-        const opt = document.createElement('option');
-        opt.value = id; opt.textContent = name;
-        colorSel.appendChild(opt);
-      }
-      // Auto-select if only one option
-      if (colors.length === 1) {
-        colorSel.value = colors[0][0];
-        onSelColor(parentId);
+      if (parentObj && parentObj.productSelect) {
+        // productSelect: populate dropdown with full SKU names (value = recordId)
+        const parentSkus = catalog.skus
+          .filter(s => s.parentId === parentId)
+          .sort((a, b) => a.name.localeCompare(b.name));
+        for (const sku of parentSkus) {
+          const opt = document.createElement('option');
+          opt.value = sku.recordId; opt.textContent = sku.name;
+          colorSel.appendChild(opt);
+        }
+        if (parentSkus.length === 1) {
+          colorSel.value = parentSkus[0].recordId;
+          onSelVariation(parentId);
+        }
+      } else {
+        // Standard: populate with colors
+        const colorMap = {};
+        for (const sku of catalog.skus) {
+          if (sku.parentId === parentId && sku.colorId && sku.colorName)
+            colorMap[sku.colorId] = sku.colorName;
+        }
+        const colors = Object.entries(colorMap).sort((a,b) => a[1].localeCompare(b[1]));
+        for (const [id, name] of colors) {
+          const opt = document.createElement('option');
+          opt.value = id; opt.textContent = name;
+          colorSel.appendChild(opt);
+        }
+        // Auto-select if only one option
+        if (colors.length === 1) {
+          colorSel.value = colors[0][0];
+          onSelColor(parentId);
+        }
       }
     }
   }
+}
+
+// ─── Variation select (productSelect parents — e.g. OHC Items) ───────────────
+function onSelVariation(parentId) {
+  const recordId = document.getElementById('sc_' + parentId).value;
+  const priceEl  = document.getElementById('sprice_' + parentId);
+  const priceRow = document.getElementById('spricerow_' + parentId);
+  const sqRow    = document.getElementById('sqrow_' + parentId);
+  const addBtn   = document.getElementById('sb_' + parentId);
+
+  sqRow.classList.add('hidden');
+  priceRow.classList.add('hidden');
+  addBtn.disabled = true;
+
+  if (!recordId) return;
+
+  const sku = catalog.skus.find(s => s.recordId === recordId);
+  if (!sku) return;
+
+  priceEl.textContent = '$' + sku.price.toFixed(2);
+  priceRow.classList.remove('hidden');
+  sqRow.classList.remove('hidden');
+  addBtn.disabled = false;
 }
 
 function onSelColor(parentId) {
@@ -1254,6 +1296,25 @@ function populateAddons(parentId, colorId, sizeId, featureVarId = '', preferredA
 
 // ─── Add item ────────────────────────────────────────────────────────────────
 function addCatalogItem(parentId) {
+  const parentObj = catalog.parents.find(p => p.id === parentId);
+
+  // productSelect parents (e.g. OHC Items): SKU identified directly by recordId
+  if (parentObj && parentObj.productSelect) {
+    const recordId = document.getElementById('sc_' + parentId).value;
+    if (!recordId) return;
+    const sku = catalog.skus.find(s => s.recordId === recordId);
+    if (!sku) return;
+    const qty = Math.max(1, parseInt(document.getElementById('sq_' + parentId).value) || 1);
+    items.push({ skuRecordId: sku.recordId, name: sku.name, qty, unitPrice: sku.price, sizeNote: '' });
+    renderItems();
+    document.getElementById('sc_' + parentId).value = '';
+    document.getElementById('sq_' + parentId).value = 1;
+    document.getElementById('sqrow_' + parentId).classList.add('hidden');
+    document.getElementById('spricerow_' + parentId).classList.add('hidden');
+    document.getElementById('sb_' + parentId).disabled = true;
+    return;
+  }
+
   const colorId      = document.getElementById('sc_' + parentId).value;
   const sizeId       = document.getElementById('ss_' + parentId).value;
   const qty          = Math.max(1, parseInt(document.getElementById('sq_' + parentId).value) || 1);
