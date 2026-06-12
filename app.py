@@ -45,7 +45,7 @@ SIZING_EXCHANGE_STORE_ID = 185018
 SHIPSTATION_KEY      = os.environ.get("SHIPSTATION_KEY", "")
 SHIPSTATION_SECRET   = os.environ.get("SHIPSTATION_SECRET", "")
 SENDGRID_API_KEY     = os.environ.get("SENDGRID_API_KEY", "")
-SENDGRID_FROM_EMAIL  = os.environ.get("SENDGRID_FROM_EMAIL", "info@bluealpha.us")
+SENDGRID_FROM_EMAIL  = os.environ.get("SENDGRID_FROM_EMAIL", "orders@bluealpha.us")
 TEST_EMAIL_OVERRIDE  = os.environ.get("TEST_EMAIL_OVERRIDE", "")
 CS_ADMIN_PASSWORD    = os.environ.get("CS_ADMIN_PASSWORD", "")
 
@@ -533,7 +533,7 @@ def send_approval_email(to_email, to_name, company, magic_link):
             <a href="{magic_link}" style="color:#1B2438;">{magic_link}</a>
           </p>
           <p style="color:#6b7a8d;font-size:12px;margin-top:16px;">
-            Questions? Contact us at <a href="mailto:info@bluealpha.us" style="color:#1B2438;">info@bluealpha.us</a>
+            Questions? Contact us at <a href="mailto:orders@bluealpha.us" style="color:#1B2438;">orders@bluealpha.us</a>
           </p>
         </td></tr>
         <tr><td style="background:#f5f7fa;border-top:1px solid #dde3ea;padding:16px 36px;text-align:center;">
@@ -584,7 +584,7 @@ def send_denial_email(to_email, to_name, company, reason):
           </p>
           <p style="color:#6b7a8d;font-size:13px;line-height:1.6;">
             If you have questions, please contact us at
-            <a href="mailto:info@bluealpha.us" style="color:#1B2438;">info@bluealpha.us</a>.
+            <a href="mailto:orders@bluealpha.us" style="color:#1B2438;">orders@bluealpha.us</a>.
           </p>
         </td></tr>
         <tr><td style="background:#f5f7fa;border-top:1px solid #dde3ea;padding:16px 36px;text-align:center;">
@@ -4135,11 +4135,11 @@ def send_quote_email(to_email, to_name, company, quote_number, record_id, expiry
           </table>
           <p style="color:#6b7a8d;font-size:13px;margin:28px 0 0;line-height:1.6;">
             This link is unique to your quote. Bookmark it or save this email — you can return anytime to edit or accept before the expiry date.<br><br>
-            Questions? Contact us at <a href="mailto:info@bluealpha.us" style="color:#1B2438;">info@bluealpha.us</a> or 678-961-3304.
+            Questions? Contact us at <a href="mailto:orders@bluealpha.us" style="color:#1B2438;">orders@bluealpha.us</a> or 678-961-3304.
           </p>
         </td></tr>
         <tr><td style="background:#f5f7fa;border-top:1px solid #dde3ea;padding:20px 40px;text-align:center;">
-          <p style="color:#6b7a8d;font-size:12px;margin:0;">Blue Alpha &bull; bluealphabelts.com &bull; info@bluealpha.us &bull; 678-961-3304</p>
+          <p style="color:#6b7a8d;font-size:12px;margin:0;">Blue Alpha &bull; bluealphabelts.com &bull; orders@bluealpha.us &bull; 678-961-3304</p>
         </td></tr>
       </table>
     </td></tr>
@@ -4219,11 +4219,11 @@ def send_quote_accepted_email(to_email, to_name, org_name, qu_number, so_number)
             </td></tr>
           </table>
           <p style="color:#6b7a8d;font-size:13px;margin:0 0 0;line-height:1.6;">
-            Questions? Contact us at <a href="mailto:info@bluealpha.us" style="color:#1B2438;">info@bluealpha.us</a> or 678-961-3304.
+            Questions? Contact us at <a href="mailto:orders@bluealpha.us" style="color:#1B2438;">orders@bluealpha.us</a> or 678-961-3304.
           </p>
         </td></tr>
         <tr><td style="background:#f5f7fa;border-top:1px solid #dde3ea;padding:20px 40px;text-align:center;">
-          <p style="color:#6b7a8d;font-size:12px;margin:0;">Blue Alpha &bull; bluealphabelts.com &bull; info@bluealpha.us &bull; 678-961-3304</p>
+          <p style="color:#6b7a8d;font-size:12px;margin:0;">Blue Alpha &bull; bluealphabelts.com &bull; orders@bluealpha.us &bull; 678-961-3304</p>
         </td></tr>
       </table>
     </td></tr>
@@ -4358,11 +4358,11 @@ def send_invoice_email(to_email, to_name, org_name, so_number, inv_number, line_
             A 1.5% monthly late fee applies to balances unpaid after 30 days.
           </p>
           <p style="color:#6b7a8d;font-size:13px;margin:0 0 0;line-height:1.6;">
-            Questions? Contact us at <a href="mailto:info@bluealpha.us" style="color:#1B2438;">info@bluealpha.us</a> or 678-961-3304.
+            Questions? Contact us at <a href="mailto:orders@bluealpha.us" style="color:#1B2438;">orders@bluealpha.us</a> or 678-961-3304.
           </p>
         </td></tr>
         <tr><td style="background:#f5f7fa;border-top:1px solid #dde3ea;padding:20px 40px;text-align:center;">
-          <p style="color:#6b7a8d;font-size:12px;margin:0;">Blue Alpha &bull; bluealphabelts.com &bull; info@bluealpha.us &bull; 678-961-3304</p>
+          <p style="color:#6b7a8d;font-size:12px;margin:0;">Blue Alpha &bull; bluealphabelts.com &bull; orders@bluealpha.us &bull; 678-961-3304</p>
         </td></tr>
       </table>
     </td></tr>
@@ -5994,7 +5994,7 @@ def _build_quote_pdf_bytes(quote, doc_type="quote"):
     pdf.set_font("Helvetica", "", 7.5)
     pdf.set_text_color(*MUTED)
     pdf.cell(W, 4.5,
-        "Questions? Contact us at info@bluealpha.us or 678-961-3304.",
+        "Questions? Contact us at orders@bluealpha.us or 678-961-3304.",
         border=0, new_x="LMARGIN", new_y="NEXT")
 
     return bytes(pdf.output())
@@ -6429,7 +6429,7 @@ def _build_invoice_pdf_bytes(inv):
     pdf.set_font("Helvetica", "", 7.5)
     pdf.set_text_color(*MUTED)
     pdf.cell(W, 4.5,
-        "Questions about this invoice? Contact us at info@bluealpha.us or 678-961-3304.",
+        "Questions about this invoice? Contact us at orders@bluealpha.us or 678-961-3304.",
         border=0, new_x="LMARGIN", new_y="NEXT")
 
     return bytes(pdf.output())
@@ -6554,7 +6554,7 @@ def _send_application_received_email(to_email, to_name, company):
             You'll receive another email once your application has been reviewed. If you have any questions in the meantime, feel free to reach out to us.
           </p>
           <p style="color:#6b7a8d;font-size:12px;margin-top:16px;">
-            Questions? Contact us at <a href="mailto:info@bluealpha.us" style="color:#1B2438;">info@bluealpha.us</a>
+            Questions? Contact us at <a href="mailto:orders@bluealpha.us" style="color:#1B2438;">orders@bluealpha.us</a>
           </p>
         </td></tr>
         <tr><td style="background:#f5f7fa;border-top:1px solid #dde3ea;padding:16px 36px;text-align:center;">
@@ -6844,7 +6844,7 @@ def portal_setup_account():
                 if exp_dt.tzinfo is None:
                     exp_dt = exp_dt.replace(tzinfo=timezone.utc)
                 if datetime.now(timezone.utc) > exp_dt:
-                    return Response(json.dumps({"error": "This setup link has expired. Please contact info@bluealpha.us to get a new one."}),
+                    return Response(json.dumps({"error": "This setup link has expired. Please contact orders@bluealpha.us to get a new one."}),
                                     status=400, headers=c, mimetype="application/json")
             except Exception:
                 pass

@@ -678,7 +678,7 @@ if (window.self !== window.top) {
     <div class="error-card">
       <h2>Quote Not Found</h2>
       <p>We couldn't find this quote. The link may be invalid or expired.<br>
-         Please contact us at <a href="mailto:info@bluealpha.us">info@bluealpha.us</a> or 678-961-3304.</p>
+         Please contact us at <a href="mailto:orders@bluealpha.us">orders@bluealpha.us</a> or 678-961-3304.</p>
     </div>
   </div>
 
@@ -689,7 +689,7 @@ if (window.self !== window.top) {
     <div id="bannerAccepted"  class="banner banner-success hidden"></div>
     <div id="bannerExpired"   class="banner banner-error   hidden">
       This quote has expired. You can request an updated quote below, or contact us at
-      <a href="mailto:info@bluealpha.us" style="color:inherit;font-weight:700;">info@bluealpha.us</a> or 678-961-3304.
+      <a href="mailto:orders@bluealpha.us" style="color:inherit;font-weight:700;">orders@bluealpha.us</a> or 678-961-3304.
     </div>
     <div id="bannerSuccess"   class="banner banner-success hidden"></div>
     <div id="bannerDuplicate" class="banner banner-success hidden"></div>
@@ -1386,7 +1386,7 @@ async function requestUpdatedQuote() {
       if (btn) { btn.disabled = false; btn.textContent = 'Request Updated Quote'; }
     }
   } catch(e) {
-    alert('Network error. Please try again or contact info@bluealpha.us');
+    alert('Network error. Please try again or contact orders@bluealpha.us');
     if (btn) { btn.disabled = false; btn.textContent = 'Request Updated Quote'; }
   }
 }
