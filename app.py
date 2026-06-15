@@ -11133,6 +11133,526 @@ def admin_mark_invoice_paid_check(record_id):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# WARRANTY PORTAL
+# ─────────────────────────────────────────────────────────────────────────────
+
+WARRANTY_TABLE_ID   = "tbl2CQL5LiRXxCrnK"
+WARRANTY_WRITE_TOKEN = os.environ.get("AIRTABLE_WRITE_TOKEN_2", "")
+
+# ShipStation product IDs and SKUs for warranty repair types
+_WARRANTY_REPAIR_MAP = {
+    "Rig Repair": {
+        "sku":       "WARR-RIG",
+        "name":      "Warranty Repair - Rig",
+        "productId": 94998152,
+    },
+    "EDC Repair": {
+        "sku":       "WARR-EDC",
+        "name":      "Warranty Repair - EDC",
+        "productId": 94998156,
+    },
+}
+
+
+@app.route("/warranty")
+def warranty_page():
+    """Serve the warranty request form."""
+    return send_from_directory(app.static_folder, "warranty.html")
+
+
+@app.route("/api/warranty/submit", methods=["POST", "OPTIONS"])
+def warranty_submit():
+    """Accept multipart form submission: create Airtable record, then upload photos."""
+    if request.method == "OPTIONS":
+        return Response("", headers={
+            **cors(),
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Allow-Methods": "POST",
+        })
+    c = cors()
+
+    if not WARRANTY_WRITE_TOKEN:
+        return Response(
+            json.dumps({"success": False, "error": "Warranty system not configured"}),
+            status=500, headers=c, mimetype="application/json",
+        )
+
+    try:
+        first_name        = request.form.get("firstName", "").strip()
+        last_name         = request.form.get("lastName", "").strip()
+        email             = request.form.get("email", "").strip()
+        phone             = request.form.get("phone", "").strip()
+        address           = request.form.get("address", "").strip()
+        city              = request.form.get("city", "").strip()
+        state             = request.form.get("state", "").strip()
+        zip_code          = request.form.get("zip", "").strip()
+        repair_description= request.form.get("repairDescription", "").strip()
+        original_order_num= request.form.get("originalOrderNum", "").strip()
+        photos            = request.files.getlist("photos")
+
+        # Basic validation
+        required_fields = [first_name, last_name, email, phone, address, city, state, zip_code, repair_description]
+        if not all(required_fields):
+            return Response(
+                json.dumps({"success": False, "error": "Missing required fields"}),
+                status=400, headers=c, mimetype="application/json",
+            )
+        if not photos:
+            return Response(
+                json.dumps({"success": False, "error": "At least one photo is required"}),
+                status=400, headers=c, mimetype="application/json",
+            )
+        photos = photos[:5]  # cap at 5
+
+        # ── Step 1: Create Airtable record (no photos yet) ──
+        fields = {
+            "First Name":          first_name,
+            "Last Name":           last_name,
+            "Email":               email,
+            "Phone":               phone,
+            "Address":             address,
+            "City":                city,
+            "State":               state,
+            "Zip":                 zip_code,
+            "Repair Description":  repair_description,
+        }
+        if original_order_num:
+            fields["Original Order #"] = original_order_num
+
+        create_resp = req_lib.post(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}",
+            headers={
+                "Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}",
+                "Content-Type":  "application/json",
+            },
+            json={"fields": fields},
+            timeout=15,
+        )
+        if not create_resp.ok:
+            return Response(
+                json.dumps({"success": False, "error": f"Airtable error: {create_resp.text[:300]}"}),
+                status=500, headers=c, mimetype="application/json",
+            )
+        record_id = create_resp.json()["id"]
+
+        # ── Step 2: Upload each photo via Airtable content upload API ──
+        photo_field_id = "fld1g7wNcTB9b7SsW"
+        for photo in photos:
+            photo_bytes = photo.read()
+            content_type = photo.content_type or "image/jpeg"
+            filename = photo.filename or "photo.jpg"
+            try:
+                req_lib.post(
+                    f"https://content.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{record_id}/{photo_field_id}",
+                    headers={"Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}"},
+                    files={"file": (filename, photo_bytes, content_type)},
+                    timeout=30,
+                )
+            except Exception as photo_err:
+                # Log but don't fail the whole submission over a single photo upload error
+                print(f"[warranty_submit] Photo upload error for {filename}: {photo_err}")
+
+        return Response(
+            json.dumps({"success": True}),
+            status=200, headers=c, mimetype="application/json",
+        )
+
+    except Exception as e:
+        print(f"[warranty_submit] Unexpected error: {e}")
+        return Response(
+            json.dumps({"success": False, "error": str(e)}),
+            status=500, headers=c, mimetype="application/json",
+        )
+
+
+def _search_ss_order(order_number):
+    """Search ShipStation for an order by number. Returns first match dict or None."""
+    try:
+        r = req_lib.get(
+            "https://ssapi.shipstation.com/orders",
+            params={"orderNumber": order_number},
+            headers=ss_headers(),
+            timeout=15,
+        )
+        orders = r.json().get("orders", [])
+        return orders[0] if orders else None
+    except Exception as e:
+        print(f"[_search_ss_order] Error: {e}")
+        return None
+
+
+def _send_warranty_approval_email(to_email, first_name, label_pdf_b64):
+    """Send approval email with return label attached. FROM: info@bluealpha.us"""
+    if not SENDGRID_API_KEY:
+        print("[warranty_email] SendGrid not configured")
+        return
+    actual_to = TEST_EMAIL_OVERRIDE or to_email
+    html_body = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f5f4ef;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f4ef;padding:32px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background:#1B2438;border-bottom:3px solid #BD3333;padding:24px 36px;">
+          <span style="font-family:Arial;font-size:20px;font-weight:800;color:#ffffff;letter-spacing:2px;">BLUE ALPHA</span>
+        </td></tr>
+        <tr><td style="padding:32px 36px;">
+          <p style="color:#1a2633;font-size:16px;margin:0 0 16px;">Hi {first_name},</p>
+          <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0 0 16px;">
+            Thank you for submitting your warranty request. We've reviewed it and we're ready to get your gear repaired!
+          </p>
+          <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0 0 16px;">
+            Attached is your prepaid return label. Please print it, attach it to your package, and drop it off at any USPS location.
+          </p>
+          <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0 0 24px;">
+            Once we receive your item, we'll begin the repair process and ship it back to you as soon as it's ready.
+          </p>
+          <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0;">
+            Questions? Reply to this email and we'll be happy to help.
+          </p>
+          <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:16px 0 0;">
+            — Blue Alpha<br>
+            <a href="mailto:info@bluealpha.us" style="color:#1B2438;">info@bluealpha.us</a>
+          </p>
+        </td></tr>
+        <tr><td style="background:#DDD8C4;border-top:1px solid #c8c3b0;padding:16px 36px;text-align:center;">
+          <p style="color:#6b7a8d;font-size:11px;margin:0;">Blue Alpha &bull; bluealphabelts.com</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+
+    payload = {
+        "personalizations": [{"to": [{"email": actual_to}]}],
+        "from": {"email": "info@bluealpha.us", "name": "Blue Alpha"},
+        "subject": "Your Blue Alpha Warranty Return Label",
+        "content": [{"type": "text/html", "value": html_body}],
+    }
+    if label_pdf_b64:
+        payload["attachments"] = [{
+            "content":     label_pdf_b64,
+            "type":        "application/pdf",
+            "filename":    "warranty-return-label.pdf",
+            "disposition": "attachment",
+        }]
+
+    try:
+        r = req_lib.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=15,
+        )
+        if r.status_code != 202:
+            print(f"[warranty_email] SendGrid approval returned {r.status_code}: {r.text}")
+    except Exception as e:
+        print(f"[warranty_email] Exception sending approval email: {e}")
+
+
+def _send_warranty_ineligible_email(to_email, first_name, ineligibility_reason):
+    """Send not-eligible email. FROM: info@bluealpha.us"""
+    if not SENDGRID_API_KEY:
+        print("[warranty_email] SendGrid not configured")
+        return
+    actual_to = TEST_EMAIL_OVERRIDE or to_email
+    reason_text = ineligibility_reason or "No reason provided."
+    html_body = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f5f4ef;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f4ef;padding:32px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background:#1B2438;border-bottom:3px solid #BD3333;padding:24px 36px;">
+          <span style="font-family:Arial;font-size:20px;font-weight:800;color:#ffffff;letter-spacing:2px;">BLUE ALPHA</span>
+        </td></tr>
+        <tr><td style="padding:32px 36px;">
+          <p style="color:#1a2633;font-size:16px;margin:0 0 16px;">Hi {first_name},</p>
+          <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0 0 16px;">
+            Thank you for submitting your warranty request. After reviewing your submission, we're unable to move forward with a repair at this time.
+          </p>
+          <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0 0 16px;">
+            <strong>Reason:</strong> {reason_text}
+          </p>
+          <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0 0 16px;">
+            If you have additional information that may change this decision, please reply to this email and our team will take another look.
+          </p>
+          <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0;">
+            Thank you for being a Blue Alpha customer.
+          </p>
+          <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:16px 0 0;">
+            — Blue Alpha Customer Service<br>
+            <a href="mailto:info@bluealpha.us" style="color:#1B2438;">info@bluealpha.us</a>
+          </p>
+        </td></tr>
+        <tr><td style="background:#DDD8C4;border-top:1px solid #c8c3b0;padding:16px 36px;text-align:center;">
+          <p style="color:#6b7a8d;font-size:11px;margin:0;">Blue Alpha &bull; bluealphabelts.com</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+
+    try:
+        r = req_lib.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "personalizations": [{"to": [{"email": actual_to}]}],
+                "from": {"email": "info@bluealpha.us", "name": "Blue Alpha"},
+                "subject": "Update on Your Blue Alpha Warranty Request",
+                "content": [{"type": "text/html", "value": html_body}],
+            },
+            timeout=15,
+        )
+        if r.status_code != 202:
+            print(f"[warranty_email] SendGrid ineligible returned {r.status_code}: {r.text}")
+    except Exception as e:
+        print(f"[warranty_email] Exception sending ineligible email: {e}")
+
+
+@app.route("/api/warranty/webhook", methods=["POST"])
+def warranty_webhook():
+    """
+    Handles two triggers:
+      - approval_changed: create SS return label + SS order, update Airtable, email customer
+      - received_changed: flip SS order to awaiting_shipment
+    """
+    c = cors()
+    try:
+        body = request.get_json(force=True) or {}
+        record_id = body.get("record_id", "").strip()
+        trigger   = body.get("trigger", "").strip()
+
+        if not record_id or not trigger:
+            return Response(
+                json.dumps({"success": False, "error": "Missing record_id or trigger"}),
+                status=400, headers=c, mimetype="application/json",
+            )
+
+        # ── Fetch full Airtable record ──
+        rec_resp = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{record_id}",
+            headers={"Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}"},
+            timeout=15,
+        )
+        if not rec_resp.ok:
+            return Response(
+                json.dumps({"success": False, "error": f"Could not fetch record: {rec_resp.text[:200]}"}),
+                status=500, headers=c, mimetype="application/json",
+            )
+        fields = rec_resp.json().get("fields", {})
+
+        # ────────────────────────────────────────────────────────────────
+        # TRIGGER: approval_changed
+        # ────────────────────────────────────────────────────────────────
+        if trigger == "approval_changed":
+            approval           = (fields.get("Approval") or "").strip()
+            first_name         = (fields.get("First Name") or "").strip()
+            last_name          = (fields.get("Last Name") or "").strip()
+            email              = (fields.get("Email") or "").strip()
+            phone              = (fields.get("Phone") or "").strip()
+            address            = (fields.get("Address") or "").strip()
+            city               = (fields.get("City") or "").strip()
+            state              = (fields.get("State") or "").strip()
+            zip_code           = (fields.get("Zip") or "").strip()
+            original_order_num = (fields.get("Original Order #") or "").strip()
+            ineligibility_reason = (fields.get("Ineligibility Reason") or "").strip()
+
+            if approval in ("Rig Repair", "EDC Repair"):
+                repair_info = _WARRANTY_REPAIR_MAP[approval]
+                from datetime import datetime, timezone
+
+                # ── Order reference ──
+                if original_order_num:
+                    order_ref = f"{original_order_num}-W"
+                else:
+                    order_ref = f"{last_name}-W"
+
+                # ── Look up original SS order if we have an order number ──
+                orig_ss_order_id = None
+                if original_order_num:
+                    orig_order = _search_ss_order(original_order_num)
+                    if orig_order:
+                        orig_ss_order_id = orig_order.get("orderId")
+
+                # ── Create return label ──
+                label_payload = {
+                    "carrierCode":  "stamps_com",
+                    "serviceCode":  "usps_priority_mail",
+                    "packageCode":  "package",
+                    "shipDate":     datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                    "weight":       {"value": 32, "units": "ounces"},
+                    "shipFrom": {
+                        "name":       f"{first_name} {last_name}".strip(),
+                        "street1":    address,
+                        "city":       city,
+                        "state":      state,
+                        "postalCode": zip_code,
+                        "country":    "US",
+                        "phone":      phone,
+                    },
+                    "shipTo": {
+                        "name":       "Blue Alpha",
+                        "company":    "Blue Alpha",
+                        "street1":    "35 Andrew St",
+                        "city":       "Newnan",
+                        "state":      "GA",
+                        "postalCode": "30263",
+                        "country":    "US",
+                        "phone":      "6789822442",
+                    },
+                    "isReturnLabel": True,
+                    "testLabel":     False,
+                }
+                if orig_ss_order_id:
+                    label_payload["orderId"] = int(orig_ss_order_id)
+
+                label_resp = req_lib.post(
+                    "https://ssapi.shipstation.com/shipments/createlabel",
+                    headers={**ss_headers(), "Content-Type": "application/json"},
+                    json=label_payload,
+                    timeout=20,
+                )
+                if not label_resp.ok:
+                    return Response(
+                        json.dumps({"success": False, "error": f"SS createlabel failed: {label_resp.text[:300]}"}),
+                        status=500, headers=c, mimetype="application/json",
+                    )
+                label_result  = label_resp.json()
+                label_pdf_b64 = label_result.get("labelData", "")
+
+                # ── Create ShipStation -W order ──
+                today_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000")
+                order_payload = {
+                    "orderNumber": order_ref,
+                    "orderStatus": "on_hold",
+                    "orderDate":   today_str,
+                    "shipTo": {
+                        "name":       f"{first_name} {last_name}".strip(),
+                        "street1":    address,
+                        "city":       city,
+                        "state":      state,
+                        "postalCode": zip_code,
+                        "country":    "US",
+                        "phone":      phone,
+                    },
+                    "items": [{
+                        "sku":       repair_info["sku"],
+                        "name":      repair_info["name"],
+                        "productId": repair_info["productId"],
+                        "quantity":  1,
+                        "unitPrice": 0,
+                    }],
+                }
+                order_resp = req_lib.post(
+                    "https://ssapi.shipstation.com/orders/createorder",
+                    headers={**ss_headers(), "Content-Type": "application/json"},
+                    json=order_payload,
+                    timeout=20,
+                )
+                if not order_resp.ok:
+                    print(f"[warranty_webhook] SS createorder warning: {order_resp.text[:300]}")
+
+                # ── Update Airtable with order ref + label URL ──
+                label_search_url = (
+                    f"https://ship11.shipstation.com/orders/all-orders-search-result"
+                    f"?quickSearch={order_ref}"
+                )
+                at_update_fields = {
+                    "Warranty Order #":  order_ref,
+                    "Return Label URL":  label_search_url,
+                }
+                req_lib.patch(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{record_id}",
+                    headers={
+                        "Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}",
+                        "Content-Type":  "application/json",
+                    },
+                    json={"fields": at_update_fields},
+                    timeout=15,
+                )
+
+                # ── Send approval email ──
+                _send_warranty_approval_email(email, first_name, label_pdf_b64)
+
+                return Response(
+                    json.dumps({"success": True, "orderRef": order_ref}),
+                    status=200, headers=c, mimetype="application/json",
+                )
+
+            elif approval == "Ineligible":
+                first_name = (fields.get("First Name") or "").strip()
+                email      = (fields.get("Email") or "").strip()
+                ineligibility_reason = (fields.get("Ineligibility Reason") or "").strip()
+                _send_warranty_ineligible_email(email, first_name, ineligibility_reason)
+                return Response(
+                    json.dumps({"success": True, "action": "ineligible_email_sent"}),
+                    status=200, headers=c, mimetype="application/json",
+                )
+
+            else:
+                # Approval value not actionable yet (e.g. "Pending" or empty)
+                return Response(
+                    json.dumps({"success": True, "action": "no_op", "approval": approval}),
+                    status=200, headers=c, mimetype="application/json",
+                )
+
+        # ────────────────────────────────────────────────────────────────
+        # TRIGGER: received_changed
+        # ────────────────────────────────────────────────────────────────
+        elif trigger == "received_changed":
+            warranty_order_num = (fields.get("Warranty Order #") or "").strip()
+            if not warranty_order_num:
+                return Response(
+                    json.dumps({"success": False, "error": "No Warranty Order # on record"}),
+                    status=400, headers=c, mimetype="application/json",
+                )
+
+            # Find existing SS order
+            existing_order = _search_ss_order(warranty_order_num)
+            if not existing_order:
+                return Response(
+                    json.dumps({"success": False, "error": f"SS order not found: {warranty_order_num}"}),
+                    status=404, headers=c, mimetype="application/json",
+                )
+
+            # Re-POST createorder with awaiting_shipment to flip status
+            update_payload = dict(existing_order)
+            update_payload["orderStatus"] = "awaiting_shipment"
+
+            upd_resp = req_lib.post(
+                "https://ssapi.shipstation.com/orders/createorder",
+                headers={**ss_headers(), "Content-Type": "application/json"},
+                json=update_payload,
+                timeout=20,
+            )
+            if not upd_resp.ok:
+                return Response(
+                    json.dumps({"success": False, "error": f"SS update failed: {upd_resp.text[:300]}"}),
+                    status=500, headers=c, mimetype="application/json",
+                )
+
+            return Response(
+                json.dumps({"success": True, "orderNumber": warranty_order_num, "newStatus": "awaiting_shipment"}),
+                status=200, headers=c, mimetype="application/json",
+            )
+
+        else:
+            return Response(
+                json.dumps({"success": False, "error": f"Unknown trigger: {trigger}"}),
+                status=400, headers=c, mimetype="application/json",
+            )
+
+    except Exception as e:
+        print(f"[warranty_webhook] Unexpected error: {e}")
+        return Response(
+            json.dumps({"success": False, "error": str(e)}),
+            status=500, headers=c, mimetype="application/json",
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

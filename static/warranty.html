@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blue Alpha — Warranty Request</title>
+  <link rel="icon" href="https://www.bluealphabelts.com/wp-content/uploads/2019/05/cropped-BAG-FAV-32x32.png">
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:   #1B2438;
+      --red:    #BD3333;
+      --cream:  #DDD8C4;
+      --light:  #f5f4ef;
+      --border: #ddd9cc;
+      --text:   #1a2633;
+      --muted:  #6b7a8d;
+      --white:  #ffffff;
+      --success:#1a7a3c;
+      --error:  #BD3333;
+    }
+
+    body {
+      font-family: 'Lato', sans-serif;
+      background: var(--light);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--navy);
+      border-bottom: 3px solid var(--red);
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    header img { height: 44px; width: auto; filter: brightness(0) invert(1); }
+    .header-divider { width: 2px; height: 36px; background: var(--red); border-radius: 2px; }
+    .header-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.75);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+
+    /* ── Container ── */
+    .container {
+      max-width: 680px;
+      margin: 48px auto;
+      padding: 0 20px 80px;
+    }
+
+    .page-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+    .page-subtitle {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 32px;
+      line-height: 1.5;
+    }
+
+    /* ── Warranty notice banner ── */
+    .warranty-notice {
+      background: var(--cream);
+      border-left: 4px solid var(--red);
+      border-radius: 6px;
+      padding: 14px 18px;
+      margin-bottom: 32px;
+      font-size: 0.9rem;
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .warranty-notice strong { color: var(--navy); }
+
+    /* ── Card ── */
+    .card {
+      background: var(--white);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 32px 36px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 4px rgba(27,36,56,0.06);
+    }
+
+    .section-label {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--muted);
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── Two-column grid ── */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 520px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .card { padding: 24px 20px; }
+    }
+
+    /* ── Form controls ── */
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field.full { grid-column: 1 / -1; }
+
+    label {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--navy);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+    label .opt {
+      font-weight: 400;
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-transform: none;
+      letter-spacing: 0;
+      margin-left: 4px;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 10px 13px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: 'Lato', sans-serif;
+      font-size: 0.95rem;
+      color: var(--text);
+      background: #faf9f6;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--navy);
+      box-shadow: 0 0 0 3px rgba(27,36,56,0.1);
+      background: var(--white);
+    }
+    textarea { resize: vertical; min-height: 110px; }
+
+    /* ── File upload ── */
+    .file-upload-area {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+      background: #faf9f6;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      position: relative;
+    }
+    .file-upload-area:hover, .file-upload-area.drag-over {
+      border-color: var(--navy);
+      background: var(--cream);
+    }
+    .file-upload-area input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+    .upload-icon { font-size: 2rem; margin-bottom: 8px; }
+    .upload-text { font-size: 0.9rem; color: var(--muted); line-height: 1.5; }
+    .upload-text strong { color: var(--navy); }
+
+    .file-list {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--cream);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+    .file-item .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-item .remove-file {
+      background: none;
+      border: none;
+      color: var(--red);
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 0 2px;
+      font-weight: 700;
+    }
+    .file-count-note {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* ── Submit button ── */
+    .btn-submit {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      background: var(--navy);
+      color: var(--white);
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      margin-top: 8px;
+    }
+    .btn-submit:hover { background: #273352; }
+    .btn-submit:active { transform: scale(0.99); }
+    .btn-submit:disabled { background: var(--muted); cursor: not-allowed; transform: none; }
+
+    /* ── Status messages ── */
+    .msg {
+      border-radius: 8px;
+      padding: 14px 18px;
+      font-size: 0.92rem;
+      line-height: 1.5;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .msg.error {
+      background: #fdf1f1;
+      border: 1px solid #f5c0c0;
+      color: var(--error);
+    }
+    .msg.show { display: block; }
+
+    /* ── Success state ── */
+    .success-panel {
+      display: none;
+      text-align: center;
+      padding: 48px 32px;
+    }
+    .success-panel.show { display: block; }
+    .success-icon {
+      font-size: 3.5rem;
+      margin-bottom: 20px;
+    }
+    .success-panel h2 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 12px;
+    }
+    .success-panel p {
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      max-width: 420px;
+      margin: 0 auto;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<header>
+  <img src="https://www.bluealphabelts.com/wp-content/uploads/2019/05/cropped-BAG-FAV-32x32.png" alt="Blue Alpha">
+  <div class="header-divider"></div>
+  <div class="header-title">Warranty Request</div>
+</header>
+
+<div class="container">
+
+  <!-- Success panel (hidden until submit) -->
+  <div class="card success-panel" id="successPanel">
+    <div class="success-icon">✅</div>
+    <h2>Request Submitted!</h2>
+    <p>Thank you for contacting us. We've received your warranty request and will review it shortly. You'll hear from us at the email address you provided.</p>
+  </div>
+
+  <!-- Form (hidden after successful submit) -->
+  <div id="formWrapper">
+    <h1 class="page-title">Warranty Request</h1>
+    <p class="page-subtitle">Submit your warranty request below. We'll review your submission and follow up via email.</p>
+
+    <div class="warranty-notice">
+      <strong>Warranty Coverage:</strong> Our warranty covers manufacturing defects for <strong>1 year from the date of purchase</strong>.
+    </div>
+
+    <div class="msg error" id="errorMsg"></div>
+
+    <form id="warrantyForm" novalidate>
+
+      <!-- Personal Info -->
+      <div class="card">
+        <div class="section-label">Your Information</div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="firstName">First Name</label>
+            <input type="text" id="firstName" name="firstName" required placeholder="Jane">
+          </div>
+          <div class="field">
+            <label for="lastName">Last Name</label>
+            <input type="text" id="lastName" name="lastName" required placeholder="Smith">
+          </div>
+          <div class="field">
+            <label for="email">Email Address</label>
+            <input type="email" id="email" name="email" required placeholder="jane@example.com">
+          </div>
+          <div class="field">
+            <label for="phone">Phone Number</label>
+            <input type="tel" id="phone" name="phone" required placeholder="(555) 000-0000">
+          </div>
+        </div>
+      </div>
+
+      <!-- Address -->
+      <div class="card">
+        <div class="section-label">Shipping Address</div>
+        <div class="grid-2">
+          <div class="field full">
+            <label for="address">Street Address</label>
+            <input type="text" id="address" name="address" required placeholder="123 Main St">
+          </div>
+          <div class="field">
+            <label for="city">City</label>
+            <input type="text" id="city" name="city" required placeholder="Anytown">
+          </div>
+          <div class="field">
+            <label for="state">State</label>
+            <input type="text" id="state" name="state" required placeholder="GA" maxlength="2">
+          </div>
+          <div class="field">
+            <label for="zip">ZIP Code</label>
+            <input type="text" id="zip" name="zip" required placeholder="30263" maxlength="10">
+          </div>
+        </div>
+      </div>
+
+      <!-- Repair Details -->
+      <div class="card">
+        <div class="section-label">Repair Details</div>
+        <div class="grid-2">
+          <div class="field full">
+            <label for="repairDescription">Repair Description</label>
+            <textarea id="repairDescription" name="repairDescription" required placeholder="Please describe the issue with your gear and how it occurred…"></textarea>
+          </div>
+          <div class="field full">
+            <label for="originalOrderNum">Original Order # <span class="opt">(optional)</span></label>
+            <input type="text" id="originalOrderNum" name="originalOrderNum" placeholder="e.g. 12345">
+          </div>
+        </div>
+      </div>
+
+      <!-- Photos -->
+      <div class="card">
+        <div class="section-label">Photos (Required)</div>
+        <div class="file-upload-area" id="uploadArea">
+          <input type="file" id="photos" name="photos" accept="image/*" multiple>
+          <div class="upload-icon">📷</div>
+          <div class="upload-text">
+            <strong>Click to upload</strong> or drag &amp; drop photos here<br>
+            JPEG, PNG, GIF, WebP accepted
+          </div>
+        </div>
+        <div class="file-list" id="fileList"></div>
+        <div class="file-count-note" id="fileCountNote"></div>
+      </div>
+
+      <button type="submit" class="btn-submit" id="submitBtn">Submit Warranty Request</button>
+
+    </form>
+  </div>
+
+</div>
+
+<script>
+  // ── File selection management ──
+  let selectedFiles = [];
+
+  const uploadArea  = document.getElementById('uploadArea');
+  const fileInput   = document.getElementById('photos');
+  const fileList    = document.getElementById('fileList');
+  const fileCountNote = document.getElementById('fileCountNote');
+
+  function updateFileDisplay() {
+    fileList.innerHTML = '';
+    selectedFiles.forEach((file, idx) => {
+      const item = document.createElement('div');
+      item.className = 'file-item';
+      item.innerHTML = `
+        <span>📄</span>
+        <span class="file-name">${escHtml(file.name)}</span>
+        <span style="color:var(--muted);font-size:0.8rem">${(file.size/1024).toFixed(0)} KB</span>
+        <button type="button" class="remove-file" data-idx="${idx}" title="Remove">✕</button>
+      `;
+      fileList.appendChild(item);
+    });
+    if (selectedFiles.length > 0) {
+      fileCountNote.textContent = `${selectedFiles.length} of 5 photos selected`;
+    } else {
+      fileCountNote.textContent = '';
+    }
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  fileInput.addEventListener('change', () => {
+    const incoming = Array.from(fileInput.files);
+    const combined = [...selectedFiles, ...incoming];
+    selectedFiles = combined.slice(0, 5); // cap at 5
+    fileInput.value = '';
+    updateFileDisplay();
+  });
+
+  fileList.addEventListener('click', e => {
+    const btn = e.target.closest('.remove-file');
+    if (!btn) return;
+    const idx = parseInt(btn.dataset.idx, 10);
+    selectedFiles.splice(idx, 1);
+    updateFileDisplay();
+  });
+
+  // Drag-and-drop
+  uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+  uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+  uploadArea.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadArea.classList.remove('drag-over');
+    const dropped = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    const combined = [...selectedFiles, ...dropped];
+    selectedFiles = combined.slice(0, 5);
+    updateFileDisplay();
+  });
+
+  // ── Form submission ──
+  document.getElementById('warrantyForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const errorMsg = document.getElementById('errorMsg');
+    errorMsg.textContent = '';
+    errorMsg.classList.remove('show');
+
+    // Validation
+    const required = ['firstName','lastName','email','phone','address','city','state','zip','repairDescription'];
+    for (const id of required) {
+      const el = document.getElementById(id);
+      if (!el.value.trim()) {
+        errorMsg.textContent = 'Please fill in all required fields.';
+        errorMsg.classList.add('show');
+        el.focus();
+        return;
+      }
+    }
+    if (selectedFiles.length === 0) {
+      errorMsg.textContent = 'Please attach at least one photo.';
+      errorMsg.classList.add('show');
+      return;
+    }
+    if (selectedFiles.length > 5) {
+      errorMsg.textContent = 'You may upload a maximum of 5 photos.';
+      errorMsg.classList.add('show');
+      return;
+    }
+
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner"></span>Submitting…';
+
+    const formData = new FormData();
+    formData.append('firstName',        document.getElementById('firstName').value.trim());
+    formData.append('lastName',         document.getElementById('lastName').value.trim());
+    formData.append('email',            document.getElementById('email').value.trim());
+    formData.append('phone',            document.getElementById('phone').value.trim());
+    formData.append('address',          document.getElementById('address').value.trim());
+    formData.append('city',             document.getElementById('city').value.trim());
+    formData.append('state',            document.getElementById('state').value.trim());
+    formData.append('zip',              document.getElementById('zip').value.trim());
+    formData.append('repairDescription',document.getElementById('repairDescription').value.trim());
+    formData.append('originalOrderNum', document.getElementById('originalOrderNum').value.trim());
+    selectedFiles.forEach(f => formData.append('photos', f));
+
+    try {
+      const resp = await fetch('/api/warranty/submit', { method: 'POST', body: formData });
+      const data = await resp.json();
+      if (data.success) {
+        document.getElementById('formWrapper').style.display = 'none';
+        document.getElementById('successPanel').classList.add('show');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        errorMsg.textContent = data.error || 'Something went wrong. Please try again.';
+        errorMsg.classList.add('show');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Warranty Request';
+      }
+    } catch (err) {
+      errorMsg.textContent = 'Network error. Please check your connection and try again.';
+      errorMsg.classList.add('show');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit Warranty Request';
+    }
+  });
+</script>
+</body>
+</html>
