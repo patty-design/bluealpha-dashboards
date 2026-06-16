@@ -1295,7 +1295,7 @@
         return;
       }
       let html = '<div class="card"><table><thead><tr>'
-        + '<th>Invoice #</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th><th>Payment</th><th>Resend</th><th>Stripe</th>'
+        + '<th>Invoice #</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th><th>PDF</th><th>Payment</th><th>Resend</th><th>Stripe</th>'
         + '</tr></thead><tbody>';
       invoices.forEach(inv => {
         const statusBadge = inv.is_paid
@@ -1312,12 +1312,15 @@
           ? '<span style="color:#155724;font-size:0.85rem;">✓ Created</span>'
           : `<button class="btn btn-outline btn-sm" style="color:#6b4c00;border-color:#c9960c;white-space:nowrap;" onclick="createStripeInvoices('${esc(inv.record_id)}','${esc(inv.inv_number)}',this)">⚡ Create</button>`;
 
+        const pdfCell = `<a href="/invoice-pdf/${esc(inv.record_id)}" target="_blank" class="btn btn-outline btn-sm" style="white-space:nowrap;">📄 PDF</a>`;
+
         html += `<tr>
           <td><strong>${esc(inv.inv_number)}</strong></td>
           <td>${esc(inv.customer_name)}</td>
           <td style="white-space:nowrap;">${fmt(inv.date)}</td>
           <td style="white-space:nowrap;">$${inv.total.toFixed(2)}</td>
           <td>${statusBadge}</td>
+          <td>${pdfCell}</td>
           <td>${paymentCell}</td>
           <td>${resendCell}</td>
           <td>${stripeCell}</td>
