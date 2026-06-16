@@ -1295,15 +1295,15 @@
         return;
       }
       let html = '<div class="card"><table style="width:100%;table-layout:fixed;"><colgroup>'
-        + '<col style="width:110px">'   // Invoice #
-        + '<col>'                        // Customer — fills remaining
-        + '<col style="width:110px">'   // Date
-        + '<col style="width:100px">'   // Total
-        + '<col style="width:85px">'    // Status
-        + '<col style="width:70px">'    // PDF
-        + '<col style="width:115px">'   // Payment
-        + '<col style="width:100px">'   // Resend
-        + '<col style="width:105px">'   // Stripe
+        + '<col style="width:115px">'   // Invoice #
+        + '<col style="width:280px">'   // Customer
+        + '<col style="width:115px">'   // Date
+        + '<col style="width:110px">'   // Total
+        + '<col style="width:90px">'    // Status
+        + '<col style="width:90px">'    // PDF
+        + '<col style="width:155px">'   // Payment
+        + '<col style="width:135px">'   // Resend
+        + '<col style="width:140px">'   // Stripe
         + '</colgroup><thead><tr>'
         + '<th>Invoice #</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th><th>PDF</th><th>Payment</th><th>Resend</th><th>Stripe</th>'
         + '</tr></thead><tbody>';
@@ -1312,7 +1312,7 @@
           ? '<span class="badge" style="background:#d4edda;color:#155724;">PAID</span>'
           : '<span class="badge" style="background:#f8d7da;color:#721c24;">UNPAID</span>';
 
-        const _btn = 'style="padding:4px 10px;font-size:0.78rem;white-space:nowrap;"';
+        const _btn = 'style="padding:6px 14px;font-size:0.82rem;white-space:nowrap;"';
         const paymentCell = inv.is_paid
           ? (inv.check_number ? `<small style="color:var(--muted);">✓ Check #${esc(inv.check_number)}</small>` : '<small style="color:var(--muted);">—</small>')
           : `<button class="btn btn-outline btn-sm" ${_btn} onclick="openMarkPaidModal('${esc(inv.record_id)}')">Mark Paid</button>`;
@@ -1321,7 +1321,7 @@
 
         const stripeCell = inv.has_stripe
           ? '<span style="color:#155724;font-size:0.82rem;">✓ Created</span>'
-          : `<button class="btn btn-outline btn-sm" ${_btn} style="padding:4px 10px;font-size:0.78rem;white-space:nowrap;color:#6b4c00;border-color:#c9960c;" onclick="createStripeInvoices('${esc(inv.record_id)}','${esc(inv.inv_number)}',this)">⚡ Create</button>`;
+          : `<button class="btn btn-outline btn-sm" ${_btn} style="padding:6px 14px;font-size:0.82rem;white-space:nowrap;color:#6b4c00;border-color:#c9960c;" onclick="createStripeInvoices('${esc(inv.record_id)}','${esc(inv.inv_number)}',this)">⚡ Create</button>`;
 
         const pdfCell = `<a href="/invoice-pdf/${esc(inv.record_id)}" target="_blank" class="btn btn-outline btn-sm" ${_btn}>📄 PDF</a>`;
 
