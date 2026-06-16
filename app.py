@@ -12122,10 +12122,16 @@ def _fetch_form_responses():
         print(f"[anniversary] form fetch error: {e}")
         return []
 
+_NAME_ALIASES = {
+    "melissa kuel-coe":   "melissa kuehl-coe",
+    "michael newton":     "mike newton",
+    "rebecca olmstead":   "becca olmstead",
+}
+
 def _fuzzy_match_name(raw, participants):
     """Return (participant, score) for the best fuzzy match, or (None, 0)."""
     import difflib
-    raw_norm = raw.lower().strip()
+    raw_norm = _NAME_ALIASES.get(raw.lower().strip(), raw.lower().strip())
     best_p, best_score = None, 0.0
     for p in participants:
         full = f"{p['first_name']} {p['last_name']}".lower()
