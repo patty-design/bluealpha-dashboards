@@ -10737,9 +10737,12 @@ def _create_stripe_invoices_for_record(write_token, inv_record_id, billing_email
 
     ss_auth = (STRIPE_SECRET_KEY, "")
 
+    # Stripe only accepts a single email — take the first if semicolon/comma-separated
+    stripe_email = billing_email.replace(",", ";").split(";")[0].strip()
+
     # 1. Create Stripe customer
     cust_r = req_lib.post("https://api.stripe.com/v1/customers",
-        data={"email": billing_email, "name": org_name or billing_name or billing_email,
+        data={"email": stripe_email, "name": org_name or billing_name or stripe_email,
               "description": billing_name or ""},
         auth=ss_auth, timeout=15)
     if not cust_r.ok:
