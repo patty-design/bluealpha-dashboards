@@ -127,6 +127,22 @@
   .award-row.grayed { opacity: .4; }
   .award-row.has-qty { background: #f0f5fa; }
 
+  .award-img {
+    width: 56px; height: 56px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--light);
+    border: 1px solid var(--border);
+  }
+  .award-img-placeholder {
+    width: 56px; height: 56px;
+    border-radius: 8px;
+    background: var(--light);
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
   .award-info { flex: 1; min-width: 0; }
   .award-name {
     font-size: 15px; font-weight: 600; color: var(--navy);
@@ -342,6 +358,7 @@
         row.className = 'award-row';
         row.id = `row-${a.record_id}`;
         row.innerHTML = `
+          ${a.image_url ? `<img class="award-img" src="${a.image_url}" alt="${a.name}" loading="lazy">` : '<div class="award-img-placeholder"></div>'}
           <div class="award-info">
             <div class="award-name">${a.name}</div>
             <div class="award-meta">

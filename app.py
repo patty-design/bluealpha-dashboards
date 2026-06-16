@@ -11972,7 +11972,7 @@ def anniversary_info():
     try:
         award_records = at_get_all(
             ANNIVERSARY_AWARDS_TABLE_ID, read_token,
-            fields=["Name", "Points", "Category", "Active", "Product URL"],
+            fields=["Name", "Points", "Category", "Active", "Product URL", "Image"],
             formula="{Active}=TRUE()",
             base_id=ANNIVERSARY_BASE_ID,
         )
@@ -11985,12 +11985,21 @@ def anniversary_info():
         af  = ar.get("fields", {})
         pts = int(af.get("Points") or 0)
         if pts <= points_budget:
+            # Extract image URL from Airtable attachment field
+            img_url = ""
+            img_field = af.get("Image", [])
+            if isinstance(img_field, list) and img_field:
+                att = img_field[0]
+                # Prefer large thumbnail, fall back to full URL
+                img_url = (att.get("thumbnails", {}).get("large", {}).get("url")
+                           or att.get("url", ""))
             awards.append({
                 "record_id":   ar["id"],
                 "name":        af.get("Name", ""),
                 "points":      pts,
                 "category":    af.get("Category", ""),
                 "product_url": af.get("Product URL", "") or "",
+                "image_url":   img_url,
             })
 
     awards.sort(key=lambda x: (x["points"], x["name"]))
