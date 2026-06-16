@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Anniversary Awards — Admin</title>
+<title>Anniversary — Admin</title>
 <style>
   :root {
     --navy:  #1B2438;
@@ -18,153 +18,140 @@
 
   .header {
     background: var(--navy); color: #fff;
-    padding: 16px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 16px 24px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   }
-  .header-logo { font-size: 20px; font-weight: 900; letter-spacing: 3px; }
-  .header-divider { width: 2px; height: 28px; background: rgba(255,255,255,0.25); }
+  .header-logo  { font-size: 20px; font-weight: 900; letter-spacing: 3px; }
+  .header-div   { width: 2px; height: 28px; background: rgba(255,255,255,.25); }
   .header-title { font-size: 15px; font-weight: 600; color: var(--cream); }
-  .refresh-badge {
-    margin-left: auto; font-size: 12px; color: rgba(255,255,255,0.6);
-    display: flex; align-items: center; gap: 8px;
-  }
-  .refresh-btn {
-    background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
-    color: #fff; border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer;
-  }
-  .refresh-btn:hover { background: rgba(255,255,255,0.25); }
+  .refresh-area { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 12px; color: rgba(255,255,255,.6); }
+  .btn-refresh  { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3); color: #fff;
+                  border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer; }
+  .btn-refresh:hover { background: rgba(255,255,255,.25); }
 
   /* Summary bar */
   .summary-bar {
     background: var(--navy); color: #fff;
-    padding: 16px 24px;
-    display: flex; gap: 24px; flex-wrap: wrap; align-items: center;
-    border-top: 1px solid rgba(255,255,255,0.1);
+    padding: 14px 24px; display: flex; gap: 20px; flex-wrap: wrap; align-items: center;
+    border-top: 1px solid rgba(255,255,255,.1);
   }
-  .stat-block { text-align: center; }
-  .stat-block .num { font-size: 28px; font-weight: 900; line-height: 1; }
-  .stat-block .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; opacity: 0.7; margin-top: 2px; }
-  .stat-divider { width: 1px; height: 40px; background: rgba(255,255,255,0.2); }
-  .tier-pills { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .tier-pill {
-    background: rgba(255,255,255,0.12); border-radius: 20px;
-    padding: 4px 12px; font-size: 12px; font-weight: 700;
-  }
-  .tier-pill .done { color: #7fff7f; }
-  .tier-pill .total { opacity: 0.6; }
+  .stat { text-align: center; }
+  .stat .n { font-size: 28px; font-weight: 900; line-height: 1; }
+  .stat .l { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; opacity: .65; margin-top: 2px; }
+  .sdiv { width: 1px; height: 40px; background: rgba(255,255,255,.2); }
+  .tier-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tier-pill { background: rgba(255,255,255,.12); border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 700; }
+  .tier-pill .ok { color: #7fff7f; }
+  .tier-pill .tot { opacity: .55; }
 
-  /* Content */
-  .content { max-width: 1300px; margin: 0 auto; padding: 28px 20px; display: flex; flex-direction: column; gap: 32px; }
+  /* Page */
+  .page { max-width: 1400px; margin: 0 auto; padding: 28px 20px; display: flex; flex-direction: column; gap: 30px; }
 
-  /* Section */
-  .section-title {
-    font-size: 13px; text-transform: uppercase; letter-spacing: 1px;
-    color: var(--navy); font-weight: 800; margin-bottom: 14px;
-  }
+  .section-title { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--navy); font-weight: 800; margin-bottom: 12px; }
 
   /* Tables */
-  .table-wrap { overflow-x: auto; border-radius: 10px; border: 1.5px solid var(--border); background: #fff; }
+  .tbl-wrap { overflow-x: auto; border-radius: 10px; border: 1.5px solid var(--border); background: #fff; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th {
-    background: var(--navy); color: #fff;
-    padding: 10px 14px; text-align: left; font-size: 12px;
-    text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;
-    white-space: nowrap;
-  }
-  td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--navy); color: #fff; padding: 10px 14px; text-align: left;
+       font-size: 11px; text-transform: uppercase; letter-spacing: .5px; font-weight: 700; white-space: nowrap; }
+  td { padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: #faf9f6; }
 
-  /* Status badges */
-  .badge-done { display: inline-block; background: #d4edda; color: #2e7d32; border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 700; }
-  .badge-pending { display: inline-block; background: #fff3cd; color: #856404; border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 700; }
+  /* Shirt totals row of chips */
+  .shirt-chips { display: flex; gap: 10px; flex-wrap: wrap; }
+  .shirt-chip  { background: #fff; border: 1.5px solid var(--border); border-radius: 8px;
+                 padding: 8px 16px; text-align: center; min-width: 64px; }
+  .shirt-chip .size  { font-size: 15px; font-weight: 800; color: var(--navy); }
+  .shirt-chip .count { font-size: 22px; font-weight: 900; color: var(--steel); display: block; }
 
-  /* Selections in table */
-  .sel-chip {
-    display: inline-block; background: var(--cream); border-radius: 4px;
-    padding: 2px 7px; font-size: 11px; margin: 2px 2px 2px 0; color: #444;
-  }
+  /* RSVP chips */
+  .rsvp-chips { display: flex; gap: 10px; flex-wrap: wrap; }
+  .rsvp-chip  { background: #fff; border: 1.5px solid var(--border); border-radius: 8px;
+                padding: 8px 16px; text-align: center; min-width: 72px; }
+  .rsvp-chip .ans   { font-size: 14px; font-weight: 800; color: var(--navy); }
+  .rsvp-chip .count { font-size: 22px; font-weight: 900; color: var(--steel); display: block; }
+
+  /* Badges */
+  .badge-done    { display: inline-block; background: #d4edda; color: #2e7d32; border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .badge-pending { display: inline-block; background: #fff3cd; color: #856404; border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .badge-yes     { display: inline-block; background: #d4edda; color: #2e7d32; border-radius: 20px; padding: 2px 9px; font-size: 11px; font-weight: 700; }
+  .badge-no      { display: inline-block; background: #f8d7da; color: #721c24; border-radius: 20px; padding: 2px 9px; font-size: 11px; font-weight: 700; }
+  .badge-maybe   { display: inline-block; background: #fff3cd; color: #856404; border-radius: 20px; padding: 2px 9px; font-size: 11px; font-weight: 700; }
+  .badge-none    { color: #aaa; font-size: 12px; }
+  .pts-badge     { background: var(--navy); color: #fff; border-radius: 20px; padding: 2px 9px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+  .warn-badge    { display: inline-block; background: #fff3cd; color: #856404; border-radius: 20px; padding: 1px 7px; font-size: 10px; font-weight: 700; margin-left: 4px; }
+
+  /* Sel chips */
+  .sel-chip { display: inline-block; background: var(--cream); border-radius: 4px;
+              padding: 2px 7px; font-size: 11px; margin: 1px 2px 1px 0; color: #444; }
 
   /* Controls */
-  .controls-row {
-    display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px;
-  }
-  .filter-btn {
-    padding: 7px 16px; border-radius: 20px; border: 1.5px solid var(--border);
-    background: #fff; font-size: 13px; font-weight: 600; cursor: pointer; color: #555;
-    transition: all 0.15s;
-  }
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .filter-btn { padding: 6px 16px; border-radius: 20px; border: 1.5px solid var(--border);
+                background: #fff; font-size: 13px; font-weight: 600; cursor: pointer; color: #555; transition: all .15s; }
   .filter-btn.active { background: var(--navy); color: #fff; border-color: var(--navy); }
-  .search-box {
-    padding: 7px 14px; border-radius: 20px; border: 1.5px solid var(--border);
-    font-size: 13px; width: 200px; outline: none;
-    transition: border-color 0.15s;
-  }
+  .search-box { padding: 6px 14px; border-radius: 20px; border: 1.5px solid var(--border);
+                font-size: 13px; width: 200px; outline: none; }
   .search-box:focus { border-color: var(--steel); }
 
-  /* Loading / error */
-  .loading-msg { text-align: center; padding: 40px; color: #888; font-size: 15px; }
-  .error-msg   { text-align: center; padding: 40px; color: var(--red); font-size: 15px; }
+  .btn-copy { padding: 6px 16px; border-radius: 20px; border: 1.5px solid var(--steel);
+              background: #fff; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--steel); margin-left: auto; }
+  .btn-copy:hover { background: var(--steel); color: #fff; }
 
-  /* Award totals pts sort badge */
-  .pts-badge { background: var(--navy); color: #fff; border-radius: 20px; padding: 2px 9px; font-size: 11px; font-weight: 800; }
+  .ts { font-size: 11px; color: #999; }
+  .loading-msg { text-align: center; padding: 32px; color: #888; }
+  .error-msg   { text-align: center; padding: 32px; color: var(--red); }
 
-  /* Timestamp */
-  .ts { font-size: 12px; color: #888; }
-
-  @media (max-width: 700px) {
-    .summary-bar { gap: 14px; }
-    th, td { padding: 8px 10px; font-size: 13px; }
-  }
+  .unmatched-note { font-size: 13px; color: #856404; background: #fff3cd; border-radius: 8px; padding: 10px 16px; margin-bottom: 12px; }
 </style>
 </head>
 <body>
 
 <header class="header">
   <span class="header-logo">BLUE ALPHA</span>
-  <div class="header-divider"></div>
-  <span class="header-title">🎉 Anniversary Awards — Admin</span>
-  <div class="refresh-badge">
-    <span id="last-refresh-txt">Loading…</span>
-    <button class="refresh-btn" onclick="loadData()">↻ Refresh</button>
+  <div class="header-div"></div>
+  <span class="header-title">🎉 Anniversary — Admin</span>
+  <div class="refresh-area">
+    <span id="refresh-txt">Loading…</span>
+    <button class="btn-refresh" onclick="loadData()">↻ Refresh</button>
   </div>
 </header>
 
-<div class="summary-bar" id="summary-bar">
-  <div class="stat-block">
-    <div class="num" id="stat-submitted">–</div>
-    <div class="lbl">Submitted</div>
-  </div>
-  <div class="stat-divider"></div>
-  <div class="stat-block">
-    <div class="num" id="stat-pending">–</div>
-    <div class="lbl">Pending</div>
-  </div>
-  <div class="stat-divider"></div>
-  <div class="stat-block">
-    <div class="num" id="stat-total">–</div>
-    <div class="lbl">Total</div>
-  </div>
-  <div class="stat-divider"></div>
+<div class="summary-bar">
+  <div class="stat"><div class="n" id="stat-submitted">–</div><div class="l">Award Submitted</div></div>
+  <div class="sdiv"></div>
+  <div class="stat"><div class="n" id="stat-pending">–</div><div class="l">Pending</div></div>
+  <div class="sdiv"></div>
+  <div class="stat"><div class="n" id="stat-rsvp">–</div><div class="l">RSVP Yes</div></div>
+  <div class="sdiv"></div>
+  <div class="stat"><div class="n" id="stat-form">–</div><div class="l">Form Responses</div></div>
+  <div class="sdiv"></div>
+  <div class="stat"><div class="n" id="stat-total">–</div><div class="l">Total Employees</div></div>
+  <div class="sdiv"></div>
   <div class="tier-pills" id="tier-pills"></div>
 </div>
 
-<div class="content">
+<div class="page">
 
-  <!-- Award Totals -->
+  <!-- T-Shirt Sizes -->
+  <section>
+    <div class="section-title">T-Shirt Sizes</div>
+    <div class="shirt-chips" id="shirt-chips"><span style="color:#aaa">Loading…</span></div>
+  </section>
+
+  <!-- RSVP Summary -->
+  <section>
+    <div class="section-title">RSVP</div>
+    <div class="rsvp-chips" id="rsvp-chips"><span style="color:#aaa">Loading…</span></div>
+  </section>
+
+  <!-- Award Order Totals -->
   <section>
     <div class="section-title">Award Order Totals</div>
-    <div class="table-wrap">
-      <table id="totals-table">
-        <thead>
-          <tr>
-            <th>Award</th>
-            <th>Points</th>
-            <th>Total Ordered</th>
-          </tr>
-        </thead>
-        <tbody id="totals-body">
-          <tr><td colspan="3" class="loading-msg">Loading…</td></tr>
-        </tbody>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Award</th><th>Points</th><th>Qty Ordered</th></tr></thead>
+        <tbody id="totals-body"><tr><td colspan="3" class="loading-msg">Loading…</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -172,26 +159,38 @@
   <!-- Participants -->
   <section>
     <div class="section-title">Participants</div>
-    <div class="controls-row">
-      <button class="filter-btn active" data-filter="all"    onclick="setFilter('all', this)">All</button>
-      <button class="filter-btn"        data-filter="submitted" onclick="setFilter('submitted', this)">Submitted</button>
-      <button class="filter-btn"        data-filter="pending"   onclick="setFilter('pending', this)">Pending</button>
-      <input  class="search-box" id="search-box" type="search" placeholder="Search name…" oninput="renderParticipants()">
+    <div class="controls">
+      <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+      <button class="filter-btn" onclick="setFilter('submitted',this)">Awards Submitted</button>
+      <button class="filter-btn" onclick="setFilter('pending',this)">Pending</button>
+      <button class="filter-btn" onclick="setFilter('rsvp_yes',this)">RSVP Yes</button>
+      <input class="search-box" id="search-box" type="search" placeholder="Search name…" oninput="renderParticipants()">
+      <button class="btn-copy" onclick="copyShoppingList()">📋 Copy Shopping List</button>
     </div>
-    <div class="table-wrap">
-      <table id="participants-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Budget</th>
-            <th>Status</th>
-            <th>Submitted At</th>
-            <th>Selections</th>
-          </tr>
-        </thead>
-        <tbody id="participants-body">
-          <tr><td colspan="5" class="loading-msg">Loading…</td></tr>
-        </tbody>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Name</th>
+          <th>Budget</th>
+          <th>Awards</th>
+          <th>Shirt</th>
+          <th>RSVP</th>
+          <th>Referred By</th>
+          <th>Award Selections</th>
+        </tr></thead>
+        <tbody id="participants-body"><tr><td colspan="7" class="loading-msg">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Unmatched Form Responses -->
+  <section id="unmatched-section" style="display:none">
+    <div class="section-title">⚠️ Unmatched Form Responses</div>
+    <div class="unmatched-note">These form responses couldn't be automatically matched to a participant. Review and manually identify them.</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Name on Form</th><th>Shirt</th><th>RSVP</th><th>Referred By</th><th>Submitted</th></tr></thead>
+        <tbody id="unmatched-body"></tbody>
       </table>
     </div>
   </section>
@@ -199,8 +198,10 @@
 </div>
 
 <script>
-let _allParticipants = [];
-let _awardTotals     = {};
+let _participants = [];
+let _awardTotals  = {};
+let _shirtTotals  = {};
+let _unmatched    = [];
 let _filter = 'all';
 
 function setFilter(f, btn) {
@@ -210,130 +211,203 @@ function setFilter(f, btn) {
   renderParticipants();
 }
 
+function rsvpBadge(v) {
+  if (!v) return '<span class="badge-none">—</span>';
+  const lv = v.toLowerCase();
+  if (lv === 'yes') return `<span class="badge-yes">Yes</span>`;
+  if (lv === 'no')  return `<span class="badge-no">No</span>`;
+  return `<span class="badge-maybe">${v}</span>`;
+}
+
 function fmtDate(iso) {
   if (!iso) return '—';
   try {
     const d = new Date(iso);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-      + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})
+      + ' ' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
   } catch { return iso; }
+}
+
+function renderShirts() {
+  const el = document.getElementById('shirt-chips');
+  const entries = Object.entries(_shirtTotals);
+  if (!entries.length) { el.innerHTML = '<span style="color:#aaa">No responses yet.</span>'; return; }
+  el.innerHTML = entries.map(([sz, cnt]) =>
+    `<div class="shirt-chip"><span class="count">${cnt}</span><span class="size">${sz}</span></div>`
+  ).join('');
+}
+
+function renderRsvp() {
+  const el = document.getElementById('rsvp-chips');
+  const counts = {};
+  _participants.forEach(p => {
+    if (p.form) {
+      const r = p.form.rsvp || 'No response';
+      counts[r] = (counts[r] || 0) + 1;
+    }
+  });
+  _unmatched.forEach(u => {
+    const r = u.rsvp || 'No response';
+    counts[r] = (counts[r] || 0) + 1;
+  });
+  const total = Object.values(counts).reduce((s,v) => s+v, 0);
+  document.getElementById('stat-rsvp').textContent = counts['Yes'] || 0;
+  if (!total) { el.innerHTML = '<span style="color:#aaa">No responses yet.</span>'; return; }
+  el.innerHTML = Object.entries(counts).map(([ans, cnt]) =>
+    `<div class="rsvp-chip"><span class="count">${cnt}</span><span class="ans">${ans}</span></div>`
+  ).join('');
+}
+
+function renderSummary() {
+  const total     = _participants.length;
+  const submitted = _participants.filter(p => p.submitted).length;
+  const pending   = total - submitted;
+  const formTotal = _participants.filter(p => p.form).length + _unmatched.length;
+
+  document.getElementById('stat-submitted').textContent = submitted;
+  document.getElementById('stat-pending').textContent   = pending;
+  document.getElementById('stat-total').textContent     = total;
+  document.getElementById('stat-form').textContent      = formTotal;
+
+  const tiers = [1,5,10,15,20,25];
+  const tc = {};
+  tiers.forEach(t => { tc[t] = {done:0, total:0}; });
+  _participants.forEach(p => {
+    if (tc[p.points]) { tc[p.points].total++; if (p.submitted) tc[p.points].done++; }
+  });
+  document.getElementById('tier-pills').innerHTML = tiers.map(t => {
+    const c = tc[t];
+    if (!c || c.total === 0) return '';
+    return `<div class="tier-pill">${t}pt: <span class="ok">${c.done}</span><span class="tot">/${c.total}</span></div>`;
+  }).join('');
 }
 
 function renderTotals() {
   const tbody = document.getElementById('totals-body');
   const entries = Object.entries(_awardTotals);
-  if (entries.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#888;padding:24px">No submissions yet.</td></tr>';
+  if (!entries.length) {
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#aaa;padding:24px">No award submissions yet.</td></tr>';
     return;
   }
-  // Sort by points desc, then name
-  entries.sort((a, b) => (b[1].points - a[1].points) || a[0].localeCompare(b[0]));
-  tbody.innerHTML = entries.map(([name, data]) => `
-    <tr>
-      <td>${name}</td>
-      <td><span class="pts-badge">${data.points} pt${data.points !== 1 ? 's' : ''}</span></td>
-      <td><strong>${data.qty}</strong></td>
-    </tr>`).join('');
-}
-
-function renderSummaryBar() {
-  const total     = _allParticipants.length;
-  const submitted = _allParticipants.filter(p => p.submitted).length;
-  const pending   = total - submitted;
-
-  document.getElementById('stat-submitted').textContent = submitted;
-  document.getElementById('stat-pending').textContent   = pending;
-  document.getElementById('stat-total').textContent     = total;
-
-  // Tier breakdown
-  const tiers = [1, 5, 10, 15, 20, 25];
-  const tierLabels = { 1:'1pt', 5:'5pt', 10:'10pt', 15:'15pt', 20:'20pt', 25:'25pt' };
-  const tierCounts = {};
-  tiers.forEach(t => { tierCounts[t] = { done: 0, total: 0 }; });
-  _allParticipants.forEach(p => {
-    const t = p.points;
-    if (tierCounts[t]) {
-      tierCounts[t].total++;
-      if (p.submitted) tierCounts[t].done++;
-    }
-  });
-
-  document.getElementById('tier-pills').innerHTML = tiers.map(t => {
-    const c = tierCounts[t];
-    if (c.total === 0) return '';
-    return `<div class="tier-pill">${tierLabels[t]}: <span class="done">${c.done}</span><span class="total">/${c.total}</span></div>`;
-  }).join('');
+  entries.sort((a,b) => (b[1].points - a[1].points) || a[0].localeCompare(b[0]));
+  tbody.innerHTML = entries.map(([name, d]) =>
+    `<tr><td>${name}</td>
+         <td><span class="pts-badge">${d.points}pt</span></td>
+         <td><strong>${d.qty}</strong></td></tr>`
+  ).join('');
 }
 
 function renderParticipants() {
-  const query   = (document.getElementById('search-box').value || '').toLowerCase().trim();
-  let list = _allParticipants;
-
+  const q = (document.getElementById('search-box').value || '').toLowerCase().trim();
+  let list = _participants;
   if (_filter === 'submitted') list = list.filter(p => p.submitted);
   if (_filter === 'pending')   list = list.filter(p => !p.submitted);
-
-  if (query) {
-    list = list.filter(p =>
-      `${p.first_name} ${p.last_name}`.toLowerCase().includes(query)
-    );
-  }
+  if (_filter === 'rsvp_yes')  list = list.filter(p => p.form?.rsvp?.toLowerCase() === 'yes');
+  if (q) list = list.filter(p => `${p.first_name} ${p.last_name}`.toLowerCase().includes(q));
 
   const tbody = document.getElementById('participants-body');
-  if (list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#888;padding:24px">No results.</td></tr>`;
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#aaa;padding:24px">No results.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = list.map(p => {
-    const badge = p.submitted
-      ? '<span class="badge-done">✓ Submitted</span>'
+    const awardBadge = p.submitted
+      ? '<span class="badge-done">✓ Done</span>'
       : '<span class="badge-pending">Pending</span>';
-    const ts = p.submitted ? `<span class="ts">${fmtDate(p.submitted_at)}</span>` : '—';
-    const chips = p.selections && p.selections.length > 0
+
+    const shirt    = p.form?.shirt    || '<span class="badge-none">—</span>';
+    const rsvp     = rsvpBadge(p.form?.rsvp);
+    const referral = p.form?.referral || '<span class="badge-none">—</span>';
+
+    // Low confidence warning
+    const warn = p.form && p.form.match_score < 0.9
+      ? `<span class="warn-badge" title="Matched as '${p.form.raw_name}' (${Math.round(p.form.match_score*100)}% confidence)">⚠ fuzzy</span>`
+      : '';
+
+    const chips = p.submitted && p.selections?.length
       ? p.selections.map(s =>
-          `<span class="sel-chip">${s.qty > 1 ? s.qty + '× ' : ''}${s.name} (${s.points * s.qty}pt${s.points * s.qty !== 1 ? 's' : ''})</span>`
+          `<span class="sel-chip">${s.qty > 1 ? s.qty+'× ' : ''}${s.name} (${s.points*s.qty}pt)</span>`
         ).join('')
-      : '<span style="color:#aaa;font-size:12px">—</span>';
+      : '<span class="badge-none">—</span>';
 
     return `<tr>
-      <td><strong>${p.last_name}</strong>, ${p.first_name}</td>
+      <td><strong>${p.last_name}</strong>, ${p.first_name}${warn}</td>
       <td><span class="pts-badge">${p.points}pt</span></td>
-      <td>${badge}</td>
-      <td>${ts}</td>
+      <td>${awardBadge}</td>
+      <td>${shirt}</td>
+      <td>${rsvp}</td>
+      <td style="font-size:12px;color:#555">${referral}</td>
       <td>${chips}</td>
     </tr>`;
   }).join('');
 }
 
-function loadData() {
-  document.getElementById('last-refresh-txt').textContent = 'Refreshing…';
+function renderUnmatched() {
+  const section = document.getElementById('unmatched-section');
+  const tbody   = document.getElementById('unmatched-body');
+  if (!_unmatched.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
+  tbody.innerHTML = _unmatched.map(u =>
+    `<tr>
+      <td><strong>${u.raw_name}</strong></td>
+      <td>${u.shirt || '—'}</td>
+      <td>${rsvpBadge(u.rsvp)}</td>
+      <td style="font-size:12px;color:#555">${u.referral || '—'}</td>
+      <td class="ts">${u.timestamp || '—'}</td>
+    </tr>`
+  ).join('');
+}
 
+function copyShoppingList() {
+  const entries = Object.entries(_awardTotals);
+  if (!entries.length) { alert('No award submissions yet.'); return; }
+  entries.sort((a,b) => b[1].points - a[1].points || a[0].localeCompare(b[0]));
+  const text = 'ANNIVERSARY AWARDS — SHOPPING LIST\n'
+    + '='.repeat(40) + '\n'
+    + entries.map(([name, d]) => `${d.qty}x  ${name}`).join('\n')
+    + '\n\nT-SHIRT SIZES\n' + '='.repeat(40) + '\n'
+    + Object.entries(_shirtTotals).map(([sz, cnt]) => `${cnt}x  ${sz}`).join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.btn-copy');
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => { btn.textContent = orig; }, 2000);
+  }).catch(() => alert('Copy failed — please copy manually.'));
+}
+
+function loadData() {
+  document.getElementById('refresh-txt').textContent = 'Refreshing…';
   fetch('/api/anniversary/admin/data')
     .then(r => r.json())
     .then(data => {
       if (data.error) {
-        document.getElementById('totals-body').innerHTML       = `<tr><td colspan="3" class="error-msg">${data.error}</td></tr>`;
-        document.getElementById('participants-body').innerHTML = `<tr><td colspan="5" class="error-msg">${data.error}</td></tr>`;
+        ['totals-body','participants-body'].forEach(id =>
+          document.getElementById(id).innerHTML = `<tr><td colspan="7" class="error-msg">${data.error}</td></tr>`);
         return;
       }
-      _allParticipants = data.participants || [];
-      _awardTotals     = data.award_totals || {};
+      _participants = data.participants  || [];
+      _awardTotals  = data.award_totals  || {};
+      _shirtTotals  = data.shirt_totals  || {};
+      _unmatched    = data.unmatched_form || [];
 
-      renderSummaryBar();
+      renderSummary();
+      renderShirts();
+      renderRsvp();
       renderTotals();
       renderParticipants();
+      renderUnmatched();
 
       const now = new Date();
-      document.getElementById('last-refresh-txt').textContent =
-        'Updated ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      document.getElementById('refresh-txt').textContent =
+        'Updated ' + now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
     })
     .catch(err => {
-      document.getElementById('last-refresh-txt').textContent = 'Error loading data';
+      document.getElementById('refresh-txt').textContent = 'Load error';
       console.error(err);
     });
 }
 
-// Initial load + auto-refresh every 60s
 loadData();
 setInterval(loadData, 60000);
 </script>

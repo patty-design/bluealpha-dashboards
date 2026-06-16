@@ -12094,6 +12094,49 @@ def anniversary_submit():
     return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
 
 
+_ANNIVERSARY_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1uQIpMb0PZLdCg7BZweIhsj4pvf9lrzWupTrTck8H-gU/export?format=csv&gid=727731834"
+
+def _fetch_form_responses():
+    """Fetch Google Form responses CSV and return list of dicts."""
+    import csv, io
+    try:
+        r = req_lib.get(_ANNIVERSARY_SHEET_CSV, timeout=10)
+        if not r.ok:
+            return []
+        reader = csv.DictReader(io.StringIO(r.text))
+        rows = []
+        for row in reader:
+            # Normalize XXXL → 3XL
+            size = row.get("What's your t-shirt size?", "").strip()
+            if size.upper() in ("XXXL", "XXX-L"):
+                size = "3XL"
+            rows.append({
+                "raw_name":  row.get("Your Name", "").strip(),
+                "referral":  row.get("Who referred you to Blue Alpha?", "").strip(),
+                "shirt":     size,
+                "rsvp":      row.get("Can you make it to the party?", "").strip(),
+                "timestamp": row.get("Timestamp", "").strip(),
+            })
+        return rows
+    except Exception as e:
+        print(f"[anniversary] form fetch error: {e}")
+        return []
+
+def _fuzzy_match_name(raw, participants):
+    """Return (participant, score) for the best fuzzy match, or (None, 0)."""
+    import difflib
+    raw_norm = raw.lower().strip()
+    best_p, best_score = None, 0.0
+    for p in participants:
+        full = f"{p['first_name']} {p['last_name']}".lower()
+        score = difflib.SequenceMatcher(None, raw_norm, full).ratio()
+        # Also try last, first order
+        rev   = f"{p['last_name']} {p['first_name']}".lower()
+        score = max(score, difflib.SequenceMatcher(None, raw_norm, rev).ratio())
+        if score > best_score:
+            best_score, best_p = score, p
+    return (best_p, best_score)
+
 @app.route("/api/anniversary/admin/data")
 def anniversary_admin_data():
     c = cors()
@@ -12111,7 +12154,7 @@ def anniversary_admin_data():
                         status=500, headers=c, mimetype="application/json")
 
     participants  = []
-    award_totals  = {}   # {name: {qty, points}}
+    award_totals  = {}
 
     for rec in participant_records:
         f         = rec.get("fields", {})
@@ -12139,11 +12182,50 @@ def anniversary_admin_data():
             "submitted":    submitted,
             "submitted_at": f.get("Submitted At", ""),
             "selections":   sels,
+            "form":         None,  # filled in below
         })
 
     participants.sort(key=lambda x: (x["last_name"], x["first_name"]))
 
+    # ── Merge Google Form responses ──────────────────────────────────────────
+    form_rows   = _fetch_form_responses()
+    matched_ids = set()
+    unmatched   = []
+    shirt_totals = {}
+
+    for row in form_rows:
+        p, score = _fuzzy_match_name(row["raw_name"], participants)
+        if p and score >= 0.75:
+            p["form"] = {
+                "raw_name":  row["raw_name"],
+                "shirt":     row["shirt"],
+                "rsvp":      row["rsvp"],
+                "referral":  row["referral"],
+                "timestamp": row["timestamp"],
+                "match_score": round(score, 2),
+            }
+            matched_ids.add(p["record_id"])
+        else:
+            unmatched.append(row)
+
+        # Tally shirt sizes (all responses, matched or not)
+        sz = row["shirt"]
+        if sz:
+            shirt_totals[sz] = shirt_totals.get(sz, 0) + 1
+
+    # Sort shirt totals in standard size order
+    size_order = ["XS","S","M","L","XL","2XL","3XL","4XL"]
+    shirt_totals_sorted = {sz: shirt_totals[sz] for sz in size_order if sz in shirt_totals}
+    # Any unexpected sizes at the end
+    for sz in shirt_totals:
+        if sz not in shirt_totals_sorted:
+            shirt_totals_sorted[sz] = shirt_totals[sz]
+
+    participants.sort(key=lambda x: (x["last_name"], x["first_name"]))
+
     return Response(json.dumps({
-        "participants": participants,
-        "award_totals": award_totals,
+        "participants":   participants,
+        "award_totals":   award_totals,
+        "shirt_totals":   shirt_totals_sorted,
+        "unmatched_form": unmatched,
     }), headers=c, mimetype="application/json")
