@@ -1294,7 +1294,19 @@
         el.innerHTML = '<div class="empty-state">No invoices found.</div>';
         return;
       }
-      let html = '<div class="card" style="overflow-x:auto;"><table style="min-width:800px;"><thead><tr>'
+      let html = `<div class="card"><table style="width:100%;table-layout:fixed;">
+        <colgroup>
+          <col style="width:90px">
+          <col style="width:auto">
+          <col style="width:90px">
+          <col style="width:80px">
+          <col style="width:72px">
+          <col style="width:52px">
+          <col style="width:90px">
+          <col style="width:78px">
+          <col style="width:82px">
+        </colgroup>
+        <thead><tr>`
         + '<th>Invoice #</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th><th>PDF</th><th>Payment</th><th>Resend</th><th>Stripe</th>'
         + '</tr></thead><tbody>';
       invoices.forEach(inv => {
@@ -1302,17 +1314,18 @@
           ? '<span class="badge" style="background:#d4edda;color:#155724;">PAID</span>'
           : '<span class="badge" style="background:#f8d7da;color:#721c24;">UNPAID</span>';
 
+        const _btn = 'style="padding:4px 8px;font-size:0.75rem;white-space:nowrap;width:100%;"';
         const paymentCell = inv.is_paid
-          ? (inv.check_number ? `<small style="color:var(--muted);white-space:nowrap;">✓ Check #${esc(inv.check_number)}</small>` : '<small style="color:var(--muted);">—</small>')
-          : `<button class="btn btn-outline btn-sm" style="white-space:nowrap;" onclick="openMarkPaidModal('${esc(inv.record_id)}')">Mark Paid</button>`;
+          ? (inv.check_number ? `<small style="color:var(--muted);">✓ Check #${esc(inv.check_number)}</small>` : '<small style="color:var(--muted);">—</small>')
+          : `<button class="btn btn-outline btn-sm" ${_btn} onclick="openMarkPaidModal('${esc(inv.record_id)}')">Mark Paid</button>`;
 
-        const resendCell = `<button class="btn btn-outline btn-sm" onclick="openResendModal('${esc(inv.record_id)}','${esc(inv.inv_number)}','${esc(inv.billing_email||'')}')">📧 Resend</button>`;
+        const resendCell = `<button class="btn btn-outline btn-sm" ${_btn} onclick="openResendModal('${esc(inv.record_id)}','${esc(inv.inv_number)}','${esc(inv.billing_email||'')}')">📧 Resend</button>`;
 
         const stripeCell = inv.has_stripe
-          ? '<span style="color:#155724;font-size:0.85rem;">✓ Created</span>'
-          : `<button class="btn btn-outline btn-sm" style="color:#6b4c00;border-color:#c9960c;white-space:nowrap;" onclick="createStripeInvoices('${esc(inv.record_id)}','${esc(inv.inv_number)}',this)">⚡ Create</button>`;
+          ? '<span style="color:#155724;font-size:0.82rem;">✓ Created</span>'
+          : `<button class="btn btn-outline btn-sm" ${_btn} style="padding:4px 8px;font-size:0.75rem;white-space:nowrap;width:100%;color:#6b4c00;border-color:#c9960c;" onclick="createStripeInvoices('${esc(inv.record_id)}','${esc(inv.inv_number)}',this)">⚡ Create</button>`;
 
-        const pdfCell = `<a href="/invoice-pdf/${esc(inv.record_id)}" target="_blank" class="btn btn-outline btn-sm" style="white-space:nowrap;">📄 PDF</a>`;
+        const pdfCell = `<a href="/invoice-pdf/${esc(inv.record_id)}" target="_blank" class="btn btn-outline btn-sm" ${_btn}>📄 PDF</a>`;
 
         html += `<tr>
           <td><strong>${esc(inv.inv_number)}</strong></td>
