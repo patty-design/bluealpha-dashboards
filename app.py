@@ -10729,14 +10729,11 @@ def admin_convert_to_invoice(record_id):
 # ── Stripe invoice creation ───────────────────────────────────────────────────
 
 def _create_stripe_invoices_for_record(write_token, inv_record_id, billing_email, billing_name, org_name, li_items):
-    """Create CC + ACH Stripe hosted invoices and patch back to the Airtable invoice record.
-    Runs synchronously — call from a background thread so it doesn't block the HTTP response."""
+    """Create CC + ACH Stripe hosted invoices and patch back to the Airtable invoice record."""
     if not STRIPE_SECRET_KEY:
-        print("[stripe] STRIPE_SECRET_KEY not set — skipping invoice creation")
-        return
+        raise Exception("STRIPE_SECRET_KEY not configured")
     if not billing_email:
-        print("[stripe] no billing email — skipping invoice creation")
-        return
+        raise Exception("No billing email provided")
 
     ss_auth = (STRIPE_SECRET_KEY, "")
 
@@ -10753,26 +10750,11 @@ def _create_stripe_invoices_for_record(write_token, inv_record_id, billing_email
     cc_id = cc_url = ach_id = ach_url = due_date_str = ""
 
     for method in ["card", "us_bank_account"]:
-        # 2. Create pending invoice items for this customer
-        for item in li_items:
-            unit_cents = int(round(float(item["unit_price"]) * 100))
-            ii_r = req_lib.post("https://api.stripe.com/v1/invoiceitems",
-                data={
-                    "customer":    customer_id,
-                    "unit_amount": unit_cents,
-                    "quantity":    str(int(item["qty"])),
-                    "currency":    "usd",
-                    "description": item["name"],
-                },
-                auth=ss_auth, timeout=15)
-            if not ii_r.ok:
-                print(f"[stripe] invoice item warn: {ii_r.text[:200]}")
-
-        # 3. Create invoice (Stripe auto-attaches all pending items for this customer)
+        # 2. Create draft invoice first
         inv_data = {
-            "customer":           customer_id,
-            "collection_method":  "send_invoice",
-            "days_until_due":     "30",
+            "customer":          customer_id,
+            "collection_method": "send_invoice",
+            "days_until_due":    "30",
             "payment_settings[payment_method_types][0]": method,
         }
         inv_r = req_lib.post("https://api.stripe.com/v1/invoices",
@@ -10780,16 +10762,32 @@ def _create_stripe_invoices_for_record(write_token, inv_record_id, billing_email
         if not inv_r.ok:
             raise Exception(f"Stripe invoice create failed ({method}): {inv_r.status_code} {inv_r.text[:300]}")
         stripe_inv_id = inv_r.json()["id"]
+        print(f"[stripe] created draft invoice {stripe_inv_id} ({method})")
+
+        # 3. Add line items directly to the draft invoice (avoids pending-item race condition)
+        for item in li_items:
+            unit_cents_decimal = str(round(float(item["unit_price"]) * 100, 4))
+            ii_r = req_lib.post("https://api.stripe.com/v1/invoiceitems",
+                data={
+                    "customer":             customer_id,
+                    "invoice":              stripe_inv_id,
+                    "unit_amount_decimal":  unit_cents_decimal,
+                    "quantity":             str(int(item["qty"])),
+                    "currency":             "usd",
+                    "description":          item["name"],
+                },
+                auth=ss_auth, timeout=15)
+            if not ii_r.ok:
+                print(f"[stripe] invoice item warn ({method}): {ii_r.status_code} {ii_r.text[:200]}")
 
         # 4. Finalize → get hosted_invoice_url
         fin_r = req_lib.post(f"https://api.stripe.com/v1/invoices/{stripe_inv_id}/finalize",
             data={}, auth=ss_auth, timeout=15)
         if not fin_r.ok:
             raise Exception(f"Stripe finalize failed ({method}): {fin_r.status_code} {fin_r.text[:300]}")
-        fin_inv   = fin_r.json()
+        fin_inv    = fin_r.json()
         hosted_url = fin_inv.get("hosted_invoice_url", "")
 
-        # Capture due date from first finalized invoice
         if not due_date_str and fin_inv.get("due_date"):
             import datetime as _dt_stripe
             due_date_str = _dt_stripe.datetime.utcfromtimestamp(fin_inv["due_date"]).strftime("%Y-%m-%d")
@@ -10802,12 +10800,12 @@ def _create_stripe_invoices_for_record(write_token, inv_record_id, billing_email
 
     # 5. Patch Airtable invoice record with all Stripe data
     patch_fields = {
-        "Stripe Customer ID":        customer_id,
-        "Stripe Invoice ID (CC)":    cc_id,
-        "Stripe Invoice URL (CC)":   cc_url,
-        "Stripe Invoice Status (CC)": "Open",
-        "Stripe Invoice ID (ACH)":   ach_id,
-        "Stripe Invoice URL (ACH)":  ach_url,
+        "Stripe Customer ID":          customer_id,
+        "Stripe Invoice ID (CC)":      cc_id,
+        "Stripe Invoice URL (CC)":     cc_url,
+        "Stripe Invoice Status (CC)":  "Open",
+        "Stripe Invoice ID (ACH)":     ach_id,
+        "Stripe Invoice URL (ACH)":    ach_url,
         "Stripe Invoice Status (ACH)": "Open",
     }
     if due_date_str:
@@ -10821,7 +10819,7 @@ def _create_stripe_invoices_for_record(write_token, inv_record_id, billing_email
     if patch_r.ok:
         print(f"[stripe] patched Airtable record {inv_record_id} with Stripe invoice URLs")
     else:
-        print(f"[stripe] Airtable patch failed: {patch_r.status_code} {patch_r.text[:200]}")
+        raise Exception(f"Airtable patch failed: {patch_r.status_code} {patch_r.text[:300]}")
 
 
 # ── Nightly tracking sync ─────────────────────────────────────────────────────
@@ -11222,18 +11220,13 @@ def admin_create_stripe_invoices(record_id):
             return Response(json.dumps({"error": "No line items found"}),
                             status=400, headers=c, mimetype="application/json")
 
-        import threading
-        t = threading.Thread(
-            target=_create_stripe_invoices_for_record,
-            args=(write_token, record_id, billing_email, billing_name, org_name, li_items),
-            daemon=True,
-        )
-        t.start()
-        t.join(timeout=30)  # wait up to 30s — Stripe is usually fast
+        # Run synchronously so any Stripe or Airtable errors surface to the caller
+        _create_stripe_invoices_for_record(write_token, record_id, billing_email, billing_name, org_name, li_items)
 
         _INVOICES_CACHE.clear()
         return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
     except Exception as e:
+        print(f"[create-stripe] error for {record_id}: {e}")
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
 
