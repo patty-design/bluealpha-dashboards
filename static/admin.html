@@ -1294,7 +1294,7 @@
         el.innerHTML = '<div class="empty-state">No invoices found.</div>';
         return;
       }
-      let html = '<div class="card"><table><thead><tr>'
+      let html = '<div class="card" style="overflow-x:auto;"><table style="min-width:800px;"><thead><tr>'
         + '<th>Invoice #</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th><th>PDF</th><th>Payment</th><th>Resend</th><th>Stripe</th>'
         + '</tr></thead><tbody>';
       invoices.forEach(inv => {
