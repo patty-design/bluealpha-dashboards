@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anniversary Awards — Admin</title>
+<style>
+  :root {
+    --navy:  #1B2438;
+    --red:   #BD3333;
+    --cream: #DDD8C4;
+    --steel: #5B7FA0;
+    --light: #f4f2ec;
+    --border:#d0ccc0;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--light); color: #222; }
+
+  .header {
+    background: var(--navy); color: #fff;
+    padding: 16px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .header-logo { font-size: 20px; font-weight: 900; letter-spacing: 3px; }
+  .header-divider { width: 2px; height: 28px; background: rgba(255,255,255,0.25); }
+  .header-title { font-size: 15px; font-weight: 600; color: var(--cream); }
+  .refresh-badge {
+    margin-left: auto; font-size: 12px; color: rgba(255,255,255,0.6);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .refresh-btn {
+    background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+    color: #fff; border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer;
+  }
+  .refresh-btn:hover { background: rgba(255,255,255,0.25); }
+
+  /* Summary bar */
+  .summary-bar {
+    background: var(--navy); color: #fff;
+    padding: 16px 24px;
+    display: flex; gap: 24px; flex-wrap: wrap; align-items: center;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+  .stat-block { text-align: center; }
+  .stat-block .num { font-size: 28px; font-weight: 900; line-height: 1; }
+  .stat-block .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; opacity: 0.7; margin-top: 2px; }
+  .stat-divider { width: 1px; height: 40px; background: rgba(255,255,255,0.2); }
+  .tier-pills { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .tier-pill {
+    background: rgba(255,255,255,0.12); border-radius: 20px;
+    padding: 4px 12px; font-size: 12px; font-weight: 700;
+  }
+  .tier-pill .done { color: #7fff7f; }
+  .tier-pill .total { opacity: 0.6; }
+
+  /* Content */
+  .content { max-width: 1300px; margin: 0 auto; padding: 28px 20px; display: flex; flex-direction: column; gap: 32px; }
+
+  /* Section */
+  .section-title {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--navy); font-weight: 800; margin-bottom: 14px;
+  }
+
+  /* Tables */
+  .table-wrap { overflow-x: auto; border-radius: 10px; border: 1.5px solid var(--border); background: #fff; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th {
+    background: var(--navy); color: #fff;
+    padding: 10px 14px; text-align: left; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;
+    white-space: nowrap;
+  }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #faf9f6; }
+
+  /* Status badges */
+  .badge-done { display: inline-block; background: #d4edda; color: #2e7d32; border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 700; }
+  .badge-pending { display: inline-block; background: #fff3cd; color: #856404; border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 700; }
+
+  /* Selections in table */
+  .sel-chip {
+    display: inline-block; background: var(--cream); border-radius: 4px;
+    padding: 2px 7px; font-size: 11px; margin: 2px 2px 2px 0; color: #444;
+  }
+
+  /* Controls */
+  .controls-row {
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px;
+  }
+  .filter-btn {
+    padding: 7px 16px; border-radius: 20px; border: 1.5px solid var(--border);
+    background: #fff; font-size: 13px; font-weight: 600; cursor: pointer; color: #555;
+    transition: all 0.15s;
+  }
+  .filter-btn.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .search-box {
+    padding: 7px 14px; border-radius: 20px; border: 1.5px solid var(--border);
+    font-size: 13px; width: 200px; outline: none;
+    transition: border-color 0.15s;
+  }
+  .search-box:focus { border-color: var(--steel); }
+
+  /* Loading / error */
+  .loading-msg { text-align: center; padding: 40px; color: #888; font-size: 15px; }
+  .error-msg   { text-align: center; padding: 40px; color: var(--red); font-size: 15px; }
+
+  /* Award totals pts sort badge */
+  .pts-badge { background: var(--navy); color: #fff; border-radius: 20px; padding: 2px 9px; font-size: 11px; font-weight: 800; }
+
+  /* Timestamp */
+  .ts { font-size: 12px; color: #888; }
+
+  @media (max-width: 700px) {
+    .summary-bar { gap: 14px; }
+    th, td { padding: 8px 10px; font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <span class="header-logo">BLUE ALPHA</span>
+  <div class="header-divider"></div>
+  <span class="header-title">🎉 Anniversary Awards — Admin</span>
+  <div class="refresh-badge">
+    <span id="last-refresh-txt">Loading…</span>
+    <button class="refresh-btn" onclick="loadData()">↻ Refresh</button>
+  </div>
+</header>
+
+<div class="summary-bar" id="summary-bar">
+  <div class="stat-block">
+    <div class="num" id="stat-submitted">–</div>
+    <div class="lbl">Submitted</div>
+  </div>
+  <div class="stat-divider"></div>
+  <div class="stat-block">
+    <div class="num" id="stat-pending">–</div>
+    <div class="lbl">Pending</div>
+  </div>
+  <div class="stat-divider"></div>
+  <div class="stat-block">
+    <div class="num" id="stat-total">–</div>
+    <div class="lbl">Total</div>
+  </div>
+  <div class="stat-divider"></div>
+  <div class="tier-pills" id="tier-pills"></div>
+</div>
+
+<div class="content">
+
+  <!-- Award Totals -->
+  <section>
+    <div class="section-title">Award Order Totals</div>
+    <div class="table-wrap">
+      <table id="totals-table">
+        <thead>
+          <tr>
+            <th>Award</th>
+            <th>Points</th>
+            <th>Total Ordered</th>
+          </tr>
+        </thead>
+        <tbody id="totals-body">
+          <tr><td colspan="3" class="loading-msg">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Participants -->
+  <section>
+    <div class="section-title">Participants</div>
+    <div class="controls-row">
+      <button class="filter-btn active" data-filter="all"    onclick="setFilter('all', this)">All</button>
+      <button class="filter-btn"        data-filter="submitted" onclick="setFilter('submitted', this)">Submitted</button>
+      <button class="filter-btn"        data-filter="pending"   onclick="setFilter('pending', this)">Pending</button>
+      <input  class="search-box" id="search-box" type="search" placeholder="Search name…" oninput="renderParticipants()">
+    </div>
+    <div class="table-wrap">
+      <table id="participants-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Budget</th>
+            <th>Status</th>
+            <th>Submitted At</th>
+            <th>Selections</th>
+          </tr>
+        </thead>
+        <tbody id="participants-body">
+          <tr><td colspan="5" class="loading-msg">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+
+<script>
+let _allParticipants = [];
+let _awardTotals     = {};
+let _filter = 'all';
+
+function setFilter(f, btn) {
+  _filter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderParticipants();
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  } catch { return iso; }
+}
+
+function renderTotals() {
+  const tbody = document.getElementById('totals-body');
+  const entries = Object.entries(_awardTotals);
+  if (entries.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#888;padding:24px">No submissions yet.</td></tr>';
+    return;
+  }
+  // Sort by points desc, then name
+  entries.sort((a, b) => (b[1].points - a[1].points) || a[0].localeCompare(b[0]));
+  tbody.innerHTML = entries.map(([name, data]) => `
+    <tr>
+      <td>${name}</td>
+      <td><span class="pts-badge">${data.points} pt${data.points !== 1 ? 's' : ''}</span></td>
+      <td><strong>${data.qty}</strong></td>
+    </tr>`).join('');
+}
+
+function renderSummaryBar() {
+  const total     = _allParticipants.length;
+  const submitted = _allParticipants.filter(p => p.submitted).length;
+  const pending   = total - submitted;
+
+  document.getElementById('stat-submitted').textContent = submitted;
+  document.getElementById('stat-pending').textContent   = pending;
+  document.getElementById('stat-total').textContent     = total;
+
+  // Tier breakdown
+  const tiers = [1, 5, 10, 15, 20, 25];
+  const tierLabels = { 1:'1pt', 5:'5pt', 10:'10pt', 15:'15pt', 20:'20pt', 25:'25pt' };
+  const tierCounts = {};
+  tiers.forEach(t => { tierCounts[t] = { done: 0, total: 0 }; });
+  _allParticipants.forEach(p => {
+    const t = p.points;
+    if (tierCounts[t]) {
+      tierCounts[t].total++;
+      if (p.submitted) tierCounts[t].done++;
+    }
+  });
+
+  document.getElementById('tier-pills').innerHTML = tiers.map(t => {
+    const c = tierCounts[t];
+    if (c.total === 0) return '';
+    return `<div class="tier-pill">${tierLabels[t]}: <span class="done">${c.done}</span><span class="total">/${c.total}</span></div>`;
+  }).join('');
+}
+
+function renderParticipants() {
+  const query   = (document.getElementById('search-box').value || '').toLowerCase().trim();
+  let list = _allParticipants;
+
+  if (_filter === 'submitted') list = list.filter(p => p.submitted);
+  if (_filter === 'pending')   list = list.filter(p => !p.submitted);
+
+  if (query) {
+    list = list.filter(p =>
+      `${p.first_name} ${p.last_name}`.toLowerCase().includes(query)
+    );
+  }
+
+  const tbody = document.getElementById('participants-body');
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#888;padding:24px">No results.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = list.map(p => {
+    const badge = p.submitted
+      ? '<span class="badge-done">✓ Submitted</span>'
+      : '<span class="badge-pending">Pending</span>';
+    const ts = p.submitted ? `<span class="ts">${fmtDate(p.submitted_at)}</span>` : '—';
+    const chips = p.selections && p.selections.length > 0
+      ? p.selections.map(s =>
+          `<span class="sel-chip">${s.qty > 1 ? s.qty + '× ' : ''}${s.name} (${s.points * s.qty}pt${s.points * s.qty !== 1 ? 's' : ''})</span>`
+        ).join('')
+      : '<span style="color:#aaa;font-size:12px">—</span>';
+
+    return `<tr>
+      <td><strong>${p.last_name}</strong>, ${p.first_name}</td>
+      <td><span class="pts-badge">${p.points}pt</span></td>
+      <td>${badge}</td>
+      <td>${ts}</td>
+      <td>${chips}</td>
+    </tr>`;
+  }).join('');
+}
+
+function loadData() {
+  document.getElementById('last-refresh-txt').textContent = 'Refreshing…';
+
+  fetch('/api/anniversary/admin/data')
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        document.getElementById('totals-body').innerHTML       = `<tr><td colspan="3" class="error-msg">${data.error}</td></tr>`;
+        document.getElementById('participants-body').innerHTML = `<tr><td colspan="5" class="error-msg">${data.error}</td></tr>`;
+        return;
+      }
+      _allParticipants = data.participants || [];
+      _awardTotals     = data.award_totals || {};
+
+      renderSummaryBar();
+      renderTotals();
+      renderParticipants();
+
+      const now = new Date();
+      document.getElementById('last-refresh-txt').textContent =
+        'Updated ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    })
+    .catch(err => {
+      document.getElementById('last-refresh-txt').textContent = 'Error loading data';
+      console.error(err);
+    });
+}
+
+// Initial load + auto-refresh every 60s
+loadData();
+setInterval(loadData, 60000);
+</script>
+</body>
+</html>

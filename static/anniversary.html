@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blue Alpha — 10 Year Anniversary Awards</title>
+<style>
+  :root {
+    --navy:  #1B2438;
+    --red:   #BD3333;
+    --cream: #DDD8C4;
+    --steel: #5B7FA0;
+    --light: #f4f2ec;
+    --gray:  #888;
+    --border:#d0ccc0;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--light); color: #222; min-height: 100vh; }
+
+  /* ── Header ── */
+  .header {
+    background: var(--navy);
+    color: #fff;
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .header-logo { font-size: 22px; font-weight: 900; letter-spacing: 3px; color: #fff; text-decoration: none; }
+  .header-divider { width: 2px; height: 32px; background: rgba(255,255,255,0.25); }
+  .header-title { font-size: 16px; font-weight: 600; color: var(--cream); letter-spacing: 0.5px; }
+
+  /* ── Screens ── */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ── Loading ── */
+  #screen-loading { text-align: center; padding: 80px 20px; }
+  .spinner {
+    width: 44px; height: 44px;
+    border: 4px solid var(--border);
+    border-top-color: var(--navy);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Error ── */
+  #screen-error { text-align: center; padding: 80px 20px; }
+  .error-box { display: inline-block; max-width: 420px; background: #fff; border: 2px solid var(--red); border-radius: 10px; padding: 32px; }
+  .error-box h2 { color: var(--red); margin-bottom: 10px; }
+  .error-box p { color: #555; line-height: 1.6; }
+
+  /* ── Already Submitted ── */
+  #screen-submitted { max-width: 700px; margin: 0 auto; padding: 40px 20px; }
+  .submitted-box { background: #fff; border-radius: 12px; padding: 36px; border: 2px solid #4caf50; }
+  .submitted-box h2 { color: #2e7d32; font-size: 22px; margin-bottom: 8px; }
+  .submitted-box .sub-meta { color: #666; font-size: 14px; margin-bottom: 24px; }
+  .sel-list { list-style: none; }
+  .sel-list li {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+    font-size: 15px;
+  }
+  .sel-list li:last-child { border-bottom: none; }
+  .sel-pts { background: var(--navy); color: #fff; font-size: 12px; font-weight: 700;
+             padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
+
+  /* ── Confirmation ── */
+  #screen-confirmation { max-width: 700px; margin: 0 auto; padding: 40px 20px; }
+  .confirm-box { background: #fff; border-radius: 12px; padding: 36px; text-align: center; }
+  .confirm-icon { font-size: 56px; margin-bottom: 16px; }
+  .confirm-box h2 { color: var(--navy); font-size: 24px; margin-bottom: 8px; }
+  .confirm-box p  { color: #555; margin-bottom: 24px; }
+  .confirm-sel-list { text-align: left; list-style: none; max-width: 400px; margin: 0 auto 20px; }
+  .confirm-sel-list li {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 15px;
+  }
+  .confirm-sel-list li:last-child { border-bottom: none; }
+
+  /* ── Picker Layout ── */
+  #screen-picker { display: none; }
+  #screen-picker.active { display: flex; flex-direction: column; min-height: calc(100vh - 64px); }
+
+  /* Employee bar */
+  .employee-bar {
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .emp-name { font-size: 18px; font-weight: 700; color: var(--navy); }
+  .emp-budget {
+    font-size: 14px; color: #555;
+    background: var(--cream); border-radius: 6px; padding: 4px 12px;
+  }
+  .emp-remaining {
+    font-size: 15px; font-weight: 700; margin-left: auto;
+    padding: 6px 16px; border-radius: 20px;
+    background: var(--navy); color: #fff;
+    transition: background 0.2s;
+  }
+  .emp-remaining.low { background: var(--red); }
+  .emp-remaining.zero { background: #888; }
+
+  /* Main content + sidebar */
+  .picker-body {
+    display: flex;
+    flex: 1;
+    gap: 0;
+    align-items: flex-start;
+  }
+
+  /* Award grid */
+  .awards-section { flex: 1; padding: 24px; min-width: 0; }
+  .awards-section h3 { color: var(--navy); font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
+  .awards-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  /* Award card */
+  .award-card {
+    background: #fff;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: border-color 0.15s, opacity 0.15s;
+    position: relative;
+  }
+  .award-card.grayed {
+    opacity: 0.45;
+    pointer-events: none; /* handled separately by JS for minus btn */
+  }
+  .award-card.grayed .qty-btn.minus-btn { pointer-events: auto; }
+  .award-card.has-qty { border-color: var(--steel); box-shadow: 0 0 0 2px rgba(91,127,160,0.2); }
+
+  .pts-badge {
+    display: inline-block;
+    background: var(--navy);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 3px 9px;
+    border-radius: 20px;
+    letter-spacing: 0.3px;
+    align-self: flex-start;
+  }
+  .award-category { font-size: 11px; color: var(--steel); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+  .award-name { font-size: 15px; font-weight: 700; color: var(--navy); line-height: 1.3; flex: 1; }
+  .amazon-link {
+    font-size: 12px; color: var(--steel); text-decoration: none; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .amazon-link:hover { color: var(--navy); text-decoration: underline; }
+
+  /* Qty controls */
+  .qty-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .qty-btn {
+    width: 32px; height: 32px;
+    border: 2px solid var(--navy);
+    background: #fff;
+    color: var(--navy);
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+    transition: background 0.1s, color 0.1s;
+  }
+  .qty-btn:hover:not(:disabled) { background: var(--navy); color: #fff; }
+  .qty-btn:disabled { border-color: #ccc; color: #ccc; cursor: not-allowed; }
+  .qty-display {
+    font-size: 18px; font-weight: 700; min-width: 24px; text-align: center; color: var(--navy);
+  }
+
+  /* Cart sidebar */
+  .cart-sidebar {
+    width: 300px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    padding: 24px 20px;
+    background: #fff;
+    border-left: 1px solid var(--border);
+    min-height: calc(100vh - 120px);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .cart-sidebar h3 { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: var(--navy); }
+  .cart-empty { color: #999; font-size: 14px; font-style: italic; flex: 1; }
+  .cart-items { list-style: none; flex: 1; }
+  .cart-items li {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; gap: 8px;
+  }
+  .cart-items li:last-child { border-bottom: none; }
+  .cart-item-name { flex: 1; color: #333; line-height: 1.3; }
+  .cart-item-pts  { font-weight: 700; color: var(--navy); white-space: nowrap; }
+  .cart-total-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-top: 12px; border-top: 2px solid var(--navy);
+    font-weight: 700; font-size: 15px; color: var(--navy);
+  }
+  .btn-submit {
+    width: 100%;
+    padding: 14px;
+    background: var(--red);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: background 0.15s;
+  }
+  .btn-submit:hover:not(:disabled) { background: #a02828; }
+  .btn-submit:disabled { background: #ccc; cursor: not-allowed; }
+
+  /* Mobile bottom bar */
+  .mobile-cart-bar {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--navy);
+    color: #fff;
+    padding: 14px 20px;
+    z-index: 100;
+    align-items: center;
+    gap: 12px;
+  }
+  .mobile-cart-bar .m-cart-info { flex: 1; font-size: 14px; }
+  .mobile-cart-bar .m-cart-info strong { display: block; font-size: 16px; }
+  .btn-submit-mobile {
+    background: var(--red);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-submit-mobile:disabled { background: #666; cursor: not-allowed; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .awards-grid { grid-template-columns: repeat(2, 1fr); }
+    .cart-sidebar { display: none; }
+    .mobile-cart-bar { display: flex; }
+    #screen-picker.active { padding-bottom: 72px; }
+  }
+  @media (max-width: 560px) {
+    .awards-grid { grid-template-columns: 1fr; }
+    .emp-remaining { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <span class="header-logo">BLUE ALPHA</span>
+  <div class="header-divider"></div>
+  <span class="header-title">🎉 10 Year Anniversary Awards</span>
+</header>
+
+<!-- Loading -->
+<div id="screen-loading" class="screen active">
+  <div class="spinner"></div>
+  <p style="color:#666">Loading your awards…</p>
+</div>
+
+<!-- Error -->
+<div id="screen-error" class="screen">
+  <div class="error-box">
+    <h2>Link Not Found</h2>
+    <p id="error-msg">This link is invalid or has expired. Please contact Patty for assistance.</p>
+  </div>
+</div>
+
+<!-- Already submitted (landing on used link) -->
+<div id="screen-submitted" class="screen">
+  <div class="submitted-box">
+    <h2>✅ You Already Submitted!</h2>
+    <p class="sub-meta" id="submitted-meta">Your selections were recorded.</p>
+    <p style="color:#444;margin-bottom:20px;font-size:14px;">Your order has been logged. Reach out to Patty if you have any questions.</p>
+    <ul class="sel-list" id="submitted-sel-list"></ul>
+  </div>
+</div>
+
+<!-- Confirmation (just submitted) -->
+<div id="screen-confirmation" class="screen">
+  <div class="confirm-box">
+    <div class="confirm-icon">🎊</div>
+    <h2>Selections Submitted!</h2>
+    <p>Thank you! Your award selections have been saved. Patty will take it from here.</p>
+    <ul class="confirm-sel-list" id="confirm-sel-list"></ul>
+    <p style="font-size:13px;color:#888;">Questions? Reach out to Patty.</p>
+  </div>
+</div>
+
+<!-- Picker -->
+<div id="screen-picker" class="screen">
+
+  <div class="employee-bar">
+    <span class="emp-name" id="emp-name"></span>
+    <span class="emp-budget" id="emp-budget"></span>
+    <span class="emp-remaining" id="emp-remaining">Loading…</span>
+  </div>
+
+  <div class="picker-body">
+    <!-- Award grid -->
+    <div class="awards-section">
+      <h3>Available Awards</h3>
+      <div class="awards-grid" id="awards-grid"></div>
+    </div>
+
+    <!-- Sidebar cart (desktop) -->
+    <aside class="cart-sidebar">
+      <h3>Your Selections</h3>
+      <p class="cart-empty" id="cart-empty-msg">No items selected yet.</p>
+      <ul class="cart-items" id="cart-items-list"></ul>
+      <div class="cart-total-row" id="cart-total-row" style="display:none">
+        <span>Total</span>
+        <span id="cart-total-pts">0 pts</span>
+      </div>
+      <button class="btn-submit" id="btn-submit" disabled>Submit Selections</button>
+    </aside>
+  </div>
+
+  <!-- Mobile bottom bar -->
+  <div class="mobile-cart-bar" id="mobile-cart-bar">
+    <div class="m-cart-info">
+      <strong id="m-remaining">-- pts left</strong>
+      <span id="m-cart-summary">Nothing selected</span>
+    </div>
+    <button class="btn-submit-mobile" id="btn-submit-mobile" disabled>Submit</button>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  // ── State ──────────────────────────────────────────────────────────────────
+  let token = null;
+  let budget = 0;
+  let awards = [];           // [{record_id, name, points, category, product_url}]
+  let quantities = {};       // {record_id: qty}
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function totalUsed() {
+    return Object.entries(quantities).reduce((sum, [rid, qty]) => {
+      const a = awards.find(x => x.record_id === rid);
+      return sum + (a ? a.points * qty : 0);
+    }, 0);
+  }
+
+  function remaining() { return budget - totalUsed(); }
+
+  function hasSelections() {
+    return Object.values(quantities).some(q => q > 0);
+  }
+
+  // ── Render helpers ─────────────────────────────────────────────────────────
+  function updateRemainingBar() {
+    const rem = remaining();
+    const el  = document.getElementById('emp-remaining');
+    el.textContent = `Remaining: ${rem} pt${rem !== 1 ? 's' : ''}`;
+    el.classList.toggle('low',  rem > 0 && rem < 3);
+    el.classList.toggle('zero', rem === 0);
+
+    // Mobile bar
+    document.getElementById('m-remaining').textContent = `${rem} pt${rem !== 1 ? 's' : ''} left`;
+  }
+
+  function updateCards() {
+    const rem = remaining();
+    awards.forEach(a => {
+      const card = document.getElementById(`card-${a.record_id}`);
+      const qty  = quantities[a.record_id] || 0;
+      if (!card) return;
+
+      // Gray out: can't afford AND none selected
+      const cantAffordMore = a.points > rem;
+      card.classList.toggle('grayed', cantAffordMore && qty === 0);
+      card.classList.toggle('has-qty', qty > 0);
+
+      // Qty display
+      card.querySelector('.qty-display').textContent = qty;
+
+      // + button: disable if adding 1 more would exceed budget
+      card.querySelector('.plus-btn').disabled  = cantAffordMore;
+      // - button: disable at 0
+      card.querySelector('.minus-btn').disabled = qty === 0;
+    });
+  }
+
+  function buildCartList() {
+    const list      = document.getElementById('cart-items-list');
+    const emptyMsg  = document.getElementById('cart-empty-msg');
+    const totalRow  = document.getElementById('cart-total-row');
+    const totalEl   = document.getElementById('cart-total-pts');
+    const mSummary  = document.getElementById('m-cart-summary');
+
+    const selected = awards.filter(a => (quantities[a.record_id] || 0) > 0);
+    list.innerHTML = '';
+
+    if (selected.length === 0) {
+      emptyMsg.style.display = '';
+      totalRow.style.display = 'none';
+      mSummary.textContent = 'Nothing selected';
+    } else {
+      emptyMsg.style.display = 'none';
+      totalRow.style.display = '';
+      let names = [];
+      selected.forEach(a => {
+        const qty = quantities[a.record_id];
+        const li  = document.createElement('li');
+        li.innerHTML = `<span class="cart-item-name">${qty > 1 ? qty + '× ' : ''}${a.name}</span>
+                        <span class="cart-item-pts">${a.points * qty} pt${a.points * qty !== 1 ? 's' : ''}</span>`;
+        list.appendChild(li);
+        names.push(qty > 1 ? `${qty}× ${a.name}` : a.name);
+      });
+      totalEl.textContent = `${totalUsed()} pts`;
+      mSummary.textContent = names.length <= 2 ? names.join(', ') : `${names[0]} + ${names.length - 1} more`;
+    }
+
+    const hasSel = selected.length > 0;
+    document.getElementById('btn-submit').disabled        = !hasSel;
+    document.getElementById('btn-submit-mobile').disabled = !hasSel;
+  }
+
+  function renderAll() {
+    updateRemainingBar();
+    updateCards();
+    buildCartList();
+  }
+
+  // ── Build award grid ───────────────────────────────────────────────────────
+  function buildGrid() {
+    const grid = document.getElementById('awards-grid');
+    grid.innerHTML = '';
+    awards.forEach(a => {
+      quantities[a.record_id] = 0;
+      const card = document.createElement('div');
+      card.className = 'award-card';
+      card.id = `card-${a.record_id}`;
+      card.innerHTML = `
+        <span class="pts-badge">${a.points} pt${a.points !== 1 ? 's' : ''}</span>
+        <span class="award-category">${a.category || ''}</span>
+        <span class="award-name">${a.name}</span>
+        ${a.product_url ? `<a class="amazon-link" href="${a.product_url}" target="_blank" rel="noopener">View on Amazon →</a>` : ''}
+        <div class="qty-row">
+          <button class="qty-btn minus-btn" data-id="${a.record_id}" aria-label="Remove one ${a.name}" disabled>−</button>
+          <span class="qty-display">0</span>
+          <button class="qty-btn plus-btn" data-id="${a.record_id}" aria-label="Add one ${a.name}">+</button>
+        </div>`;
+      grid.appendChild(card);
+    });
+
+    // Event delegation
+    grid.addEventListener('click', e => {
+      const btn = e.target.closest('.qty-btn');
+      if (!btn || btn.disabled) return;
+      const id = btn.dataset.id;
+      const a  = awards.find(x => x.record_id === id);
+      if (!a) return;
+      if (btn.classList.contains('plus-btn')) {
+        // Final guard: don't exceed budget
+        if (a.points > remaining()) return;
+        quantities[id] = (quantities[id] || 0) + 1;
+      } else {
+        quantities[id] = Math.max(0, (quantities[id] || 0) - 1);
+      }
+      renderAll();
+    });
+  }
+
+  // ── Submit ─────────────────────────────────────────────────────────────────
+  function doSubmit() {
+    const selected = awards.filter(a => (quantities[a.record_id] || 0) > 0);
+    if (selected.length === 0) return;
+
+    const msg = selected.map(a => `• ${quantities[a.record_id] > 1 ? quantities[a.record_id] + '× ' : ''}${a.name} (${a.points * quantities[a.record_id]} pts)`).join('\n');
+    if (!confirm(`Submit these selections?\n\n${msg}\n\nTotal: ${totalUsed()} pts\n\nYou cannot change your selections after submitting.`)) return;
+
+    // Disable buttons while submitting
+    document.getElementById('btn-submit').disabled = true;
+    document.getElementById('btn-submit-mobile').disabled = true;
+    document.getElementById('btn-submit').textContent = 'Submitting…';
+
+    const payload = {
+      token,
+      selections: selected.map(a => ({
+        record_id: a.record_id,
+        name:      a.name,
+        points:    a.points,
+        qty:       quantities[a.record_id],
+      })),
+    };
+
+    fetch('/api/anniversary/submit', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        // Show confirmation screen
+        const list = document.getElementById('confirm-sel-list');
+        list.innerHTML = payload.selections.map(s =>
+          `<li><span>${s.qty > 1 ? s.qty + '× ' : ''}${s.name}</span>
+               <span class="sel-pts">${s.points * s.qty} pts</span></li>`
+        ).join('');
+        show('screen-confirmation');
+      } else {
+        alert('Error: ' + (data.error || 'Unknown error. Please try again.'));
+        document.getElementById('btn-submit').disabled = false;
+        document.getElementById('btn-submit-mobile').disabled = false;
+        document.getElementById('btn-submit').textContent = 'Submit Selections';
+      }
+    })
+    .catch(err => {
+      alert('Network error. Please try again.\n' + err);
+      document.getElementById('btn-submit').disabled = false;
+      document.getElementById('btn-submit-mobile').disabled = false;
+      document.getElementById('btn-submit').textContent = 'Submit Selections';
+    });
+  }
+
+  document.getElementById('btn-submit').addEventListener('click', doSubmit);
+  document.getElementById('btn-submit-mobile').addEventListener('click', doSubmit);
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  function init() {
+    const params = new URLSearchParams(window.location.search);
+    token = params.get('t');
+
+    if (!token) {
+      document.getElementById('error-msg').textContent = 'No access token found in this link. Please use the personal link Patty sent you.';
+      show('screen-error');
+      return;
+    }
+
+    fetch(`/api/anniversary/info?t=${encodeURIComponent(token)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+          document.getElementById('error-msg').textContent = data.error;
+          show('screen-error');
+          return;
+        }
+
+        budget = data.points_budget;
+
+        // Already submitted?
+        if (data.already_submitted) {
+          const meta = document.getElementById('submitted-meta');
+          meta.textContent = `${data.first_name} ${data.last_name} — ${data.points_budget} pt budget`;
+          const list = document.getElementById('submitted-sel-list');
+          const sels = data.selections || [];
+          if (sels.length > 0) {
+            list.innerHTML = sels.map(s =>
+              `<li><span>${s.qty > 1 ? s.qty + '× ' : ''}${s.name}</span>
+                   <span class="sel-pts">${s.points * s.qty} pts</span></li>`
+            ).join('');
+          } else {
+            list.innerHTML = '<li><em style="color:#888">No selection details on file.</em></li>';
+          }
+          show('screen-submitted');
+          return;
+        }
+
+        // Setup picker
+        awards = data.awards;
+        document.getElementById('emp-name').textContent = `${data.first_name} ${data.last_name}`;
+        document.getElementById('emp-budget').textContent = `${data.points_budget} pt${data.points_budget !== 1 ? 's' : ''} to spend`;
+
+        buildGrid();
+        renderAll();
+        show('screen-picker');
+      })
+      .catch(err => {
+        document.getElementById('error-msg').textContent = 'Could not load your awards. Please refresh and try again.';
+        show('screen-error');
+        console.error(err);
+      });
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

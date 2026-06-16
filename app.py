@@ -11901,3 +11901,240 @@ def warranty_webhook():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ANNIVERSARY AWARD PICKER
+# Base: Automated Data (app3xt0dghBWnHxdN) — separate from ops base
+# Tables created manually — set env vars after Airtable setup:
+#   ANNIVERSARY_AWARDS_TABLE_ID        (Anniversary Awards table)
+#   ANNIVERSARY_PARTICIPANTS_TABLE_ID  (Anniversary Participants table)
+# Token: SO_TRACKING_WRITE_TOKEN (Railway) — used for both reads and writes
+#        since patVc6ShozxQ6mrkp does not have access to the Automated Data base
+# ─────────────────────────────────────────────────────────────────────────────
+
+ANNIVERSARY_BASE_ID               = "app3xt0dghBWnHxdN"
+ANNIVERSARY_AWARDS_TABLE_ID       = os.environ.get("ANNIVERSARY_AWARDS_TABLE_ID", "tbl_REPLACE_AWARDS")
+ANNIVERSARY_PARTICIPANTS_TABLE_ID = os.environ.get("ANNIVERSARY_PARTICIPANTS_TABLE_ID", "tbl_REPLACE_PARTICIPANTS")
+ANNIVERSARY_WRITE_TOKEN           = os.environ.get("SO_TRACKING_WRITE_TOKEN", "")
+
+@app.route("/anniversary")
+def anniversary_page():
+    return send_from_directory("static", "anniversary.html")
+
+@app.route("/anniversary/admin")
+def anniversary_admin_page():
+    return send_from_directory("static", "anniversary-admin.html")
+
+@app.route("/api/anniversary/info")
+def anniversary_info():
+    c = cors()
+    token = request.args.get("t", "").strip()
+    if not token:
+        return Response(json.dumps({"error": "Missing token"}),
+                        status=400, headers=c, mimetype="application/json")
+
+    read_token = ANNIVERSARY_WRITE_TOKEN
+
+    # Look up participant by Token field
+    try:
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{ANNIVERSARY_BASE_ID}/{ANNIVERSARY_PARTICIPANTS_TABLE_ID}",
+            headers=at_headers(read_token),
+            params={"filterByFormula": f"{{Token}}='{token}'", "maxRecords": 1},
+            timeout=10,
+        )
+        records = r.json().get("records", [])
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
+
+    if not records:
+        return Response(json.dumps({"error": "Invalid or expired link"}),
+                        status=404, headers=c, mimetype="application/json")
+
+    rec   = records[0]
+    f     = rec.get("fields", {})
+    first_name       = f.get("First Name", "")
+    last_name        = f.get("Last Name", "")
+    points_budget    = int(f.get("Points") or 0)
+    already_submitted = bool(f.get("Submitted"))
+    selections = None
+    if already_submitted:
+        sel_json = f.get("Selections JSON", "")
+        if sel_json:
+            try:
+                selections = json.loads(sel_json)
+            except Exception:
+                selections = []
+
+    # Fetch all active awards and filter client-side by budget
+    try:
+        award_records = at_get_all(
+            ANNIVERSARY_AWARDS_TABLE_ID, read_token,
+            fields=["Name", "Points", "Category", "Active", "Product URL"],
+            formula="{Active}=TRUE()",
+            base_id=ANNIVERSARY_BASE_ID,
+        )
+    except Exception as e:
+        return Response(json.dumps({"error": f"Could not load awards: {str(e)}"}),
+                        status=500, headers=c, mimetype="application/json")
+
+    awards = []
+    for ar in award_records:
+        af  = ar.get("fields", {})
+        pts = int(af.get("Points") or 0)
+        if pts <= points_budget:
+            awards.append({
+                "record_id":   ar["id"],
+                "name":        af.get("Name", ""),
+                "points":      pts,
+                "category":    af.get("Category", ""),
+                "product_url": af.get("Product URL", "") or "",
+            })
+
+    awards.sort(key=lambda x: (x["points"], x["name"]))
+
+    resp = {
+        "first_name":       first_name,
+        "last_name":        last_name,
+        "points_budget":    points_budget,
+        "already_submitted": already_submitted,
+        "awards":           awards,
+    }
+    if selections is not None:
+        resp["selections"] = selections
+
+    return Response(json.dumps(resp), headers=c, mimetype="application/json")
+
+
+@app.route("/api/anniversary/submit", methods=["POST", "OPTIONS"])
+def anniversary_submit():
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(),
+                        "Access-Control-Allow-Headers": "Content-Type",
+                        "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    data       = request.get_json() or {}
+    token      = data.get("token", "").strip()
+    selections = data.get("selections", [])   # [{record_id, name, points, qty}]
+
+    if not token:
+        return Response(json.dumps({"error": "Missing token"}),
+                        status=400, headers=c, mimetype="application/json")
+    if not selections:
+        return Response(json.dumps({"error": "No selections provided"}),
+                        status=400, headers=c, mimetype="application/json")
+
+    read_token = ANNIVERSARY_WRITE_TOKEN
+
+    # Look up participant
+    try:
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{ANNIVERSARY_BASE_ID}/{ANNIVERSARY_PARTICIPANTS_TABLE_ID}",
+            headers=at_headers(read_token),
+            params={"filterByFormula": f"{{Token}}='{token}'", "maxRecords": 1},
+            timeout=10,
+        )
+        records = r.json().get("records", [])
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
+
+    if not records:
+        return Response(json.dumps({"error": "Invalid token"}),
+                        status=404, headers=c, mimetype="application/json")
+
+    rec           = records[0]
+    f             = rec.get("fields", {})
+    record_id     = rec["id"]
+    points_budget = int(f.get("Points") or 0)
+
+    if f.get("Submitted"):
+        return Response(json.dumps({"error": "Already submitted"}),
+                        status=409, headers=c, mimetype="application/json")
+
+    # Validate total points <= budget
+    total_pts = sum(int(s.get("points", 0)) * int(s.get("qty", 1)) for s in selections)
+    if total_pts > points_budget:
+        return Response(
+            json.dumps({"error": f"Total ({total_pts} pts) exceeds budget ({points_budget} pts)"}),
+            status=400, headers=c, mimetype="application/json")
+
+    from datetime import datetime, timezone
+    submitted_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+    try:
+        patch_r = req_lib.patch(
+            f"https://api.airtable.com/v0/{ANNIVERSARY_BASE_ID}/{ANNIVERSARY_PARTICIPANTS_TABLE_ID}/{record_id}",
+            headers={**at_headers(ANNIVERSARY_WRITE_TOKEN), "Content-Type": "application/json"},
+            json={"fields": {
+                "Submitted":      True,
+                "Submitted At":   submitted_at,
+                "Selections JSON": json.dumps(selections),
+            }},
+            timeout=10,
+        )
+        if patch_r.status_code not in (200, 201):
+            return Response(json.dumps({"error": patch_r.text}),
+                            status=500, headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
+
+    return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+
+
+@app.route("/api/anniversary/admin/data")
+def anniversary_admin_data():
+    c = cors()
+    read_token = ANNIVERSARY_WRITE_TOKEN
+
+    try:
+        participant_records = at_get_all(
+            ANNIVERSARY_PARTICIPANTS_TABLE_ID, read_token,
+            fields=["First Name", "Last Name", "Points",
+                    "Submitted", "Submitted At", "Selections JSON"],
+            base_id=ANNIVERSARY_BASE_ID,
+        )
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}),
+                        status=500, headers=c, mimetype="application/json")
+
+    participants  = []
+    award_totals  = {}   # {name: {qty, points}}
+
+    for rec in participant_records:
+        f         = rec.get("fields", {})
+        submitted = bool(f.get("Submitted"))
+        sels      = []
+        if submitted:
+            sel_json = f.get("Selections JSON", "")
+            if sel_json:
+                try:
+                    sels = json.loads(sel_json)
+                    for s in sels:
+                        nm  = s.get("name", "")
+                        qty = int(s.get("qty", 1))
+                        pts = int(s.get("points", 0))
+                        if nm not in award_totals:
+                            award_totals[nm] = {"qty": 0, "points": pts}
+                        award_totals[nm]["qty"] += qty
+                except Exception:
+                    pass
+        participants.append({
+            "record_id":    rec["id"],
+            "first_name":   f.get("First Name", ""),
+            "last_name":    f.get("Last Name", ""),
+            "points":       int(f.get("Points") or 0),
+            "submitted":    submitted,
+            "submitted_at": f.get("Submitted At", ""),
+            "selections":   sels,
+        })
+
+    participants.sort(key=lambda x: (x["last_name"], x["first_name"]))
+
+    return Response(json.dumps({
+        "participants": participants,
+        "award_totals": award_totals,
+    }), headers=c, mimetype="application/json")
