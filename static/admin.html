@@ -61,7 +61,7 @@
       text-align: center;
     }
     #adminContent { display: none; }
-    .container { max-width: 1000px; margin: 0 auto; padding: 36px 20px 80px; }
+    .container { max-width: 1400px; margin: 0 auto; padding: 36px 32px 80px; }
     label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; }
     .pw-wrap { position: relative; }
     .pw-wrap input { padding-right: 40px !important; }
@@ -1294,16 +1294,18 @@
         el.innerHTML = '<div class="empty-state">No invoices found.</div>';
         return;
       }
-      let html = '<div class="card"><table style="width:100%;"><thead><tr>'
-        + '<th style="min-width:100px;">Invoice #</th>'
-        + '<th style="min-width:200px;">Customer</th>'
-        + '<th style="min-width:100px;">Date</th>'
-        + '<th style="min-width:90px;">Total</th>'
-        + '<th style="min-width:80px;">Status</th>'
-        + '<th style="min-width:60px;">PDF</th>'
-        + '<th style="min-width:105px;">Payment</th>'
-        + '<th style="min-width:90px;">Resend</th>'
-        + '<th style="min-width:95px;">Stripe</th>'
+      let html = '<div class="card"><table style="width:100%;table-layout:fixed;"><colgroup>'
+        + '<col style="width:110px">'   // Invoice #
+        + '<col>'                        // Customer — fills remaining
+        + '<col style="width:110px">'   // Date
+        + '<col style="width:100px">'   // Total
+        + '<col style="width:85px">'    // Status
+        + '<col style="width:70px">'    // PDF
+        + '<col style="width:115px">'   // Payment
+        + '<col style="width:100px">'   // Resend
+        + '<col style="width:105px">'   // Stripe
+        + '</colgroup><thead><tr>'
+        + '<th>Invoice #</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th><th>PDF</th><th>Payment</th><th>Resend</th><th>Stripe</th>'
         + '</tr></thead><tbody>';
       invoices.forEach(inv => {
         const statusBadge = inv.is_paid
