@@ -479,6 +479,26 @@
   </div>
 
   <!-- Mark Paid by Check Modal -->
+  <!-- Resend Invoice Modal -->
+  <div class="modal-overlay" id="resendInvoiceModal">
+    <div class="modal">
+      <h3>Resend Invoice Email</h3>
+      <p id="resendInvoiceLabel" style="margin:0 0 14px;color:var(--muted);font-size:0.9rem;"></p>
+      <a id="resendPdfLink" href="#" target="_blank"
+         style="display:inline-block;margin-bottom:16px;font-size:0.88rem;color:#1B2438;text-decoration:underline;">
+        📄 Preview PDF
+      </a>
+      <label>Send To</label>
+      <input type="email" id="resendEmailInput" placeholder="billing@example.com"
+             style="width:100%;box-sizing:border-box;" autocomplete="off">
+      <div id="resendMsg"></div>
+      <div class="modal-btns" style="margin-top:14px;">
+        <button class="btn btn-outline" onclick="closeResendModal()">Cancel</button>
+        <button class="btn btn-primary" id="resendSubmitBtn" onclick="submitResend()">Send</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="markPaidModal">
     <div class="modal">
       <h3>Mark Paid by Check</h3>
@@ -1287,7 +1307,7 @@
         } else if (inv.check_number) {
           actions = `<small style="color:var(--muted);">Check #${esc(inv.check_number)}</small> `;
         }
-        actions += `<button class="btn btn-outline btn-sm" id="resend-btn-${esc(inv.record_id)}" onclick="resendInvoice('${esc(inv.record_id)}','${esc(inv.inv_number)}',this)" style="margin-left:4px;">📧 Resend</button>`;
+        actions += `<button class="btn btn-outline btn-sm" onclick="openResendModal('${esc(inv.record_id)}','${esc(inv.inv_number)}','${esc(inv.billing_email||'')}')" style="margin-left:4px;">📧 Resend</button>`;
         if (!inv.has_stripe) {
           actions += ` <button class="btn btn-outline btn-sm" onclick="createStripeInvoices('${esc(inv.record_id)}','${esc(inv.inv_number)}',this)" style="margin-left:4px;color:#6b4c00;border-color:#c9960c;">⚡ Create Stripe</button>`;
         }
@@ -1322,27 +1342,56 @@
       document.getElementById('markPaidModal').classList.remove('show');
     }
 
-    async function resendInvoice(recordId, invNumber, btn) {
-      if (!confirm(`Resend invoice email for ${invNumber}?`)) return;
-      const orig = btn.textContent;
+    let _resendRecordId = null;
+
+    function openResendModal(recordId, invNumber, billingEmail) {
+      _resendRecordId = recordId;
+      document.getElementById('resendInvoiceLabel').textContent = `Invoice: ${invNumber}`;
+      document.getElementById('resendPdfLink').href = `/invoice-pdf/${recordId}`;
+      document.getElementById('resendEmailInput').value = billingEmail || '';
+      document.getElementById('resendMsg').innerHTML = '';
+      const btn = document.getElementById('resendSubmitBtn');
+      btn.disabled = false;
+      btn.textContent = 'Send';
+      document.getElementById('resendInvoiceModal').classList.add('show');
+    }
+
+    function closeResendModal() {
+      _resendRecordId = null;
+      document.getElementById('resendInvoiceModal').classList.remove('show');
+    }
+
+    async function submitResend() {
+      const email = document.getElementById('resendEmailInput').value.trim();
+      const msgEl = document.getElementById('resendMsg');
+      msgEl.innerHTML = '';
+      if (!email) {
+        msgEl.innerHTML = '<div class="alert alert-error" style="margin-top:10px;">Email address is required.</div>';
+        return;
+      }
+      const btn = document.getElementById('resendSubmitBtn');
       btn.disabled = true;
       btn.textContent = 'Sending…';
       try {
-        const resp = await fetch(`/api/admin/invoices/${recordId}/resend`, { method: 'POST' });
+        const resp = await fetch(`/api/admin/invoices/${_resendRecordId}/resend`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
         const data = await resp.json();
         if (resp.ok && data.ok) {
+          msgEl.innerHTML = '<div class="alert alert-success" style="margin-top:10px;">✓ Invoice sent!</div>';
           btn.textContent = '✓ Sent';
-          btn.style.color = '#155724';
-          setTimeout(() => { btn.textContent = orig; btn.style.color = ''; btn.disabled = false; }, 3000);
+          setTimeout(() => closeResendModal(), 1500);
         } else {
-          alert(`Failed to resend: ${data.error || 'Unknown error'}`);
-          btn.textContent = orig;
+          msgEl.innerHTML = `<div class="alert alert-error" style="margin-top:10px;">${data.error || 'Failed to send.'}</div>`;
           btn.disabled = false;
+          btn.textContent = 'Send';
         }
       } catch (e) {
-        alert('Network error. Please try again.');
-        btn.textContent = orig;
+        msgEl.innerHTML = '<div class="alert alert-error" style="margin-top:10px;">Network error. Please try again.</div>';
         btn.disabled = false;
+        btn.textContent = 'Send';
       }
     }
 

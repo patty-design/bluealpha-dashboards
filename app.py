@@ -11139,6 +11139,7 @@ def admin_invoices():
             if not snapshot_org:
                 linked_custs = f.get("Customer", [])
                 snapshot_org = cust_name_map.get(linked_custs[0], "") if linked_custs else ""
+            bill_email_raw = f.get("Bill-To Contact Email (from Customer)", [])
             invoices.append({
                 "record_id":     rec["id"],
                 "inv_number":    inv_number,
@@ -11152,6 +11153,7 @@ def admin_invoices():
                 "check_date":    check_date,
                 "check_amount":  check_amount,
                 "has_stripe":    bool(f.get("Stripe Invoice URL (CC)", "")),
+                "billing_email": bill_email_raw[0] if isinstance(bill_email_raw, list) and bill_email_raw else (bill_email_raw or ""),
             })
 
         invoices.sort(key=lambda x: x.get("date", ""), reverse=True)
@@ -11335,6 +11337,12 @@ def admin_resend_invoice(record_id):
         to_email   = _first(fields.get("Bill-To Contact Email (from Customer)", []))
         to_name    = _first(fields.get("Bill-To Contact Name (from Customer)", []))
         org_name   = _first(fields.get("Bill-To Org Name (from Customer)", []))
+
+        # Allow caller to override the destination email
+        body = request.get_json(silent=True) or {}
+        override_email = (body.get("email") or "").strip()
+        if override_email:
+            to_email = override_email
 
         if not to_email:
             return Response(json.dumps({"error": "No billing email on record"}), status=400, headers=c, mimetype="application/json")
