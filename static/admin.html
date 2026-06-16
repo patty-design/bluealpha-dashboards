@@ -1283,10 +1283,11 @@
           : '<span class="badge" style="background:#f8d7da;color:#721c24;">UNPAID</span>';
         let actions = '';
         if (!inv.is_paid) {
-          actions = `<button class="btn btn-outline btn-sm" onclick="openMarkPaidModal('${esc(inv.record_id)}')">Mark Paid by Check</button>`;
+          actions = `<button class="btn btn-outline btn-sm" onclick="openMarkPaidModal('${esc(inv.record_id)}')">Mark Paid by Check</button> `;
         } else if (inv.check_number) {
-          actions = `<small style="color:var(--muted);">Check #${esc(inv.check_number)}</small>`;
+          actions = `<small style="color:var(--muted);">Check #${esc(inv.check_number)}</small> `;
         }
+        actions += `<button class="btn btn-outline btn-sm" id="resend-btn-${esc(inv.record_id)}" onclick="resendInvoice('${esc(inv.record_id)}','${esc(inv.inv_number)}',this)" style="margin-left:4px;">📧 Resend</button>`;
         html += `<tr>
           <td><strong>${esc(inv.inv_number)}</strong></td>
           <td>${esc(inv.so_number)}</td>
@@ -1316,6 +1317,30 @@
     function closeMarkPaidModal() {
       markPaidRecordId = null;
       document.getElementById('markPaidModal').classList.remove('show');
+    }
+
+    async function resendInvoice(recordId, invNumber, btn) {
+      if (!confirm(`Resend invoice email for ${invNumber}?`)) return;
+      const orig = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      try {
+        const resp = await fetch(`/api/admin/invoices/${recordId}/resend`, { method: 'POST' });
+        const data = await resp.json();
+        if (resp.ok && data.ok) {
+          btn.textContent = '✓ Sent';
+          btn.style.color = '#155724';
+          setTimeout(() => { btn.textContent = orig; btn.style.color = ''; btn.disabled = false; }, 3000);
+        } else {
+          alert(`Failed to resend: ${data.error || 'Unknown error'}`);
+          btn.textContent = orig;
+          btn.disabled = false;
+        }
+      } catch (e) {
+        alert('Network error. Please try again.');
+        btn.textContent = orig;
+        btn.disabled = false;
+      }
     }
 
     async function submitMarkPaid() {

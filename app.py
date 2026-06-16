@@ -4246,7 +4246,7 @@ def send_quote_accepted_email(to_email, to_name, org_name, qu_number, so_number)
         print(f"[send_quote_accepted_email] failed: {e}")
 
 
-def send_invoice_email(to_email, to_name, org_name, so_number, inv_number, line_items, total, tracking, ship_date=None):
+def send_invoice_email(to_email, to_name, org_name, so_number, inv_number, line_items, total, tracking, ship_date=None, pdf_bytes=None):
     """Send invoice email after SO is converted to invoice."""
     if not SENDGRID_API_KEY:
         return
@@ -4370,15 +4370,24 @@ def send_invoice_email(to_email, to_name, org_name, so_number, inv_number, line_
 </body>
 </html>"""
     try:
+        import base64 as _b64
+        payload = {
+            "personalizations": [{"to": to_list}],
+            "from": {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
+            "subject": subject,
+            "content": [{"type": "text/html", "value": html_body}],
+        }
+        if pdf_bytes:
+            payload["attachments"] = [{
+                "content":     _b64.b64encode(pdf_bytes).decode("utf-8"),
+                "type":        "application/pdf",
+                "filename":    f"{inv_number}.pdf",
+                "disposition": "attachment",
+            }]
         req_lib.post(
             "https://api.sendgrid.com/v3/mail/send",
             headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
-            json={
-                "personalizations": [{"to": to_list}],
-                "from": {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
-                "subject": subject,
-                "content": [{"type": "text/html", "value": html_body}],
-            },
+            json=payload,
             timeout=15,
         )
     except Exception as e:
@@ -10104,8 +10113,36 @@ def portal_admin_convert_to_invoice(user, record_id):
 
         if to_email:
             try:
+                def _fso(lst):
+                    return lst[0] if isinstance(lst, list) and lst else (lst or "")
+                ship_city  = _fso(so_fields.get("Customer City (from Customer)", []))
+                ship_state = _fso(so_fields.get("Customer State (from Customer)", []))
+                ship_zip   = _fso(so_fields.get("Customer Zip Code (from Customer)", []))
+                ship_csz   = ", ".join(filter(None, [ship_city, f"{ship_state} {ship_zip}".strip()]))
+                inv_dict = {
+                    "invNumber":    inv_number,
+                    "soNumber":     so_number,
+                    "date":         so_fields.get("Date", ""),
+                    "poNumber":     so_fields.get("Purchase Order #", ""),
+                    "orgName":      org_name,
+                    "contact":      to_name,
+                    "addr1":        _fso(so_fields.get("Bill-To Address (Line 1) (from Customer)", [])),
+                    "addr2":        _fso(so_fields.get("Bill-To Address (Line 2) (from Customer)", [])),
+                    "shipOrg":      _fso(so_fields.get("Organization Name (from Customer)", [])),
+                    "shipName":     _fso(so_fields.get("Main Contact Name (from Customer)", [])),
+                    "shipAddr1":    _fso(so_fields.get("Customer Address (Line 1) (from Customer)", [])),
+                    "shipAddr2":    _fso(so_fields.get("Customer Address (Line 2) (from Customer)", [])) or ship_csz,
+                    "tracking":     tracking,
+                    "shipDate":     ship_date,
+                    "lineItems":    email_line_items,
+                    "subtotal":     total,
+                    "stripeCcUrl":  "",
+                    "stripeAchUrl": "",
+                }
+                inv_pdf_bytes = _build_invoice_pdf_bytes(inv_dict)
                 send_invoice_email(to_email, to_name, org_name, so_number, inv_number,
-                                   email_line_items, total, tracking, ship_date=ship_date)
+                                   email_line_items, total, tracking, ship_date=ship_date,
+                                   pdf_bytes=inv_pdf_bytes)
             except Exception as email_err:
                 print(f"[convert-to-invoice] email failed: {email_err}")
 
@@ -10643,11 +10680,37 @@ def admin_convert_to_invoice(record_id):
 
         total = round(sum(i["qty"] * i["unit_price"] for i in li_items_for_email), 2)
 
-        # Send invoice email
+        # Send invoice email with PDF attachment
         if bill_email:
             try:
+                ship_city  = _first(so_fields.get("Customer City (from Customer)", []))
+                ship_state = _first(so_fields.get("Customer State (from Customer)", []))
+                ship_zip   = _first(so_fields.get("Customer Zip Code (from Customer)", []))
+                ship_csz   = ", ".join(filter(None, [ship_city, f"{ship_state} {ship_zip}".strip()]))
+                inv_dict = {
+                    "invNumber":    inv_number,
+                    "soNumber":     so_number,
+                    "date":         so_fields.get("Date", ""),
+                    "poNumber":     so_fields.get("Purchase Order #", ""),
+                    "orgName":      org_name,
+                    "contact":      bill_name,
+                    "addr1":        _first(so_fields.get("Bill-To Address (Line 1) (from Customer)", [])),
+                    "addr2":        _first(so_fields.get("Bill-To Address (Line 2) (from Customer)", [])),
+                    "shipOrg":      _first(so_fields.get("Organization Name (from Customer)", [])),
+                    "shipName":     _first(so_fields.get("Main Contact Name (from Customer)", [])),
+                    "shipAddr1":    _first(so_fields.get("Customer Address (Line 1) (from Customer)", [])),
+                    "shipAddr2":    _first(so_fields.get("Customer Address (Line 2) (from Customer)", [])) or ship_csz,
+                    "tracking":     tracking,
+                    "shipDate":     ship_date,
+                    "lineItems":    li_items_for_email,
+                    "subtotal":     total,
+                    "stripeCcUrl":  "",
+                    "stripeAchUrl": "",
+                }
+                inv_pdf_bytes = _build_invoice_pdf_bytes(inv_dict)
                 send_invoice_email(bill_email, bill_name, org_name, so_number, inv_number,
-                                   li_items_for_email, total, tracking, ship_date=ship_date)
+                                   li_items_for_email, total, tracking, ship_date=ship_date,
+                                   pdf_bytes=inv_pdf_bytes)
             except Exception as email_err:
                 print(f"[convert-to-invoice] email failed: {email_err}")
 
@@ -11127,6 +11190,105 @@ def admin_mark_invoice_paid_check(record_id):
                 status=500, headers=c, mimetype="application/json",
             )
         _INVOICES_CACHE.clear()
+        return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/admin/invoices/<record_id>/resend", methods=["POST", "OPTIONS"])
+def admin_resend_invoice(record_id):
+    """Resend the invoice email (with PDF) for an existing invoice record."""
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type",
+                                     "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    if not check_admin_session(request):
+        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+    try:
+        read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+
+        # Fetch the invoice record
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+            headers=at_headers(read_token), timeout=15,
+        )
+        if not r.ok:
+            return Response(json.dumps({"error": "Invoice not found"}), status=404, headers=c, mimetype="application/json")
+        fields = r.json().get("fields", {})
+        if fields.get("Order Type") != "Invoice":
+            return Response(json.dumps({"error": "Not an invoice"}), status=400, headers=c, mimetype="application/json")
+
+        def _first(lst):
+            return lst[0] if isinstance(lst, list) and lst else (lst or "")
+
+        order_id   = str(fields.get("Order ID", "")).strip()
+        inv_number = fields.get("Document ID", f"IN-{order_id}")
+        so_number  = f"SO-{order_id}" if order_id else ""
+
+        # Get tracking + ship date
+        tracking = ship_date = ""
+        tracking_recs = at_get_all(_SO_TRACKING_TABLE, _SO_TRACKING_TOKEN,
+                                    fields=["Order #", "Tracking #", "Ship Date"], base_id=_SO_TRACKING_BASE)
+        for tr in tracking_recs:
+            if tr.get("fields", {}).get("Order #", "").strip() == so_number:
+                tracking  = tr["fields"].get("Tracking #", "")
+                ship_date = tr["fields"].get("Ship Date", "")
+                break
+        if not tracking:
+            tracking = fields.get("Tracking #", "") or fields.get("Tracking", "")
+
+        # Fetch line items
+        li_ids = fields.get("MO Line Items", [])
+        line_items = []
+        for li_id in li_ids:
+            lr = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+                headers=at_headers(read_token), timeout=10,
+            )
+            if lr.ok:
+                lf = lr.json().get("fields", {})
+                pname = _first(lf.get("Product Name (from Product SKU)", [])) or \
+                        _first(lf.get("Name + Variations (from Product SKU)", [])) or "Item"
+                price = float(lf.get("Confirmed Unit Price") or 0)
+                qty   = lf.get("Qty.", 0)
+                line_items.append({"name": pname, "qty": qty, "unit_price": price})
+
+        total      = round(sum(li["qty"] * li["unit_price"] for li in line_items), 2)
+        to_email   = _first(fields.get("Bill-To Contact Email (from Customer)", []))
+        to_name    = _first(fields.get("Bill-To Contact Name (from Customer)", []))
+        org_name   = _first(fields.get("Bill-To Org Name (from Customer)", []))
+
+        if not to_email:
+            return Response(json.dumps({"error": "No billing email on record"}), status=400, headers=c, mimetype="application/json")
+
+        ship_city  = _first(fields.get("Customer City (from Customer)", []))
+        ship_state = _first(fields.get("Customer State (from Customer)", []))
+        ship_zip   = _first(fields.get("Customer Zip Code (from Customer)", []))
+        ship_csz   = ", ".join(filter(None, [ship_city, f"{ship_state} {ship_zip}".strip()]))
+
+        inv_dict = {
+            "invNumber":    inv_number,
+            "soNumber":     so_number,
+            "date":         fields.get("Date", ""),
+            "poNumber":     fields.get("Purchase Order #", ""),
+            "orgName":      org_name,
+            "contact":      to_name,
+            "addr1":        _first(fields.get("Bill-To Address (Line 1) (from Customer)", [])),
+            "addr2":        _first(fields.get("Bill-To Address (Line 2) (from Customer)", [])),
+            "shipOrg":      _first(fields.get("Organization Name (from Customer)", [])),
+            "shipName":     _first(fields.get("Main Contact Name (from Customer)", [])),
+            "shipAddr1":    _first(fields.get("Customer Address (Line 1) (from Customer)", [])),
+            "shipAddr2":    _first(fields.get("Customer Address (Line 2) (from Customer)", [])) or ship_csz,
+            "tracking":     tracking,
+            "shipDate":     ship_date,
+            "lineItems":    line_items,
+            "subtotal":     total,
+            "stripeCcUrl":  fields.get("Stripe Invoice URL (CC)", ""),
+            "stripeAchUrl": fields.get("Stripe Invoice URL (ACH)", ""),
+        }
+        pdf_bytes = _build_invoice_pdf_bytes(inv_dict)
+        send_invoice_email(to_email, to_name, org_name, so_number, inv_number,
+                           line_items, total, tracking, ship_date=ship_date, pdf_bytes=pdf_bytes)
         return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
