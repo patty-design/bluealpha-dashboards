@@ -1288,6 +1288,9 @@
           actions = `<small style="color:var(--muted);">Check #${esc(inv.check_number)}</small> `;
         }
         actions += `<button class="btn btn-outline btn-sm" id="resend-btn-${esc(inv.record_id)}" onclick="resendInvoice('${esc(inv.record_id)}','${esc(inv.inv_number)}',this)" style="margin-left:4px;">📧 Resend</button>`;
+        if (!inv.has_stripe) {
+          actions += ` <button class="btn btn-outline btn-sm" onclick="createStripeInvoices('${esc(inv.record_id)}','${esc(inv.inv_number)}',this)" style="margin-left:4px;color:#6b4c00;border-color:#c9960c;">⚡ Create Stripe</button>`;
+        }
         html += `<tr>
           <td><strong>${esc(inv.inv_number)}</strong></td>
           <td>${esc(inv.so_number)}</td>
@@ -1333,6 +1336,31 @@
           setTimeout(() => { btn.textContent = orig; btn.style.color = ''; btn.disabled = false; }, 3000);
         } else {
           alert(`Failed to resend: ${data.error || 'Unknown error'}`);
+          btn.textContent = orig;
+          btn.disabled = false;
+        }
+      } catch (e) {
+        alert('Network error. Please try again.');
+        btn.textContent = orig;
+        btn.disabled = false;
+      }
+    }
+
+    async function createStripeInvoices(recordId, invNumber, btn) {
+      if (!confirm(`Create Stripe CC + ACH invoices for ${invNumber}?`)) return;
+      const orig = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Creating…';
+      try {
+        const resp = await fetch(`/api/admin/invoices/${recordId}/create-stripe`, { method: 'POST' });
+        const data = await resp.json();
+        if (resp.ok && data.ok) {
+          btn.textContent = '✓ Created';
+          btn.style.color = '#155724';
+          btn.style.borderColor = '#155724';
+          setTimeout(() => { invoicesLoaded = false; loadInvoices(); }, 1500);
+        } else {
+          alert(`Failed: ${data.error || 'Unknown error'}`);
           btn.textContent = orig;
           btn.disabled = false;
         }

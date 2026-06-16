@@ -11076,7 +11076,9 @@ def admin_invoices():
             fields=["Document ID", "Order ID", "Date", "Snapshot Org", "MO Line Items",
                     "Invoice Paid", "Check #", "Check Date", "Check Payment Amount",
                     "Stripe Invoice Status (CC)", "Stripe Invoice Status (ACH)",
-                    "Stripe Invoice Due Date"],
+                    "Stripe Invoice URL (CC)", "Stripe Invoice Due Date",
+                    "Bill-To Contact Email (from Customer)", "Bill-To Contact Name (from Customer)",
+                    "Bill-To Org Name (from Customer)"],
             formula='{Order Type}="Invoice"',
         )
 
@@ -11149,10 +11151,86 @@ def admin_invoices():
                 "check_number":  check_number,
                 "check_date":    check_date,
                 "check_amount":  check_amount,
+                "has_stripe":    bool(f.get("Stripe Invoice URL (CC)", "")),
             })
 
         invoices.sort(key=lambda x: x.get("date", ""), reverse=True)
         return Response(json.dumps({"invoices": invoices}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
+
+
+@app.route("/api/admin/invoices/<record_id>/create-stripe", methods=["POST", "OPTIONS"])
+def admin_create_stripe_invoices(record_id):
+    """Create Stripe CC + ACH invoices for an invoice record that is missing them."""
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type",
+                                     "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    if not check_admin_session(request):
+        return Response(json.dumps({"error": "Unauthorized"}), status=401, headers=c, mimetype="application/json")
+    try:
+        read_token  = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+        write_token = RETURNS_WRITE_TOKEN
+
+        # Fetch invoice record
+        r = req_lib.get(
+            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}/{record_id}",
+            headers=at_headers(read_token), timeout=15,
+        )
+        if not r.ok:
+            return Response(json.dumps({"error": "Invoice not found"}), status=404, headers=c, mimetype="application/json")
+        fields = r.json().get("fields", {})
+        if fields.get("Order Type") != "Invoice":
+            return Response(json.dumps({"error": "Not an invoice"}), status=400, headers=c, mimetype="application/json")
+
+        # Guard: don't create if Stripe URLs already exist
+        if fields.get("Stripe Invoice URL (CC)"):
+            return Response(json.dumps({"error": "Stripe invoices already exist for this record"}),
+                            status=400, headers=c, mimetype="application/json")
+
+        def _first(lst):
+            return lst[0] if isinstance(lst, list) and lst else (lst or "")
+
+        billing_email = _first(fields.get("Bill-To Contact Email (from Customer)", []))
+        billing_name  = _first(fields.get("Bill-To Contact Name (from Customer)", []))
+        org_name      = _first(fields.get("Bill-To Org Name (from Customer)", []))
+
+        if not billing_email:
+            return Response(json.dumps({"error": "No billing email on record"}),
+                            status=400, headers=c, mimetype="application/json")
+
+        # Fetch line items
+        li_ids = fields.get("MO Line Items", [])
+        li_items = []
+        for li_id in li_ids:
+            lr = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}/{li_id}",
+                headers=at_headers(read_token), timeout=10,
+            )
+            if lr.ok:
+                lf = lr.json().get("fields", {})
+                pname = _first(lf.get("Product Name (from Product SKU)", [])) or \
+                        _first(lf.get("Name + Variations (from Product SKU)", [])) or "Item"
+                price = float(lf.get("Confirmed Unit Price") or 0)
+                qty   = lf.get("Qty.", 0)
+                li_items.append({"name": pname, "qty": qty, "unit_price": price})
+
+        if not li_items:
+            return Response(json.dumps({"error": "No line items found"}),
+                            status=400, headers=c, mimetype="application/json")
+
+        import threading
+        t = threading.Thread(
+            target=_create_stripe_invoices_for_record,
+            args=(write_token, record_id, billing_email, billing_name, org_name, li_items),
+            daemon=True,
+        )
+        t.start()
+        t.join(timeout=30)  # wait up to 30s — Stripe is usually fast
+
+        _INVOICES_CACHE.clear()
+        return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")
 
