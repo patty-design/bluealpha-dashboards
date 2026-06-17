@@ -312,13 +312,15 @@
     document.getElementById('bb-pts').textContent = `${used} of ${budget} pt${budget !== 1 ? 's' : ''} used`;
     const selected = awards.filter(a => (qty[a.record_id] || 0) > 0);
     if (selected.length === 0) {
-      document.getElementById('bb-sel').textContent = 'Nothing selected yet';
+      document.getElementById('bb-sel').textContent = r > 0 ? `You have ${r} pt${r !== 1 ? 's' : ''} to spend — pick something!` : 'Nothing selected yet';
+    } else if (r > 0) {
+      document.getElementById('bb-sel').textContent = `Spend ${r} more pt${r !== 1 ? 's' : ''} to unlock Submit`;
     } else {
       const names = selected.map(a => (qty[a.record_id] > 1 ? `${qty[a.record_id]}× ` : '') + a.name);
       document.getElementById('bb-sel').textContent =
         names.length <= 2 ? names.join(', ') : `${names[0]} + ${names.length - 1} more`;
     }
-    document.getElementById('bb-submit').disabled = selected.length === 0;
+    document.getElementById('bb-submit').disabled = r !== 0;
 
     // Rows
     awards.forEach(a => {
