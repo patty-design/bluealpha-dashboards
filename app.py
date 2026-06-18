@@ -11813,8 +11813,9 @@ def warranty_webhook():
                         json.dumps({"success": False, "error": f"SS createlabel failed: {label_resp.text[:300]}"}),
                         status=500, headers=c, mimetype="application/json",
                     )
-                label_result  = label_resp.json()
-                label_pdf_b64 = label_result.get("labelData", "")
+                label_result     = label_resp.json()
+                label_pdf_b64    = label_result.get("labelData", "")
+                label_tracking   = label_result.get("trackingNumber", "")
 
                 # ── Create ShipStation -W order ──
                 today_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000")
@@ -11851,14 +11852,14 @@ def warranty_webhook():
                 if not order_resp.ok:
                     print(f"[warranty_webhook] SS createorder warning: {order_resp.text[:300]}")
 
-                # ── Update Airtable with order ref + label URL ──
-                label_search_url = (
-                    f"https://ship11.shipstation.com/orders/all-orders-search-result"
-                    f"?quickSearch={order_ref}"
+                # ── Update Airtable with order ref + tracking number ──
+                tracking_url = (
+                    f"https://tools.usps.com/go/TrackConfirmAction?qtc_tLabels1={label_tracking}"
+                    if label_tracking else ""
                 )
                 at_update_fields = {
                     "Warranty Order #":  order_ref,
-                    "Return Label URL":  label_search_url,
+                    "Return Label URL":  tracking_url,
                 }
                 req_lib.patch(
                     f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{record_id}",
