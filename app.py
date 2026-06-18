@@ -5205,7 +5205,7 @@ def create_quote():
                 headers={**at_headers(token), "Content-Type": "application/json"},
                 json={"fields": {
                     "Manual Order":               [mo_record_id],
-                    "Product SKU":                [item["skuRecordId"]],
+                    "Product SKU":                [item.get("skuRecordId") or item.get("recordId", "")],
                     "Qty.":                       int(item["qty"]),
                     "Confirmed Unit Price":       float(item["unitPrice"]),
                     "Confirmed Adj. Unit Price":  float(item["unitPrice"]),
