@@ -11769,6 +11769,14 @@ def warranty_webhook():
             original_order_num = (fields.get("Original Order #") or "").strip()
             ineligibility_reason = (fields.get("Ineligibility Reason") or "").strip()
 
+            # ── Idempotency: skip if label already sent (Tracking # populated) ──
+            if fields.get("Tracking #"):
+                print(f"[warranty_webhook] approval_changed skipped — Tracking # already set for {record_id}", flush=True)
+                return Response(
+                    json.dumps({"success": True, "action": "already_processed"}),
+                    status=200, headers=c, mimetype="application/json",
+                )
+
             if approval in ("Rig Repair", "EDC Repair"):
                 repair_info = _WARRANTY_REPAIR_MAP[approval]
                 from datetime import datetime, timezone
@@ -11906,6 +11914,15 @@ def warranty_webhook():
                     status=400, headers=c, mimetype="application/json",
                 )
 
+            # ── Idempotency: skip if SS order already exists ──
+            existing = _search_ss_order(warranty_order_num)
+            if existing:
+                print(f"[warranty_webhook] received_changed skipped — SS order {warranty_order_num} already exists", flush=True)
+                return Response(
+                    json.dumps({"success": True, "action": "already_created", "orderNumber": warranty_order_num}),
+                    status=200, headers=c, mimetype="application/json",
+                )
+
             repair_info    = _WARRANTY_REPAIR_MAP[approval]
             today_str      = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000")
             _customer_addr = {
@@ -11963,6 +11980,71 @@ def warranty_webhook():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────
+# WARRANTY CATCH-UP SCANNER  (runs every 12 hours)
+# Finds records that need processing but weren't caught by the real-time trigger
+# ─────────────────────────────────────────────────────────────────────────────
+def _warranty_scan():
+    """Scan Warranty Requests twice a day and process any missed records."""
+    import time as _time
+    _time.sleep(60)  # wait 1 min after startup before first scan
+    _read_tok = AIRTABLE_OPS_TOKEN or AIRTABLE_BASE_TOKEN or WARRANTY_WRITE_TOKEN
+    while True:
+        try:
+            print("[warranty-scan] running catch-up scan", flush=True)
+            # Fetch all warranty records
+            resp = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}",
+                headers={"Authorization": f"Bearer {_read_tok}"},
+                timeout=15,
+            )
+            if not resp.ok:
+                print(f"[warranty-scan] fetch failed: {resp.status_code}", flush=True)
+            else:
+                records = resp.json().get("records", [])
+                for rec in records:
+                    f = rec["fields"]
+                    rid = rec["id"]
+                    send_email   = f.get("Send Customer Email", False)
+                    item_rcvd    = f.get("Item Received", False)
+                    tracking_set = bool(f.get("Tracking #", "").strip())
+                    order_ref    = (f.get("Warranty Order #") or "").strip()
+                    approval     = (f.get("Approval") or "").strip()
+
+                    # Needs label but tracking not yet set
+                    if send_email and not tracking_set and approval in ("Rig Repair", "EDC Repair"):
+                        print(f"[warranty-scan] queuing approval_changed for {rid}", flush=True)
+                        try:
+                            req_lib.post(
+                                "http://localhost:" + os.environ.get("PORT", "5000") + "/api/warranty/webhook",
+                                json={"record_id": rid, "trigger": "approval_changed"},
+                                timeout=30,
+                            )
+                        except Exception as e:
+                            print(f"[warranty-scan] approval call error: {e}", flush=True)
+
+                    # Needs SS order but order doesn't exist yet
+                    elif item_rcvd and order_ref and approval in ("Rig Repair", "EDC Repair"):
+                        existing = _search_ss_order(order_ref)
+                        if not existing:
+                            print(f"[warranty-scan] queuing received_changed for {rid}", flush=True)
+                            try:
+                                req_lib.post(
+                                    "http://localhost:" + os.environ.get("PORT", "5000") + "/api/warranty/webhook",
+                                    json={"record_id": rid, "trigger": "received_changed"},
+                                    timeout=30,
+                                )
+                            except Exception as e:
+                                print(f"[warranty-scan] received call error: {e}", flush=True)
+
+        except Exception as e:
+            print(f"[warranty-scan] unexpected error: {e}", flush=True)
+
+        _time.sleep(12 * 3600)  # sleep 12 hours
+
+threading.Thread(target=_warranty_scan, daemon=True).start()
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
