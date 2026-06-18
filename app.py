@@ -11660,13 +11660,16 @@ def _send_warranty_approval_email(to_email, first_name, label_pdf_b64):
         print(f"[warranty_email] Exception sending approval email: {e}")
 
 
-def _send_warranty_ineligible_email(to_email, first_name, ineligibility_reason):
+def _send_warranty_ineligible_email(to_email, first_name, ineligibility_reason, denial_explanation=""):
     """Send not-eligible email. FROM: info@bluealpha.us"""
     if not SENDGRID_API_KEY:
         print("[warranty_email] SendGrid not configured")
         return
     actual_to = TEST_EMAIL_OVERRIDE or to_email
     reason_text = ineligibility_reason or "No reason provided."
+    notes_line = (f'<p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0 0 16px;">'
+                  f'<strong>Customer Service Notes:</strong> {denial_explanation}</p>'
+                  if denial_explanation else "")
     html_body = f"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#f5f4ef;font-family:Arial,Helvetica,sans-serif;">
@@ -11684,6 +11687,7 @@ def _send_warranty_ineligible_email(to_email, first_name, ineligibility_reason):
           <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0 0 16px;">
             <strong>Reason:</strong> {reason_text}
           </p>
+          {notes_line}
           <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0 0 16px;">
             If you have additional information that may change this decision, please reply to this email and our team will take another look.
           </p>
@@ -11719,6 +11723,76 @@ def _send_warranty_ineligible_email(to_email, first_name, ineligibility_reason):
             print(f"[warranty_email] SendGrid ineligible returned {r.status_code}: {r.text}")
     except Exception as e:
         print(f"[warranty_email] Exception sending ineligible email: {e}")
+
+
+def _wa_email_header():
+    return """<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f5f4ef;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f4ef;padding:32px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background:#1B2438;border-bottom:3px solid #BD3333;padding:24px 36px;">
+          <span style="font-family:Arial;font-size:20px;font-weight:800;color:#ffffff;letter-spacing:2px;">BLUE ALPHA</span>
+        </td></tr><tr><td style="padding:32px 36px;">"""
+
+
+def _wa_email_footer():
+    return """<p style="color:#4a5568;font-size:14px;line-height:1.7;margin:16px 0 0;">
+            — Blue Alpha Customer Service<br>
+            <a href="mailto:info@bluealpha.us" style="color:#1B2438;">info@bluealpha.us</a>
+          </p>
+        </td></tr>
+        <tr><td style="background:#DDD8C4;border-top:1px solid #c8c3b0;padding:16px 36px;text-align:center;">
+          <p style="color:#6b7a8d;font-size:11px;margin:0;">Blue Alpha &bull; bluealphabelts.com</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+
+
+def _send_warranty_replace_email(to_email, first_name, replacement_item, label_pdf_b64=None):
+    """Replace approval email — includes return label if provided."""
+    if not SENDGRID_API_KEY:
+        return
+    actual_to = TEST_EMAIL_OVERRIDE or to_email
+    if label_pdf_b64:
+        return_label_line = """<p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0 0 16px;">
+            Attached is a prepaid return label. Please print it, attach it to your original item, and drop it off at any USPS location.
+          </p>"""
+    else:
+        return_label_line = ""
+    html_body = _wa_email_header() + f"""
+          <p style="color:#1a2633;font-size:16px;margin:0 0 16px;">Hi {first_name},</p>
+          <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0 0 16px;">
+            Great news — your warranty request has been approved! We'll be sending out a replacement <strong>{replacement_item}</strong> to you shortly.
+          </p>
+          {return_label_line}
+          <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0;">
+            If you have any questions, please reply to this email and we'll be happy to help.
+          </p>""" + _wa_email_footer()
+
+    payload = {
+        "personalizations": [{"to": [{"email": actual_to}]}],
+        "from": {"email": "info@bluealpha.us", "name": "Blue Alpha"},
+        "subject": "Your Blue Alpha Warranty Request Has Been Approved",
+        "content": [{"type": "text/html", "value": html_body}],
+    }
+    if label_pdf_b64:
+        payload["attachments"] = [{
+            "content": label_pdf_b64, "type": "application/pdf",
+            "filename": "return-label.pdf", "disposition": "attachment",
+        }]
+    try:
+        r = req_lib.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+            json=payload, timeout=15,
+        )
+        if r.status_code != 202:
+            print(f"[warranty_email] replace email returned {r.status_code}: {r.text}", flush=True)
+    except Exception as e:
+        print(f"[warranty_email] replace email error: {e}", flush=True)
 
 
 @app.route("/api/warranty/webhook", methods=["POST"])
@@ -11773,8 +11847,8 @@ def warranty_webhook():
 
             _DENIAL_OPTIONS = ("Outside warranty window", "Not a Blue Alpha product", "Repair not deemed necessary")
 
-            # ── Idempotency: for repairs, skip if label already sent (Tracking # populated) ──
-            if approval in ("Rig Repair", "EDC Repair") and fields.get("Tracking #"):
+            # ── Idempotency: skip if already processed ──
+            if approval in ("Rig Repair", "EDC Repair", "Replace") and fields.get("Tracking #"):
                 print(f"[warranty_webhook] approval_changed skipped — Tracking # already set for {record_id}", flush=True)
                 return Response(
                     json.dumps({"success": True, "action": "already_processed"}),
@@ -11875,11 +11949,118 @@ def warranty_webhook():
                 )
 
             elif approval in ("Outside warranty window", "Not a Blue Alpha product", "Repair not deemed necessary"):
-                _send_warranty_ineligible_email(email, first_name, approval)
+                denial_explanation = (fields.get("Denial Explanation") or "").strip()
+                _send_warranty_ineligible_email(email, first_name, approval, denial_explanation)
                 return Response(
                     json.dumps({"success": True, "action": "denial_email_sent", "reason": approval}),
                     status=200, headers=c, mimetype="application/json",
                 )
+
+            elif approval == "Replace w/o Return":
+                # ── No return label; just create SS order and email customer ──
+                replacement_item = (fields.get("Replacement Item") or "").strip()
+                if not replacement_item:
+                    return Response(json.dumps({"success": False, "error": "Replacement Item field is empty"}),
+                                    status=400, headers=c, mimetype="application/json")
+                if fields.get("Warranty Order #"):
+                    return Response(json.dumps({"success": True, "action": "already_processed"}),
+                                    status=200, headers=c, mimetype="application/json")
+                from datetime import datetime, timezone
+                if original_order_num:
+                    order_ref = f"{original_order_num}-WN"
+                else:
+                    order_ref = f"{last_name}-WN"
+                today_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000")
+                _caddr = {"name": f"{first_name} {last_name}".strip(), "street1": address,
+                          "city": city, "state": state, "postalCode": zip_code, "country": "US", "phone": phone}
+                order_resp = req_lib.post(
+                    "https://ssapi.shipstation.com/orders/createorder",
+                    headers={**ss_headers(), "Content-Type": "application/json"},
+                    json={"orderNumber": order_ref, "orderStatus": "awaiting_shipment",
+                          "orderDate": today_str, "billTo": _caddr, "shipTo": _caddr,
+                          "items": [{"name": replacement_item, "quantity": 1, "unitPrice": 0}],
+                          "advancedOptions": {"storeId": 241180}},
+                    timeout=20,
+                )
+                if not order_resp.ok:
+                    print(f"[warranty_webhook] replace_wo_return SS order warning: {order_resp.text[:300]}", flush=True)
+                req_lib.patch(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{record_id}",
+                    headers={"Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}", "Content-Type": "application/json"},
+                    json={"fields": {"Warranty Order #": order_ref}}, timeout=10,
+                )
+                print(f"[warranty_webhook] sending replace_wo_return email to {email}", flush=True)
+                _send_warranty_replace_email(email, first_name, replacement_item)
+                return Response(json.dumps({"success": True, "action": "replace_wo_return", "orderRef": order_ref}),
+                                status=200, headers=c, mimetype="application/json")
+
+            elif approval == "Replace":
+                # ── Create return label + SS replacement order + email with label ──
+                replacement_item = (fields.get("Replacement Item") or "").strip()
+                if not replacement_item:
+                    return Response(json.dumps({"success": False, "error": "Replacement Item field is empty"}),
+                                    status=400, headers=c, mimetype="application/json")
+                if fields.get("Tracking #"):
+                    return Response(json.dumps({"success": True, "action": "already_processed"}),
+                                    status=200, headers=c, mimetype="application/json")
+                from datetime import datetime, timezone
+                if original_order_num:
+                    order_ref = f"{original_order_num}-WR"
+                else:
+                    order_ref = f"{last_name}-WR"
+
+                # Create return label
+                label_resp = req_lib.post(
+                    "https://ssapi.shipstation.com/shipments/createlabel",
+                    headers={**ss_headers(), "Content-Type": "application/json"},
+                    json={"carrierCode": "stamps_com", "serviceCode": "usps_priority_mail",
+                          "packageCode": "package", "shipDate": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                          "weight": {"value": 32, "units": "ounces"},
+                          "shipFrom": {"name": f"{first_name} {last_name}".strip(), "street1": address,
+                                       "city": city, "state": state, "postalCode": zip_code, "country": "US", "phone": phone},
+                          "shipTo": {"name": "Blue Alpha", "company": "Blue Alpha", "street1": "35 Andrew St",
+                                     "city": "Newnan", "state": "GA", "postalCode": "30263", "country": "US", "phone": "6789822442"},
+                          "isReturnLabel": True, "testLabel": False},
+                    timeout=20,
+                )
+                if not label_resp.ok:
+                    return Response(json.dumps({"success": False, "error": f"SS createlabel failed: {label_resp.text[:300]}"}),
+                                    status=500, headers=c, mimetype="application/json")
+                label_result   = label_resp.json()
+                label_pdf_b64  = label_result.get("labelData", "")
+                label_tracking = label_result.get("trackingNumber", "")
+
+                # Create SS replacement order
+                today_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000")
+                _caddr = {"name": f"{first_name} {last_name}".strip(), "street1": address,
+                          "city": city, "state": state, "postalCode": zip_code, "country": "US", "phone": phone}
+                order_resp = req_lib.post(
+                    "https://ssapi.shipstation.com/orders/createorder",
+                    headers={**ss_headers(), "Content-Type": "application/json"},
+                    json={"orderNumber": order_ref, "orderStatus": "awaiting_shipment",
+                          "orderDate": today_str, "billTo": _caddr, "shipTo": _caddr,
+                          "items": [{"name": replacement_item, "quantity": 1, "unitPrice": 0}],
+                          "weight": {"value": 4, "units": "ounces"},
+                          "dimensions": {"units": "inches", "length": 8, "width": 6, "height": 2},
+                          "advancedOptions": {"storeId": 241180}},
+                    timeout=20,
+                )
+                if not order_resp.ok:
+                    print(f"[warranty_webhook] replace SS order warning: {order_resp.text[:300]}", flush=True)
+
+                # Update Airtable
+                tracking_url = (f"https://tools.usps.com/go/TrackConfirmAction?qtc_tLabels1={label_tracking}"
+                                if label_tracking else "")
+                req_lib.patch(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{record_id}",
+                    headers={"Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}", "Content-Type": "application/json"},
+                    json={"fields": {"Warranty Order #": order_ref, "USPS Tracking": tracking_url, "Tracking #": label_tracking}},
+                    timeout=10,
+                )
+                print(f"[warranty_webhook] sending replace email to {email}, label_len={len(label_pdf_b64)}", flush=True)
+                _send_warranty_replace_email(email, first_name, replacement_item, label_pdf_b64)
+                return Response(json.dumps({"success": True, "action": "replace", "orderRef": order_ref}),
+                                status=200, headers=c, mimetype="application/json")
 
             else:
                 # Approval value not actionable yet (e.g. "Pending" or empty)
@@ -12070,8 +12251,10 @@ def _warranty_scan():
 
                     _DENIAL_OPTS = ("Outside warranty window", "Not a Blue Alpha product", "Repair not deemed necessary")
 
-                    # Needs label but tracking not yet set
-                    if send_email and not tracking_set and approval in ("Rig Repair", "EDC Repair"):
+                    warranty_order_set = bool(order_ref)
+
+                    # Needs processing: repairs/replace need tracking; replace w/o return needs order#
+                    if send_email and approval in ("Rig Repair", "EDC Repair", "Replace") and not tracking_set:
                         print(f"[warranty-scan] queuing approval_changed for {rid}", flush=True)
                         try:
                             req_lib.post(
@@ -12094,7 +12277,19 @@ def _warranty_scan():
                         except Exception as e:
                             print(f"[warranty-scan] denial call error: {e}", flush=True)
 
-                    # Needs SS order but order doesn't exist yet
+                    # Replace w/o Return: needs order but hasn't been created yet
+                    elif send_email and not warranty_order_set and approval == "Replace w/o Return":
+                        print(f"[warranty-scan] queuing replace_wo_return for {rid}", flush=True)
+                        try:
+                            req_lib.post(
+                                "http://localhost:" + os.environ.get("PORT", "5000") + "/api/warranty/webhook",
+                                json={"record_id": rid, "trigger": "approval_changed"},
+                                timeout=30,
+                            )
+                        except Exception as e:
+                            print(f"[warranty-scan] replace_wo_return call error: {e}", flush=True)
+
+                    # Needs SS order but order doesn't exist yet (repairs only — replacements handled above)
                     elif item_rcvd and order_ref and approval in ("Rig Repair", "EDC Repair"):
                         existing = _search_ss_order(order_ref)
                         if not existing:
