@@ -11396,6 +11396,10 @@ def admin_resend_invoice(record_id):
 
 WARRANTY_TABLE_ID   = "tbl2CQL5LiRXxCrnK"
 WARRANTY_WRITE_TOKEN = os.environ.get("AIRTABLE_WRITE_TOKEN_2", "")
+# Temporary in-memory store for warranty photos: {key: (bytes, content_type, filename)}
+# Airtable fetches these URLs when the record is patched; entries are safe to keep
+# for ~1 hour (Airtable fetches promptly on PATCH).
+_WARRANTY_PHOTO_STORE: dict = {}
 
 # ShipStation product IDs and SKUs for warranty repair types
 _WARRANTY_REPAIR_MAP = {
@@ -11416,6 +11420,17 @@ _WARRANTY_REPAIR_MAP = {
 def warranty_page():
     """Serve the warranty request form."""
     return send_from_directory(app.static_folder, "warranty.html")
+
+
+@app.route("/warranty/photos/<key>")
+def warranty_photo(key):
+    """Temporarily serve a warranty submission photo so Airtable can fetch it."""
+    entry = _WARRANTY_PHOTO_STORE.get(key)
+    if not entry:
+        return Response("Not found", status=404)
+    photo_bytes, content_type, filename = entry
+    return Response(photo_bytes, content_type=content_type,
+                    headers={"Content-Disposition": f'inline; filename="{filename}"'})
 
 
 @app.route("/api/warranty/submit", methods=["POST", "OPTIONS"])
@@ -11493,22 +11508,41 @@ def warranty_submit():
             )
         record_id = create_resp.json()["id"]
 
-        # ── Step 2: Upload each photo via Airtable content upload API ──
-        photo_field_id = "fld1g7wNcTB9b7SsW"
+        # ── Step 2: Serve photos temporarily from this app, then PATCH Airtable with URLs ──
+        # The Airtable content upload API (uploadAttachment) requires OAuth scopes our PATs
+        # don't have. Instead: stash each photo in memory under a UUID-keyed route,
+        # PATCH the record with those public URLs, then Airtable fetches them.
+        import uuid as _uuid
+        import os as _os
+        BASE_URL = _os.environ.get("RAILWAY_PUBLIC_DOMAIN", "quote.bluealphabelts.com")
+        if not BASE_URL.startswith("http"):
+            BASE_URL = f"https://{BASE_URL}"
+
+        photo_urls = []
         for photo in photos:
             photo_bytes = photo.read()
             content_type = photo.content_type or "image/jpeg"
             filename = photo.filename or "photo.jpg"
+            ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "jpg"
+            key = f"{_uuid.uuid4().hex}.{ext}"
+            _WARRANTY_PHOTO_STORE[key] = (photo_bytes, content_type, filename)
+            photo_urls.append({
+                "url": f"{BASE_URL}/warranty/photos/{key}",
+                "filename": filename,
+            })
+
+        if photo_urls:
             try:
-                req_lib.post(
-                    f"https://content.airtable.com/v0/{AIRTABLE_BASE_ID}/{record_id}/{photo_field_id}/uploadAttachment",
-                    headers={"Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}"},
-                    files={"file": (filename, photo_bytes, content_type)},
-                    timeout=30,
+                patch_resp = req_lib.patch(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{record_id}",
+                    headers={"Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}", "Content-Type": "application/json"},
+                    json={"fields": {"Photos": photo_urls}},
+                    timeout=15,
                 )
+                if not patch_resp.ok:
+                    print(f"[warranty_submit] Photo patch failed {patch_resp.status_code}: {patch_resp.text[:200]}")
             except Exception as photo_err:
-                # Log but don't fail the whole submission over a single photo upload error
-                print(f"[warranty_submit] Photo upload error for {filename}: {photo_err}")
+                print(f"[warranty_submit] Photo patch error: {photo_err}")
 
         return Response(
             json.dumps({"success": True}),
