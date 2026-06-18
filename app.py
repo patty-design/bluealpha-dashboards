@@ -5199,19 +5199,23 @@ def create_quote():
         mo_record_id = mo_r.json()["id"]
 
         # 4. Create line items
+        print(f"[create_quote] creating {len(items)} line item(s) for MO {mo_record_id} using token {token[:12]}...")
         for item in items:
+            sku_id = item.get("skuRecordId") or item.get("recordId", "")
+            print(f"[create_quote]   item: sku={sku_id}, qty={item.get('qty')}, price={item.get('unitPrice')}")
             li_r = req_lib.post(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MO_LINE_ITEMS_TABLE_ID}",
                 headers={**at_headers(token), "Content-Type": "application/json"},
                 json={"fields": {
                     "Manual Order":               [mo_record_id],
-                    "Product SKU":                [item.get("skuRecordId") or item.get("recordId", "")],
+                    "Product SKU":                [sku_id],
                     "Qty.":                       int(item["qty"]),
                     "Confirmed Unit Price":       float(item["unitPrice"]),
                     "Confirmed Adj. Unit Price":  float(item["unitPrice"]),
                 }},
                 timeout=15,
             )
+            print(f"[create_quote]   line item result: {li_r.status_code} {li_r.text[:200]}")
             if not li_r.ok:
                 err_detail = ""
                 try: err_detail = li_r.json()
