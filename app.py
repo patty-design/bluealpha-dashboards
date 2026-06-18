@@ -7142,8 +7142,9 @@ def portal_me(user):
                 print(f"[portal_me] customer fetch failed: {e}")
         _ME_CACHE[customer_id] = {"ts": _time_mod.time(), "data": agency_name}
 
-    # Check if user has credentials set up (Portal Username on their own record)
+    # Check if user has credentials set up; also grab email while we're here
     has_credentials = False
+    user_email = ""
     user_id = user.get("user_id", "") or customer_id
     if user_id:
         try:
@@ -7151,16 +7152,20 @@ def portal_me(user):
             ur = req_lib.get(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{user_id}",
                 headers=at_headers(read_token),
-                params={"fields[]": ["Portal Username"]},
+                params={"fields[]": ["Portal Username", "Main Contact Email"]},
                 timeout=10,
             )
             if ur.status_code == 200:
-                has_credentials = bool(ur.json().get("fields", {}).get("Portal Username", "").strip())
+                uf = ur.json().get("fields", {})
+                has_credentials = bool(uf.get("Portal Username", "").strip())
+                user_email = uf.get("Main Contact Email", "").strip()
         except Exception as e:
             print(f"[portal_me] credentials check failed: {e}")
 
     return Response(json.dumps({
         "agencyName":      agency_name,
+        "orgName":         agency_name,   # alias so submitOrder() works without a separate profile fetch
+        "email":           user_email,
         "isPrimary":       is_primary,
         "customerId":      customer_id,
         "role":            role,
