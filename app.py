@@ -11986,11 +11986,27 @@ def warranty_webhook():
 # Finds records that need processing but weren't caught by the real-time trigger
 # ─────────────────────────────────────────────────────────────────────────────
 def _warranty_scan():
-    """Scan Warranty Requests twice a day and process any missed records."""
+    """Scan Warranty Requests at 10 AM and 2 PM ET daily and process any missed records."""
     import time as _time
-    _time.sleep(60)  # wait 1 min after startup before first scan
+    from datetime import datetime as _dt, timezone as _tz
+    import zoneinfo as _zi
+
+    _ET = _zi.ZoneInfo("America/New_York")
+    _RUN_HOURS = {10, 14}  # 10 AM and 2 PM ET
+
+    _time.sleep(30)  # brief startup delay
+    _last_run_hour = None
     _read_tok = AIRTABLE_OPS_TOKEN or AIRTABLE_BASE_TOKEN or WARRANTY_WRITE_TOKEN
+
     while True:
+        now_et = _dt.now(_ET)
+        current_hour = now_et.hour
+        # Run at the top of each target hour, once per hour
+        if current_hour in _RUN_HOURS and _last_run_hour != (now_et.date(), current_hour):
+            _last_run_hour = (now_et.date(), current_hour)
+        else:
+            _time.sleep(60)
+            continue
         try:
             print("[warranty-scan] running catch-up scan", flush=True)
             # Fetch all warranty records
@@ -12041,7 +12057,7 @@ def _warranty_scan():
         except Exception as e:
             print(f"[warranty-scan] unexpected error: {e}", flush=True)
 
-        _time.sleep(12 * 3600)  # sleep 12 hours
+        _time.sleep(60)  # check every minute, run only at target hours
 
 threading.Thread(target=_warranty_scan, daemon=True).start()
 
