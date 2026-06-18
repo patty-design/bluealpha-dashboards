@@ -383,7 +383,7 @@
           </div>
           <div class="field full">
             <label for="originalOrderNum">Original Order # <span class="opt">(optional)</span></label>
-            <input type="text" id="originalOrderNum" name="originalOrderNum" placeholder="e.g. 12345">
+            <input type="text" id="originalOrderNum" name="originalOrderNum" placeholder="e.g. 12345" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
           </div>
         </div>
       </div>
