@@ -11501,7 +11501,7 @@ def warranty_submit():
             filename = photo.filename or "photo.jpg"
             try:
                 req_lib.post(
-                    f"https://content.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{record_id}/{photo_field_id}",
+                    f"https://content.airtable.com/v0/{AIRTABLE_BASE_ID}/{record_id}/{photo_field_id}/uploadAttachment",
                     headers={"Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}"},
                     files={"file": (filename, photo_bytes, content_type)},
                     timeout=30,
