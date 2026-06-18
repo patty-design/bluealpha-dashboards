@@ -11722,10 +11722,11 @@ def warranty_webhook():
                 status=400, headers=c, mimetype="application/json",
             )
 
-        # ── Fetch full Airtable record ──
+        # ── Fetch full Airtable record (use read token — write token lacks read scope) ──
+        _read_tok = AIRTABLE_OPS_TOKEN or AIRTABLE_BASE_TOKEN or WARRANTY_WRITE_TOKEN
         rec_resp = req_lib.get(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{record_id}",
-            headers={"Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}"},
+            headers={"Authorization": f"Bearer {_read_tok}"},
             timeout=15,
         )
         if not rec_resp.ok:
