@@ -5066,9 +5066,13 @@ def create_quote():
     data = request.get_json() or {}
     token = RETURNS_WRITE_TOKEN
 
-    org_name = (data.get("orgName") or "").strip()
-    email    = (data.get("email") or "").strip()
-    items    = data.get("items", [])
+    org_name   = (data.get("orgName") or "").strip()
+    email      = (data.get("email") or "").strip()
+    items      = data.get("items", [])
+    # Contract portal orders are Sales Orders; legacy/admin submissions default to Quote
+    order_type = (data.get("orderType") or "Quote").strip()
+    if order_type not in ("Quote", "Sales Order"):
+        order_type = "Quote"
 
     if not org_name or not email or not items:
         return Response(json.dumps({"error": "orgName, email, and items are required"}),
@@ -5135,12 +5139,15 @@ def create_quote():
         # 2. Get next order ID — use read token (write token may lack read scope)
         read_token = AIRTABLE_BASE_TOKEN or AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
         order_id_str = _next_order_id(read_token)
-        quote_number = f"QU-{order_id_str}"
+        doc_prefix   = "SO" if order_type == "Sales Order" else "QU"
+        quote_number = f"{doc_prefix}-{order_id_str}"
 
-        today       = _today_utc()
-        expiry_date = today + timedelta(days=90)
-        today_str   = today.isoformat()
-        expiry_str  = expiry_date.isoformat()
+        today     = _today_utc()
+        today_str = today.isoformat()
+        # Expiry only applies to Quotes
+        expiry_str = ""
+        if order_type == "Quote":
+            expiry_str = (today + timedelta(days=90)).isoformat()
 
         # 3. Create Manual Order
         # Collect per-item size notes and append to order notes
@@ -5163,10 +5170,9 @@ def create_quote():
 
         mo_body = {
             "fields": {
-                "Order Type":       "Quote",
+                "Order Type":       order_type,
                 "Order ID":         order_id_str,
                 "Date":             today_str,
-                "Expiry Date":      expiry_str,
                 "Customer":         [cust_id],
                 # Snapshot billing/shipping — stored directly so customer record changes
                 # never alter this quote's displayed info
@@ -5182,6 +5188,8 @@ def create_quote():
             mo_body["fields"]["Purchase Order #"] = po_number
         if notes:
             mo_body["fields"]["Notes from Customer"] = notes
+        if expiry_str:
+            mo_body["fields"]["Expiry Date"] = expiry_str
 
         mo_r = req_lib.post(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{MANUAL_ORDERS_TABLE_ID}",
