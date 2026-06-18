@@ -11396,10 +11396,10 @@ def admin_resend_invoice(record_id):
 
 WARRANTY_TABLE_ID   = "tbl2CQL5LiRXxCrnK"
 WARRANTY_WRITE_TOKEN = os.environ.get("AIRTABLE_WRITE_TOKEN_2", "")
-# Temporary in-memory store for warranty photos: {key: (bytes, content_type, filename)}
-# Airtable fetches these URLs when the record is patched; entries are safe to keep
-# for ~1 hour (Airtable fetches promptly on PATCH).
-_WARRANTY_PHOTO_STORE: dict = {}
+# Disk-based photo store: photos saved to /tmp/warranty_photos/{key}
+# More reliable than in-memory — survives within the same container instance.
+_WARRANTY_PHOTO_DIR = "/tmp/warranty_photos"
+os.makedirs(_WARRANTY_PHOTO_DIR, exist_ok=True)
 
 # ShipStation product IDs and SKUs for warranty repair types
 _WARRANTY_REPAIR_MAP = {
@@ -11424,11 +11424,23 @@ def warranty_page():
 
 @app.route("/warranty/photos/<key>")
 def warranty_photo(key):
-    """Temporarily serve a warranty submission photo so Airtable can fetch it."""
-    entry = _WARRANTY_PHOTO_STORE.get(key)
-    if not entry:
+    """Serve a warranty submission photo from disk so Airtable can fetch it."""
+    # key format: {uuid}.{ext}  — meta file: {uuid}.{ext}.meta (content_type\nfilename)
+    if ".." in key or "/" in key:
+        return Response("Forbidden", status=403)
+    file_path = os.path.join(_WARRANTY_PHOTO_DIR, key)
+    meta_path = file_path + ".meta"
+    if not os.path.exists(file_path):
         return Response("Not found", status=404)
-    photo_bytes, content_type, filename = entry
+    content_type = "image/jpeg"
+    filename = key
+    if os.path.exists(meta_path):
+        with open(meta_path) as mf:
+            lines = mf.read().splitlines()
+            if lines: content_type = lines[0]
+            if len(lines) > 1: filename = lines[1]
+    with open(file_path, "rb") as f:
+        photo_bytes = f.read()
     return Response(photo_bytes, content_type=content_type,
                     headers={"Content-Disposition": f'inline; filename="{filename}"'})
 
@@ -11525,7 +11537,11 @@ def warranty_submit():
             filename = photo.filename or "photo.jpg"
             ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "jpg"
             key = f"{_uuid.uuid4().hex}.{ext}"
-            _WARRANTY_PHOTO_STORE[key] = (photo_bytes, content_type, filename)
+            file_path = os.path.join(_WARRANTY_PHOTO_DIR, key)
+            with open(file_path, "wb") as pf:
+                pf.write(photo_bytes)
+            with open(file_path + ".meta", "w") as mf:
+                mf.write(f"{content_type}\n{filename}")
             photo_urls.append({
                 "url": f"{BASE_URL}/warranty/photos/{key}",
                 "filename": filename,
