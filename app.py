@@ -11771,8 +11771,10 @@ def warranty_webhook():
             original_order_num = (fields.get("Original Order #") or "").strip()
             ineligibility_reason = (fields.get("Ineligibility Reason") or "").strip()
 
-            # ── Idempotency: skip if label already sent (Tracking # populated) ──
-            if fields.get("Tracking #"):
+            _DENIAL_OPTIONS = ("Outside warranty window", "Not a Blue Alpha product", "Repair not deemed necessary")
+
+            # ── Idempotency: for repairs, skip if label already sent (Tracking # populated) ──
+            if approval in ("Rig Repair", "EDC Repair") and fields.get("Tracking #"):
                 print(f"[warranty_webhook] approval_changed skipped — Tracking # already set for {record_id}", flush=True)
                 return Response(
                     json.dumps({"success": True, "action": "already_processed"}),
@@ -11872,13 +11874,10 @@ def warranty_webhook():
                     status=200, headers=c, mimetype="application/json",
                 )
 
-            elif approval == "Ineligible":
-                first_name = (fields.get("First Name") or "").strip()
-                email      = (fields.get("Email") or "").strip()
-                ineligibility_reason = (fields.get("Ineligibility Reason") or "").strip()
-                _send_warranty_ineligible_email(email, first_name, ineligibility_reason)
+            elif approval in ("Outside warranty window", "Not a Blue Alpha product", "Repair not deemed necessary"):
+                _send_warranty_ineligible_email(email, first_name, approval)
                 return Response(
-                    json.dumps({"success": True, "action": "ineligible_email_sent"}),
+                    json.dumps({"success": True, "action": "denial_email_sent", "reason": approval}),
                     status=200, headers=c, mimetype="application/json",
                 )
 
@@ -12069,6 +12068,8 @@ def _warranty_scan():
                         except Exception as se:
                             print(f"[warranty-scan] shipment check error for {rid}: {se}", flush=True)
 
+                    _DENIAL_OPTS = ("Outside warranty window", "Not a Blue Alpha product", "Repair not deemed necessary")
+
                     # Needs label but tracking not yet set
                     if send_email and not tracking_set and approval in ("Rig Repair", "EDC Repair"):
                         print(f"[warranty-scan] queuing approval_changed for {rid}", flush=True)
@@ -12080,6 +12081,18 @@ def _warranty_scan():
                             )
                         except Exception as e:
                             print(f"[warranty-scan] approval call error: {e}", flush=True)
+
+                    # Denial email missed (send_email checked, denial approval, no tracking#)
+                    elif send_email and not tracking_set and approval in _DENIAL_OPTS:
+                        print(f"[warranty-scan] queuing denial email for {rid} ({approval})", flush=True)
+                        try:
+                            req_lib.post(
+                                "http://localhost:" + os.environ.get("PORT", "5000") + "/api/warranty/webhook",
+                                json={"record_id": rid, "trigger": "approval_changed"},
+                                timeout=30,
+                            )
+                        except Exception as e:
+                            print(f"[warranty-scan] denial call error: {e}", flush=True)
 
                     # Needs SS order but order doesn't exist yet
                     elif item_rcvd and order_ref and approval in ("Rig Repair", "EDC Repair"):
