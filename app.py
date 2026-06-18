@@ -5174,6 +5174,8 @@ def create_quote():
                 "Order ID":         order_id_str,
                 "Date":             today_str,
                 "Customer":         [cust_id],
+                # Sales Orders from the portal are pre-approved (vetted contract customers)
+                **({"Sales Order Status": "Approved"} if order_type == "Sales Order" else {}),
                 # Snapshot billing/shipping — stored directly so customer record changes
                 # never alter this quote's displayed info
                 "Snapshot Org":     org_name,
