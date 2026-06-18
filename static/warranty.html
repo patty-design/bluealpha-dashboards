@@ -345,7 +345,7 @@
           </div>
           <div class="field">
             <label for="phone">Phone Number</label>
-            <input type="tel" id="phone" name="phone" required placeholder="(555) 000-0000">
+            <input type="tel" id="phone" name="phone" required placeholder="(555) 000-0000" inputmode="numeric" maxlength="10" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)">
           </div>
         </div>
       </div>
