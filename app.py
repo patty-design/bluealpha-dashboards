@@ -11490,6 +11490,7 @@ def warranty_submit():
         photos = photos[:5]  # cap at 5
 
         # ── Step 1: Create Airtable record (no photos yet) ──
+        from datetime import datetime as _dt_sub, timezone as _tz_sub
         fields = {
             "First Name":          first_name,
             "Last Name":           last_name,
@@ -11500,6 +11501,7 @@ def warranty_submit():
             "State":               state,
             "Zip":                 zip_code,
             "Repair Description":  repair_description,
+            "Request Date":        _dt_sub.now(_tz_sub.utc).strftime("%Y-%m-%d"),
         }
         if original_order_num:
             fields["Original Order #"] = original_order_num
@@ -11960,6 +11962,13 @@ def warranty_webhook():
                     status=500, headers=c, mimetype="application/json",
                 )
             print(f"[warranty_webhook] SS order created on item received: {warranty_order_num}", flush=True)
+            # Set Received Date in Airtable
+            req_lib.patch(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{record_id}",
+                headers={"Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}", "Content-Type": "application/json"},
+                json={"fields": {"Received Date": today_str[:10]}},
+                timeout=10,
+            )
             return Response(
                 json.dumps({"success": True, "action": "order_created", "orderNumber": warranty_order_num}),
                 status=200, headers=c, mimetype="application/json",
@@ -12027,6 +12036,38 @@ def _warranty_scan():
                     tracking_set = bool(f.get("Tracking #", "").strip())
                     order_ref    = (f.get("Warranty Order #") or "").strip()
                     approval     = (f.get("Approval") or "").strip()
+
+                    shipped_date = (f.get("Shipped Date") or "").strip()
+
+                    # Check if SS order has shipped → populate Shipped Date + Outgoing Tracking #
+                    if order_ref and not shipped_date:
+                        try:
+                            ship_resp = req_lib.get(
+                                "https://ssapi.shipstation.com/shipments",
+                                params={"orderNumber": order_ref, "pageSize": 50},
+                                headers={**ss_headers()},
+                                timeout=10,
+                            )
+                            if ship_resp.ok:
+                                shipments = [s for s in ship_resp.json().get("shipments", [])
+                                             if not s.get("voided", False)]
+                                if shipments:
+                                    latest = sorted(shipments, key=lambda s: s.get("shipDate",""), reverse=True)[0]
+                                    ship_date = (latest.get("shipDate") or "")[:10]
+                                    out_tracking = latest.get("trackingNumber", "")
+                                    if ship_date:
+                                        patch_fields = {"Shipped Date": ship_date}
+                                        if out_tracking:
+                                            patch_fields["Outgoing Tracking #"] = out_tracking
+                                        req_lib.patch(
+                                            f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{rid}",
+                                            headers={"Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}", "Content-Type": "application/json"},
+                                            json={"fields": patch_fields},
+                                            timeout=10,
+                                        )
+                                        print(f"[warranty-scan] shipped date set for {rid}: {ship_date} tracking={out_tracking}", flush=True)
+                        except Exception as se:
+                            print(f"[warranty-scan] shipment check error for {rid}: {se}", flush=True)
 
                     # Needs label but tracking not yet set
                     if send_email and not tracking_set and approval in ("Rig Repair", "EDC Repair"):
