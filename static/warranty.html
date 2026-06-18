@@ -389,6 +389,8 @@
           <div class="field full">
             <label for="originalOrderNum">Original Order # <span class="opt">(optional)</span></label>
             <input type="text" id="originalOrderNum" name="originalOrderNum" placeholder="e.g. 12345" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+            <label for="originalPurchaserLastName" style="margin-top:14px;">Original Purchaser's Last Name <span class="opt">(optional)</span></label>
+            <input type="text" id="originalPurchaserLastName" name="originalPurchaserLastName" placeholder="e.g. Smith">
           </div>
         </div>
       </div>
@@ -521,6 +523,7 @@
     formData.append('zip',              document.getElementById('zip').value.trim());
     formData.append('repairDescription',document.getElementById('repairDescription').value.trim());
     formData.append('originalOrderNum', document.getElementById('originalOrderNum').value.trim());
+    formData.append('originalPurchaserLastName', document.getElementById('originalPurchaserLastName').value.trim());
     selectedFiles.forEach(f => formData.append('photos', f));
 
     try {

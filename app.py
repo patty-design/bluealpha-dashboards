@@ -11472,7 +11472,8 @@ def warranty_submit():
         state             = request.form.get("state", "").strip()
         zip_code          = request.form.get("zip", "").strip()
         repair_description= request.form.get("repairDescription", "").strip()
-        original_order_num= request.form.get("originalOrderNum", "").strip()
+        original_order_num         = request.form.get("originalOrderNum", "").strip()
+        original_purchaser_last_name = request.form.get("originalPurchaserLastName", "").strip()
         photos            = request.files.getlist("photos")
 
         # Basic validation
@@ -11505,6 +11506,8 @@ def warranty_submit():
         }
         if original_order_num:
             fields["Original Order #"] = original_order_num
+        if original_purchaser_last_name:
+            fields["Original Purchaser's Last Name"] = original_purchaser_last_name
 
         create_resp = req_lib.post(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}",
