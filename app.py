@@ -11859,7 +11859,8 @@ def warranty_webhook():
                 )
                 at_update_fields = {
                     "Warranty Order #":  order_ref,
-                    "Return Label URL":  tracking_url,
+                    "USPS Tracking":     tracking_url,
+                    "Tracking #":        label_tracking,
                 }
                 req_lib.patch(
                     f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{record_id}",
