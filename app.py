@@ -11817,7 +11817,42 @@ def warranty_webhook():
                 label_pdf_b64    = label_result.get("labelData", "")
                 label_tracking   = label_result.get("trackingNumber", "")
 
-                # ── Update Airtable: order ref + tracking (NO SS order yet — created on Item Received) ──
+                # ── Create ShipStation -W order (awaiting_shipment directly) ──
+                today_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000")
+                _customer_addr = {
+                    "name":       f"{first_name} {last_name}".strip(),
+                    "street1":    address,
+                    "city":       city,
+                    "state":      state,
+                    "postalCode": zip_code,
+                    "country":    "US",
+                    "phone":      phone,
+                }
+                order_payload = {
+                    "orderNumber": order_ref,
+                    "orderStatus": "awaiting_shipment",
+                    "orderDate":   today_str,
+                    "billTo":      _customer_addr,
+                    "shipTo":      _customer_addr,
+                    "items": [{
+                        "sku":       repair_info["sku"],
+                        "name":      repair_info["name"],
+                        "productId": repair_info["productId"],
+                        "quantity":  1,
+                        "unitPrice": 0,
+                    }],
+                    "advancedOptions": {"storeId": 241180},  # BA Warranty store
+                }
+                order_resp = req_lib.post(
+                    "https://ssapi.shipstation.com/orders/createorder",
+                    headers={**ss_headers(), "Content-Type": "application/json"},
+                    json=order_payload,
+                    timeout=20,
+                )
+                if not order_resp.ok:
+                    print(f"[warranty_webhook] SS createorder warning: {order_resp.text[:300]}", flush=True)
+
+                # ── Update Airtable: order ref + tracking ──
                 tracking_url = (
                     f"https://tools.usps.com/go/TrackConfirmAction?qtc_tLabels1={label_tracking}"
                     if label_tracking else ""
@@ -11842,7 +11877,7 @@ def warranty_webhook():
                 _send_warranty_approval_email(email, first_name, label_pdf_b64)
 
                 return Response(
-                    json.dumps({"success": True, "action": "label_created", "orderRef": order_ref}),
+                    json.dumps({"success": True, "action": "approved", "orderRef": order_ref}),
                     status=200, headers=c, mimetype="application/json",
                 )
 
@@ -11864,73 +11899,11 @@ def warranty_webhook():
                 )
 
         # ────────────────────────────────────────────────────────────────
-        # TRIGGER: received_changed
+        # TRIGGER: received_changed (no-op — Item Received is informational only)
         # ────────────────────────────────────────────────────────────────
         elif trigger == "received_changed":
-            from datetime import datetime, timezone
-
-            warranty_order_num = (fields.get("Warranty Order #") or "").strip()
-            approval           = (fields.get("Approval") or "").strip()
-            first_name         = (fields.get("First Name") or "").strip()
-            last_name          = (fields.get("Last Name") or "").strip()
-            phone              = (fields.get("Phone") or "").strip()
-            address            = (fields.get("Address") or "").strip()
-            city               = (fields.get("City") or "").strip()
-            state              = (fields.get("State") or "").strip()
-            zip_code           = (fields.get("Zip") or "").strip()
-
-            if not warranty_order_num:
-                return Response(
-                    json.dumps({"success": False, "error": "No Warranty Order # on record — was it approved first?"}),
-                    status=400, headers=c, mimetype="application/json",
-                )
-            if approval not in ("Rig Repair", "EDC Repair"):
-                return Response(
-                    json.dumps({"success": False, "error": f"Unexpected approval value: {approval}"}),
-                    status=400, headers=c, mimetype="application/json",
-                )
-
-            repair_info = _WARRANTY_REPAIR_MAP[approval]
-            today_str   = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000")
-            _customer_addr = {
-                "name":       f"{first_name} {last_name}".strip(),
-                "street1":    address,
-                "city":       city,
-                "state":      state,
-                "postalCode": zip_code,
-                "country":    "US",
-                "phone":      phone,
-            }
-            order_payload = {
-                "orderNumber": warranty_order_num,
-                "orderStatus": "awaiting_shipment",
-                "orderDate":   today_str,
-                "billTo":      _customer_addr,
-                "shipTo":      _customer_addr,
-                "items": [{
-                    "sku":       repair_info["sku"],
-                    "name":      repair_info["name"],
-                    "productId": repair_info["productId"],
-                    "quantity":  1,
-                    "unitPrice": 0,
-                }],
-                "advancedOptions": {"storeId": 241180},  # BA Warranty store
-            }
-            order_resp = req_lib.post(
-                "https://ssapi.shipstation.com/orders/createorder",
-                headers={**ss_headers(), "Content-Type": "application/json"},
-                json=order_payload,
-                timeout=20,
-            )
-            if not order_resp.ok:
-                return Response(
-                    json.dumps({"success": False, "error": f"SS createorder failed: {order_resp.text[:300]}"}),
-                    status=500, headers=c, mimetype="application/json",
-                )
-            print(f"[warranty_webhook] SS order created on item received: {warranty_order_num}", flush=True)
-
             return Response(
-                json.dumps({"success": True, "orderNumber": warranty_order_num, "status": "awaiting_shipment"}),
+                json.dumps({"success": True, "action": "no_op"}),
                 status=200, headers=c, mimetype="application/json",
             )
 
