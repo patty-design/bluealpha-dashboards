@@ -7133,7 +7133,6 @@ def portal_me(user):
                 cr = req_lib.get(
                     f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{customer_id}",
                     headers=at_headers(read_token),
-                    params={"fields[]": ["Organization Name"]},
                     timeout=10,
                 )
                 if cr.status_code == 200:
@@ -7152,7 +7151,6 @@ def portal_me(user):
             ur = req_lib.get(
                 f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{CUSTOMERS_TABLE_ID}/{user_id}",
                 headers=at_headers(read_token),
-                params={"fields[]": ["Portal Username", "Main Contact Email"]},
                 timeout=10,
             )
             if ur.status_code == 200:
