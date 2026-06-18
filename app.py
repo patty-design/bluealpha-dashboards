@@ -11836,6 +11836,7 @@ def warranty_webhook():
                         "quantity":  1,
                         "unitPrice": 0,
                     }],
+                    "advancedOptions": {"storeId": 241180},  # BA Warranty store
                 }
                 order_resp = req_lib.post(
                     "https://ssapi.shipstation.com/orders/createorder",
