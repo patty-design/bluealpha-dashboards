@@ -11817,19 +11817,21 @@ def warranty_webhook():
 
                 # ── Create ShipStation -W order ──
                 today_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000")
+                _customer_addr = {
+                    "name":       f"{first_name} {last_name}".strip(),
+                    "street1":    address,
+                    "city":       city,
+                    "state":      state,
+                    "postalCode": zip_code,
+                    "country":    "US",
+                    "phone":      phone,
+                }
                 order_payload = {
                     "orderNumber": order_ref,
                     "orderStatus": "on_hold",
                     "orderDate":   today_str,
-                    "shipTo": {
-                        "name":       f"{first_name} {last_name}".strip(),
-                        "street1":    address,
-                        "city":       city,
-                        "state":      state,
-                        "postalCode": zip_code,
-                        "country":    "US",
-                        "phone":      phone,
-                    },
+                    "billTo":  _customer_addr,
+                    "shipTo":  _customer_addr,
                     "items": [{
                         "sku":       repair_info["sku"],
                         "name":      repair_info["name"],
