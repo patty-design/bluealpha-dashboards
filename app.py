@@ -11715,6 +11715,7 @@ def warranty_webhook():
         body = request.get_json(force=True) or {}
         record_id = body.get("record_id", "").strip()
         trigger   = body.get("trigger", "").strip()
+        print(f"[warranty_webhook] received: record={record_id} trigger={trigger}", flush=True)
 
         if not record_id or not trigger:
             return Response(
@@ -11870,6 +11871,7 @@ def warranty_webhook():
                 )
 
                 # ── Send approval email ──
+                print(f"[warranty_webhook] sending approval email to {email}, label_data_len={len(label_pdf_b64)}", flush=True)
                 _send_warranty_approval_email(email, first_name, label_pdf_b64)
 
                 return Response(
