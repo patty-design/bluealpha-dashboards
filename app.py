@@ -11396,6 +11396,11 @@ def admin_resend_invoice(record_id):
 
 WARRANTY_TABLE_ID   = "tbl2CQL5LiRXxCrnK"
 WARRANTY_WRITE_TOKEN = os.environ.get("AIRTABLE_WRITE_TOKEN_2", "")
+
+# In-memory lock to prevent duplicate webhook processing (race condition between
+# Airtable automation and background scan firing for the same record simultaneously)
+_warranty_processing: set = set()
+_warranty_processing_lock = threading.Lock()
 # Disk-based photo store: photos saved to /tmp/warranty_photos/{key}
 # More reliable than in-memory — survives within the same container instance.
 _WARRANTY_PHOTO_DIR = "/tmp/warranty_photos"
@@ -11818,6 +11823,30 @@ def warranty_webhook():
                 status=400, headers=c, mimetype="application/json",
             )
 
+        # ── Duplicate-call guard: reject if this record is already being processed ──
+        processing_key = f"{record_id}:{trigger}"
+        with _warranty_processing_lock:
+            if processing_key in _warranty_processing:
+                print(f"[warranty_webhook] duplicate call ignored for {processing_key}", flush=True)
+                return Response(
+                    json.dumps({"success": True, "action": "duplicate_ignored"}),
+                    status=200, headers=c, mimetype="application/json",
+                )
+            _warranty_processing.add(processing_key)
+        try:
+            return _warranty_webhook_inner(record_id, trigger, c)
+        finally:
+            with _warranty_processing_lock:
+                _warranty_processing.discard(processing_key)
+
+    except Exception as outer_err:
+        print(f"[warranty_webhook] outer error: {outer_err}", flush=True)
+        return Response(json.dumps({"success": False, "error": str(outer_err)}),
+                        status=500, headers=cors(), mimetype="application/json")
+
+
+def _warranty_webhook_inner(record_id, trigger, c):
+    try:
         # ── Fetch full Airtable record (use read token — write token lacks read scope) ──
         _read_tok = AIRTABLE_OPS_TOKEN or AIRTABLE_BASE_TOKEN or WARRANTY_WRITE_TOKEN
         rec_resp = req_lib.get(
