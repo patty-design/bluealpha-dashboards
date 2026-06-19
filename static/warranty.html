@@ -336,19 +336,19 @@
         <div class="section-label">Your Information</div>
         <div class="grid-2">
           <div class="field">
-            <label for="firstName">First Name</label>
+            <label for="firstName">First Name <span style="color:var(--red)">*</span></label>
             <input type="text" id="firstName" name="firstName" required placeholder="Jane">
           </div>
           <div class="field">
-            <label for="lastName">Last Name</label>
+            <label for="lastName">Last Name <span style="color:var(--red)">*</span></label>
             <input type="text" id="lastName" name="lastName" required placeholder="Smith">
           </div>
           <div class="field">
-            <label for="email">Email Address</label>
+            <label for="email">Email Address <span style="color:var(--red)">*</span></label>
             <input type="email" id="email" name="email" required placeholder="jane@example.com">
           </div>
           <div class="field">
-            <label for="phone">Phone Number</label>
+            <label for="phone">Phone Number <span style="color:var(--red)">*</span></label>
             <input type="tel" id="phone" name="phone" required placeholder="(555) 000-0000" inputmode="numeric" maxlength="10" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)">
           </div>
         </div>
@@ -359,19 +359,19 @@
         <div class="section-label">Shipping Address</div>
         <div class="grid-2">
           <div class="field full">
-            <label for="address">Street Address</label>
+            <label for="address">Street Address <span style="color:var(--red)">*</span></label>
             <input type="text" id="address" name="address" required placeholder="123 Main St">
           </div>
           <div class="field">
-            <label for="city">City</label>
+            <label for="city">City <span style="color:var(--red)">*</span></label>
             <input type="text" id="city" name="city" required placeholder="Anytown">
           </div>
           <div class="field">
-            <label for="state">State</label>
+            <label for="state">State <span style="color:var(--red)">*</span></label>
             <input type="text" id="state" name="state" required placeholder="GA" maxlength="2">
           </div>
           <div class="field">
-            <label for="zip">ZIP Code</label>
+            <label for="zip">ZIP Code <span style="color:var(--red)">*</span></label>
             <input type="text" id="zip" name="zip" required placeholder="30263" maxlength="10">
           </div>
         </div>
@@ -382,7 +382,7 @@
         <div class="section-label">Repair Details</div>
         <div class="grid-2">
           <div class="field full">
-            <label for="repairDescription">Repair Description</label>
+            <label for="repairDescription">Repair Description <span style="color:var(--red)">*</span></label>
             <textarea id="repairDescription" name="repairDescription" required placeholder="Please describe the issue with your gear and how it occurred…" maxlength="150" oninput="document.getElementById('descCount').textContent=150-this.value.length"></textarea>
             <div style="text-align:right;font-size:12px;color:#888;margin-top:4px;"><span id="descCount">150</span> characters remaining</div>
           </div>
@@ -397,7 +397,7 @@
 
       <!-- Photos -->
       <div class="card">
-        <div class="section-label">Photos (Required)</div>
+        <div class="section-label">Photos <span style="color:var(--red)">*</span></div>
         <div class="file-upload-area" id="uploadArea">
           <input type="file" id="photos" name="photos" accept="image/*" multiple>
           <div class="upload-icon">📷</div>
