@@ -337,11 +337,11 @@
         <div class="grid-2">
           <div class="field">
             <label for="firstName">First Name <span style="color:var(--red)">*</span></label>
-            <input type="text" id="firstName" name="firstName" required placeholder="Jane" maxlength="20">
+            <input type="text" id="firstName" name="firstName" required placeholder="Jane" maxlength="20" oninput="this.value=this.value.replace(/[^a-zA-Z-]/g,'')">
           </div>
           <div class="field">
             <label for="lastName">Last Name <span style="color:var(--red)">*</span></label>
-            <input type="text" id="lastName" name="lastName" required placeholder="Smith" maxlength="20">
+            <input type="text" id="lastName" name="lastName" required placeholder="Smith" maxlength="20" oninput="this.value=this.value.replace(/[^a-zA-Z-]/g,'')">
           </div>
           <div class="field">
             <label for="email">Email Address <span style="color:var(--red)">*</span></label>
@@ -390,7 +390,7 @@
             <label for="originalOrderNum">Original Order # <span class="opt">(optional)</span></label>
             <input type="text" id="originalOrderNum" name="originalOrderNum" placeholder="e.g. 12345" inputmode="numeric" pattern="[0-9]*" maxlength="6" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,6)">
             <label for="originalPurchaserLastName" style="margin-top:14px;">Original Purchaser's Last Name <span class="opt">(optional)</span></label>
-            <input type="text" id="originalPurchaserLastName" name="originalPurchaserLastName" placeholder="e.g. Smith" maxlength="20">
+            <input type="text" id="originalPurchaserLastName" name="originalPurchaserLastName" placeholder="e.g. Smith" maxlength="20" oninput="this.value=this.value.replace(/[^a-zA-Z-]/g,'')">
           </div>
         </div>
       </div>
