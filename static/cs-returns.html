@@ -430,6 +430,8 @@
       <button class="mode-btn" id="btn-mode-missing"    onclick="setMode('missing')">🔍 Missing<br>Items</button>
       <div class="mode-toggle-col-divider"></div>
       <button class="mode-btn" id="btn-mode-incorrect"  onclick="setMode('incorrect')">⚠ Incorrect<br>Items</button>
+      <div class="mode-toggle-col-divider"></div>
+      <button class="mode-btn" id="btn-mode-warranty" onclick="setMode('warranty')">🛡 Warranty<br>Request</button>
     </div>
 
     <div class="card">
@@ -469,6 +471,11 @@
         ⚠ <strong>Incorrect items sent</strong> — Verify the order shipped, then select which components or items were incorrect. A new order will be created in ShipStation.
       </div>
 
+      <!-- Warranty banner -->
+      <div id="banner-warranty" class="info-banner banner-green hidden">
+        🛡 <strong>Warranty Request</strong> — Submit a warranty request on behalf of a customer. Fill out the form below and submit.
+      </div>
+
       <!-- Lost Order banner + action toggle -->
       <div id="banner-lost" class="hidden">
         <div class="info-banner banner-amber" style="margin-bottom:10px;">
@@ -480,6 +487,7 @@
         </div>
       </div>
 
+      <div id="order-lookup-section">
       <!-- Order lookup (shared) -->
       <div class="field">
         <label>Order Number <span class="req">*</span></label>
@@ -489,6 +497,7 @@
         </div>
         <div class="message message-error" id="msg-order-not-found">Order not found. Double-check the order number.</div>
         <div class="message message-error" id="msg-lookup-error">Something went wrong. Please try again.</div>
+      </div>
       </div>
 
       <div id="order-info-block" class="hidden">
@@ -722,6 +731,58 @@
     </div>
   </div>
 
+  <!-- WARRANTY FORM BLOCK -->
+  <div id="warranty-form-block" class="hidden" style="margin-top: 24px;">
+    <div class="card">
+      <div class="msg error" id="warranty-error-msg" style="display:none;border-radius:8px;padding:14px 18px;font-size:0.92rem;line-height:1.5;margin-bottom:16px;background:#fdf1f1;border:1px solid #f5c0c0;color:#BD3333;"></div>
+      <div id="warranty-form-inner">
+        <div class="section-label" style="font-family:'Montserrat',sans-serif;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#6b7a8d;margin-bottom:20px;padding-bottom:10px;border-bottom:1px solid #ddd9cc;">Your Information</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+          <div class="field"><label>First Name</label><input type="text" id="w-firstName" placeholder="Jane"></div>
+          <div class="field"><label>Last Name</label><input type="text" id="w-lastName" placeholder="Smith"></div>
+          <div class="field"><label>Email Address</label><input type="email" id="w-email" placeholder="jane@example.com"></div>
+          <div class="field"><label>Phone Number</label><input type="tel" id="w-phone" placeholder="(555) 000-0000" inputmode="numeric" maxlength="10" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)"></div>
+        </div>
+        <div class="section-label" style="font-family:'Montserrat',sans-serif;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#6b7a8d;margin-bottom:20px;padding-bottom:10px;border-bottom:1px solid #ddd9cc;">Shipping Address</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+          <div class="field" style="grid-column:1/-1;"><label>Street Address</label><input type="text" id="w-address" placeholder="123 Main St"></div>
+          <div class="field"><label>City</label><input type="text" id="w-city" placeholder="Anytown"></div>
+          <div class="field"><label>State</label><input type="text" id="w-state" placeholder="GA" maxlength="2"></div>
+          <div class="field"><label>ZIP Code</label><input type="text" id="w-zip" placeholder="30263" maxlength="10"></div>
+        </div>
+        <div class="section-label" style="font-family:'Montserrat',sans-serif;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#6b7a8d;margin-bottom:20px;padding-bottom:10px;border-bottom:1px solid #ddd9cc;">Repair Details</div>
+        <div style="display:grid;gap:16px;margin-bottom:24px;">
+          <div class="field">
+            <label>Repair Description</label>
+            <textarea id="w-repairDescription" placeholder="Please describe the issue with the customer's gear and how it occurred…" maxlength="150" oninput="document.getElementById('w-descCount').textContent=150-this.value.length" style="resize:vertical;min-height:110px;width:100%;padding:10px 13px;border:1px solid #ddd9cc;border-radius:6px;font-family:'Lato',sans-serif;font-size:0.95rem;"></textarea>
+            <div style="text-align:right;font-size:12px;color:#888;margin-top:4px;"><span id="w-descCount">150</span> characters remaining</div>
+          </div>
+          <div class="field">
+            <label>Original Order # <span style="font-weight:400;font-size:0.78rem;color:#6b7a8d;">(optional)</span></label>
+            <input type="text" id="w-originalOrderNum" placeholder="e.g. 12345" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+            <label style="margin-top:14px;">Original Purchaser's Last Name <span style="font-weight:400;font-size:0.78rem;color:#6b7a8d;">(optional)</span></label>
+            <input type="text" id="w-originalPurchaserLastName" placeholder="e.g. Smith">
+          </div>
+        </div>
+        <div class="section-label" style="font-family:'Montserrat',sans-serif;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#6b7a8d;margin-bottom:20px;padding-bottom:10px;border-bottom:1px solid #ddd9cc;">Photos (Required)</div>
+        <div style="border:2px dashed #ddd9cc;border-radius:8px;padding:24px;text-align:center;background:#faf9f6;cursor:pointer;position:relative;" id="w-uploadArea">
+          <input type="file" id="w-photos" name="w-photos" accept="image/*" multiple style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;">
+          <div style="font-size:2rem;margin-bottom:8px;">📷</div>
+          <div style="font-size:0.9rem;color:#6b7a8d;line-height:1.5;"><strong style="color:#003a6c;">Click to upload</strong> or drag &amp; drop photos here<br>JPEG, PNG, GIF, WebP accepted</div>
+        </div>
+        <div id="w-fileList" style="margin-top:12px;display:flex;flex-direction:column;gap:6px;"></div>
+        <div id="w-fileCountNote" style="font-size:0.8rem;color:#6b7a8d;margin-top:6px;"></div>
+        <button class="btn btn-primary" id="w-submitBtn" onclick="submitWarrantyForm()" style="margin-top:24px;width:100%;">Submit Warranty Request</button>
+      </div>
+      <div id="warranty-success" class="hidden" style="text-align:center;padding:48px 32px;">
+        <div style="font-size:3.5rem;margin-bottom:20px;">✅</div>
+        <h2 style="font-family:'Montserrat',sans-serif;font-size:1.5rem;font-weight:800;color:#003a6c;margin-bottom:12px;">Request Submitted!</h2>
+        <p style="color:#6b7a8d;font-size:0.95rem;line-height:1.6;">The warranty request has been submitted successfully.</p>
+        <button class="btn btn-primary" onclick="resetWarrantyForm()" style="margin-top:24px;">Submit Another</button>
+      </div>
+    </div>
+  </div>
+
   <!-- SUCCESS (shared container, different inner screens) -->
   <div id="screen-success" class="hidden">
     <div class="card">
@@ -914,6 +975,7 @@ function setMode(mode) {
   const isShipping  = mode === 'shipping';
   const isMissing   = mode === 'missing';
   const isIncorrect = mode === 'incorrect';
+  const isWarranty  = mode === 'warranty';
   const isReship    = isMissing || isIncorrect;
 
   document.getElementById('btn-mode-return').classList.toggle('active', isReturn);
@@ -924,6 +986,7 @@ function setMode(mode) {
   document.getElementById('btn-mode-shipping').classList.toggle('active', isShipping);
   document.getElementById('btn-mode-missing').classList.toggle('active', isMissing);
   document.getElementById('btn-mode-incorrect').classList.toggle('active', isIncorrect);
+  document.getElementById('btn-mode-warranty').classList.toggle('active', isWarranty);
 
   // Banners
   document.getElementById('banner-return').classList.toggle('hidden', !isReturn);
@@ -934,6 +997,7 @@ function setMode(mode) {
   document.getElementById('banner-shipping').classList.toggle('hidden', !isShipping);
   document.getElementById('banner-missing').classList.toggle('hidden', !isMissing);
   document.getElementById('banner-incorrect').classList.toggle('hidden', !isIncorrect);
+  document.getElementById('banner-warranty').classList.toggle('hidden', !isWarranty);
 
   // Items label (only relevant for non-exchange/non-intl/non-shipping modes)
   document.getElementById('items-label').innerHTML = (isReturn ? 'Items to Return' : isCancel ? 'Items to Cancel' : 'Items to Reship') + ' <span class="req">*</span>';
@@ -959,7 +1023,7 @@ function setMode(mode) {
                                                                  : 'Any additional context from the customer…';
 
   // Submit button: hide in exchange/intl/missing/incorrect modes (those use their own submit UI)
-  document.getElementById('btn-cs-submit').classList.toggle('hidden', isExchange || isIntl || isReship);
+  document.getElementById('btn-cs-submit').classList.toggle('hidden', isExchange || isIntl || isReship || isWarranty);
   if (isReturn)        document.getElementById('btn-cs-submit').innerHTML = 'Submit &amp; Send Label';
   else if (isCancel)   document.getElementById('btn-cs-submit').innerHTML = 'Submit Cancellation Request';
   else if (isLost)     document.getElementById('btn-cs-submit').innerHTML = lostAction === 'refund' ? 'Log Refund Request' : 'Create Reshipment';
@@ -967,6 +1031,8 @@ function setMode(mode) {
 
   // In exchange/intl mode, hide the shared order-info-block; show info blocks only after lookup
   document.getElementById('order-info-block').classList.add('hidden');
+  document.getElementById('order-lookup-section').classList.toggle('hidden', isWarranty);
+  document.getElementById('warranty-form-block').classList.toggle('hidden', !isWarranty);
   document.getElementById('reship-panel').classList.add('hidden');
   document.getElementById('exchange-info-block').classList.toggle('hidden', !isExchange || !exchangeVerifyData);
   document.getElementById('intl-info-block').classList.toggle('hidden', !isIntl || !intlVerifyData);
@@ -989,7 +1055,7 @@ function setMode(mode) {
   document.getElementById('msg-lookup-error').classList.remove('show');
   document.getElementById('cs-order-number').value = '';
   // Re-show submit button in case it was hidden by block state (non-exchange/intl/reship modes)
-  if (!isExchange && !isIntl && !isReship) document.getElementById('btn-cs-submit').classList.remove('hidden');
+  if (!isExchange && !isIntl && !isReship && !isWarranty) document.getElementById('btn-cs-submit').classList.remove('hidden');
 }
 
 // ── Lost action sub-toggle ─────────────────────────────────────────────────
@@ -2114,6 +2180,128 @@ function resetForm() {
   document.getElementById('screen-main').classList.remove('hidden');
   // Reset lost sub-toggle to reship
   if (currentMode === 'lost') setLostAction('reship');
+}
+
+// ── Warranty form file handling ─────────────────────────────────────────────
+let wSelectedFiles = [];
+
+(function() {
+  const area  = document.getElementById('w-uploadArea');
+  const input = document.getElementById('w-photos');
+  const list  = document.getElementById('w-fileList');
+  const note  = document.getElementById('w-fileCountNote');
+
+  function updateWFileDisplay() {
+    list.innerHTML = '';
+    wSelectedFiles.forEach((file, idx) => {
+      const item = document.createElement('div');
+      item.style.cssText = 'display:flex;align-items:center;gap:10px;background:#DDD8C4;border-radius:6px;padding:8px 12px;font-size:0.85rem;';
+      item.innerHTML = `<span>📄</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${file.name.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</span><span style="color:#6b7a8d;font-size:0.8rem">${(file.size/1024).toFixed(0)} KB</span><button type="button" onclick="wRemoveFile(${idx})" style="background:none;border:none;color:#BD3333;cursor:pointer;font-size:1rem;font-weight:700;padding:0 2px;">✕</button>`;
+      list.appendChild(item);
+    });
+    note.textContent = wSelectedFiles.length > 0 ? `${wSelectedFiles.length} of 5 photos selected` : '';
+  }
+
+  input.addEventListener('change', () => {
+    const combined = [...wSelectedFiles, ...Array.from(input.files)];
+    wSelectedFiles = combined.slice(0, 5);
+    input.value = '';
+    updateWFileDisplay();
+  });
+
+  area.addEventListener('dragover', e => { e.preventDefault(); area.style.borderColor = '#003a6c'; });
+  area.addEventListener('dragleave', () => { area.style.borderColor = '#ddd9cc'; });
+  area.addEventListener('drop', e => {
+    e.preventDefault();
+    area.style.borderColor = '#ddd9cc';
+    const dropped = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    wSelectedFiles = [...wSelectedFiles, ...dropped].slice(0, 5);
+    updateWFileDisplay();
+  });
+
+  window.wRemoveFile = function(idx) {
+    wSelectedFiles.splice(idx, 1);
+    updateWFileDisplay();
+  };
+  window._updateWFileDisplay = updateWFileDisplay;
+})();
+
+async function submitWarrantyForm() {
+  const errEl = document.getElementById('warranty-error-msg');
+  errEl.style.display = 'none';
+  errEl.textContent = '';
+
+  const required = [
+    ['w-firstName', 'First Name'], ['w-lastName', 'Last Name'],
+    ['w-email', 'Email Address'], ['w-phone', 'Phone Number'],
+    ['w-address', 'Street Address'], ['w-city', 'City'],
+    ['w-state', 'State'], ['w-zip', 'ZIP Code'],
+    ['w-repairDescription', 'Repair Description'],
+  ];
+  for (const [id, label] of required) {
+    const el = document.getElementById(id);
+    if (!el.value.trim()) {
+      errEl.textContent = `Please fill in: ${label}`;
+      errEl.style.display = 'block';
+      el.focus();
+      return;
+    }
+  }
+  if (wSelectedFiles.length === 0) {
+    errEl.textContent = 'Please attach at least one photo.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('w-submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  const formData = new FormData();
+  formData.append('firstName',        document.getElementById('w-firstName').value.trim());
+  formData.append('lastName',         document.getElementById('w-lastName').value.trim());
+  formData.append('email',            document.getElementById('w-email').value.trim());
+  formData.append('phone',            document.getElementById('w-phone').value.trim());
+  formData.append('address',          document.getElementById('w-address').value.trim());
+  formData.append('city',             document.getElementById('w-city').value.trim());
+  formData.append('state',            document.getElementById('w-state').value.trim());
+  formData.append('zip',              document.getElementById('w-zip').value.trim());
+  formData.append('repairDescription',document.getElementById('w-repairDescription').value.trim());
+  formData.append('originalOrderNum', document.getElementById('w-originalOrderNum').value.trim());
+  formData.append('originalPurchaserLastName', document.getElementById('w-originalPurchaserLastName').value.trim());
+  wSelectedFiles.forEach(f => formData.append('photos', f));
+
+  try {
+    const resp = await fetch('/api/warranty/submit', { method: 'POST', body: formData });
+    const data = await resp.json();
+    if (data.success) {
+      document.getElementById('warranty-form-inner').classList.add('hidden');
+      document.getElementById('warranty-success').classList.remove('hidden');
+    } else {
+      errEl.textContent = data.error || 'Something went wrong. Please try again.';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Submit Warranty Request';
+    }
+  } catch (err) {
+    errEl.textContent = 'Network error. Please check your connection and try again.';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Submit Warranty Request';
+  }
+}
+
+function resetWarrantyForm() {
+  ['w-firstName','w-lastName','w-email','w-phone','w-address','w-city','w-state','w-zip','w-repairDescription','w-originalOrderNum','w-originalPurchaserLastName'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  wSelectedFiles = [];
+  window._updateWFileDisplay();
+  document.getElementById('w-descCount').textContent = '150';
+  document.getElementById('warranty-form-inner').classList.remove('hidden');
+  document.getElementById('warranty-success').classList.add('hidden');
+  document.getElementById('w-submitBtn').disabled = false;
+  document.getElementById('w-submitBtn').textContent = 'Submit Warranty Request';
 }
 </script>
 </body>
