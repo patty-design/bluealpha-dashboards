@@ -759,7 +759,7 @@
           </div>
           <div class="field">
             <label>Original Order # <span style="font-weight:400;font-size:0.78rem;color:#6b7a8d;">(optional)</span></label>
-            <input type="text" id="w-originalOrderNum" placeholder="e.g. 12345" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+            <input type="text" id="w-originalOrderNum" placeholder="e.g. 12345" inputmode="numeric" pattern="[0-9]*" maxlength="6" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,6)">
             <label style="margin-top:14px;">Original Purchaser's Last Name <span style="font-weight:400;font-size:0.78rem;color:#6b7a8d;">(optional)</span></label>
             <input type="text" id="w-originalPurchaserLastName" placeholder="e.g. Smith">
           </div>
