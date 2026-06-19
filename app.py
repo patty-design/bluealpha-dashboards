@@ -11612,13 +11612,10 @@ def _send_warranty_approval_email(to_email, first_name, label_pdf_b64):
         <tr><td style="padding:32px 36px;">
           <p style="color:#1a2633;font-size:16px;margin:0 0 16px;">Hi {first_name},</p>
           <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0 0 16px;">
-            Thank you for submitting your warranty request. We've reviewed it and a replacement is already on its way to you!
+            Great news — your warranty request has been approved! We'll be sending out a replacement <strong>{replacement_item}</strong> to you shortly.
           </p>
           <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0 0 16px;">
             We do ask that you send your original item back to us so we can take a look at what happened. Attached is a prepaid return label — please print it, attach it to your package, and drop it off at any USPS location at your earliest convenience.
-          </p>
-          <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0 0 24px;">
-            You don't need to wait for us to receive your return before your replacement ships — we've already got that taken care of.
           </p>
           <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0;">
             Questions? Reply to this email and we'll be happy to help.
