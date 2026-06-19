@@ -11907,7 +11907,7 @@ def _warranty_webhook_inner(record_id, trigger, c):
                 # ── Create return label ──
                 label_payload = {
                     "carrierCode":  "stamps_com",
-                    "serviceCode":  "usps_priority_mail",
+                    "serviceCode":  "usps_ground_advantage",
                     "packageCode":  "package",
                     "shipDate":     datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                     "weight":       {"value": 32, "units": "ounces"},
@@ -12052,7 +12052,7 @@ def _warranty_webhook_inner(record_id, trigger, c):
                 label_resp = req_lib.post(
                     "https://ssapi.shipstation.com/shipments/createlabel",
                     headers={**ss_headers(), "Content-Type": "application/json"},
-                    json={"carrierCode": "stamps_com", "serviceCode": "usps_priority_mail",
+                    json={"carrierCode": "stamps_com", "serviceCode": "usps_ground_advantage",
                           "packageCode": "package", "shipDate": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                           "weight": {"value": 32, "units": "ounces"},
                           "shipFrom": {"name": f"{first_name} {last_name}".strip(), "street1": address,
