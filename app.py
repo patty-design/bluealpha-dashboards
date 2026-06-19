@@ -11983,11 +11983,11 @@ def _warranty_webhook_inner(record_id, trigger, c):
             elif approval in ("Outside warranty window", "Not a Blue Alpha product", "Repair not deemed necessary"):
                 denial_explanation = (fields.get("Denial Explanation") or "").strip()
                 _send_warranty_ineligible_email(email, first_name, approval, denial_explanation)
-                # ── Uncheck "Send Customer Email" so the scan never re-sends this denial ──
+                # ── Set Tracking # to "N/A" so the scan's idempotency check won't re-fire ──
                 req_lib.patch(
                     f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{record_id}",
                     headers={"Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}", "Content-Type": "application/json"},
-                    json={"fields": {"Send Customer Email": False}},
+                    json={"fields": {"Tracking #": "N/A"}},
                     timeout=10,
                 )
                 return Response(
