@@ -11995,7 +11995,7 @@ def _warranty_webhook_inner(record_id, trigger, c):
                     status=200, headers=c, mimetype="application/json",
                 )
 
-            elif approval == "Replace w/o Return":
+            elif approval.lower() == "replace w/o return":
                 # ── No return label; just create SS order and email customer ──
                 replacement_item = (fields.get("Replacement Item") or "").strip()
                 if not replacement_item:
@@ -12323,7 +12323,7 @@ def _warranty_scan():
                             print(f"[warranty-scan] denial call error: {e}", flush=True)
 
                     # Replace w/o Return: needs order but hasn't been created yet
-                    elif send_email and not warranty_order_set and approval == "Replace w/o Return":
+                    elif send_email and not warranty_order_set and approval.lower() == "replace w/o return":
                         print(f"[warranty-scan] queuing replace_wo_return for {rid}", flush=True)
                         try:
                             req_lib.post(
