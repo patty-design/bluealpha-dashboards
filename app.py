@@ -11983,6 +11983,13 @@ def _warranty_webhook_inner(record_id, trigger, c):
             elif approval in ("Outside warranty window", "Not a Blue Alpha product", "Repair not deemed necessary"):
                 denial_explanation = (fields.get("Denial Explanation") or "").strip()
                 _send_warranty_ineligible_email(email, first_name, approval, denial_explanation)
+                # ── Uncheck "Send Customer Email" so the scan never re-sends this denial ──
+                req_lib.patch(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{record_id}",
+                    headers={"Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}", "Content-Type": "application/json"},
+                    json={"fields": {"Send Customer Email": False}},
+                    timeout=10,
+                )
                 return Response(
                     json.dumps({"success": True, "action": "denial_email_sent", "reason": approval}),
                     status=200, headers=c, mimetype="application/json",
@@ -12209,21 +12216,27 @@ def _warranty_webhook_inner(record_id, trigger, c):
 def _warranty_scan():
     """Scan Warranty Requests at 10 AM and 2 PM ET daily and process any missed records."""
     import time as _time
-    from datetime import datetime as _dt, timezone as _tz
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
     import zoneinfo as _zi
 
     _ET = _zi.ZoneInfo("America/New_York")
     _RUN_HOURS = {10, 14}  # 10 AM and 2 PM ET
+    _STARTUP_DELAY = 300   # 5 min — prevents re-firing when app restarts mid-target-hour
 
     _time.sleep(30)  # brief startup delay
+    _process_start = _dt.now(_ET)
     _last_run_hour = None
     _read_tok = AIRTABLE_OPS_TOKEN or AIRTABLE_BASE_TOKEN or WARRANTY_WRITE_TOKEN
 
     while True:
         now_et = _dt.now(_ET)
         current_hour = now_et.hour
-        # Run at the top of each target hour, once per hour
-        if current_hour in _RUN_HOURS and _last_run_hour != (now_et.date(), current_hour):
+        secs_since_start = (now_et - _process_start).total_seconds()
+        # Run at the top of each target hour, once per hour.
+        # Also require 5 min since startup so deployments mid-hour don't re-fire.
+        if (current_hour in _RUN_HOURS
+                and _last_run_hour != (now_et.date(), current_hour)
+                and secs_since_start >= _STARTUP_DELAY):
             _last_run_hour = (now_et.date(), current_hour)
         else:
             _time.sleep(60)
