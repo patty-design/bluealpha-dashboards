@@ -337,15 +337,15 @@
         <div class="grid-2">
           <div class="field">
             <label for="firstName">First Name <span style="color:var(--red)">*</span></label>
-            <input type="text" id="firstName" name="firstName" required placeholder="Jane">
+            <input type="text" id="firstName" name="firstName" required placeholder="Jane" maxlength="20">
           </div>
           <div class="field">
             <label for="lastName">Last Name <span style="color:var(--red)">*</span></label>
-            <input type="text" id="lastName" name="lastName" required placeholder="Smith">
+            <input type="text" id="lastName" name="lastName" required placeholder="Smith" maxlength="20">
           </div>
           <div class="field">
             <label for="email">Email Address <span style="color:var(--red)">*</span></label>
-            <input type="email" id="email" name="email" required placeholder="jane@example.com">
+            <input type="email" id="email" name="email" required placeholder="jane@example.com" maxlength="100">
           </div>
           <div class="field">
             <label for="phone">Phone Number <span style="color:var(--red)">*</span></label>
@@ -360,19 +360,19 @@
         <div class="grid-2">
           <div class="field full">
             <label for="address">Street Address <span style="color:var(--red)">*</span></label>
-            <input type="text" id="address" name="address" required placeholder="123 Main St">
+            <input type="text" id="address" name="address" required placeholder="123 Main St" maxlength="50">
           </div>
           <div class="field">
             <label for="city">City <span style="color:var(--red)">*</span></label>
-            <input type="text" id="city" name="city" required placeholder="Anytown">
+            <input type="text" id="city" name="city" required placeholder="Anytown" maxlength="30">
           </div>
           <div class="field">
             <label for="state">State <span style="color:var(--red)">*</span></label>
-            <input type="text" id="state" name="state" required placeholder="GA" maxlength="2">
+            <input type="text" id="state" name="state" required placeholder="GA" maxlength="2" oninput="this.value=this.value.replace(/[^a-zA-Z]/g,'').slice(0,2).toUpperCase()">
           </div>
           <div class="field">
             <label for="zip">ZIP Code <span style="color:var(--red)">*</span></label>
-            <input type="text" id="zip" name="zip" required placeholder="30263" maxlength="10">
+            <input type="text" id="zip" name="zip" required placeholder="30263" maxlength="5" inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,5)">
           </div>
         </div>
       </div>
@@ -390,7 +390,7 @@
             <label for="originalOrderNum">Original Order # <span class="opt">(optional)</span></label>
             <input type="text" id="originalOrderNum" name="originalOrderNum" placeholder="e.g. 12345" inputmode="numeric" pattern="[0-9]*" maxlength="6" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,6)">
             <label for="originalPurchaserLastName" style="margin-top:14px;">Original Purchaser's Last Name <span class="opt">(optional)</span></label>
-            <input type="text" id="originalPurchaserLastName" name="originalPurchaserLastName" placeholder="e.g. Smith">
+            <input type="text" id="originalPurchaserLastName" name="originalPurchaserLastName" placeholder="e.g. Smith" maxlength="20">
           </div>
         </div>
       </div>
@@ -496,6 +496,13 @@
         el.focus();
         return;
       }
+    }
+    const emailVal = document.getElementById('email').value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
+      errorMsg.textContent = 'Please enter a valid email address.';
+      errorMsg.classList.add('show');
+      document.getElementById('email').focus();
+      return;
     }
     if (selectedFiles.length === 0) {
       errorMsg.textContent = 'Please attach at least one photo.';
