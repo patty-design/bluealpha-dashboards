@@ -388,7 +388,7 @@
           </div>
           <div class="field full">
             <label for="originalOrderNum">Original Order # <span class="opt">(optional)</span></label>
-            <input type="text" id="originalOrderNum" name="originalOrderNum" placeholder="e.g. 12345" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+            <input type="text" id="originalOrderNum" name="originalOrderNum" placeholder="e.g. 12345" inputmode="numeric" pattern="[0-9]*" maxlength="6" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,6)">
             <label for="originalPurchaserLastName" style="margin-top:14px;">Original Purchaser's Last Name <span class="opt">(optional)</span></label>
             <input type="text" id="originalPurchaserLastName" name="originalPurchaserLastName" placeholder="e.g. Smith">
           </div>
