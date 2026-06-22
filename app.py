@@ -11506,7 +11506,6 @@ def warranty_submit():
             "Zip":                 zip_code,
             "Repair Description":  repair_description,
             "Request Date":        _dt_sub.now(_tz_sub.utc).strftime("%Y-%m-%d"),
-            "Received Date":       _dt_sub.now(_tz_sub.utc).strftime("%Y-%m-%d"),
         }
         if original_order_num:
             fields["Original Order #"] = original_order_num
@@ -12029,7 +12028,7 @@ def _warranty_webhook_inner(record_id, trigger, c):
                 today_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000")
                 _caddr = {"name": f"{first_name} {last_name}".strip(), "street1": address,
                           "city": city, "state": state, "postalCode": zip_code, "country": "US", "phone": phone}
-                _pd = _ss_payment_date(fields.get("Received Date"))
+                _pd = _ss_payment_date(fields.get("Request Date"))
                 _order_payload = {"orderNumber": order_ref, "orderStatus": "awaiting_shipment",
                           "orderDate": today_str, "billTo": _caddr, "shipTo": _caddr,
                           "items": [{"name": replacement_item, "quantity": 1, "unitPrice": 0}],
@@ -12100,7 +12099,7 @@ def _warranty_webhook_inner(record_id, trigger, c):
                 today_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000")
                 _caddr = {"name": f"{first_name} {last_name}".strip(), "street1": address,
                           "city": city, "state": state, "postalCode": zip_code, "country": "US", "phone": phone}
-                _pd = _ss_payment_date(fields.get("Received Date"))
+                _pd = _ss_payment_date(fields.get("Request Date"))
                 _order_payload = {"orderNumber": order_ref, "orderStatus": "awaiting_shipment",
                           "orderDate": today_str, "billTo": _caddr, "shipTo": _caddr,
                           "items": [{"name": replacement_item, "quantity": 1, "unitPrice": 0}],
