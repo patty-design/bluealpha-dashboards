@@ -12649,7 +12649,7 @@ def anniversary_admin_data():
             "form":         None,  # filled in below
         })
 
-    participants.sort(key=lambda x: (x["last_name"], x["first_name"]))
+    participants.sort(key=lambda x: (x["first_name"], x["last_name"]))
 
     # ── Merge Google Form responses ──────────────────────────────────────────
     form_rows   = _fetch_form_responses()
