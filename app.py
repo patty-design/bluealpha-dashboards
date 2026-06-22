@@ -12685,7 +12685,7 @@ def anniversary_admin_data():
         if sz not in shirt_totals_sorted:
             shirt_totals_sorted[sz] = shirt_totals[sz]
 
-    participants.sort(key=lambda x: (x["last_name"], x["first_name"]))
+    participants.sort(key=lambda x: (x["first_name"], x["last_name"]))
 
     return Response(json.dumps({
         "participants":   participants,
