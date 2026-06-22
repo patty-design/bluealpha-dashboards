@@ -2372,20 +2372,17 @@ def create_return_label(order_id, customer_addr, customer_email="", order_number
     label_pdf_b64 is the base64-encoded PDF from ShipStation (may be empty string if not returned)."""
     from datetime import datetime, timezone
 
-    # Inherit carrier/service/weight from original shipment
+    # Always use USPS Ground Advantage for return labels regardless of original shipment method
+    carrier = "stamps_com"
+    service = "usps_ground_advantage"
+    weight  = {"value": 16, "units": "ounces"}
+    # Still fetch original shipment to inherit weight only
     sr = req_lib.get("https://ssapi.shipstation.com/shipments",
                      params={"orderId": order_id},
                      headers=ss_headers(), timeout=10)
     ships = sr.json().get("shipments", [])
-    carrier = "stamps_com"
-    service = "usps_priority_mail"
-    weight  = {"value": 16, "units": "ounces"}
-    # Prefer outbound (non-return) shipments so we don't inherit zero weights
-    # from previous failed return label attempts on this order
     outbound = [s for s in ships if not s.get("isReturnLabel", False)]
     for s in (outbound or ships):
-        carrier = s.get("carrierCode") or carrier
-        service = s.get("serviceCode") or service
         w = s.get("weight") or {}
         if w.get("value", 0) > 0:
             weight = w
