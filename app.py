@@ -11397,8 +11397,9 @@ WARRANTY_WRITE_TOKEN = os.environ.get("AIRTABLE_WRITE_TOKEN_2", "")
 
 # In-memory lock to prevent duplicate webhook processing (race condition between
 # Airtable automation and background scan firing for the same record simultaneously)
-_warranty_processing: set = set()
+_warranty_processing: dict = {}   # key -> completed_at timestamp (0 = still in progress)
 _warranty_processing_lock = threading.Lock()
+_WARRANTY_DEDUP_WINDOW = 300  # seconds to block duplicate webhook calls after completion
 # Disk-based photo store: photos saved to /tmp/warranty_photos/{key}
 # More reliable than in-memory — survives within the same container instance.
 _WARRANTY_PHOTO_DIR = "/tmp/warranty_photos"
@@ -11818,21 +11819,32 @@ def warranty_webhook():
                 status=400, headers=c, mimetype="application/json",
             )
 
-        # ── Duplicate-call guard: reject if this record is already being processed ──
+        # ── Duplicate-call guard: reject if this record is already being processed
+        #    or was processed within the last 5 minutes ──
         processing_key = f"{record_id}:{trigger}"
+        import time as _time
+        now = _time.time()
         with _warranty_processing_lock:
+            # Clean up entries older than the dedup window
+            expired = [k for k, t in _warranty_processing.items() if t > 0 and now - t > _WARRANTY_DEDUP_WINDOW]
+            for k in expired:
+                del _warranty_processing[k]
             if processing_key in _warranty_processing:
                 print(f"[warranty_webhook] duplicate call ignored for {processing_key}", flush=True)
                 return Response(
                     json.dumps({"success": True, "action": "duplicate_ignored"}),
                     status=200, headers=c, mimetype="application/json",
                 )
-            _warranty_processing.add(processing_key)
+            _warranty_processing[processing_key] = 0  # 0 = in progress
         try:
-            return _warranty_webhook_inner(record_id, trigger, c)
-        finally:
+            result = _warranty_webhook_inner(record_id, trigger, c)
             with _warranty_processing_lock:
-                _warranty_processing.discard(processing_key)
+                _warranty_processing[processing_key] = _time.time()  # mark completed
+            return result
+        except Exception:
+            with _warranty_processing_lock:
+                _warranty_processing.pop(processing_key, None)  # on error, allow retry
+            raise
 
     except Exception as outer_err:
         print(f"[warranty_webhook] outer error: {outer_err}", flush=True)
