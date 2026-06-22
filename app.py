@@ -46,6 +46,7 @@ SHIPSTATION_KEY      = os.environ.get("SHIPSTATION_KEY", "")
 SHIPSTATION_SECRET   = os.environ.get("SHIPSTATION_SECRET", "")
 SENDGRID_API_KEY     = os.environ.get("SENDGRID_API_KEY", "")
 SENDGRID_FROM_EMAIL  = os.environ.get("SENDGRID_FROM_EMAIL", "orders@bluealpha.us")
+CS_FROM_EMAIL        = "info@bluealpha.us"   # CS portal emails (exchange, returns, warranty, etc.)
 TEST_EMAIL_OVERRIDE  = os.environ.get("TEST_EMAIL_OVERRIDE", "")
 CS_ADMIN_PASSWORD    = os.environ.get("CS_ADMIN_PASSWORD", "")
 
@@ -1764,8 +1765,8 @@ def cs_intl_exchange_submit():
                     headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
                     json={
                         "personalizations": [{"to": [{"email": TEST_EMAIL_OVERRIDE or customer_email}]}],
-                        "from":    {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
-                        "reply_to": {"email": SENDGRID_FROM_EMAIL},
+                        "from":    {"email": CS_FROM_EMAIL, "name": "Blue Alpha"},
+                        "reply_to": {"email": CS_FROM_EMAIL},
                         "subject": f"Your Blue Alpha Size Exchange Payment — Order #{order_number}",
                         "content": [{"type": "text/plain", "value": email_body}],
                     },
@@ -2335,7 +2336,7 @@ def send_return_label_email(to_email, customer_name, order_number, label_pdf_b64
         first_name = customer_name.split()[0] if customer_name else "there"
         payload = {
             "personalizations": [{"to": [{"email": to_email}]}],
-            "from": {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
+            "from": {"email": CS_FROM_EMAIL, "name": "Blue Alpha"},
             "subject": f"Your Blue Alpha Return Label — Order #{order_number}",
             "content": [{"type": "text/plain", "value": (
                 f"Hi {first_name},\n\n"
@@ -4024,7 +4025,7 @@ def submit_exchange():
                     headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
                     json={
                         "personalizations": [{"to": [{"email": TEST_EMAIL_OVERRIDE or customer_email}]}],
-                        "from":    {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
+                        "from":    {"email": CS_FROM_EMAIL, "name": "Blue Alpha"},
                         "subject": f"Your Blue Alpha Size Exchange — Order #{original_order_number}",
                         "content": [{"type": "text/plain", "value": email_body}],
                     },
@@ -9166,8 +9167,8 @@ def international_success():
                 headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
                 json={
                     "personalizations": [{"to": [{"email": TEST_EMAIL_OVERRIDE or customer_email}]}],
-                    "from":    {"email": SENDGRID_FROM_EMAIL, "name": "Blue Alpha"},
-                    "reply_to": {"email": SENDGRID_FROM_EMAIL},
+                    "from":    {"email": CS_FROM_EMAIL, "name": "Blue Alpha"},
+                    "reply_to": {"email": CS_FROM_EMAIL},
                     "subject": f"Your Blue Alpha Size Exchange — Order #{order_number}",
                     "content": [{"type": "text/plain", "value": email_body}],
                 },
