@@ -11773,9 +11773,6 @@ def _send_warranty_replace_email(to_email, first_name, replacement_item, label_p
             Great news — your warranty request has been approved! We'll be sending out a replacement <strong>{replacement_item}</strong> to you shortly.
           </p>
           {return_label_line}
-          <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0 0 16px;">
-            You do not need to send back your original item — no return is required.
-          </p>
           <p style="color:#4a5568;font-size:14px;line-height:1.7;margin:0;">
             If you have any questions, please reply to this email and we'll be happy to help.
           </p>""" + _wa_email_footer()
@@ -11880,7 +11877,7 @@ def _warranty_webhook_inner(record_id, trigger, c):
             _DENIAL_OPTIONS = ("Outside warranty window", "Not a Blue Alpha product", "Repair not deemed necessary")
 
             # ── Idempotency: skip if already processed ──
-            if approval in ("Rig Repair", "EDC Repair", "Replace") and fields.get("Tracking #"):
+            if approval in ("Rig Repair", "EDC Repair", "Replace") and (fields.get("Tracking #") or fields.get("Warranty Order #")):
                 print(f"[warranty_webhook] approval_changed skipped — Tracking # already set for {record_id}", flush=True)
                 return Response(
                     json.dumps({"success": True, "action": "already_processed"}),
@@ -11896,6 +11893,13 @@ def _warranty_webhook_inner(record_id, trigger, c):
                     order_ref = f"{original_order_num}-W"
                 else:
                     order_ref = f"{last_name}-W"
+
+                # ── Write order ref immediately to block duplicate webhook calls ──
+                req_lib.patch(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{record_id}",
+                    headers={"Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}", "Content-Type": "application/json"},
+                    json={"fields": {"Warranty Order #": order_ref}}, timeout=10,
+                )
 
                 # ── Look up original SS order if we have an order number ──
                 orig_ss_order_id = None
@@ -12006,9 +12010,15 @@ def _warranty_webhook_inner(record_id, trigger, c):
                                     status=200, headers=c, mimetype="application/json")
                 from datetime import datetime, timezone
                 if original_order_num:
-                    order_ref = f"{original_order_num}-WN"
+                    order_ref = f"{original_order_num}-W"
                 else:
-                    order_ref = f"{last_name}-WN"
+                    order_ref = f"{last_name}-W"
+                # ── Write order ref immediately to block duplicate webhook calls ──
+                req_lib.patch(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{record_id}",
+                    headers={"Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}", "Content-Type": "application/json"},
+                    json={"fields": {"Warranty Order #": order_ref}}, timeout=10,
+                )
                 today_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000")
                 _caddr = {"name": f"{first_name} {last_name}".strip(), "street1": address,
                           "city": city, "state": state, "postalCode": zip_code, "country": "US", "phone": phone}
@@ -12039,14 +12049,20 @@ def _warranty_webhook_inner(record_id, trigger, c):
                 if not replacement_item:
                     return Response(json.dumps({"success": False, "error": "Replacement Item field is empty"}),
                                     status=400, headers=c, mimetype="application/json")
-                if fields.get("Tracking #"):
+                if fields.get("Tracking #") or fields.get("Warranty Order #"):
                     return Response(json.dumps({"success": True, "action": "already_processed"}),
                                     status=200, headers=c, mimetype="application/json")
                 from datetime import datetime, timezone
                 if original_order_num:
-                    order_ref = f"{original_order_num}-WR"
+                    order_ref = f"{original_order_num}-W"
                 else:
-                    order_ref = f"{last_name}-WR"
+                    order_ref = f"{last_name}-W"
+                # ── Write order ref immediately to block duplicate webhook calls ──
+                req_lib.patch(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{record_id}",
+                    headers={"Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}", "Content-Type": "application/json"},
+                    json={"fields": {"Warranty Order #": order_ref}}, timeout=10,
+                )
 
                 # Create return label
                 label_resp = req_lib.post(
