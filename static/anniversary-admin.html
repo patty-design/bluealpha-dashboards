@@ -332,7 +332,7 @@ function renderParticipants() {
       : '<span class="badge-none">—</span>';
 
     return `<tr>
-      <td><strong>${p.last_name}</strong>, ${p.first_name}${warn}</td>
+      <td><strong>${p.first_name} ${p.last_name}</strong>${warn}</td>
       <td><span class="pts-badge">${p.points}pt</span></td>
       <td>${awardBadge}</td>
       <td>${shirt}</td>
