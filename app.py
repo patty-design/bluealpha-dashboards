@@ -11856,6 +11856,14 @@ def _warranty_webhook_inner(record_id, trigger, c):
             )
         fields = rec_resp.json().get("fields", {})
 
+        # Helper: format Airtable date (YYYY-MM-DD) as ShipStation paymentDate
+        def _ss_payment_date(airtable_date_str):
+            if airtable_date_str:
+                d = (airtable_date_str or "").strip()[:10]  # take YYYY-MM-DD portion
+                if d:
+                    return f"{d}T00:00:00.0000000"
+            return None
+
         # ────────────────────────────────────────────────────────────────
         # TRIGGER: approval_changed
         # ────────────────────────────────────────────────────────────────
@@ -12020,13 +12028,17 @@ def _warranty_webhook_inner(record_id, trigger, c):
                 today_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000")
                 _caddr = {"name": f"{first_name} {last_name}".strip(), "street1": address,
                           "city": city, "state": state, "postalCode": zip_code, "country": "US", "phone": phone}
+                _pd = _ss_payment_date(fields.get("Received Date"))
+                _order_payload = {"orderNumber": order_ref, "orderStatus": "awaiting_shipment",
+                          "orderDate": today_str, "billTo": _caddr, "shipTo": _caddr,
+                          "items": [{"name": replacement_item, "quantity": 1, "unitPrice": 0}],
+                          "advancedOptions": {"storeId": 241180}}
+                if _pd:
+                    _order_payload["paymentDate"] = _pd
                 order_resp = req_lib.post(
                     "https://ssapi.shipstation.com/orders/createorder",
                     headers={**ss_headers(), "Content-Type": "application/json"},
-                    json={"orderNumber": order_ref, "orderStatus": "awaiting_shipment",
-                          "orderDate": today_str, "billTo": _caddr, "shipTo": _caddr,
-                          "items": [{"name": replacement_item, "quantity": 1, "unitPrice": 0}],
-                          "advancedOptions": {"storeId": 241180}},
+                    json=_order_payload,
                     timeout=20,
                 )
                 if not order_resp.ok:
@@ -12087,15 +12099,19 @@ def _warranty_webhook_inner(record_id, trigger, c):
                 today_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000")
                 _caddr = {"name": f"{first_name} {last_name}".strip(), "street1": address,
                           "city": city, "state": state, "postalCode": zip_code, "country": "US", "phone": phone}
-                order_resp = req_lib.post(
-                    "https://ssapi.shipstation.com/orders/createorder",
-                    headers={**ss_headers(), "Content-Type": "application/json"},
-                    json={"orderNumber": order_ref, "orderStatus": "awaiting_shipment",
+                _pd = _ss_payment_date(fields.get("Received Date"))
+                _order_payload = {"orderNumber": order_ref, "orderStatus": "awaiting_shipment",
                           "orderDate": today_str, "billTo": _caddr, "shipTo": _caddr,
                           "items": [{"name": replacement_item, "quantity": 1, "unitPrice": 0}],
                           "weight": {"value": 4, "units": "ounces"},
                           "dimensions": {"units": "inches", "length": 8, "width": 6, "height": 2},
-                          "advancedOptions": {"storeId": 241180}},
+                          "advancedOptions": {"storeId": 241180}}
+                if _pd:
+                    _order_payload["paymentDate"] = _pd
+                order_resp = req_lib.post(
+                    "https://ssapi.shipstation.com/orders/createorder",
+                    headers={**ss_headers(), "Content-Type": "application/json"},
+                    json=_order_payload,
                     timeout=20,
                 )
                 if not order_resp.ok:
@@ -12169,24 +12185,28 @@ def _warranty_webhook_inner(record_id, trigger, c):
                 "country":    "US",
                 "phone":      phone,
             }
+            _pd = _ss_payment_date(fields.get("Received Date"))
+            _repair_payload = {
+                "orderNumber": warranty_order_num,
+                "orderStatus": "awaiting_shipment",
+                "orderDate":   today_str,
+                "billTo":      _customer_addr,
+                "shipTo":      _customer_addr,
+                "items": [{
+                    "sku":       repair_info["sku"],
+                    "name":      repair_info["name"],
+                    "productId": repair_info["productId"],
+                    "quantity":  1,
+                    "unitPrice": 0,
+                }],
+                "advancedOptions": {"storeId": 241180},
+            }
+            if _pd:
+                _repair_payload["paymentDate"] = _pd
             order_resp = req_lib.post(
                 "https://ssapi.shipstation.com/orders/createorder",
                 headers={**ss_headers(), "Content-Type": "application/json"},
-                json={
-                    "orderNumber": warranty_order_num,
-                    "orderStatus": "awaiting_shipment",
-                    "orderDate":   today_str,
-                    "billTo":      _customer_addr,
-                    "shipTo":      _customer_addr,
-                    "items": [{
-                        "sku":       repair_info["sku"],
-                        "name":      repair_info["name"],
-                        "productId": repair_info["productId"],
-                        "quantity":  1,
-                        "unitPrice": 0,
-                    }],
-                    "advancedOptions": {"storeId": 241180},
-                },
+                json=_repair_payload,
                 timeout=20,
             )
             if not order_resp.ok:
