@@ -11506,6 +11506,7 @@ def warranty_submit():
             "Zip":                 zip_code,
             "Repair Description":  repair_description,
             "Request Date":        _dt_sub.now(_tz_sub.utc).strftime("%Y-%m-%d"),
+            "Received Date":       _dt_sub.now(_tz_sub.utc).strftime("%Y-%m-%d"),
         }
         if original_order_num:
             fields["Original Order #"] = original_order_num
