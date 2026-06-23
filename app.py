@@ -11918,11 +11918,15 @@ def _warranty_webhook_inner(record_id, trigger, c):
                     order_ref = f"{last_name}-W"
 
                 # ── Write order ref immediately to block duplicate webhook calls ──
-                req_lib.patch(
+                _lock_resp = req_lib.patch(
                     f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{record_id}",
                     headers={"Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}", "Content-Type": "application/json"},
                     json={"fields": {"Warranty Order #": order_ref}}, timeout=10,
                 )
+                if not _lock_resp.ok:
+                    print(f"[warranty_webhook] ABORT — could not write Warranty Order # lock for {record_id}: {_lock_resp.text[:200]}", flush=True)
+                    return Response(json.dumps({"success": False, "error": "Failed to write idempotency lock — aborting to prevent duplicate"}),
+                                    status=500, headers=c, mimetype="application/json")
 
                 # ── Look up original SS order if we have an order number ──
                 orig_ss_order_id = None
@@ -12037,11 +12041,15 @@ def _warranty_webhook_inner(record_id, trigger, c):
                 else:
                     order_ref = f"{last_name}-W"
                 # ── Write order ref immediately to block duplicate webhook calls ──
-                req_lib.patch(
+                _lock_resp = req_lib.patch(
                     f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{record_id}",
                     headers={"Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}", "Content-Type": "application/json"},
                     json={"fields": {"Warranty Order #": order_ref}}, timeout=10,
                 )
+                if not _lock_resp.ok:
+                    print(f"[warranty_webhook] ABORT — could not write Warranty Order # lock for {record_id}: {_lock_resp.text[:200]}", flush=True)
+                    return Response(json.dumps({"success": False, "error": "Failed to write idempotency lock — aborting to prevent duplicate"}),
+                                    status=500, headers=c, mimetype="application/json")
                 today_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000")
                 _caddr = {"name": f"{first_name} {last_name}".strip(), "street1": address,
                           "city": city, "state": state, "postalCode": zip_code, "country": "US", "phone": phone}
@@ -12085,11 +12093,15 @@ def _warranty_webhook_inner(record_id, trigger, c):
                 else:
                     order_ref = f"{last_name}-W"
                 # ── Write order ref immediately to block duplicate webhook calls ──
-                req_lib.patch(
+                _lock_resp = req_lib.patch(
                     f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}/{record_id}",
                     headers={"Authorization": f"Bearer {WARRANTY_WRITE_TOKEN}", "Content-Type": "application/json"},
                     json={"fields": {"Warranty Order #": order_ref}}, timeout=10,
                 )
+                if not _lock_resp.ok:
+                    print(f"[warranty_webhook] ABORT — could not write Warranty Order # lock for {record_id}: {_lock_resp.text[:200]}", flush=True)
+                    return Response(json.dumps({"success": False, "error": "Failed to write idempotency lock — aborting to prevent duplicate"}),
+                                    status=500, headers=c, mimetype="application/json")
 
                 # Create return label
                 label_resp = req_lib.post(
@@ -12295,16 +12307,29 @@ def _warranty_scan():
             continue
         try:
             print("[warranty-scan] running catch-up scan", flush=True)
-            # Fetch all warranty records
-            resp = req_lib.get(
-                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}",
-                headers={"Authorization": f"Bearer {_read_tok}"},
-                timeout=15,
-            )
-            if not resp.ok:
-                print(f"[warranty-scan] fetch failed: {resp.status_code}", flush=True)
-            else:
-                records = resp.json().get("records", [])
+            # Fetch ALL warranty records (paginate through Airtable's 100-record pages)
+            records = []
+            offset = None
+            while True:
+                params = {}
+                if offset:
+                    params["offset"] = offset
+                resp = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}",
+                    headers={"Authorization": f"Bearer {_read_tok}"},
+                    params=params,
+                    timeout=15,
+                )
+                if not resp.ok:
+                    print(f"[warranty-scan] fetch failed: {resp.status_code}", flush=True)
+                    break
+                page = resp.json()
+                records.extend(page.get("records", []))
+                offset = page.get("offset")
+                if not offset:
+                    break
+            print(f"[warranty-scan] fetched {len(records)} records", flush=True)
+            if records:
                 for rec in records:
                     f = rec["fields"]
                     rid = rec["id"]
@@ -12351,7 +12376,9 @@ def _warranty_scan():
                     warranty_order_set = bool(order_ref)
 
                     # Needs processing: repairs/replace need tracking; replace w/o return needs order#
-                    if send_email and approval in ("Rig Repair", "EDC Repair", "Replace") and not tracking_set:
+                    # Also guard on warranty_order_set: the webhook writes Warranty Order # as a lock BEFORE
+                    # creating anything — if it's already set, approval_changed already started for this record.
+                    if send_email and approval in ("Rig Repair", "EDC Repair", "Replace") and not tracking_set and not warranty_order_set:
                         print(f"[warranty-scan] queuing approval_changed for {rid}", flush=True)
                         try:
                             req_lib.post(
