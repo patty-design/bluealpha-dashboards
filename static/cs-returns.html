@@ -1478,7 +1478,10 @@ async function csSubmitReshipment() {
   const state   = document.getElementById('lost-state').value.trim();
   const zip     = document.getElementById('lost-zip').value.trim();
 
-  if (!name || !street1 || !city || !state || !zip) {
+  const country = document.getElementById('lost-country').value.trim() || 'US';
+  const isDomestic = country.toUpperCase() === 'US';
+  // State and zip required for US; for international, only name/street/city are required
+  if (!name || !street1 || !city || (isDomestic && (!state || !zip))) {
     document.getElementById('msg-lost-address').style.display = 'block';
     return;
   }
@@ -1501,7 +1504,7 @@ async function csSubmitReshipment() {
           city:       city,
           state:      state,
           postalCode: zip,
-          country:    document.getElementById('lost-country').value.trim() || 'US',
+          country:    country,
         }
       })
     });

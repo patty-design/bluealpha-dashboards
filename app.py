@@ -1097,6 +1097,7 @@ def cs_lookup_order():
                 "city":       ship_to.get("city", ""),
                 "state":      ship_to.get("state", ""),
                 "postalCode": ship_to.get("postalCode", ""),
+                "country":    ship_to.get("country", "US"),
             },
             "items":                items,
             "orderGroups":          order_groups,
