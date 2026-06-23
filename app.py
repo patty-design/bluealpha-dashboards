@@ -12046,7 +12046,7 @@ def _warranty_webhook_inner(record_id, trigger, c):
                 _caddr = {"name": f"{first_name} {last_name}".strip(), "street1": address,
                           "city": city, "state": state, "postalCode": zip_code, "country": "US", "phone": phone}
                 _pd = _ss_payment_date(fields.get("Request Date"))
-                _order_payload = {"orderNumber": order_ref, "orderStatus": "awaiting_shipment",
+                _order_payload = {"orderNumber": order_ref, "orderKey": order_ref, "orderStatus": "awaiting_shipment",
                           "orderDate": today_str, "billTo": _caddr, "shipTo": _caddr,
                           "items": [{"name": replacement_item, "quantity": 1, "unitPrice": 0}],
                           "advancedOptions": {"storeId": 241180}}
@@ -12117,7 +12117,7 @@ def _warranty_webhook_inner(record_id, trigger, c):
                 _caddr = {"name": f"{first_name} {last_name}".strip(), "street1": address,
                           "city": city, "state": state, "postalCode": zip_code, "country": "US", "phone": phone}
                 _pd = _ss_payment_date(fields.get("Request Date"))
-                _order_payload = {"orderNumber": order_ref, "orderStatus": "awaiting_shipment",
+                _order_payload = {"orderNumber": order_ref, "orderKey": order_ref, "orderStatus": "awaiting_shipment",
                           "orderDate": today_str, "billTo": _caddr, "shipTo": _caddr,
                           "items": [{"name": replacement_item, "quantity": 1, "unitPrice": 0}],
                           "weight": {"value": 4, "units": "ounces"},
@@ -12205,6 +12205,7 @@ def _warranty_webhook_inner(record_id, trigger, c):
             _pd = _ss_payment_date(fields.get("Received Date"))
             _repair_payload = {
                 "orderNumber": warranty_order_num,
+                "orderKey":    warranty_order_num,
                 "orderStatus": "awaiting_shipment",
                 "orderDate":   today_str,
                 "billTo":      _customer_addr,
