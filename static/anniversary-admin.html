@@ -150,8 +150,8 @@
     <div class="section-title">Award Order Totals</div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>Award</th><th>Points</th><th>Qty Ordered</th></tr></thead>
-        <tbody id="totals-body"><tr><td colspan="3" class="loading-msg">Loading…</td></tr></tbody>
+        <thead><tr><th>Award</th><th>Points</th><th>Qty Needed</th><th>Qty Ordered</th></tr></thead>
+        <tbody id="totals-body"><tr><td colspan="4" class="loading-msg">Loading…</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -282,19 +282,40 @@ function renderSummary() {
   }).join('');
 }
 
+const QTY_ORDERED_KEY = 'anniversary_qty_ordered';
+
+function getQtyOrdered() {
+  try { return JSON.parse(localStorage.getItem(QTY_ORDERED_KEY) || '{}'); } catch { return {}; }
+}
+
+function setQtyOrdered(name, val) {
+  const data = getQtyOrdered();
+  if (val === '' || val === null) { delete data[name]; } else { data[name] = val; }
+  localStorage.setItem(QTY_ORDERED_KEY, JSON.stringify(data));
+}
+
 function renderTotals() {
   const tbody = document.getElementById('totals-body');
   const entries = Object.entries(_awardTotals);
   if (!entries.length) {
-    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#aaa;padding:24px">No award submissions yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#aaa;padding:24px">No award submissions yet.</td></tr>';
     return;
   }
   entries.sort((a,b) => (b[1].points - a[1].points) || a[0].localeCompare(b[0]));
-  tbody.innerHTML = entries.map(([name, d]) =>
-    `<tr><td>${name}</td>
-         <td><span class="pts-badge">${d.points}pt</span></td>
-         <td><strong>${d.qty}</strong></td></tr>`
-  ).join('');
+  const qtyOrdered = getQtyOrdered();
+  tbody.innerHTML = entries.map(([name, d]) => {
+    const ordered = qtyOrdered[name] !== undefined ? qtyOrdered[name] : '';
+    const safeName = name.replace(/"/g, '&quot;');
+    return `<tr>
+      <td>${name}</td>
+      <td><span class="pts-badge">${d.points}pt</span></td>
+      <td><strong>${d.qty}</strong></td>
+      <td><input type="number" min="0" value="${ordered}" placeholder="—"
+           style="width:70px;padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:0.9rem;text-align:center;"
+           onchange="setQtyOrdered('${safeName}', this.value.trim())"
+           oninput="setQtyOrdered('${safeName}', this.value.trim())"></td>
+    </tr>`;
+  }).join('');
 }
 
 function renderParticipants() {
