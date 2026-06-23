@@ -147,11 +147,16 @@
 
   <!-- Award Order Totals -->
   <section>
-    <div class="section-title">Award Order Totals</div>
+    <div class="section-title" style="display:flex;align-items:center;gap:12px;">
+      Award Order Totals
+      <span style="font-size:11px;font-weight:600;color:#6b7a8d;letter-spacing:0;text-transform:none;">Sort by:</span>
+      <button class="filter-btn active" id="sort-pts-btn" onclick="setAwardSort('points',this)" style="font-size:11px;padding:3px 12px;">Points</button>
+      <button class="filter-btn" id="sort-name-btn" onclick="setAwardSort('name',this)" style="font-size:11px;padding:3px 12px;">Name</button>
+    </div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>Award</th><th>Points</th><th>Qty Needed</th><th>Qty Ordered 6/23</th></tr></thead>
-        <tbody id="totals-body"><tr><td colspan="4" class="loading-msg">Loading…</td></tr></tbody>
+        <thead><tr><th style="width:56px"></th><th>Award</th><th>Points</th><th>Qty Needed</th><th>Qty Ordered 6/23</th></tr></thead>
+        <tbody id="totals-body"><tr><td colspan="5" class="loading-msg">Loading…</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -199,11 +204,20 @@
 </div>
 
 <script>
-let _participants = [];
-let _awardTotals  = {};
-let _shirtTotals  = {};
-let _unmatched    = [];
-let _filter = 'all';
+let _participants   = [];
+let _awardTotals    = {};
+let _awardsCatalog  = [];
+let _shirtTotals    = {};
+let _unmatched      = [];
+let _filter     = 'all';
+let _awardSort  = 'points'; // 'points' | 'name'
+
+function setAwardSort(s, btn) {
+  _awardSort = s;
+  document.querySelectorAll('#sort-pts-btn,#sort-name-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTotals();
+}
 
 function setFilter(f, btn) {
   _filter = f;
@@ -306,20 +320,31 @@ function setQtyOrdered(name, val) {
 
 function renderTotals() {
   const tbody = document.getElementById('totals-body');
-  const entries = Object.entries(_awardTotals);
-  if (!entries.length) {
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#aaa;padding:24px">No award submissions yet.</td></tr>';
+  if (!_awardsCatalog.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:24px">Loading awards…</td></tr>';
     return;
   }
-  entries.sort((a,b) => (b[1].points - a[1].points) || a[0].localeCompare(b[0]));
+  const sorted = [..._awardsCatalog].sort((a, b) => {
+    if (_awardSort === 'name') return a.name.localeCompare(b.name);
+    return (b.points - a.points) || a.name.localeCompare(b.name);
+  });
   const qtyOrdered = getQtyOrdered();
-  tbody.innerHTML = entries.map(([name, d]) => {
-    const ordered = qtyOrdered[name] !== undefined ? qtyOrdered[name] : '';
-    const safeName = name.replace(/"/g, '&quot;');
+  tbody.innerHTML = sorted.map(award => {
+    const { name, points, image_url, product_url, qty_needed } = award;
+    const ordered   = qtyOrdered[name] !== undefined ? qtyOrdered[name] : '';
+    const safeName  = name.replace(/"/g, '&quot;');
+    const imgCell   = image_url
+      ? `<img src="${image_url}" style="width:48px;height:48px;object-fit:contain;border-radius:4px;">`
+      : `<div style="width:48px;height:48px;background:#f0f0f0;border-radius:4px;"></div>`;
+    const nameCell  = product_url
+      ? `<a href="${product_url}" target="_blank" rel="noopener" style="color:var(--navy);font-weight:600;">${name} ↗</a>`
+      : `<span style="font-weight:600;">${name}</span>`;
+    const qtyStyle  = qty_needed > 0 ? 'font-weight:900;color:var(--navy);' : 'color:#aaa;';
     return `<tr>
-      <td>${name}</td>
-      <td><span class="pts-badge">${d.points}pt</span></td>
-      <td><strong>${d.qty}</strong></td>
+      <td style="text-align:center;">${imgCell}</td>
+      <td>${nameCell}</td>
+      <td><span class="pts-badge">${points}pt</span></td>
+      <td style="${qtyStyle}">${qty_needed > 0 ? qty_needed : '—'}</td>
       <td><input type="number" min="0" value="${ordered}" placeholder="—"
            style="width:70px;padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:0.9rem;text-align:center;"
            onchange="setQtyOrdered('${safeName}', this.value.trim())"
@@ -392,12 +417,12 @@ function renderUnmatched() {
 }
 
 function copyShoppingList() {
-  const entries = Object.entries(_awardTotals);
+  const entries = [..._awardsCatalog].filter(a => a.qty_needed > 0)
+    .sort((a,b) => b.points - a.points || a.name.localeCompare(b.name));
   if (!entries.length) { alert('No award submissions yet.'); return; }
-  entries.sort((a,b) => b[1].points - a[1].points || a[0].localeCompare(b[0]));
   const text = 'ANNIVERSARY AWARDS — SHOPPING LIST\n'
     + '='.repeat(40) + '\n'
-    + entries.map(([name, d]) => `${d.qty}x  ${name}`).join('\n')
+    + entries.map(a => `${a.qty_needed}x  ${a.name}`).join('\n')
     + '\n\nT-SHIRT SIZES\n' + '='.repeat(40) + '\n'
     + Object.entries(_shirtTotals).map(([sz, cnt]) => `${cnt}x  ${sz}`).join('\n');
   navigator.clipboard.writeText(text).then(() => {
@@ -419,8 +444,9 @@ function loadData() {
         return;
       }
       _participants = data.participants  || [];
-      _awardTotals  = data.award_totals  || {};
-      _shirtTotals  = data.shirt_totals  || {};
+      _awardTotals   = data.award_totals   || {};
+      _awardsCatalog = data.awards_catalog || [];
+      _shirtTotals   = data.shirt_totals   || {};
       _unmatched    = data.unmatched_form || [];
 
       renderSummary();

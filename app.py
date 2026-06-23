@@ -12794,9 +12794,36 @@ def anniversary_admin_data():
 
     participants.sort(key=lambda x: (x["first_name"], x["last_name"]))
 
+    # ── Full awards catalog ──────────────────────────────────────────────────
+    awards_catalog = []
+    try:
+        award_records = at_get_all(
+            ANNIVERSARY_AWARDS_TABLE_ID, read_token,
+            fields=["Name", "Points", "Category", "Product URL", "Image", "Active"],
+            base_id=ANNIVERSARY_BASE_ID,
+        )
+        for rec in award_records:
+            f = rec.get("fields", {})
+            if not f.get("Active", True):
+                continue
+            images = f.get("Image", [])
+            img_url = images[0].get("url", "") if images else ""
+            name = f.get("Name", "")
+            awards_catalog.append({
+                "name":        name,
+                "points":      int(f.get("Points") or 0),
+                "category":    f.get("Category", ""),
+                "product_url": f.get("Product URL") or "",
+                "image_url":   img_url,
+                "qty_needed":  award_totals.get(name, {}).get("qty", 0),
+            })
+    except Exception as e:
+        print(f"[anniversary_admin] awards catalog error: {e}")
+
     return Response(json.dumps({
         "participants":   participants,
         "award_totals":   award_totals,
+        "awards_catalog": awards_catalog,
         "shirt_totals":   shirt_totals_sorted,
         "unmatched_form": unmatched,
     }), headers=c, mimetype="application/json")
