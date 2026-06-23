@@ -230,10 +230,19 @@ function fmtDate(iso) {
 
 function renderShirts() {
   const el = document.getElementById('shirt-chips');
-  const entries = Object.entries(_shirtTotals);
-  if (!entries.length) { el.innerHTML = '<span style="color:#aaa">No responses yet.</span>'; return; }
-  el.innerHTML = entries.map(([sz, cnt]) =>
-    `<div class="shirt-chip"><span class="count">${cnt}</span><span class="size">${sz}</span></div>`
+  const SIZE_ORDER = ['XS','S','M','L','XL','2XL','3XL'];
+  const totals = {};
+  Object.entries(_shirtTotals).forEach(([sz, cnt]) => {
+    // Normalize XXL → 2XL
+    const normalized = sz.toUpperCase() === 'XXL' ? '2XL' : sz;
+    totals[normalized] = (totals[normalized] || 0) + cnt;
+  });
+  if (!Object.keys(totals).length) { el.innerHTML = '<span style="color:#aaa">No responses yet.</span>'; return; }
+  // Sort by SIZE_ORDER, then any remaining sizes alphabetically
+  const sorted = [...SIZE_ORDER.filter(s => totals[s] !== undefined),
+                  ...Object.keys(totals).filter(s => !SIZE_ORDER.includes(s)).sort()];
+  el.innerHTML = sorted.map(sz =>
+    `<div class="shirt-chip"><span class="count">${totals[sz]}</span><span class="size">${sz}</span></div>`
   ).join('');
 }
 
