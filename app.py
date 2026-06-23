@@ -11478,6 +11478,9 @@ def warranty_submit():
         repair_description= request.form.get("repairDescription", "").strip()
         original_order_num         = request.form.get("originalOrderNum", "").strip()
         original_purchaser_last_name = request.form.get("originalPurchaserLastName", "").strip()
+        approval          = request.form.get("approval", "").strip()
+        replacement_item_val = request.form.get("replacementItem", "").strip()
+        send_customer_email_val = request.form.get("sendCustomerEmail", "0").strip() == "1"
         photos            = request.files.getlist("photos")
 
         # Basic validation
@@ -11487,12 +11490,7 @@ def warranty_submit():
                 json.dumps({"success": False, "error": "Missing required fields"}),
                 status=400, headers=c, mimetype="application/json",
             )
-        if not photos:
-            return Response(
-                json.dumps({"success": False, "error": "At least one photo is required"}),
-                status=400, headers=c, mimetype="application/json",
-            )
-        photos = photos[:5]  # cap at 5
+        photos = photos[:5]  # cap at 5 (photos are optional for CS submissions)
 
         # ── Step 1: Create Airtable record (no photos yet) ──
         from datetime import datetime as _dt_sub, timezone as _tz_sub
@@ -11512,6 +11510,12 @@ def warranty_submit():
             fields["Original Order #"] = original_order_num
         if original_purchaser_last_name:
             fields["Original Purchaser's Last Name"] = original_purchaser_last_name
+        if approval:
+            fields["Approval"] = approval
+        if replacement_item_val:
+            fields["Replacement Item"] = replacement_item_val
+        if send_customer_email_val:
+            fields["Send Customer Email"] = True
 
         create_resp = req_lib.post(
             f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{WARRANTY_TABLE_ID}",

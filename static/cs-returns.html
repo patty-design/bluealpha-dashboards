@@ -764,15 +764,28 @@
             <input type="text" id="w-originalPurchaserLastName" placeholder="e.g. Smith" maxlength="20" oninput="this.value=this.value.replace(/[^a-zA-Z-]/g,'')">
           </div>
         </div>
-        <div class="section-label" style="font-family:'Montserrat',sans-serif;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#6b7a8d;margin-bottom:20px;padding-bottom:10px;border-bottom:1px solid #ddd9cc;">Photos (Required)</div>
-        <div style="border:2px dashed #ddd9cc;border-radius:8px;padding:24px;text-align:center;background:#faf9f6;cursor:pointer;position:relative;" id="w-uploadArea">
-          <input type="file" id="w-photos" name="w-photos" accept="image/*" multiple style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;">
-          <div style="font-size:2rem;margin-bottom:8px;">📷</div>
-          <div style="font-size:0.9rem;color:#6b7a8d;line-height:1.5;"><strong style="color:#003a6c;">Click to upload</strong> or drag &amp; drop photos here<br>JPEG, PNG, GIF, WebP accepted</div>
+        <div class="section-label" style="font-family:'Montserrat',sans-serif;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#6b7a8d;margin-bottom:20px;padding-bottom:10px;border-bottom:1px solid #ddd9cc;">Decision</div>
+        <div style="display:grid;gap:16px;margin-bottom:24px;">
+          <div class="field">
+            <label>Approval</label>
+            <select id="w-approval" onchange="warrantyApprovalChanged()" style="width:100%;padding:10px 13px;border:1px solid #ddd9cc;border-radius:6px;font-family:'Lato',sans-serif;font-size:0.95rem;background:#fff;color:#1a2633;">
+              <option value="">— Select —</option>
+              <option value="Repair">Repair</option>
+              <option value="Replace">Replace</option>
+              <option value="Replace w/o return">Replace w/o Return</option>
+              <option value="Deny">Deny</option>
+            </select>
+          </div>
+          <div class="field" id="w-replacementItemRow" style="display:none;">
+            <label>Replacement Item</label>
+            <input type="text" id="w-replacementItem" placeholder="e.g. 1.75&quot; Cobra Belt — Coyote Brown / Medium" maxlength="100">
+          </div>
+          <div class="field" style="display:flex;align-items:center;gap:12px;">
+            <input type="checkbox" id="w-sendEmail" style="width:18px;height:18px;cursor:pointer;accent-color:#003a6c;">
+            <label for="w-sendEmail" style="margin:0;cursor:pointer;font-size:0.95rem;font-weight:600;color:#1a2633;">Send Customer Email</label>
+          </div>
         </div>
-        <div id="w-fileList" style="margin-top:12px;display:flex;flex-direction:column;gap:6px;"></div>
-        <div id="w-fileCountNote" style="font-size:0.8rem;color:#6b7a8d;margin-top:6px;"></div>
-        <button class="btn btn-primary" id="w-submitBtn" onclick="submitWarrantyForm()" style="margin-top:24px;width:100%;">Submit Warranty Request</button>
+        <button class="btn btn-primary" id="w-submitBtn" onclick="submitWarrantyForm()" style="margin-top:8px;width:100%;">Submit Warranty Request</button>
       </div>
       <div id="warranty-success" class="hidden" style="text-align:center;padding:48px 32px;">
         <div style="font-size:3.5rem;margin-bottom:20px;">✅</div>
@@ -2182,49 +2195,13 @@ function resetForm() {
   if (currentMode === 'lost') setLostAction('reship');
 }
 
-// ── Warranty form file handling ─────────────────────────────────────────────
-let wSelectedFiles = [];
-
-(function() {
-  const area  = document.getElementById('w-uploadArea');
-  const input = document.getElementById('w-photos');
-  const list  = document.getElementById('w-fileList');
-  const note  = document.getElementById('w-fileCountNote');
-
-  function updateWFileDisplay() {
-    list.innerHTML = '';
-    wSelectedFiles.forEach((file, idx) => {
-      const item = document.createElement('div');
-      item.style.cssText = 'display:flex;align-items:center;gap:10px;background:#DDD8C4;border-radius:6px;padding:8px 12px;font-size:0.85rem;';
-      item.innerHTML = `<span>📄</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${file.name.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</span><span style="color:#6b7a8d;font-size:0.8rem">${(file.size/1024).toFixed(0)} KB</span><button type="button" onclick="wRemoveFile(${idx})" style="background:none;border:none;color:#BD3333;cursor:pointer;font-size:1rem;font-weight:700;padding:0 2px;">✕</button>`;
-      list.appendChild(item);
-    });
-    note.textContent = wSelectedFiles.length > 0 ? `${wSelectedFiles.length} of 5 photos selected` : '';
-  }
-
-  input.addEventListener('change', () => {
-    const combined = [...wSelectedFiles, ...Array.from(input.files)];
-    wSelectedFiles = combined.slice(0, 5);
-    input.value = '';
-    updateWFileDisplay();
-  });
-
-  area.addEventListener('dragover', e => { e.preventDefault(); area.style.borderColor = '#003a6c'; });
-  area.addEventListener('dragleave', () => { area.style.borderColor = '#ddd9cc'; });
-  area.addEventListener('drop', e => {
-    e.preventDefault();
-    area.style.borderColor = '#ddd9cc';
-    const dropped = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-    wSelectedFiles = [...wSelectedFiles, ...dropped].slice(0, 5);
-    updateWFileDisplay();
-  });
-
-  window.wRemoveFile = function(idx) {
-    wSelectedFiles.splice(idx, 1);
-    updateWFileDisplay();
-  };
-  window._updateWFileDisplay = updateWFileDisplay;
-})();
+// ── Warranty form helpers ────────────────────────────────────────────────────
+function warrantyApprovalChanged() {
+  const val = document.getElementById('w-approval').value;
+  const showReplacement = val === 'Replace' || val === 'Replace w/o return';
+  document.getElementById('w-replacementItemRow').style.display = showReplacement ? '' : 'none';
+  if (!showReplacement) document.getElementById('w-replacementItem').value = '';
+}
 
 async function submitWarrantyForm() {
   const errEl = document.getElementById('warranty-error-msg');
@@ -2254,9 +2231,14 @@ async function submitWarrantyForm() {
     document.getElementById('w-email').focus();
     return;
   }
-  if (wSelectedFiles.length === 0) {
-    errEl.textContent = 'Please attach at least one photo.';
+
+  const approval = document.getElementById('w-approval').value;
+  const replacementItem = document.getElementById('w-replacementItem').value.trim();
+  const needsReplacement = approval === 'Replace' || approval === 'Replace w/o return';
+  if (needsReplacement && !replacementItem) {
+    errEl.textContent = 'Please fill in: Replacement Item';
     errEl.style.display = 'block';
+    document.getElementById('w-replacementItem').focus();
     return;
   }
 
@@ -2276,7 +2258,9 @@ async function submitWarrantyForm() {
   formData.append('repairDescription',document.getElementById('w-repairDescription').value.trim());
   formData.append('originalOrderNum', document.getElementById('w-originalOrderNum').value.trim());
   formData.append('originalPurchaserLastName', document.getElementById('w-originalPurchaserLastName').value.trim());
-  wSelectedFiles.forEach(f => formData.append('photos', f));
+  formData.append('approval',         approval);
+  formData.append('replacementItem',  replacementItem);
+  formData.append('sendCustomerEmail', document.getElementById('w-sendEmail').checked ? '1' : '0');
 
   try {
     const resp = await fetch('/api/warranty/submit', { method: 'POST', body: formData });
@@ -2299,11 +2283,12 @@ async function submitWarrantyForm() {
 }
 
 function resetWarrantyForm() {
-  ['w-firstName','w-lastName','w-email','w-phone','w-address','w-city','w-state','w-zip','w-repairDescription','w-originalOrderNum','w-originalPurchaserLastName'].forEach(id => {
+  ['w-firstName','w-lastName','w-email','w-phone','w-address','w-city','w-state','w-zip','w-repairDescription','w-originalOrderNum','w-originalPurchaserLastName','w-replacementItem'].forEach(id => {
     document.getElementById(id).value = '';
   });
-  wSelectedFiles = [];
-  window._updateWFileDisplay();
+  document.getElementById('w-approval').value = '';
+  document.getElementById('w-sendEmail').checked = false;
+  document.getElementById('w-replacementItemRow').style.display = 'none';
   document.getElementById('w-descCount').textContent = '150';
   document.getElementById('warranty-form-inner').classList.remove('hidden');
   document.getElementById('warranty-success').classList.add('hidden');
