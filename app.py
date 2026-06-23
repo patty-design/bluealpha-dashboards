@@ -3522,12 +3522,23 @@ def verify_exchange():
         if country not in ("US", "USA") or state in MILITARY_STATES:
             return Response(json.dumps({"status": "international"}), headers=c, mimetype="application/json")
 
+        # Block exchanges on unshipped orders
+        order_status = order.get("orderStatus", "")
+        UNSHIPPED_STATUSES = {"awaiting_shipment", "awaiting_payment", "on_hold"}
+        if order_status in UNSHIPPED_STATUSES:
+            return Response(json.dumps({"status": "not_shipped"}), headers=c, mimetype="application/json")
+
         # Check ship date within 37 days
         sr = req_lib.get("https://ssapi.shipstation.com/shipments",
                           params={"orderNumber": order_number},
                           headers=ss_headers(), timeout=10)
         shipments = sr.json().get("shipments", [])
-        ship_date_str = shipments[0].get("shipDate", "") if shipments else ""
+        active_shipments = [s for s in shipments if not s.get("voided", False)]
+        ship_date_str = active_shipments[0].get("shipDate", "") if active_shipments else ""
+
+        # Also block if no shipments and order status isn't clearly shipped
+        if not ship_date_str and order_status != "shipped":
+            return Response(json.dumps({"status": "not_shipped"}), headers=c, mimetype="application/json")
 
         def parse_dt(s):
             s = s.replace("Z", "+00:00")
