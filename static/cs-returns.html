@@ -2233,6 +2233,12 @@ async function submitWarrantyForm() {
   }
 
   const approval = document.getElementById('w-approval').value;
+  if (!approval) {
+    errEl.textContent = 'Please select an Approval outcome.';
+    errEl.style.display = 'block';
+    document.getElementById('w-approval').focus();
+    return;
+  }
   const replacementItem = document.getElementById('w-replacementItem').value.trim();
   const needsReplacement = approval === 'Replace' || approval === 'Replace w/o return';
   if (needsReplacement && !replacementItem) {
