@@ -345,10 +345,14 @@ function renderTotals() {
       <td>${nameCell}</td>
       <td><span class="pts-badge">${points}pt</span></td>
       <td style="${qtyStyle}">${qty_needed > 0 ? qty_needed : '—'}</td>
-      <td><input type="number" min="0" value="${ordered}" placeholder="—"
-           style="width:70px;padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:0.9rem;text-align:center;"
-           onchange="setQtyOrdered('${safeName}', this.value.trim())"
-           oninput="setQtyOrdered('${safeName}', this.value.trim())"></td>
+      <td>${award.category === 'Gift Card'
+        ? `<input type="number" min="0" value="${ordered}" placeholder="—"
+             style="width:70px;padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:0.9rem;text-align:center;"
+             onchange="setQtyOrdered('${safeName}', this.value.trim())"
+             oninput="setQtyOrdered('${safeName}', this.value.trim())">`
+        : `<input type="number" min="0" value="${ordered}" placeholder="—" disabled
+             style="width:70px;padding:4px 8px;border:1px solid #eee;border-radius:4px;font-size:0.9rem;text-align:center;background:#f5f5f5;color:#aaa;cursor:not-allowed;">`
+      }</td>
     </tr>`;
   }).join('');
 }
