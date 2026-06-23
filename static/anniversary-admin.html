@@ -164,6 +164,7 @@
       <button class="filter-btn" onclick="setFilter('submitted',this)">Awards Submitted</button>
       <button class="filter-btn" onclick="setFilter('pending',this)">Pending</button>
       <button class="filter-btn" onclick="setFilter('rsvp_yes',this)">RSVP Yes</button>
+      <button class="filter-btn" onclick="setFilter('rsvp_pending',this)">RSVP Pending</button>
       <input class="search-box" id="search-box" type="search" placeholder="Search name…" oninput="renderParticipants()">
       <button class="btn-copy" onclick="copyShoppingList()">📋 Copy Shopping List</button>
     </div>
@@ -332,7 +333,8 @@ function renderParticipants() {
   let list = _participants;
   if (_filter === 'submitted') list = list.filter(p => p.submitted);
   if (_filter === 'pending')   list = list.filter(p => !p.submitted);
-  if (_filter === 'rsvp_yes')  list = list.filter(p => p.form?.rsvp?.toLowerCase() === 'yes');
+  if (_filter === 'rsvp_yes')     list = list.filter(p => p.form?.rsvp?.toLowerCase() === 'yes');
+  if (_filter === 'rsvp_pending') list = list.filter(p => !p.form);
   if (q) list = list.filter(p => `${p.first_name} ${p.last_name}`.toLowerCase().includes(q));
 
   const tbody = document.getElementById('participants-body');
