@@ -3777,13 +3777,17 @@ def submit_exchange():
         airtable_read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
         order_items = []
 
-        # Pre-check: if the customer is explicitly selecting an inner-only belt as one of
-        # their exchange items, suppress the auto-add for all ONB/combo paths — otherwise
-        # we'd end up with two inners (one auto-added + one directly selected).
+        # Pre-check: if this is an exchange-of-an-exchange (original order number contains "-E"),
+        # and the customer is explicitly selecting an inner-only belt, suppress the auto-add —
+        # the inner was already included in the previous exchange order, so auto-adding another
+        # would create a duplicate. For plain original orders, allow both (customer may have
+        # originally ordered an outer + inner separately and wants to exchange both).
+        is_exchange_of_exchange = "-E" in original_order_number.upper()
         customer_selecting_inner = any(
             "inner" in (i.get("selectedName", "")).lower()
             for i in items_payload
         )
+        suppress_inner_auto_add = is_exchange_of_exchange and customer_selecting_inner
 
         for item_idx, item_data in enumerate(items_payload):
             original_sku = item_data.get("originalSku", "")
@@ -3802,8 +3806,9 @@ def submit_exchange():
             })
 
             # ── LP Inner lookup ───────────────────────────────────────────────
-            # Skip entirely if the customer's own selections already include an inner belt
-            if customer_selecting_inner:
+            # Skip entirely if this is an exchange-of-exchange and the customer is
+            # already selecting an inner belt item directly
+            if suppress_inner_auto_add:
                 continue
 
             selected_is_onb = bool(re.search(r'-ONB$', selected_sku, re.IGNORECASE))
