@@ -1638,7 +1638,7 @@ async function buildExchangeBlock(data) {
         body: JSON.stringify({ parentProductId: pid })
       });
       const resp = await res.json();
-      exchangeOptionsCache[pid] = resp.options || [];
+      exchangeOptionsCache[pid] = resp.sameSkuOnly ? resp : (resp.options || []);
     } catch(e) {
       exchangeOptionsCache[pid] = [];
     }
@@ -1653,25 +1653,33 @@ async function buildExchangeBlock(data) {
     row.className = 'exchange-item-row' + (autoCheck ? ' checked' : '');
     row.id = 'ex-item-row-' + idx;
 
-    const allOpts = exchangeOptionsCache[item.parentProductId] || [];
-    const opts = allOpts.filter(o => o.sku !== item.sku);
-    let optionsHtml = '<option value="">Select a size/color…</option>';
-    if (opts.length === 0) {
-      optionsHtml = '<option value="">No other sizes available — contact us</option>';
-    } else {
-      opts.forEach(opt => {
-        optionsHtml += '<option value=\'' + JSON.stringify({sku: opt.sku, name: opt.name}).replace(/'/g, '&#39;') + '\'>' + displayName(opt.name) + '</option>';
-      });
-    }
+    const cachedOpts = exchangeOptionsCache[item.parentProductId] || [];
+    const isSameSku  = item.sameSkuExchange || (cachedOpts.sameSkuOnly === true);
 
-    const itemQty = item.quantity || 1;
-    let qtyHtml = '';
-    if (itemQty > 1) {
-      let qOpts = '';
-      for (let i = 1; i <= itemQty; i++) qOpts += '<option value="' + i + '">' + i + '</option>';
-      qtyHtml = '<select id="ex-item-qty-' + idx + '" style="margin-top:8px;">' + qOpts + '</select>';
+    let optionsWrapHtml;
+    if (isSameSku) {
+      const colors = cachedOpts.colorOptions || [];
+      const sizes  = cachedOpts.sizeOptions  || [];
+      let colorOpts = '<option value="">Select a color…</option>' + colors.map(c => '<option value="' + escHtml(c) + '">' + escHtml(c) + '</option>').join('');
+      let sizeOpts  = '<option value="">Select a size…</option>'  + sizes.map(s => '<option value="' + escHtml(s) + '">' + escHtml(s) + '</option>').join('');
+      optionsWrapHtml = '<select id="ex-item-color-' + idx + '">' + colorOpts + '</select>' +
+                        '<select id="ex-item-size-' + idx  + '">' + sizeOpts  + '</select>';
     } else {
-      qtyHtml = '<input type="hidden" id="ex-item-qty-' + idx + '" value="1">';
+      const allOpts = Array.isArray(cachedOpts) ? cachedOpts : [];
+      const opts = allOpts.filter(o => o.sku !== item.sku);
+      let optionsHtml = '<option value="">Select a size/color…</option>';
+      if (opts.length === 0) {
+        optionsHtml = '<option value="">No other sizes available — contact us</option>';
+      } else {
+        opts.forEach(opt => {
+          optionsHtml += '<option value=\'' + JSON.stringify({sku: opt.sku, name: opt.name}).replace(/'/g, '&#39;') + '\'>' + displayName(opt.name) + '</option>';
+        });
+      }
+      const itemQty = item.quantity || 1;
+      let qtyHtml = itemQty > 1
+        ? ('<select id="ex-item-qty-' + idx + '" style="margin-top:8px;">' + Array.from({length: itemQty}, (_, i) => '<option value="' + (i+1) + '">' + (i+1) + '</option>').join('') + '</select>')
+        : '<input type="hidden" id="ex-item-qty-' + idx + '" value="1">';
+      optionsWrapHtml = '<select id="ex-item-select-' + idx + '">' + optionsHtml + '</select>' + qtyHtml;
     }
 
     row.innerHTML =
@@ -1683,8 +1691,7 @@ async function buildExchangeBlock(data) {
         '</div>' +
       '</label>' +
       '<div class="ex-item-options-wrap' + (autoCheck ? '' : ' hidden') + '" id="ex-item-options-' + idx + '">' +
-        '<select id="ex-item-select-' + idx + '">' + optionsHtml + '</select>' +
-        qtyHtml +
+        optionsWrapHtml +
       '</div>';
 
     row.querySelector('#ex-item-check-' + idx).addEventListener('change', () => {
@@ -1713,9 +1720,26 @@ async function csSubmitExchange() {
 
   const items = (exchangeVerifyData && exchangeVerifyData.eligibleItems) || [];
   const selections = [];
+  const colorSizePrefixes = [];
   for (let idx = 0; idx < items.length; idx++) {
     const cb = document.getElementById('ex-item-check-' + idx);
     if (!cb || !cb.checked) continue;
+    const cachedOpts = exchangeOptionsCache[items[idx].parentProductId] || [];
+    const isSameSku  = items[idx].sameSkuExchange || (cachedOpts.sameSkuOnly === true);
+    if (isSameSku) {
+      const colorSel = document.getElementById('ex-item-color-' + idx);
+      const sizeSel  = document.getElementById('ex-item-size-' + idx);
+      const color = colorSel ? colorSel.value : '';
+      const size  = sizeSel  ? sizeSel.value  : '';
+      if (!color || !size) { noSelEl.style.display = 'block'; return; }
+      colorSizePrefixes.push(color + ' - ' + size);
+      selections.push({
+        originalSku: items[idx].sku, originalAirtableId: items[idx].airtableId,
+        selectedSku: items[idx].sku, selectedName: items[idx].name,
+        quantity: 1, parentProductId: items[idx].parentProductId,
+      });
+      continue;
+    }
     const sel = document.getElementById('ex-item-select-' + idx);
     const qtyEl = document.getElementById('ex-item-qty-' + idx);
     const qty = parseInt(qtyEl ? qtyEl.value : 1) || 1;
@@ -1733,6 +1757,8 @@ async function csSubmitExchange() {
   }
 
   if (selections.length === 0) { noSelEl.style.display = 'block'; return; }
+  const prefix = colorSizePrefixes.join('; ');
+  const csNotes = 'CS exception: size exchange outside 30-day window.' + (prefix ? ' Color/Size: ' + prefix : '');
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Submitting…';
@@ -1747,7 +1773,7 @@ async function csSubmitExchange() {
         customerEmail:       emailVal,
         customerName:        exchangeVerifyData.customerName,
         shipTo:              exchangeVerifyData.shipTo,
-        notes:               'CS exception: size exchange outside 30-day window.',
+        notes:               csNotes,
         nextSuffix:          exchangeVerifyData.nextSuffix || '-E',
         items:               selections,
       })
@@ -1843,7 +1869,7 @@ async function buildIntlExchangeBlock(data) {
         body: JSON.stringify({ parentProductId: pid })
       });
       const resp = await res.json();
-      intlOptionsCache[pid] = resp.options || [];
+      intlOptionsCache[pid] = resp.sameSkuOnly ? resp : (resp.options || []);
     } catch(e) {
       intlOptionsCache[pid] = [];
     }
@@ -1858,25 +1884,31 @@ async function buildIntlExchangeBlock(data) {
     row.className = 'exchange-item-row' + (autoCheck ? ' checked' : '');
     row.id = 'intl-item-row-' + idx;
 
-    const allOpts = intlOptionsCache[item.parentProductId] || [];
-    const opts = allOpts.filter(o => o.sku !== item.sku);
-    let optionsHtml = '<option value="">Select a size/color…</option>';
-    if (opts.length === 0) {
-      optionsHtml = '<option value="">No other sizes available</option>';
-    } else {
-      opts.forEach(opt => {
-        optionsHtml += '<option value=\'' + JSON.stringify({sku: opt.sku, name: opt.name}).replace(/'/g, '&#39;') + '\'>' + displayName(opt.name) + '</option>';
-      });
-    }
+    const intlCachedOpts = intlOptionsCache[item.parentProductId] || [];
+    const intlIsSameSku  = item.sameSkuExchange || (intlCachedOpts.sameSkuOnly === true);
 
-    const itemQty = item.quantity || 1;
-    let qtyHtml = '';
-    if (itemQty > 1) {
-      let qOpts = '';
-      for (let i = 1; i <= itemQty; i++) qOpts += '<option value="' + i + '">' + i + '</option>';
-      qtyHtml = '<select id="intl-item-qty-' + idx + '" style="margin-top:8px;">' + qOpts + '</select>';
+    let intlOptWrapHtml;
+    if (intlIsSameSku) {
+      const colors = intlCachedOpts.colorOptions || [];
+      const sizes  = intlCachedOpts.sizeOptions  || [];
+      intlOptWrapHtml = '<select id="intl-item-color-' + idx + '"><option value="">Select a color…</option>' + colors.map(c => '<option value="' + escHtml(c) + '">' + escHtml(c) + '</option>').join('') + '</select>' +
+                        '<select id="intl-item-size-'  + idx + '"><option value="">Select a size…</option>'  + sizes.map(s => '<option value="' + escHtml(s) + '">' + escHtml(s) + '</option>').join('') + '</select>';
     } else {
-      qtyHtml = '<input type="hidden" id="intl-item-qty-' + idx + '" value="1">';
+      const allOpts = Array.isArray(intlCachedOpts) ? intlCachedOpts : [];
+      const opts = allOpts.filter(o => o.sku !== item.sku);
+      let optionsHtml = '<option value="">Select a size/color…</option>';
+      if (opts.length === 0) {
+        optionsHtml = '<option value="">No other sizes available</option>';
+      } else {
+        opts.forEach(opt => {
+          optionsHtml += '<option value=\'' + JSON.stringify({sku: opt.sku, name: opt.name}).replace(/'/g, '&#39;') + '\'>' + displayName(opt.name) + '</option>';
+        });
+      }
+      const itemQty = item.quantity || 1;
+      let qtyHtml = itemQty > 1
+        ? ('<select id="intl-item-qty-' + idx + '" style="margin-top:8px;">' + Array.from({length: itemQty}, (_, i) => '<option value="' + (i+1) + '">' + (i+1) + '</option>').join('') + '</select>')
+        : '<input type="hidden" id="intl-item-qty-' + idx + '" value="1">';
+      intlOptWrapHtml = '<select id="intl-item-select-' + idx + '">' + optionsHtml + '</select>' + qtyHtml;
     }
 
     row.innerHTML =
@@ -1888,8 +1920,7 @@ async function buildIntlExchangeBlock(data) {
         '</div>' +
       '</label>' +
       '<div class="ex-item-options-wrap' + (autoCheck ? '' : ' hidden') + '" id="intl-item-options-' + idx + '">' +
-        '<select id="intl-item-select-' + idx + '">' + optionsHtml + '</select>' +
-        qtyHtml +
+        intlOptWrapHtml +
       '</div>';
 
     row.querySelector('#intl-item-check-' + idx).addEventListener('change', () => {
@@ -1925,9 +1956,21 @@ async function csSubmitIntlExchange() {
 
   const items = (intlVerifyData && intlVerifyData.eligibleItems) || [];
   const selections = [];
+  const intlColorSizePrefixes = [];
   for (let idx = 0; idx < items.length; idx++) {
     const cb = document.getElementById('intl-item-check-' + idx);
     if (!cb || !cb.checked) continue;
+    const intlCached = intlOptionsCache[items[idx].parentProductId] || [];
+    if (items[idx].sameSkuExchange || intlCached.sameSkuOnly) {
+      const color = (document.getElementById('intl-item-color-' + idx) || {}).value || '';
+      const size  = (document.getElementById('intl-item-size-'  + idx) || {}).value || '';
+      if (!color || !size) { noSelEl.style.display = 'block'; return; }
+      intlColorSizePrefixes.push(color + ' - ' + size);
+      selections.push({ originalSku: items[idx].sku, originalName: items[idx].name,
+        selectedSku: items[idx].sku, selectedName: items[idx].name,
+        quantity: 1, parentProductId: items[idx].parentProductId });
+      continue;
+    }
     const sel = document.getElementById('intl-item-select-' + idx);
     const qtyEl = document.getElementById('intl-item-qty-' + idx);
     const qty = parseInt(qtyEl ? qtyEl.value : 1) || 1;
@@ -1945,6 +1988,9 @@ async function csSubmitIntlExchange() {
   }
 
   if (selections.length === 0) { noSelEl.style.display = 'block'; return; }
+  if (intlColorSizePrefixes.length) {
+    selections.forEach(s => { if (s.selectedSku === s.originalSku) s.selectedName += ' [' + intlColorSizePrefixes.join('; ') + ']'; });
+  }
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Generating…';

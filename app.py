@@ -1390,6 +1390,7 @@ def cs_verify_exchange():
             formula="{Can Exchange}=TRUE()",
         )
         eligible_parent_ids = set()
+        eligible_parent_ids.update(SAME_SKU_EXCHANGE_PARENT_IDS)  # same-SKU exchange
         for opt in all_exchange_options:
             for pid in opt["fields"].get("Parent Product", []):
                 eligible_parent_ids.add(pid)
@@ -1420,6 +1421,7 @@ def cs_verify_exchange():
                 "quantity":        int(item.get("quantity", 1)),
                 "airtableId":      rec["id"],
                 "parentProductId": parent_product_id,
+                "sameSkuExchange": parent_product_id in SAME_SKU_EXCHANGE_PARENT_IDS,
             })
 
         if not eligible_items:
@@ -1521,6 +1523,7 @@ def cs_verify_intl_exchange():
             formula="{Can Exchange}=TRUE()",
         )
         eligible_parent_ids = set()
+        eligible_parent_ids.update(SAME_SKU_EXCHANGE_PARENT_IDS)  # same-SKU exchange
         for opt in all_exchange_options:
             for pid in opt["fields"].get("Parent Product", []):
                 eligible_parent_ids.add(pid)
@@ -1551,6 +1554,7 @@ def cs_verify_intl_exchange():
                 "quantity":        int(item.get("quantity", 1)),
                 "airtableId":      rec["id"],
                 "parentProductId": parent_product_id,
+                "sameSkuExchange": parent_product_id in SAME_SKU_EXCHANGE_PARENT_IDS,
             })
 
         if not eligible_items:
