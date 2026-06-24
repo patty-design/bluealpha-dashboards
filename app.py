@@ -4598,7 +4598,7 @@ def _fetch_quote_data(record_id):
 
 
 _CATALOG_CACHE      = {"data": None, "ts": 0}
-_CATALOG_TTL        = 1800  # 30 minutes
+_CATALOG_TTL        = 86400  # 24 hours (manual refresh via admin button)
 _CATALOG_REFRESHING = False  # prevent duplicate background refreshes
 
 
