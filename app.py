@@ -3416,7 +3416,10 @@ def budget_parent_page():
 
 @app.route("/exchange")
 def exchange_portal():
-    return send_from_directory("static", "exchange.html")
+    resp = send_from_directory("static", "exchange.html")
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Budget Cloud Sync API
