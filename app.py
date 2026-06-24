@@ -12799,7 +12799,7 @@ def anniversary_admin_data():
     try:
         award_records = at_get_all(
             ANNIVERSARY_AWARDS_TABLE_ID, read_token,
-            fields=["Name", "Points", "Category", "Product URL", "Image", "Active", "Qty Ordered", "Qty Ordered 6/24"],
+            fields=["Name", "Points", "Category", "Product URL", "Image", "Active", "Qty Ordered 6/23", "Qty Ordered 6/24"],
             base_id=ANNIVERSARY_BASE_ID,
         )
         for rec in award_records:
@@ -12817,7 +12817,7 @@ def anniversary_admin_data():
                 "product_url":    f.get("Product URL") or "",
                 "image_url":      img_url,
                 "qty_needed":     award_totals.get(name, {}).get("qty", 0),
-                "qty_ordered":    f.get("Qty Ordered", None),
+                "qty_ordered":    f.get("Qty Ordered 6/23", None),
                 "qty_ordered_624": f.get("Qty Ordered 6/24", None),
             })
     except Exception as e:
@@ -12850,7 +12850,7 @@ def anniversary_admin_set_qty_ordered():
         return Response(json.dumps({"error": "record_id required"}), status=400, headers=c, mimetype="application/json")
 
     field_map = {
-        "qty_ordered":     "Qty Ordered",
+        "qty_ordered":     "Qty Ordered 6/23",
         "qty_ordered_624": "Qty Ordered 6/24",
     }
     at_field = field_map.get(field_key)
