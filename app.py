@@ -12799,7 +12799,7 @@ def anniversary_admin_data():
     try:
         award_records = at_get_all(
             ANNIVERSARY_AWARDS_TABLE_ID, read_token,
-            fields=["Name", "Points", "Category", "Product URL", "Image", "Active", "Qty Ordered"],
+            fields=["Name", "Points", "Category", "Product URL", "Image", "Active", "Qty Ordered", "Qty Ordered 6/24"],
             base_id=ANNIVERSARY_BASE_ID,
         )
         for rec in award_records:
@@ -12810,14 +12810,15 @@ def anniversary_admin_data():
             img_url = images[0].get("url", "") if images else ""
             name = f.get("Name", "")
             awards_catalog.append({
-                "record_id":   rec["id"],
-                "name":        name,
-                "points":      int(f.get("Points") or 0),
-                "category":    f.get("Category", ""),
-                "product_url": f.get("Product URL") or "",
-                "image_url":   img_url,
-                "qty_needed":  award_totals.get(name, {}).get("qty", 0),
-                "qty_ordered": f.get("Qty Ordered", None),
+                "record_id":      rec["id"],
+                "name":           name,
+                "points":         int(f.get("Points") or 0),
+                "category":       f.get("Category", ""),
+                "product_url":    f.get("Product URL") or "",
+                "image_url":      img_url,
+                "qty_needed":     award_totals.get(name, {}).get("qty", 0),
+                "qty_ordered":    f.get("Qty Ordered", None),
+                "qty_ordered_624": f.get("Qty Ordered 6/24", None),
             })
     except Exception as e:
         print(f"[anniversary_admin] awards catalog error: {e}")
@@ -12833,17 +12834,28 @@ def anniversary_admin_data():
 
 @app.route("/api/anniversary/admin/qty-ordered", methods=["POST", "OPTIONS"])
 def anniversary_admin_set_qty_ordered():
-    """Save Qty Ordered for an award back to Airtable."""
+    """Save Qty Ordered or Qty Ordered 6/24 for an award back to Airtable.
+    Expects JSON: { record_id, qty, field } where field is 'qty_ordered' or 'qty_ordered_624'.
+    """
     if request.method == "OPTIONS":
         return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type",
                                      "Access-Control-Allow-Methods": "POST"})
     c = cors()
     data      = request.get_json(force=True) or {}
     record_id = data.get("record_id", "").strip()
-    qty       = data.get("qty")  # None = clear, int = set
+    qty       = data.get("qty")
+    field_key = data.get("field", "qty_ordered_624")
 
     if not record_id:
         return Response(json.dumps({"error": "record_id required"}), status=400, headers=c, mimetype="application/json")
+
+    field_map = {
+        "qty_ordered":     "Qty Ordered",
+        "qty_ordered_624": "Qty Ordered 6/24",
+    }
+    at_field = field_map.get(field_key)
+    if not at_field:
+        return Response(json.dumps({"error": "invalid field"}), status=400, headers=c, mimetype="application/json")
 
     write_token = os.environ.get("SO_TRACKING_WRITE_TOKEN", "")
     patch_val   = int(qty) if qty is not None and qty != "" else None
@@ -12851,7 +12863,7 @@ def anniversary_admin_set_qty_ordered():
         r = req_lib.patch(
             f"https://api.airtable.com/v0/{ANNIVERSARY_BASE_ID}/{ANNIVERSARY_AWARDS_TABLE_ID}/{record_id}",
             headers={**at_headers(write_token), "Content-Type": "application/json"},
-            json={"fields": {"Qty Ordered": patch_val}},
+            json={"fields": {at_field: patch_val}},
             timeout=10,
         )
         if not r.ok:

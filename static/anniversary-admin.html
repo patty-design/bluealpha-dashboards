@@ -155,7 +155,7 @@
     </div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th style="width:56px"></th><th>Award</th><th>Points</th><th>Total Awarded</th><th>Qty Ordered 6/23</th></tr></thead>
+        <thead><tr><th style="width:56px"></th><th>Award</th><th>Points</th><th>Total Awarded</th><th>Qty Ordered 6/23</th><th>Qty Ordered 6/24</th></tr></thead>
         <tbody id="totals-body"><tr><td colspan="5" class="loading-msg">Loading…</td></tr></tbody>
       </table>
     </div>
@@ -309,26 +309,27 @@ function renderSummary() {
 // Debounce timers keyed by record_id
 const _qtyDebounce = {};
 
-async function saveQtyOrdered(recordId, val) {
+async function saveQtyOrdered(recordId, val, field) {
   const qty = (val === '' || val === null) ? null : parseInt(val, 10);
   try {
     await fetch('/api/anniversary/admin/qty-ordered', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ record_id: recordId, qty }),
+      body: JSON.stringify({ record_id: recordId, qty, field }),
     });
   } catch(e) {
     console.warn('qty-ordered save failed', e);
   }
 }
 
-function onQtyInput(recordId, val) {
+function onQtyInput(recordId, val, field) {
   // Update catalog in memory immediately so re-renders don't clobber the input
   const award = _awardsCatalog.find(a => a.record_id === recordId);
-  if (award) award.qty_ordered = (val === '' ? null : parseInt(val, 10));
+  if (award) award[field] = (val === '' ? null : parseInt(val, 10));
   // Debounce the Airtable write by 800ms
-  clearTimeout(_qtyDebounce[recordId]);
-  _qtyDebounce[recordId] = setTimeout(() => saveQtyOrdered(recordId, val), 800);
+  const debounceKey = recordId + field;
+  clearTimeout(_qtyDebounce[debounceKey]);
+  _qtyDebounce[debounceKey] = setTimeout(() => saveQtyOrdered(recordId, val, field), 800);
 }
 
 function renderTotals() {
@@ -342,8 +343,9 @@ function renderTotals() {
     return (b.points - a.points) || a.name.localeCompare(b.name);
   });
   tbody.innerHTML = sorted.map(award => {
-    const { record_id, name, points, image_url, product_url, qty_needed, qty_ordered } = award;
-    const ordered  = qty_ordered !== null && qty_ordered !== undefined ? qty_ordered : '';
+    const { record_id, name, points, image_url, product_url, qty_needed, qty_ordered, qty_ordered_624 } = award;
+    const ordered623 = qty_ordered !== null && qty_ordered !== undefined ? qty_ordered : '—';
+    const ordered624 = qty_ordered_624 !== null && qty_ordered_624 !== undefined ? qty_ordered_624 : '';
     const imgCell  = image_url
       ? `<img src="${image_url}" style="width:48px;height:48px;object-fit:contain;border-radius:4px;">`
       : `<div style="width:48px;height:48px;background:#f0f0f0;border-radius:4px;"></div>`;
@@ -357,9 +359,10 @@ function renderTotals() {
       <td>${nameCell}</td>
       <td><span class="pts-badge">${points}pt</span></td>
       <td style="${qtyStyle}">${qty_needed > 0 ? qty_needed : '—'}</td>
-      <td><input type="number" min="0" value="${ordered}" placeholder="—"
+      <td style="text-align:center;color:#555;font-weight:600;">${ordered623}</td>
+      <td><input type="number" min="0" value="${ordered624}" placeholder="—"
            style="width:70px;padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:0.9rem;text-align:center;"
-           oninput="onQtyInput('${safeId}', this.value.trim())"></td>
+           oninput="onQtyInput('${safeId}', this.value.trim(), 'qty_ordered_624')"></td>
     </tr>`;
   }).join('');
 }
