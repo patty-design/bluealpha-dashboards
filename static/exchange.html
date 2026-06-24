@@ -417,6 +417,9 @@
 
 <script>
 const API_BASE = '';
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 let verifyData = null;         // full response from /api/verify-exchange
 let selectedItem = null;       // { name, sku, airtableId, parentProductId }
 let optionsCache = {};         // parentProductId → filtered options array
