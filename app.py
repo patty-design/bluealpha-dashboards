@@ -12799,7 +12799,7 @@ def anniversary_admin_data():
     try:
         award_records = at_get_all(
             ANNIVERSARY_AWARDS_TABLE_ID, read_token,
-            fields=["Name", "Points", "Category", "Product URL", "Image", "Active"],
+            fields=["Name", "Points", "Category", "Product URL", "Image", "Active", "Qty Ordered"],
             base_id=ANNIVERSARY_BASE_ID,
         )
         for rec in award_records:
@@ -12810,12 +12810,14 @@ def anniversary_admin_data():
             img_url = images[0].get("url", "") if images else ""
             name = f.get("Name", "")
             awards_catalog.append({
+                "record_id":   rec["id"],
                 "name":        name,
                 "points":      int(f.get("Points") or 0),
                 "category":    f.get("Category", ""),
                 "product_url": f.get("Product URL") or "",
                 "image_url":   img_url,
                 "qty_needed":  award_totals.get(name, {}).get("qty", 0),
+                "qty_ordered": f.get("Qty Ordered", None),
             })
     except Exception as e:
         print(f"[anniversary_admin] awards catalog error: {e}")
@@ -12827,3 +12829,34 @@ def anniversary_admin_data():
         "shirt_totals":   shirt_totals_sorted,
         "unmatched_form": unmatched,
     }), headers=c, mimetype="application/json")
+
+
+@app.route("/api/anniversary/admin/qty-ordered", methods=["POST", "OPTIONS"])
+def anniversary_admin_set_qty_ordered():
+    """Save Qty Ordered for an award back to Airtable."""
+    if request.method == "OPTIONS":
+        return Response("", headers={**cors(), "Access-Control-Allow-Headers": "Content-Type",
+                                     "Access-Control-Allow-Methods": "POST"})
+    c = cors()
+    data      = request.get_json(force=True) or {}
+    record_id = data.get("record_id", "").strip()
+    qty       = data.get("qty")  # None = clear, int = set
+
+    if not record_id:
+        return Response(json.dumps({"error": "record_id required"}), status=400, headers=c, mimetype="application/json")
+
+    write_token = os.environ.get("SO_TRACKING_WRITE_TOKEN", "")
+    patch_val   = int(qty) if qty is not None and qty != "" else None
+    try:
+        r = req_lib.patch(
+            f"https://api.airtable.com/v0/{ANNIVERSARY_BASE_ID}/{ANNIVERSARY_AWARDS_TABLE_ID}/{record_id}",
+            headers={**at_headers(write_token), "Content-Type": "application/json"},
+            json={"fields": {"Qty Ordered": patch_val}},
+            timeout=10,
+        )
+        if not r.ok:
+            return Response(json.dumps({"error": f"Airtable error: {r.status_code}"}),
+                            status=500, headers=c, mimetype="application/json")
+        return Response(json.dumps({"ok": True}), headers=c, mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, headers=c, mimetype="application/json")

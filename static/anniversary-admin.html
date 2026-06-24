@@ -306,16 +306,29 @@ function renderSummary() {
   }).join('');
 }
 
-const QTY_ORDERED_KEY = 'anniversary_qty_ordered';
+// Debounce timers keyed by record_id
+const _qtyDebounce = {};
 
-function getQtyOrdered() {
-  try { return JSON.parse(localStorage.getItem(QTY_ORDERED_KEY) || '{}'); } catch { return {}; }
+async function saveQtyOrdered(recordId, val) {
+  const qty = (val === '' || val === null) ? null : parseInt(val, 10);
+  try {
+    await fetch('/api/anniversary/admin/qty-ordered', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ record_id: recordId, qty }),
+    });
+  } catch(e) {
+    console.warn('qty-ordered save failed', e);
+  }
 }
 
-function setQtyOrdered(name, val) {
-  const data = getQtyOrdered();
-  if (val === '' || val === null) { delete data[name]; } else { data[name] = val; }
-  localStorage.setItem(QTY_ORDERED_KEY, JSON.stringify(data));
+function onQtyInput(recordId, val) {
+  // Update catalog in memory immediately so re-renders don't clobber the input
+  const award = _awardsCatalog.find(a => a.record_id === recordId);
+  if (award) award.qty_ordered = (val === '' ? null : parseInt(val, 10));
+  // Debounce the Airtable write by 800ms
+  clearTimeout(_qtyDebounce[recordId]);
+  _qtyDebounce[recordId] = setTimeout(() => saveQtyOrdered(recordId, val), 800);
 }
 
 function renderTotals() {
@@ -328,31 +341,25 @@ function renderTotals() {
     if (_awardSort === 'name') return a.name.localeCompare(b.name);
     return (b.points - a.points) || a.name.localeCompare(b.name);
   });
-  const qtyOrdered = getQtyOrdered();
   tbody.innerHTML = sorted.map(award => {
-    const { name, points, image_url, product_url, qty_needed } = award;
-    const ordered   = qtyOrdered[name] !== undefined ? qtyOrdered[name] : '';
-    const safeName  = name.replace(/"/g, '&quot;');
-    const imgCell   = image_url
+    const { record_id, name, points, image_url, product_url, qty_needed, qty_ordered } = award;
+    const ordered  = qty_ordered !== null && qty_ordered !== undefined ? qty_ordered : '';
+    const imgCell  = image_url
       ? `<img src="${image_url}" style="width:48px;height:48px;object-fit:contain;border-radius:4px;">`
       : `<div style="width:48px;height:48px;background:#f0f0f0;border-radius:4px;"></div>`;
-    const nameCell  = product_url
+    const nameCell = product_url
       ? `<a href="${product_url}" target="_blank" rel="noopener" style="color:var(--navy);font-weight:600;">${name} ↗</a>`
       : `<span style="font-weight:600;">${name}</span>`;
-    const qtyStyle  = qty_needed > 0 ? 'font-weight:900;color:var(--navy);' : 'color:#aaa;';
+    const qtyStyle = qty_needed > 0 ? 'font-weight:900;color:var(--navy);' : 'color:#aaa;';
+    const safeId   = record_id.replace(/"/g, '&quot;');
     return `<tr>
       <td style="text-align:center;">${imgCell}</td>
       <td>${nameCell}</td>
       <td><span class="pts-badge">${points}pt</span></td>
       <td style="${qtyStyle}">${qty_needed > 0 ? qty_needed : '—'}</td>
-      <td>${award.category === 'Gift Card'
-        ? `<input type="number" min="0" value="${ordered}" placeholder="—"
-             style="width:70px;padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:0.9rem;text-align:center;"
-             onchange="setQtyOrdered('${safeName}', this.value.trim())"
-             oninput="setQtyOrdered('${safeName}', this.value.trim())">`
-        : `<input type="number" min="0" value="${ordered}" placeholder="—" disabled
-             style="width:70px;padding:4px 8px;border:1px solid #eee;border-radius:4px;font-size:0.9rem;text-align:center;background:#f5f5f5;color:#aaa;cursor:not-allowed;">`
-      }</td>
+      <td><input type="number" min="0" value="${ordered}" placeholder="—"
+           style="width:70px;padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:0.9rem;text-align:center;"
+           oninput="onQtyInput('${safeId}', this.value.trim())"></td>
     </tr>`;
   }).join('');
 }
