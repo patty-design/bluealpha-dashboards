@@ -543,7 +543,9 @@ async function buildStep2(data) {
         body: JSON.stringify({ parentProductId: pid })
       });
       const data = await res.json();
-      optionsCache[pid] = data.options || [];
+      // sameSkuOnly parents return {sameSkuOnly, colorOptions, sizeOptions}
+      // normal parents return {options: [...]}
+      optionsCache[pid] = data.sameSkuOnly ? data : (data.options || []);
     } catch(e) {
       optionsCache[pid] = [];
     }
@@ -566,8 +568,11 @@ async function buildStep2(data) {
         </div>
       </label>
       <div class="item-options-wrap ${autoCheck ? '' : 'hidden'}" id="item-options-${idx}">
-        <select id="item-select-${idx}"></select>
-        <select id="item-qty-${idx}" style="display:none"></select>
+        ${item.sameSkuExchange
+          ? `<select id="item-color-${idx}"><option value="">Select a color…</option></select>
+             <select id="item-size-${idx}"><option value="">Select a size…</option></select>`
+          : `<select id="item-select-${idx}"></select>
+             <select id="item-qty-${idx}" style="display:none"></select>`}
       </div>`;
     row.querySelector(`#item-check-${idx}`).addEventListener('change', () => onItemChecked(idx));
     list.appendChild(row);
@@ -607,6 +612,24 @@ function detectBuckle(sku, name) {
 }
 
 function populateItemSelect(idx, item) {
+  // Same-SKU exchange: populate color + size dropdowns
+  if (item.sameSkuExchange) {
+    const data   = optionsCache[item.parentProductId] || {};
+    const colors = data.colorOptions || [];
+    const sizes  = data.sizeOptions  || [];
+    const colorSel = document.getElementById(`item-color-${idx}`);
+    const sizeSel  = document.getElementById(`item-size-${idx}`);
+    if (colorSel) {
+      colorSel.innerHTML = '<option value="">Select a color…</option>' +
+        colors.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+    }
+    if (sizeSel) {
+      sizeSel.innerHTML = '<option value="">Select a size…</option>' +
+        sizes.map(s => `<option value="${escHtml(s)}">${escHtml(s)}</option>`).join('');
+    }
+    return;
+  }
+
   const sel    = document.getElementById(`item-select-${idx}`);
   const qtySel = document.getElementById(`item-qty-${idx}`);
 
@@ -651,7 +674,6 @@ function populateItemSelect(idx, item) {
 // ── Submit Exchange ───────────────────────────────────────────────────────────
 async function submitExchange() {
   const btn      = document.getElementById('btn-submit');
-  const notes    = document.getElementById('notes').value.trim();
   const emailVal = document.getElementById('confirm-email').value.trim();
   const noSelEl  = document.getElementById('msg-no-selection');
   const errEl    = document.getElementById('msg-submit-error');
@@ -662,9 +684,33 @@ async function submitExchange() {
   // Collect all checked items
   const items = verifyData.eligibleItems || [];
   const selections = [];
+  const colorSizePrefixes = [];  // for same-SKU items
   for (let idx = 0; idx < items.length; idx++) {
     const cb  = document.getElementById(`item-check-${idx}`);
     if (!cb || !cb.checked) continue;
+
+    if (items[idx].sameSkuExchange) {
+      // Same-SKU exchange: validate color + size dropdowns
+      const colorSel = document.getElementById(`item-color-${idx}`);
+      const sizeSel  = document.getElementById(`item-size-${idx}`);
+      const color = colorSel ? colorSel.value : '';
+      const size  = sizeSel  ? sizeSel.value  : '';
+      if (!color || !size) {
+        noSelEl.classList.remove('hidden'); noSelEl.classList.add('show');
+        return;
+      }
+      colorSizePrefixes.push(`${color} - ${size}`);
+      selections.push({
+        originalSku:        items[idx].sku,
+        originalAirtableId: items[idx].airtableId,
+        selectedSku:        items[idx].sku,   // same SKU
+        selectedName:       items[idx].name,  // same name
+        quantity:           1,
+        parentProductId:    items[idx].parentProductId,
+      });
+      continue;
+    }
+
     const sel = document.getElementById(`item-select-${idx}`);
     const qty = parseInt(document.getElementById(`item-qty-${idx}`).value) || 1;
     const val = sel ? sel.value : '';
@@ -688,6 +734,14 @@ async function submitExchange() {
     noSelEl.classList.remove('hidden'); noSelEl.classList.add('show');
     return;
   }
+
+  // Prepend color/size selections to notes (format: "Ranger Green - 32; customer notes")
+  const prefix = colorSizePrefixes.join('; ');
+  const notes  = prefix
+    ? (document.getElementById('notes').value.trim()
+        ? `${prefix}; ${document.getElementById('notes').value.trim()}`
+        : prefix)
+    : document.getElementById('notes').value.trim();
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Submitting…';

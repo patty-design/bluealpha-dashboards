@@ -3573,6 +3573,8 @@ def verify_exchange():
         for opt in all_exchange_options:
             for pid in opt["fields"].get("Parent Product", []):
                 eligible_parent_ids.add(pid)
+        # Always allow same-SKU exchange parents even if no Can Exchange SKUs set
+        eligible_parent_ids.update(SAME_SKU_EXCHANGE_PARENT_IDS)
 
         print(f"[verify-exchange] eligible_parent_ids ({len(eligible_parent_ids)}): {eligible_parent_ids}")
         eligible_items = []
@@ -3622,6 +3624,7 @@ def verify_exchange():
                 "quantity":        int(item.get("quantity", 1)),
                 "airtableId":      rec["id"],
                 "parentProductId": parent_product_id,
+                "sameSkuExchange": parent_product_id in SAME_SKU_EXCHANGE_PARENT_IDS,
             })
 
         if not eligible_items:
@@ -3702,6 +3705,37 @@ def exchange_options():
 
     try:
         airtable_read_token = AIRTABLE_OPS_TOKEN or RETURNS_WRITE_TOKEN
+
+        # Same-SKU exchange: return color/size dropdowns from the parent product's variations
+        if parent_product_id in SAME_SKU_EXCHANGE_PARENT_IDS:
+            parent_r = req_lib.get(
+                f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{PARENT_PRODUCTS_TABLE_ID}/{parent_product_id}",
+                headers=at_headers(airtable_read_token), timeout=10,
+            )
+            pf = parent_r.json().get("fields", {})
+            color_options, size_options = [], []
+            for cid in pf.get("Color Variations", []):
+                cr = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{COLORS_TABLE_ID}/{cid}",
+                    headers=at_headers(airtable_read_token), timeout=10,
+                )
+                name = cr.json().get("fields", {}).get("Name", "").strip()
+                if name:
+                    color_options.append(name)
+            for sid in pf.get("Size Variations", []):
+                sr = req_lib.get(
+                    f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{SIZES_TABLE_ID}/{sid}",
+                    headers=at_headers(airtable_read_token), timeout=10,
+                )
+                name = sr.json().get("fields", {}).get("Name", "").strip()
+                if name and name.lower() not in ("none", "n/a", "one size"):
+                    size_options.append(name)
+            return Response(json.dumps({
+                "sameSkuOnly":  True,
+                "colorOptions": color_options,
+                "sizeOptions":  size_options,
+            }), headers=c, mimetype="application/json")
+
         records = at_get_all(
             PRODUCT_SKUS_TABLE_ID,
             airtable_read_token,
@@ -4793,6 +4827,13 @@ threading.Thread(target=_refresh_catalog_bg, daemon=True).start()
 # Parent product Airtable IDs whose exchange selections are outer-only SKUs (no components),
 # but still require an LP inner belt to be added to the exchange order.
 # These use the same LP INNER ONLY Belt color+size lookup as the ONB path.
+# Outer-only SKUs that exchange for the exact same SKU (customer picks color/size via dropdowns)
+SAME_SKU_EXCHANGE_SKUS = {"BAG-2946", "BAG-2947", "BAG-2948", "BAG-2949"}
+SAME_SKU_EXCHANGE_PARENT_IDS = {
+    "recgRB1lD5pz1XyAt",  # 1.75" Standard Belt Outer Only
+    "recWdIikdBGidXXJl",  # 1.75" MOLLE Battle Belt Outer Only
+}
+
 _LP_INNER_REQUIRED_PARENT_IDS = {
     "recMx2geTxsMGq4H8",  # 1.75" Battle Belt - Aluminum COBRA® Buckle
     "recyoI521Kdbbkz6x",  # 1.75" Battle Belt - D-ring COBRA® Buckle
